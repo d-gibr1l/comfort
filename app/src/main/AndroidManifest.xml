@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only needed on API 24-28; API 29+ (scoped storage) writes to the gallery via MediaStore without it. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <!-- Download progress/completion notifications, and keeping the download alive as a foreground service. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:windowSoftInputMode="adjustResize"
+        android:theme="@style/Theme.GalleryDL">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Lets other apps (Twitter, Instagram, a browser, ...) share a link straight into the
+             download flow via their own Share sheet. Handled by a separate, transparent-themed
+             activity (rather than MainActivity) so it renders as a bottom sheet floating over
+             whatever app the user was in, instead of visibly switching to this app. -->
+        <activity
+            android:name=".ShareActivity"
+            android:exported="true"
+            android:theme="@style/Theme.GalleryDL.Transparent"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Direct link taps (not just Share) for the sites Home advertises as supported,
+                 so e.g. tapping a Twitter/Instagram/Pixiv link opens the picker instead of a
+                 browser. Deliberately not an exhaustive host list (gallery-dl supports hundreds
+                 of sites) — broader coverage here means more "which app" prompts on links that
+                 have nothing to do with downloading. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="twitter.com" />
+                <data android:scheme="https" android:host="x.com" />
+                <data android:scheme="https" android:host="www.twitter.com" />
+                <data android:scheme="https" android:host="www.x.com" />
+                <data android:scheme="https" android:host="instagram.com" />
+                <data android:scheme="https" android:host="www.instagram.com" />
+                <data android:scheme="https" android:host="pixiv.net" />
+                <data android:scheme="https" android:host="www.pixiv.net" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".worker.DownloadActionReceiver"
+            android:exported="false" />
+
+        <!-- WorkManager's own service, declared here only to add the foregroundServiceType that
+             DownloadWorker's ForegroundInfo requires on API 34+; without a matching declaration
+             here, setForeground() throws "foregroundServiceType is not a subset of ... manifest". -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+    </application>
+
+</manifest>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.GalleryDL" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Used only by ShareActivity: a fullscreen but see-through window so the app it was
+         shared from (Twitter, Reddit, a browser, ...) stays visible behind the picker sheet,
+         instead of a normal opaque Activity transition that reads as "leaving" that app. -->
+    <style name="Theme.GalleryDL.Transparent" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+    </style>
+</resources>
