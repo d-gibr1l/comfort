@@ -50,8 +50,8 @@ fun QueueScreen(
 ) {
     val queueItems by viewModel.queueFlow.collectAsState()
     val isGloballyPaused by viewModel.isGloballyPaused.collectAsState()
-    var selectedFilter by remember { mutableStateOf("All") }
-    val filters = listOf("All", "Running", "In Queue", "Paused", "Errored", "Cancelled")
+    var selectedFilter by remember { mutableStateOf("Running") }
+    val filters = listOf("Running", "In Queue", "Paused", "Errored", "Cancelled")
 
     // The "Add cookies" error-card action opens this for the failing item's own site, then
     // retries that same download once cookies are extracted.
@@ -77,7 +77,8 @@ fun QueueScreen(
     val showResumeAction = isGloballyPaused || (!hasActiveDownload && hasPausedDownload)
 
     // Hoisted above the Scaffold so the FAB can react to both the current filter tab (Errored/
-    // Cancelled get "Retry All" instead of Pause/Resume) and what's actually in it.
+    // Cancelled get "Retry All" instead of Pause/Resume) and what's actually in it. No more
+    // catch-all "All" tab — every status has its own explicit chip now, so this is exhaustive.
     val filteredItems = queueItems.filter { item ->
         when (selectedFilter) {
             "Running" -> item.status == DownloadStatus.RUNNING
@@ -85,9 +86,7 @@ fun QueueScreen(
             "Paused" -> item.status == DownloadStatus.PAUSED
             "Errored" -> item.status == DownloadStatus.ERRORED
             "Cancelled" -> item.status == DownloadStatus.CANCELLED
-            // Errored/Cancelled downloads need an explicit look, not a spot in the
-            // catch-all view — they stay reachable only via their own chips.
-            else -> item.status != DownloadStatus.ERRORED && item.status != DownloadStatus.CANCELLED
+            else -> false
         }
     }
     val retryAllStatus = when (selectedFilter) {
