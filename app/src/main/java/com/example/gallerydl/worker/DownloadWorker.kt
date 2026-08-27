@@ -14,19 +14,13 @@ import com.example.gallerydl.data.VideoQuality
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.util.FfmpegRuntime
 import com.example.gallerydl.util.GalleryDlListing
-import com.example.gallerydl.util.PythonEngineLock
 import com.example.gallerydl.util.MediaStoreHelper
+import com.example.gallerydl.util.PythonRuntime
 import com.example.gallerydl.util.QuickJsRuntime
-import com.chaquo.python.Python
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.CoroutineScope
 import java.io.File
-import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -99,9 +93,6 @@ class DownloadWorker(
                     return@withContext Result.success()
                 }
 
-                val python = Python.getInstance()
-                val galleryWrapper = python.getModule("gallery_dl_wrapper")
-                val ytDlpWrapper = python.getModule("yt_dlp_wrapper")
                 val cookiesPath = applicationContext.filesDir.resolve("cookies.txt")
 
                 // gallery-dl needs a real filesystem path to write to; stage downloads here,
@@ -115,15 +106,6 @@ class DownloadWorker(
                 // gets saved, so a real cause (blocked, login required, no formats found, ...) is
                 // visible instead of every failure looking identical.
                 val lastErrorLine = java.util.concurrent.atomic.AtomicReference<String?>(null)
-                val callbackScope = CoroutineScope(Dispatchers.IO)
-                val pendingJobs = Collections.synchronizedList(mutableListOf<Job>())
-
-                // gallery-dl's download() call below is synchronous/blocking (a direct JNI call
-                // into Python), so cancelling this coroutine's Job has no effect on it — there's
-                // no suspension point for that cancellation to land on until the call returns on
-                // its own. Passing isStopped down as a poll-able flag lets the Python side notice
-                // a Pause/Cancel and interrupt itself instead of running the whole gallery to completion.
-                val shouldCancel = { isStopped }
 
                 // The placeholder title set at enqueue time (see DownloadDispatcher) always starts
                 // this way — used below to tell "still showing the placeholder" apart from "the
@@ -139,7 +121,11 @@ class DownloadWorker(
                 // [thumbnail] branch below) rather than being blocked by an already-filled slot.
                 val singleItemDownload = (entity?.totalItems ?: 1) <= 1
 
-                val actualCallback = { line: String ->
+                // suspend, not a plain lambda — PythonRuntime's onLine has no JNI-reentrancy
+                // constraint (unlike Chaquopy's old synchronous callback), so every DB write below
+                // is a direct, awaited suspend call instead of a fire-and-launch job collected into
+                // a separate list and joined afterward.
+                val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     android.util.Log.d("DownloadEngine", "Python output: $line")
                     when {
                         // yt-dlp-only signals (see yt_dlp_wrapper.py's progress_hook) — gallery-dl
@@ -147,9 +133,7 @@ class DownloadWorker(
                         // branch and keep using the item-count progress path below untouched.
                         line.startsWith("[size] ") -> {
                             val bytes = line.removePrefix("[size] ").trim().toLongOrNull()
-                            if (bytes != null) {
-                                pendingJobs.add(callbackScope.launch { dao.setExpectedBytes(downloadId, bytes) })
-                            }
+                            if (bytes != null) dao.setExpectedBytes(downloadId, bytes)
                         }
                         line.startsWith("[progress] ") -> {
                             val rest = line.removePrefix("[progress] ")
@@ -157,7 +141,7 @@ class DownloadWorker(
                             val speedBps = Regex("speed=([\\d.]+)").find(rest)?.groupValues?.get(1)?.toFloatOrNull()
                             if (downloaded != null) {
                                 val speedMbs = (speedBps ?: 0f) / (1024f * 1024f)
-                                pendingJobs.add(callbackScope.launch { dao.updateLiveBytes(downloadId, downloaded, speedMbs) })
+                                dao.updateLiveBytes(downloadId, downloaded, speedMbs)
                             }
                         }
                         line.startsWith("[thumbnail] ") -> {
@@ -168,9 +152,7 @@ class DownloadWorker(
                             // resumed/retried download; the real local file still wins over this
                             // remote preview once it lands, via the singleItemDownload check below.
                             val thumbUrl = line.removePrefix("[thumbnail] ").trim()
-                            if (thumbUrl.isNotBlank()) {
-                                pendingJobs.add(callbackScope.launch { dao.setThumbnailIfAbsent(downloadId, thumbUrl) })
-                            }
+                            if (thumbUrl.isNotBlank()) dao.setThumbnailIfAbsent(downloadId, thumbUrl)
                         }
                         line.startsWith("[title] ") -> {
                             // Sent as soon as extraction finishes — well before the first byte
@@ -180,9 +162,7 @@ class DownloadWorker(
                             // keep relying on derivePosterCaptionTitle once a file lands instead.
                             if (hasPlaceholderTitle) {
                                 val title = line.removePrefix("[title] ").trim()
-                                if (title.isNotBlank()) {
-                                    pendingJobs.add(callbackScope.launch { dao.updateTitle(downloadId, title) })
-                                }
+                                if (title.isNotBlank()) dao.updateTitle(downloadId, title)
                             }
                         }
                         // yt-dlp's own "[error] ERROR: ..." lines, gallery-dl's own
@@ -205,59 +185,63 @@ class DownloadWorker(
                             // one that happened to run last.
                             lastErrorLine.compareAndSet(null, line.substringAfter("[error] ").trim())
                         }
+                        // yt-dlp's own non-fatal warnings — never file paths, nothing to act on,
+                        // just kept out of the file-path branch below.
+                        line.startsWith("[warning] ") -> Unit
+                        // The wrapper script's own final status line (see its __main__ block) —
+                        // never consumed (status is derived from lastErrorLine/savedCount instead,
+                        // same as when this was Chaquopy's callAttr() return value), just kept out
+                        // of the file-path branch below.
+                        line.startsWith("[__status__] ") -> Unit
                         else -> {
-                            val job = callbackScope.launch {
-                                try {
-                                    val candidate = File(line.trim())
-                                    if (candidate.isAbsolute && candidate.isFile &&
-                                        candidate.canonicalPath.startsWith(stagingDir.canonicalPath)
-                                    ) {
-                                        // gallery-dl's own --download-archive isn't reliably updated
-                                        // before a pause/cancel interrupt can land, so a file we've
-                                        // already moved and counted can still get re-announced as "fresh"
-                                        // on a later resume. This is the actual source of truth for
-                                        // whether we've handled this exact file for this download before
-                                        // — a duplicate announcement is dropped here instead of being
-                                        // recounted and saved as a second copy.
-                                        val isNewFile = dao.recordDownloadedFile(DownloadedFileRecord(downloadId, candidate.name)) != -1L
-                                        if (!isNewFile) {
-                                            candidate.delete()
-                                            return@launch
-                                        }
-                                        val fileSize = candidate.length()
-                                        val savedUri = MediaStoreHelper.saveMediaToGallery(applicationContext, candidate)
-                                        if (savedUri != null) {
-                                            candidate.delete()
-                                            val count = savedCount.incrementAndGet()
-                                            val totalBytes = bytesSoFar.addAndGet(fileSize)
-                                            val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
-                                            val speedMbs = (totalBytes / (1024f * 1024f)) / elapsedSeconds
-                                            dao.updateLiveProgress(downloadId, count, speedMbs)
-                                            if (singleItemDownload) {
-                                                dao.setThumbnail(downloadId, savedUri.toString())
-                                            } else {
-                                                dao.setThumbnailIfAbsent(downloadId, savedUri.toString())
-                                            }
-                                            dao.addBytes(downloadId, fileSize)
-                                            if (hasPlaceholderTitle) {
-                                                derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
-                                            }
-                                            DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, count)
-                                        }
+                            try {
+                                val candidate = File(line.trim())
+                                if (candidate.isAbsolute && candidate.isFile &&
+                                    candidate.canonicalPath.startsWith(stagingDir.canonicalPath)
+                                ) {
+                                    // gallery-dl's own --download-archive isn't reliably updated
+                                    // before a pause/cancel interrupt can land, so a file we've
+                                    // already moved and counted can still get re-announced as "fresh"
+                                    // on a later resume. This is the actual source of truth for
+                                    // whether we've handled this exact file for this download before
+                                    // — a duplicate announcement is dropped here instead of being
+                                    // recounted and saved as a second copy.
+                                    val isNewFile = dao.recordDownloadedFile(DownloadedFileRecord(downloadId, candidate.name)) != -1L
+                                    if (!isNewFile) {
+                                        candidate.delete()
+                                        return@actualCallback
                                     }
-                                } catch (e: Exception) {
-                                    android.util.Log.e("DownloadEngine", "Failed to process output line: $line", e)
+                                    val fileSize = candidate.length()
+                                    val savedUri = MediaStoreHelper.saveMediaToGallery(applicationContext, candidate)
+                                    if (savedUri != null) {
+                                        candidate.delete()
+                                        val count = savedCount.incrementAndGet()
+                                        val totalBytes = bytesSoFar.addAndGet(fileSize)
+                                        val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
+                                        val speedMbs = (totalBytes / (1024f * 1024f)) / elapsedSeconds
+                                        dao.updateLiveProgress(downloadId, count, speedMbs)
+                                        if (singleItemDownload) {
+                                            dao.setThumbnail(downloadId, savedUri.toString())
+                                        } else {
+                                            dao.setThumbnailIfAbsent(downloadId, savedUri.toString())
+                                        }
+                                        dao.addBytes(downloadId, fileSize)
+                                        if (hasPlaceholderTitle) {
+                                            derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
+                                        }
+                                        DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, count)
+                                    }
                                 }
+                            } catch (e: Exception) {
+                                android.util.Log.e("DownloadEngine", "Failed to process output line: $line", e)
                             }
-                            pendingJobs.add(job)
                         }
                     }
-                    Unit
                 }
 
-                val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else null
+                val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
                 val filenameFormat = GalleryDlPreferences.getFilenameFormat(applicationContext)
-                val extraArgs = GalleryDlPreferences.getExtraArgs(applicationContext).ifBlank { null }
+                val extraArgs = GalleryDlPreferences.getExtraArgs(applicationContext)
                 // Tracks already-fetched item IDs across retries, so pausing/retrying a download
                 // resumes where it left off instead of starting the whole gallery over. Separate
                 // files per engine — gallery-dl's archive is a sqlite db, yt-dlp's is a plain text
@@ -268,24 +252,30 @@ class DownloadWorker(
                 val ytDlpArchivePath = File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt")
                     .apply { parentFile?.mkdirs() }
                     .absolutePath
-                val limitRate = GalleryDlPreferences.getSpeedLimit(applicationContext).ifBlank { null }
+                val limitRate = GalleryDlPreferences.getSpeedLimit(applicationContext)
 
-                // Only one Python call (either engine) may run at a time across the whole app —
-                // see PythonEngineLock's doc comment for why concurrent calls corrupt each other.
-                suspend fun runGalleryDl(excludeVideo: Boolean): String = PythonEngineLock.withLock {
-                    galleryWrapper.callAttr(
-                        "download", url, stagingDir.absolutePath, cookiesArg, actualCallback,
-                        filenameFormat, extraArgs, galleryArchivePath, limitRate, entity?.itemFilter,
-                        shouldCancel, excludeVideo,
-                    ).toString()
-                }
+                // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
+                // call into one shared interpreter — the race PythonEngineLock existed to prevent
+                // (gallery-dl mutating process-global sys.argv/stdout across concurrent calls)
+                // doesn't apply here, so downloads now run genuinely concurrently up to the
+                // "Concurrent downloads" setting instead of being serialized behind one lock.
+                suspend fun runGalleryDl(excludeVideo: Boolean): Int =
+                    PythonRuntime.run(
+                        applicationContext, "gallery_dl_wrapper.py",
+                        listOf(
+                            "download", url, stagingDir.absolutePath, cookiesArg,
+                            filenameFormat, extraArgs, galleryArchivePath, limitRate,
+                            entity?.itemFilter.orEmpty(), if (excludeVideo) "1" else "0",
+                        ),
+                        actualCallback,
+                    )
 
                 // Bundled as jniLibs/<abi>/libqjs.so and libffmpeg.so respectively — see
                 // QuickJsRuntime's and FfmpegRuntime's doc comments for why sites like YouTube
                 // need the former just to extract real download URLs, and the latter to merge
                 // the separate video/audio streams those URLs point to into one playable file.
-                val jsRuntimePath = QuickJsRuntime.getExecutablePath(applicationContext)
-                val ffmpegPath = FfmpegRuntime.getExecutablePath(applicationContext)
+                val jsRuntimePath = QuickJsRuntime.getExecutablePath(applicationContext).orEmpty()
+                val ffmpegPath = FfmpegRuntime.getExecutablePath(applicationContext).orEmpty()
 
                 val videoQuality = GalleryDlPreferences.getVideoQuality(applicationContext)
                 val audioOnly = videoQuality == VideoQuality.AUDIO_ONLY
@@ -295,17 +285,22 @@ class DownloadWorker(
                 val embedMetadata = GalleryDlPreferences.isEmbedMetadata(applicationContext)
                 val noPlaylist = GalleryDlPreferences.isNoPlaylist(applicationContext)
 
-                suspend fun runYtDlp(): String = PythonEngineLock.withLock {
+                suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
                     // string mean anything to yt-dlp, so those two aren't passed through — cookies
                     // and the speed limit use compatible formats for both engines and are shared.
-                    ytDlpWrapper.callAttr(
-                        "download", url, stagingDir.absolutePath, cookiesArg, actualCallback,
-                        null, null, ytDlpArchivePath, limitRate, null, shouldCancel,
-                        jsRuntimePath, ffmpegPath, audioOnly, downloadSubtitles, subtitleLangs,
-                        embedThumbnail, embedMetadata, noPlaylist, videoQuality.resolutionCap(),
-                    ).toString()
-                }
+                    PythonRuntime.run(
+                        applicationContext, "yt_dlp_wrapper.py",
+                        listOf(
+                            "download", url, stagingDir.absolutePath, cookiesArg,
+                            "", "", ytDlpArchivePath, limitRate, "",
+                            jsRuntimePath, ffmpegPath,
+                            if (audioOnly) "1" else "0", if (downloadSubtitles) "1" else "0", subtitleLangs,
+                            if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
+                            videoQuality.resolutionCap()?.toString().orEmpty(),
+                        ),
+                        actualCallback,
+                    )
 
                 when (engine) {
                     DownloadEngine.YT_DLP -> runYtDlp()
@@ -348,15 +343,17 @@ class DownloadWorker(
                     }
                 }
 
-                // Wait for every in-flight move-to-gallery callback to finish before cleaning up staging.
-                pendingJobs.toList().joinAll()
                 stagingDir.deleteRecursively()
 
                 if (isStopped) {
-                    // Paused/cancelled mid-download: both engines' calls above return normally even
-                    // when interrupted, so this has to be checked explicitly instead of relying on
-                    // an exception. Leave whatever status pauseDownload()/cancelDownload() already
-                    // set instead of overwriting it here.
+                    // Defensive fallback only now — a genuine Pause/Cancel mid-download normally
+                    // throws CancellationException straight out of runGalleryDl()/runYtDlp() these
+                    // days (PythonRuntime kills the subprocess the moment this coroutine's Job is
+                    // cancelled, which is what isStopped flipping true actually means; see its own
+                    // doc comment), caught by the outer catch block below instead of reaching here.
+                    // Leave whatever status pauseDownload()/cancelDownload() already set instead of
+                    // overwriting it either way.
+                    // Result.success() — see the isStopped branch above for why.
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
                 }

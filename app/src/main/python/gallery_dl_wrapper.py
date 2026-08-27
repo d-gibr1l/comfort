@@ -29,7 +29,9 @@ class CallbackWriter:
         # never did. No-op: this writer already only ever does newline-buffered text, so there's
         # nothing to actually reconfigure — but the call has to not *raise*, or gallery-dl's own
         # startup crashes with "'CallbackWriter' object has no attribute 'reconfigure'" before a
-        # single line of real output ever happens (reproduced live).
+        # single line of real output ever happens (reproduced live, both under Chaquopy and here
+        # under the subprocess runtime — this isn't a Chaquopy-specific quirk, any custom stand-in
+        # substituting for real stdout during a redirect_stdout() hits the same gap).
         pass
 
     def _emit(self, line):
@@ -196,3 +198,44 @@ def list_items(url, cookies_path=None, extra_args=None):
     # Nothing on stdout — surface whatever gallery-dl said on stderr (auth required,
     # unsupported URL, etc.) so it's visible in logs instead of silently returning nothing.
     return "ERR:" + warnings
+
+
+# CLI entry point for PythonRuntime.kt (subprocess model, replacing Chaquopy's direct callAttr()).
+# should_cancel is deliberately not wired here — with each download now its own OS process,
+# cancellation is just Kotlin killing the process, no cooperative polling needed. argv is all
+# strings, so an empty string is this module's own "None" sentinel; DownloadWorker.kt passes "" for
+# any positional arg it would otherwise pass Kotlin null for.
+if __name__ == "__main__":
+    import sys as _sys
+
+    # download() redirects sys.stdout to its own CallbackWriter for the duration of the call (see
+    # above) — capturing the *real* stdout here, before that happens, and printing straight to it
+    # (bypassing whatever sys.stdout currently is) is what stops _emit -> print -> sys.stdout ->
+    # CallbackWriter.write -> _emit from recursing into itself forever.
+    _real_stdout = _sys.stdout
+
+    def _s(v):
+        return None if v == "" else v
+
+    def _emit(line):
+        print(line, file=_real_stdout, flush=True)
+
+    if len(_sys.argv) < 2:
+        print("Usage: gallery_dl_wrapper.py <download|list_items> ...", file=_sys.stderr)
+        _sys.exit(2)
+
+    _cmd, _rest = _sys.argv[1], _sys.argv[2:]
+    if _cmd == "download":
+        _status = download(
+            url=_rest[0], download_dir=_rest[1], cookies_path=_s(_rest[2]),
+            callback=_emit, filename_format=_s(_rest[3]), extra_args=_s(_rest[4]),
+            archive_path=_s(_rest[5]), limit_rate=_s(_rest[6]), item_filter=_s(_rest[7]),
+            should_cancel=None, exclude_video=(_rest[8] == "1"),
+        )
+        print(f"[__status__] {_status}", file=_real_stdout, flush=True)
+    elif _cmd == "list_items":
+        _result = list_items(url=_rest[0], cookies_path=_s(_rest[1]), extra_args=_s(_rest[2]))
+        print(_result, file=_real_stdout, flush=True)
+    else:
+        print(f"Unknown command: {_cmd}", file=_sys.stderr)
+        _sys.exit(2)
