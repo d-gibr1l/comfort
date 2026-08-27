@@ -36,8 +36,11 @@ class DownloadWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val downloadId = inputData.getString("downloadId") ?: return Result.failure()
-        val url = inputData.getString("url") ?: return Result.failure()
+        // Result.success() here too (never expected to actually trigger — WorkManager's own input
+        // is always set by DownloadDispatcher) — same reasoning throughout this file: failure()
+        // would cascade and kill every other download sharing this WorkManager concurrency slot.
+        val downloadId = inputData.getString("downloadId") ?: return Result.success()
+        val url = inputData.getString("url") ?: return Result.success()
 
         val dao = AppDatabase.getDatabase(applicationContext).downloadDao()
         val entity = dao.getById(downloadId)
@@ -83,8 +86,17 @@ class DownloadWorker(
                     hasVideoItem = listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
                 }
                 if (isStopped) {
+                    // Result.success(), not failure() — this WorkRequest only shares a WorkManager
+                    // "queue" name with unrelated downloads to cap concurrency (see
+                    // DownloadDispatcher's round-robin slots), not because they depend on each
+                    // other. Result.failure() propagates through enqueueUniqueWork's chain and
+                    // auto-fails every OTHER download still queued behind this one in the same
+                    // slot — without ever running them — permanently freezing them at "waiting to
+                    // start" with no error surfaced (reproduced live). Our own DB status column is
+                    // the real source of truth for this download's outcome; WorkManager's Result
+                    // only needs to say "done, move on to the next queued item".
                     DownloadNotifications.cancel(applicationContext, downloadId)
-                    return@withContext Result.failure()
+                    return@withContext Result.success()
                 }
 
                 val python = Python.getInstance()
@@ -346,7 +358,7 @@ class DownloadWorker(
                     // an exception. Leave whatever status pauseDownload()/cancelDownload() already
                     // set instead of overwriting it here.
                     DownloadNotifications.cancel(applicationContext, downloadId)
-                    return@withContext Result.failure()
+                    return@withContext Result.success()
                 }
 
                 if (savedCount.get() == 0) {
@@ -355,7 +367,11 @@ class DownloadWorker(
                     // reason to show the user (unsupported link, blocked request, nothing there).
                     dao.updateError(downloadId, DownloadStatus.ERRORED, lastErrorLine.get() ?: "No downloadable content found at this link")
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle)
-                    return@withContext Result.failure()
+                    // Result.success(), not failure() — see the isStopped branch above for why:
+                    // this download's own ERRORED status is already recorded in our DB; returning
+                    // failure() here would additionally auto-kill every other download still
+                    // queued behind this one in the same WorkManager concurrency slot.
+                    return@withContext Result.success()
                 }
 
                 dao.updateStatus(downloadId, DownloadStatus.FINISHED)
@@ -368,13 +384,18 @@ class DownloadWorker(
                 DownloadNotifications.cancel(applicationContext, downloadId)
                 throw e
             } catch (e: Exception) {
+                // Result.success() in both branches below, not failure() — same reasoning as the
+                // isStopped/savedCount==0 branches above: this download's outcome is already
+                // recorded in our own DB (or intentionally left alone, for the isStopped case), and
+                // failure() would cascade to kill every other download sharing this WorkManager
+                // concurrency slot without ever running them.
                 if (isStopped) {
                     DownloadNotifications.cancel(applicationContext, downloadId)
-                    Result.failure()
+                    Result.success()
                 } else {
                     dao.updateError(downloadId, DownloadStatus.ERRORED, e.localizedMessage)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle)
-                    Result.failure()
+                    Result.success()
                 }
             }
         }

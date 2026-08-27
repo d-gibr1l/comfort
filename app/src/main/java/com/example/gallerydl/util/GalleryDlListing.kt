@@ -38,7 +38,13 @@ object GalleryDlListing {
             PythonEngineLock.withLock {
                 wrapper.callAttr("list_items", url, cookiesArg, extraArgs).toString()
             }
+        }.onFailure {
+            android.util.Log.w("GalleryDlListing", "list_items threw for $url", it)
         }.getOrNull() ?: return@withContext emptyList()
+
+        if (rawText.startsWith("ERR:")) {
+            android.util.Log.w("GalleryDlListing", "list_items returned no stdout for $url: $rawText")
+        }
 
         val markerIndex = rawText.indexOf(WARNINGS_MARKER)
         val jsonText: String
@@ -52,7 +58,11 @@ object GalleryDlListing {
             jsonText = rawText
         }
 
-        parseItems(jsonText)
+        parseItems(jsonText).also {
+            if (it.isEmpty() && jsonText.isNotBlank()) {
+                android.util.Log.w("GalleryDlListing", "parseItems() found nothing in a non-blank response for $url (len=${jsonText.length}): ${jsonText.take(300)}")
+            }
+        }
     }
 
     private fun parseItems(jsonText: String): List<GalleryItem> {
