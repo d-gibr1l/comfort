@@ -45,6 +45,8 @@ import com.example.gallerydl.theme.ThemeMode
 import com.example.gallerydl.theme.ThemePreferences
 import com.example.gallerydl.theme.Typography
 import com.example.gallerydl.ui.main.SharePickerScreen
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -64,6 +66,11 @@ class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Sharing can launch this Activity as the app's very first entry point in a fresh
+        // process (MainActivity may never have run), so Python needs its own init here too.
+        if (!Python.isStarted()) {
+            Python.start(AndroidPlatform(this))
+        }
         com.example.gallerydl.util.AppImageLoader.install(applicationContext)
 
         val sharedText = when {

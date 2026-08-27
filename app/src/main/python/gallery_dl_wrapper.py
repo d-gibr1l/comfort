@@ -16,50 +16,21 @@ import gallery_dl.job
 # file out from under it (see DownloadWorker's actualCallback, which moves/deletes whatever path
 # it's given as soon as it sees it). DownloadWorker's savedCount==0 fallback then correctly hands
 # the same URL to yt_dlp_wrapper.py instead, which merges it properly.
-
-import tempfile
-import os
-
-def _create_fixed_cookie_file(cookies_path):
-    if not cookies_path or not os.path.exists(cookies_path):
-        return cookies_path
-    try:
-        with open(cookies_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        fixed_lines = []
-        for line in lines:
-            line = line.replace('\r', '')  # Fix Windows CRLF issues that gallery-dl doesn't strip
-            if line.startswith('#') and not line.startswith('#HttpOnly_'):
-                fixed_lines.append(line)
-                continue
-                
-            parts = line.split('\t')
-            if len(parts) >= 7:
-                domain = parts[0]
-                if domain.startswith('#HttpOnly_'):
-                    domain = domain[10:]
-                
-                # yt-dlp applies cookies broadly, while gallery-dl's strict MozillaCookieJar
-                # restricts www.instagram.com cookies from reaching i.instagram.com API calls.
-                if 'instagram.com' in domain:
-                    parts[0] = '.instagram.com' if not line.startswith('#HttpOnly_') else '#HttpOnly_.instagram.com'
-                    parts[1] = 'TRUE'  # domain_specified
-                    line = '\t'.join(parts)
-            fixed_lines.append(line)
-            
-        fd, temp_path = tempfile.mkstemp(suffix='.txt', prefix='fixed_cookies_')
-        with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as f:
-            f.writelines(fixed_lines)
-        return temp_path
-    except Exception:
-        return cookies_path
-
 class CallbackWriter:
     def __init__(self, callback, should_cancel=None):
         self.callback = callback
         self.should_cancel = should_cancel
         self.buffer = ""
+
+    def reconfigure(self, *args, **kwargs):
+        # gallery-dl (pinned to git HEAD, not a fixed release — see build.gradle.kts) started
+        # calling sys.stdout.reconfigure(...) at some point after this was last tested; real
+        # TextIOWrapper stdout supports that call (adjusting encoding/buffering), this stand-in
+        # never did. No-op: this writer already only ever does newline-buffered text, so there's
+        # nothing to actually reconfigure — but the call has to not *raise*, or gallery-dl's own
+        # startup crashes with "'CallbackWriter' object has no attribute 'reconfigure'" before a
+        # single line of real output ever happens (reproduced live).
+        pass
 
     def _emit(self, line):
         if ".fdash-" in line:
@@ -99,14 +70,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     original_argv = sys.argv
     args = ["gallery-dl", "--directory", download_dir]
-    # Pass a real browser User-Agent so Instagram (and others) don't immediately flag
-    # the default gallery-dl/1.xx.x UA as a bot and force a login redirect despite valid cookies.
-    args.extend(["--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"])
-    
-    fixed_cookies = None
     if cookies_path:
-        fixed_cookies = _create_fixed_cookie_file(cookies_path)
-        args.extend(["--cookies", fixed_cookies])
+        args.extend(["--cookies", cookies_path])
     if filename_format:
         args.extend(["--filename", filename_format])
     if limit_rate:
@@ -143,20 +108,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             gallery_dl.main()
         except SystemExit as e:
             if e.code != 0:
-                status = f"Failed with code {e.code}"
+                status = f"Error: exited with code {e.code}"
+                print(f"Error, exited with code {e.code}")
         except KeyboardInterrupt:
             status = "Cancelled"
         except Exception as e:
-            status = f"Exception: {e}"
+            status = f"Error: {e}"
+            print(f"Exception: {e}")
         finally:
             if callback and not (should_cancel is not None and should_cancel()):
                 writer.flush()
             sys.argv = original_argv
-            if fixed_cookies and fixed_cookies != cookies_path and os.path.exists(fixed_cookies):
-                try:
-                    os.remove(fixed_cookies)
-                except Exception:
-                    pass
 
     return status
 
@@ -167,12 +129,8 @@ def list_items(url, cookies_path=None, extra_args=None):
     implies simulate mode on its own, so no separate --simulate flag is needed."""
     original_argv = sys.argv
     args = ["gallery-dl", "--dump-json"]
-    args.extend(["--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"])
-    
-    fixed_cookies = None
     if cookies_path:
-        fixed_cookies = _create_fixed_cookie_file(cookies_path)
-        args.extend(["--cookies", fixed_cookies])
+        args.extend(["--cookies", cookies_path])
     if extra_args:
         try:
             args.extend(shlex.split(extra_args))
@@ -210,11 +168,6 @@ def list_items(url, cookies_path=None, extra_args=None):
             sys.argv = original_argv
             if file_index is not None:
                 gallery_dl.job.DataJob.__init__.__defaults__ = original_defaults
-            if fixed_cookies and fixed_cookies != cookies_path and os.path.exists(fixed_cookies):
-                try:
-                    os.remove(fixed_cookies)
-                except Exception:
-                    pass
 
     out = out_buffer.getvalue()
     warnings = err_buffer.getvalue().strip()
@@ -233,44 +186,3 @@ def list_items(url, cookies_path=None, extra_args=None):
     # Nothing on stdout — surface whatever gallery-dl said on stderr (auth required,
     # unsupported URL, etc.) so it's visible in logs instead of silently returning nothing.
     return "ERR:" + warnings
-
-
-# CLI entry point for PythonRuntime.kt (subprocess model, replacing Chaquopy's direct callAttr()).
-# should_cancel is deliberately not wired here — with each download now its own OS process,
-# cancellation is just Kotlin killing the process, no cooperative polling needed. argv is all
-# strings, so an empty string is this module's own "None" sentinel; DownloadWorker.kt passes "" for
-# any positional arg it would otherwise pass Kotlin null for.
-if __name__ == "__main__":
-    import sys as _sys
-
-    # download() redirects sys.stdout to its own CallbackWriter for the duration of the call (see
-    # above) — capturing the *real* stdout here, before that happens, and printing straight to it
-    # (bypassing whatever sys.stdout currently is) is what stops _emit -> print -> sys.stdout ->
-    # CallbackWriter.write -> _emit from recursing into itself forever.
-    _real_stdout = _sys.stdout
-
-    def _s(v):
-        return None if v == "" else v
-
-    def _emit(line):
-        print(line, file=_real_stdout, flush=True)
-
-    if len(_sys.argv) < 2:
-        print("Usage: gallery_dl_wrapper.py <download|list_items> ...", file=_sys.stderr)
-        _sys.exit(2)
-
-    _cmd, _rest = _sys.argv[1], _sys.argv[2:]
-    if _cmd == "download":
-        _status = download(
-            url=_rest[0], download_dir=_rest[1], cookies_path=_s(_rest[2]),
-            callback=_emit, filename_format=_s(_rest[3]), extra_args=_s(_rest[4]),
-            archive_path=_s(_rest[5]), limit_rate=_s(_rest[6]), item_filter=_s(_rest[7]),
-            should_cancel=None, exclude_video=(_rest[8] == "1"),
-        )
-        print(f"[__status__] {_status}", file=_real_stdout, flush=True)
-    elif _cmd == "list_items":
-        _result = list_items(url=_rest[0], cookies_path=_s(_rest[1]), extra_args=_s(_rest[2]))
-        print(_result, file=_real_stdout, flush=True)
-    else:
-        print(f"Unknown command: {_cmd}", file=_sys.stderr)
-        _sys.exit(2)
