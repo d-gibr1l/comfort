@@ -4,8 +4,33 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [DownloadEntity::class], version = 6, exportSchema = false)
+// Added the downloaded_files table (tracks which filenames have already been moved into the
+// gallery per download, so gallery-dl re-announcing an already-handled file on resume doesn't
+// get double-counted or double-saved).
+private val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS downloaded_files (" +
+                "downloadId TEXT NOT NULL, filename TEXT NOT NULL, " +
+                "PRIMARY KEY(downloadId, filename))"
+        )
+    }
+}
+
+// Added expectedBytes (a file's known-upfront total size, from yt-dlp) and liveBytes (bytes
+// downloaded so far into the file currently in flight) — both drive the byte-accurate progress
+// bar/speed for single-item video downloads instead of the old all-or-nothing item-count jump.
+private val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN expectedBytes INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN liveBytes INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 8, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
@@ -16,6 +41,11 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
+                    // Only a safety net for a schema bump nobody wrote an explicit migration
+                    // for — every version change from here on should get a real Migration
+                    // above instead, so this never actually triggers and wipes the user's
+                    // download history/queue again the way the 6->7 destructive fallback did.
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { Instance = it }

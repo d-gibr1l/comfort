@@ -3,6 +3,11 @@ package com.example.gallerydl.ui.main
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,10 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.PillShape
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
@@ -32,6 +39,12 @@ private val tabs = listOf(
     NavTab("Library", FeatherIcons.Image),
     NavTab("Settings", FeatherIcons.Settings),
 )
+
+// FloatingNavBar's own footprint: 16dp padding + 68dp pill + 16dp padding. Screens that now
+// overlay it (instead of Scaffold reserving space for it) use this so their own scrollable
+// content and floating buttons can still clear the pill instead of sitting behind it.
+val NAV_BAR_RESERVED_HEIGHT = 100.dp
+
 
 @Composable
 fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
@@ -53,34 +66,37 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     // instead of immediately falling through to the empty nav backstack and quitting the app.
     BackHandler(enabled = selectedTab != 0) { selectedTab = 0 }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            FloatingNavBar(
-                selectedTab = selectedTab,
-                hasActiveDownloads = hasActiveDownloads,
-                onSelect = { index ->
-                    // Tapping the already-selected Library tab again jumps to the Queue,
-                    // matching the "tap again for more" pattern used elsewhere in the app.
-                    if (index == 1 && selectedTab == 1) {
-                        showQueueScreen = true
-                    } else {
-                        selectedTab = index
-                    }
-                },
+    // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
+    // measured region — pill height plus FloatingNavBar's own 24dp/16dp padding — and paints
+    // containerColor behind all of it, not just the pill itself. That turned the padding around
+    // the floating pill into a solid opaque block sitting on top of (and cutting off) whatever
+    // list content would otherwise be visible there. Overlaying it on a plain Box instead lets
+    // content scroll underneath the pill's transparent padding for real, which is what "floating"
+    // is supposed to look like.
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        when (selectedTab) {
+            0 -> HomeScreen(onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") })
+            1 -> DownloadsHistoryScreen(
+                viewModel = viewModel,
+                onOpenQueue = { showQueueScreen = true }
             )
+            2 -> MoreScreen()
         }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()).fillMaxSize()) {
-            when (selectedTab) {
-                0 -> HomeScreen(onDownload = { url -> viewModel.enqueueDownload(url, "Downloading $url") })
-                1 -> DownloadsHistoryScreen(
-                    viewModel = viewModel,
-                    onOpenQueue = { showQueueScreen = true }
-                )
-                2 -> MoreScreen()
-            }
-        }
+
+        FloatingNavBar(
+            selectedTab = selectedTab,
+            hasActiveDownloads = hasActiveDownloads,
+            onSelect = { index ->
+                // Tapping the already-selected Library tab again jumps to the Queue, matching
+                // the "tap again for more" pattern used elsewhere in the app.
+                if (index == 1 && selectedTab == 1) {
+                    showQueueScreen = true
+                } else {
+                    selectedTab = index
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -89,16 +105,30 @@ private fun FloatingNavBar(
     selectedTab: Int,
     hasActiveDownloads: Boolean,
     onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    // Read via graphicsLayer's deferred block below (not destructured with `by`), so this
+    // continuous animation only re-triggers the settings icon's draw phase, not a recomposition
+    // of the whole nav bar on every frame.
+    val settingsRotation = rememberInfiniteTransition(label = "settingsSpin").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "settingsRotation",
+    )
+
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth().height(68.dp),
             shape = PillShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.primary,
             tonalElevation = 4.dp,
             shadowElevation = 12.dp,
         ) {
@@ -110,7 +140,7 @@ private fun FloatingNavBar(
                 tabs.forEachIndexed { index, tab ->
                     val selected = selectedTab == index
                     val tint by animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f),
                         animationSpec = tween(200),
                         label = "navTint",
                     )
@@ -128,12 +158,23 @@ private fun FloatingNavBar(
                             .padding(horizontal = if (selected) 20.dp else 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        val iconModifier = Modifier
+                            .size(22.dp)
+                            .then(
+                                if (index == 2) {
+                                    Modifier.graphicsLayer {
+                                        rotationZ = if (selected) settingsRotation.value else 0f
+                                    }
+                                } else {
+                                    Modifier
+                                }
+                            )
                         if (index == 1 && hasActiveDownloads) {
                             BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) }) {
-                                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
+                                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                             }
                         } else {
-                            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
+                            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                         }
                         AnimatedVisibility(visible = selected) {
                             Row {
@@ -182,7 +223,7 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
                             MaterialTheme.colorScheme.background,
                         )
                     )
@@ -329,7 +370,10 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            // Matches NAV_BAR_RESERVED_HEIGHT below — content needs to be able to scroll clear
+            // of the floating pill now that it overlays on top instead of reserving its own
+            // Scaffold-managed space (see MainScreen's own comment on that change).
+            Spacer(Modifier.height(NAV_BAR_RESERVED_HEIGHT))
         }
     }
 
@@ -344,7 +388,7 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                 text = { Text("Paste copied link") },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(24.dp),
+                    .padding(bottom = NAV_BAR_RESERVED_HEIGHT, end = 24.dp),
             )
         }
     }

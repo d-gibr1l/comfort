@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.gallerydl.data.DownloadDispatcher
 import com.example.gallerydl.data.GalleryDlPreferences
+import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.DarkColorScheme
 import com.example.gallerydl.theme.LightColorScheme
 import com.example.gallerydl.theme.Shapes
@@ -44,8 +45,6 @@ import com.example.gallerydl.theme.ThemeMode
 import com.example.gallerydl.theme.ThemePreferences
 import com.example.gallerydl.theme.Typography
 import com.example.gallerydl.ui.main.SharePickerScreen
-import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -65,11 +64,6 @@ class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Sharing can launch this Activity as the app's very first entry point in a fresh
-        // process (MainActivity may never have run), so Python needs its own init here too.
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-        }
         com.example.gallerydl.util.AppImageLoader.install(applicationContext)
 
         val sharedText = when {
@@ -90,7 +84,7 @@ class ShareActivity : ComponentActivity() {
         if (GalleryDlPreferences.isInstantShareEnabled(this)) {
             // No sheet, no frame ever drawn — just enqueue in the background and close.
             lifecycleScope.launch {
-                DownloadDispatcher.enqueueDownload(applicationContext, url, url)
+                DownloadDispatcher.enqueueDownload(applicationContext, url, "Downloading from ${VideoSiteRouter.siteName(url)}")
                 Toast.makeText(applicationContext, "Download started", Toast.LENGTH_SHORT).show()
                 finish()
             }
@@ -169,9 +163,9 @@ private fun SharePickerSheet(url: String, onFinished: () -> Unit) {
                 SharePickerScreen(
                     url = url,
                     onDismiss = { visible = false },
-                    onDownload = { downloadUrl, itemFilter ->
+                    onDownload = { downloadUrl, itemFilter, totalItems ->
                         scope.launch {
-                            DownloadDispatcher.enqueueDownload(context, downloadUrl, downloadUrl, itemFilter)
+                            DownloadDispatcher.enqueueDownload(context, downloadUrl, "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}", itemFilter, totalItems)
                         }
                         visible = false
                     },

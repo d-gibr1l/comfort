@@ -19,3 +19,9 @@ local.properties
 scratch_*
 .claude/
 .agents/
+
+# Stray local artifacts pulled/created during on-device debugging - not source, never commit.
+downloads.db
+gallerydl_database
+test_cookies.txt
+/gallery-dl/

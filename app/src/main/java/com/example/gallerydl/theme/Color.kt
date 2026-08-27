@@ -16,6 +16,13 @@ val Teal40 = Color(0xFF0D9488)
 val Teal80 = Color(0xFF5EEAD4)
 val Teal90 = Color(0xFFCCFBF1)
 
+// Brand accent — the floating nav bar's palette, reused anywhere else in the app that wants to
+// visually match it (e.g. the Library toolbar's active filter chips).
+val AccentSalmon = Color(0xFFEA7B7B)
+val AccentRed = Color(0xFFD25353)
+val AccentRedDark = Color(0xFF9E3B3B)
+val AccentCream = Color(0xFFFFEAD3)
+
 // Error
 val Red40 = Color(0xFFDC2626)
 val Red80 = Color(0xFFF87171)

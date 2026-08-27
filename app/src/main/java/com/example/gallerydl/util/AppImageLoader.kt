@@ -3,6 +3,7 @@ package com.example.gallerydl.util
 import android.content.Context
 import coil.Coil
 import coil.ImageLoader
+import coil.decode.VideoFrameDecoder
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 
@@ -23,6 +24,12 @@ object AppImageLoader {
         Coil.setImageLoader(
             ImageLoader.Builder(context)
                 .okHttpClient(client)
+                .components {
+                    // Registers frame extraction for video thumbnails (gallery-dl downloads are
+                    // all images, but yt-dlp ones are video — without this decoder, a video's
+                    // MediaStore thumbnail Uri just renders blank instead of a preview frame).
+                    add(VideoFrameDecoder.Factory())
+                }
                 .build()
         )
     }

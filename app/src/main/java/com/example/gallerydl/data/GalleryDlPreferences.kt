@@ -3,6 +3,31 @@ package com.example.gallerydl.data
 import android.content.Context
 import android.net.Uri
 
+enum class VideoQuality(val label: String) {
+    BEST("Best available"),
+    P1080("1080p"),
+    P720("720p"),
+    P480("480p"),
+    AUDIO_ONLY("Audio only");
+
+    /** null means "no cap" (BEST) or "meaningless" (AUDIO_ONLY, which overrides the format
+     * entirely). Passed to yt_dlp_wrapper.py as a `format_sort: ["res:N"]` entry rather than a
+     * manual "[height<=?N]" filter on the format string — a first attempt used the latter and
+     * broke on portrait video (Instagram reels etc.): yt-dlp's `height` field is the raw pixel
+     * height, which for a portrait video is the *long* side (e.g. ~1920 for a "1080p" reel, since
+     * 1080 there means 1080px wide), so a height<=1080 filter wrongly excluded the very format the
+     * cap was supposed to allow and silently fell back to a lower quality. `res:N` sorts by
+     * min(height, width) instead — the conventional quality number regardless of orientation —
+     * which is yt-dlp's own documented idiom for "best available at or under N, gracefully
+     * degrading if nothing fits" (see their README's "Sorting Formats" section). */
+    fun resolutionCap(): Int? = when (this) {
+        BEST, AUDIO_ONLY -> null
+        P1080 -> 1080
+        P720 -> 720
+        P480 -> 480
+    }
+}
+
 object GalleryDlPreferences {
     const val PREFS_NAME = "GalleryDlPrefs"
     const val KEY_COOKIES = "cookies"
@@ -17,6 +42,13 @@ object GalleryDlPreferences {
     const val KEY_DOWNLOAD_LOCATION_URI = "download_location_uri"
     const val KEY_GLOBAL_PAUSE = "global_pause"
     const val KEY_INSTANT_SHARE = "instant_share"
+    const val KEY_LIBRARY_GRID_VIEW = "library_grid_view"
+    const val KEY_VIDEO_QUALITY = "video_quality"
+    const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
+    const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
+    const val KEY_EMBED_THUMBNAIL = "embed_thumbnail"
+    const val KEY_EMBED_METADATA = "embed_metadata"
+    const val KEY_NO_PLAYLIST = "no_playlist"
     // The naive "{uploader} - {title} - {id}" pattern collapses to the literal string
     // "None - None - None" on sources that don't expose that metadata, which makes every item
     // in the gallery resolve to the same filename — only the first survives, the rest are
@@ -24,7 +56,14 @@ object GalleryDlPreferences {
     // what the default naming scheme is built from), so anchoring on it guarantees uniqueness
     // even when the human-readable fields are missing.
     private const val LEGACY_DEFAULT_FILENAME_FORMAT = "{uploader} - {title} - {id}.{extension}"
-    const val DEFAULT_FILENAME_FORMAT = "{uploader|category} - {title|id} - {filename}.{extension}"
+    // {id}-anchored uniqueness worked but read as noise ("uploader - title - id.ext" for every
+    // single item); {filename} is gallery-dl's own always-populated per-item field, so anchoring
+    // on that instead — bracketed, matching yt-dlp's own "[id]" convention in yt_dlp_wrapper.py —
+    // keeps the same guaranteed-unique-even-when-metadata's-missing property while reading as
+    // "poster - caption" first. DownloadWorker derives the entity's own display title by
+    // stripping that trailing bracket, so the two need to keep matching.
+    private const val LEGACY_DEFAULT_FILENAME_FORMAT_2 = "{uploader|category} - {title|id} - {filename}.{extension}"
+    const val DEFAULT_FILENAME_FORMAT = "{uploader|category} - {title|category} [{filename}].{extension}"
     const val DEFAULT_CONCURRENT_DOWNLOADS = 2
     const val MAX_CONCURRENT_DOWNLOADS = 5
 
@@ -32,7 +71,7 @@ object GalleryDlPreferences {
 
     fun getFilenameFormat(context: Context): String {
         val stored = prefs(context).getString(KEY_FILENAME_FORMAT, null)?.takeIf { it.isNotBlank() }
-        if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT) return DEFAULT_FILENAME_FORMAT
+        if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT || stored == LEGACY_DEFAULT_FILENAME_FORMAT_2) return DEFAULT_FILENAME_FORMAT
         return stored
     }
 
@@ -123,5 +162,68 @@ object GalleryDlPreferences {
 
     fun setInstantShareEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_INSTANT_SHARE, enabled).apply()
+    }
+
+    fun isLibraryGridView(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_LIBRARY_GRID_VIEW, false)
+    }
+
+    fun setLibraryGridView(context: Context, gridView: Boolean) {
+        prefs(context).edit().putBoolean(KEY_LIBRARY_GRID_VIEW, gridView).apply()
+    }
+
+    fun getVideoQuality(context: Context): VideoQuality {
+        val stored = prefs(context).getString(KEY_VIDEO_QUALITY, VideoQuality.BEST.name)
+        return runCatching { VideoQuality.valueOf(stored ?: VideoQuality.BEST.name) }.getOrDefault(VideoQuality.BEST)
+    }
+
+    fun setVideoQuality(context: Context, quality: VideoQuality) {
+        prefs(context).edit().putString(KEY_VIDEO_QUALITY, quality.name).apply()
+    }
+
+    fun isDownloadSubtitles(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_DOWNLOAD_SUBTITLES, false)
+    }
+
+    fun setDownloadSubtitles(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_DOWNLOAD_SUBTITLES, enabled).apply()
+    }
+
+    fun getSubtitleLanguages(context: Context): String {
+        return prefs(context).getString(KEY_SUBTITLE_LANGUAGES, "en") ?: "en"
+    }
+
+    fun setSubtitleLanguages(context: Context, languages: String) {
+        prefs(context).edit().putString(KEY_SUBTITLE_LANGUAGES, languages.trim()).apply()
+    }
+
+    fun isEmbedThumbnail(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_EMBED_THUMBNAIL, false)
+    }
+
+    fun setEmbedThumbnail(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_EMBED_THUMBNAIL, enabled).apply()
+    }
+
+    fun isEmbedMetadata(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_EMBED_METADATA, false)
+    }
+
+    fun setEmbedMetadata(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_EMBED_METADATA, enabled).apply()
+    }
+
+    /** Whether a link that's technically part of a playlist/channel downloads just that one
+     * video (true) or the whole playlist (false, the default). Off by default because actually
+     * setting this on a yt-dlp download — not just the preference existing — has a real cost:
+     * verified live that it turns a ~6s extraction into 60-250+s in the currently-bundled yt-dlp
+     * version (see yt_dlp_wrapper.py's own comment on this), so it's opt-in rather than paid by
+     * every download by default. */
+    fun isNoPlaylist(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_NO_PLAYLIST, false)
+    }
+
+    fun setNoPlaylist(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_NO_PLAYLIST, enabled).apply()
     }
 }

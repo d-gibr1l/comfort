@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 import androidx.room.ColumnInfo
 
 enum class DownloadStatus {
-    RUNNING, QUEUED, SCHEDULED, CANCELLED, ERRORED, FINISHED, SAVED
+    RUNNING, QUEUED, SCHEDULED, PAUSED, CANCELLED, ERRORED, FINISHED, SAVED, DELETED
 }
 
 @Entity(tableName = "downloads")
@@ -37,8 +37,27 @@ data class DownloadEntity(
     @ColumnInfo(defaultValue = "0")
     val isFavorite: Boolean = false,
     val workRequestId: String? = null,
+    // Known-upfront total size of the file currently downloading (yt-dlp reports this before any
+    // bytes move) and how far into it the download has actually gotten — together these drive a
+    // byte-accurate progress bar/speed for single-item downloads instead of the item-count-only
+    // fraction, which can only ever jump straight from 0% to 100% when there's just one item.
+    // Both go stale immediately once the item finishes (superseded by totalBytes/downloadedItems),
+    // which is fine since neither is read once the download leaves RUNNING.
+    @ColumnInfo(defaultValue = "0")
+    val expectedBytes: Long = 0,
+    @ColumnInfo(defaultValue = "0")
+    val liveBytes: Long = 0,
     // gallery-dl `--filter "num in {...}"` expression, set when the user picked specific items
     // in the share sheet instead of the whole gallery. Persisted so retry/resume re-applies the
     // same selection instead of re-fetching everything.
     val itemFilter: String? = null,
-)
+) {
+    /** When this download actually happened, not when the link was submitted — those can differ
+     * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for
+     * hours before DownloadWorker ever runs. Falls back to [dateAdded] for anything that hasn't
+     * started running yet (downloadStartTime stays at its 0 default until DownloadWorker's own
+     * first line, `dao.setStartTime(...)`, actually fires), so a still-queued item still sorts/
+     * displays sensibly. */
+    val effectiveDate: Long
+        get() = downloadStartTime.takeIf { it > 0 } ?: dateAdded
+}

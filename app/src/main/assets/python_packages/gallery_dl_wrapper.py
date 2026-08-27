@@ -16,45 +16,6 @@ import gallery_dl.job
 # file out from under it (see DownloadWorker's actualCallback, which moves/deletes whatever path
 # it's given as soon as it sees it). DownloadWorker's savedCount==0 fallback then correctly hands
 # the same URL to yt_dlp_wrapper.py instead, which merges it properly.
-
-import tempfile
-import os
-
-def _create_fixed_cookie_file(cookies_path):
-    if not cookies_path or not os.path.exists(cookies_path):
-        return cookies_path
-    try:
-        with open(cookies_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        fixed_lines = []
-        for line in lines:
-            line = line.replace('\r', '')  # Fix Windows CRLF issues that gallery-dl doesn't strip
-            if line.startswith('#') and not line.startswith('#HttpOnly_'):
-                fixed_lines.append(line)
-                continue
-                
-            parts = line.split('\t')
-            if len(parts) >= 7:
-                domain = parts[0]
-                if domain.startswith('#HttpOnly_'):
-                    domain = domain[10:]
-                
-                # yt-dlp applies cookies broadly, while gallery-dl's strict MozillaCookieJar
-                # restricts www.instagram.com cookies from reaching i.instagram.com API calls.
-                if 'instagram.com' in domain:
-                    parts[0] = '.instagram.com' if not line.startswith('#HttpOnly_') else '#HttpOnly_.instagram.com'
-                    parts[1] = 'TRUE'  # domain_specified
-                    line = '\t'.join(parts)
-            fixed_lines.append(line)
-            
-        fd, temp_path = tempfile.mkstemp(suffix='.txt', prefix='fixed_cookies_')
-        with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as f:
-            f.writelines(fixed_lines)
-        return temp_path
-    except Exception:
-        return cookies_path
-
 class CallbackWriter:
     def __init__(self, callback, should_cancel=None):
         self.callback = callback
@@ -99,14 +60,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     original_argv = sys.argv
     args = ["gallery-dl", "--directory", download_dir]
-    # Pass a real browser User-Agent so Instagram (and others) don't immediately flag
-    # the default gallery-dl/1.xx.x UA as a bot and force a login redirect despite valid cookies.
-    args.extend(["--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"])
-    
-    fixed_cookies = None
     if cookies_path:
-        fixed_cookies = _create_fixed_cookie_file(cookies_path)
-        args.extend(["--cookies", fixed_cookies])
+        args.extend(["--cookies", cookies_path])
     if filename_format:
         args.extend(["--filename", filename_format])
     if limit_rate:
@@ -143,20 +98,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             gallery_dl.main()
         except SystemExit as e:
             if e.code != 0:
-                status = f"Failed with code {e.code}"
+                status = f"Error: exited with code {e.code}"
+                print(f"Error, exited with code {e.code}")
         except KeyboardInterrupt:
             status = "Cancelled"
         except Exception as e:
-            status = f"Exception: {e}"
+            status = f"Error: {e}"
+            print(f"Exception: {e}")
         finally:
             if callback and not (should_cancel is not None and should_cancel()):
                 writer.flush()
             sys.argv = original_argv
-            if fixed_cookies and fixed_cookies != cookies_path and os.path.exists(fixed_cookies):
-                try:
-                    os.remove(fixed_cookies)
-                except Exception:
-                    pass
 
     return status
 
@@ -167,12 +119,8 @@ def list_items(url, cookies_path=None, extra_args=None):
     implies simulate mode on its own, so no separate --simulate flag is needed."""
     original_argv = sys.argv
     args = ["gallery-dl", "--dump-json"]
-    args.extend(["--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"])
-    
-    fixed_cookies = None
     if cookies_path:
-        fixed_cookies = _create_fixed_cookie_file(cookies_path)
-        args.extend(["--cookies", fixed_cookies])
+        args.extend(["--cookies", cookies_path])
     if extra_args:
         try:
             args.extend(shlex.split(extra_args))
@@ -210,11 +158,6 @@ def list_items(url, cookies_path=None, extra_args=None):
             sys.argv = original_argv
             if file_index is not None:
                 gallery_dl.job.DataJob.__init__.__defaults__ = original_defaults
-            if fixed_cookies and fixed_cookies != cookies_path and os.path.exists(fixed_cookies):
-                try:
-                    os.remove(fixed_cookies)
-                except Exception:
-                    pass
 
     out = out_buffer.getvalue()
     warnings = err_buffer.getvalue().strip()

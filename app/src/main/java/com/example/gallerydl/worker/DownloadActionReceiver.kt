@@ -25,7 +25,7 @@ class DownloadActionReceiver : BroadcastReceiver() {
             try {
                 when (intent.action) {
                     ACTION_PAUSE -> DownloadDispatcher.pauseDownload(appContext, id)
-                    ACTION_CANCEL -> DownloadDispatcher.deleteDownload(appContext, id)
+                    ACTION_CANCEL -> DownloadDispatcher.cancelDownload(appContext, id)
                 }
             } finally {
                 pendingResult.finish()
