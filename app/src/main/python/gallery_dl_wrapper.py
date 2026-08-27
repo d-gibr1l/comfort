@@ -122,6 +122,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     return status
 
+# Same gap as CallbackWriter.reconfigure() above, hitting a different object here: DataJob
+# (patched in below to write straight into out_buffer instead of real stdout) calls
+# file.reconfigure(...) on whatever it's given, and plain io.StringIO has no such method —
+# reproduced live as "'_io.StringIO' object has no attribute 'reconfigure'", silently caught by
+# list_items()'s own except-and-report-empty handling below, so every listing quietly came back
+# empty instead of raising loudly.
+class _ReconfigurableStringIO(io.StringIO):
+    def reconfigure(self, *args, **kwargs):
+        pass
+
 def list_items(url, cookies_path=None, extra_args=None):
     """Enumerates items in a gallery without downloading anything, for the share-sheet item
     picker. Returns gallery-dl's raw --dump-json output as text (a JSON array of
@@ -139,8 +149,8 @@ def list_items(url, cookies_path=None, extra_args=None):
     args.append(url)
 
     sys.argv = args
-    out_buffer = io.StringIO()
-    err_buffer = io.StringIO()
+    out_buffer = _ReconfigurableStringIO()
+    err_buffer = _ReconfigurableStringIO()
 
     # DataJob.__init__(self, url, parent=None, file=sys.stdout, ...) captures the *original*
     # sys.stdout as a default argument at import time, before we ever get a chance to redirect
