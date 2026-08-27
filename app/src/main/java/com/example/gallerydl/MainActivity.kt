@@ -26,11 +26,16 @@ import com.example.gallerydl.theme.LocalThemeState
 import com.example.gallerydl.theme.ThemePreferences
 import com.example.gallerydl.theme.ThemeState
 import com.example.gallerydl.util.AppImageLoader
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
+    if (!Python.isStarted()) {
+        Python.start(AndroidPlatform(this))
+    }
     AppImageLoader.install(applicationContext)
 
     enableEdgeToEdge()

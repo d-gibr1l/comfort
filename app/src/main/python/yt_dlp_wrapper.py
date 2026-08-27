@@ -292,37 +292,3 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         if callback:
             callback(f"[error] {e}")
         return f"Error: {e}"
-
-
-# CLI entry point for PythonRuntime.kt (subprocess model, replacing Chaquopy's direct callAttr()).
-# should_cancel is deliberately not wired here — with each download now its own OS process,
-# cancellation is just Kotlin killing the process, no cooperative polling needed. argv is all
-# strings, so an empty string is this module's own "None" sentinel; DownloadWorker.kt passes "" for
-# any positional arg it would otherwise pass Kotlin null for.
-if __name__ == "__main__":
-    import sys as _sys
-
-    def _s(v):
-        return None if v == "" else v
-
-    def _b(v):
-        return v == "1"
-
-    def _emit(line):
-        print(line, flush=True)
-
-    if len(_sys.argv) < 2 or _sys.argv[1] != "download":
-        print("Usage: yt_dlp_wrapper.py download <18 positional args>", file=_sys.stderr)
-        _sys.exit(2)
-
-    a = _sys.argv[2:]
-    status = download(
-        url=a[0], download_dir=a[1], cookies_path=_s(a[2]),
-        callback=_emit, filename_format=_s(a[3]), extra_args=_s(a[4]),
-        archive_path=_s(a[5]), limit_rate=_s(a[6]), format_selector=_s(a[7]),
-        should_cancel=None, js_runtime_path=_s(a[8]), ffmpeg_path=_s(a[9]),
-        audio_only=_b(a[10]), download_subtitles=_b(a[11]), subtitle_langs=_s(a[12]),
-        embed_thumbnail=_b(a[13]), embed_metadata=_b(a[14]), no_playlist=_b(a[15]),
-        resolution_cap=(int(a[16]) if a[16] else None),
-    )
-    print(f"[__status__] {status}", flush=True)

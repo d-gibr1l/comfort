@@ -1,6 +1,7 @@
 package com.example.gallerydl.util
 
 import android.content.Context
+import com.chaquo.python.Python
 import com.example.gallerydl.data.GalleryDlPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,21 +28,17 @@ object GalleryDlListing {
      * extractors that don't emit the expected shape) — callers should fall back to a normal
      * whole-gallery download in that case. */
     suspend fun listItems(context: Context, url: String): List<GalleryItem> = withContext(Dispatchers.IO) {
+        val python = Python.getInstance()
+        val wrapper = python.getModule("gallery_dl_wrapper")
         val cookiesPath = context.filesDir.resolve("cookies.txt")
-        val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
-        val extraArgs = GalleryDlPreferences.getExtraArgs(context)
+        val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else null
+        val extraArgs = GalleryDlPreferences.getExtraArgs(context).ifBlank { null }
 
-        // list_items() only ever prints once (see gallery_dl_wrapper.py's __main__), but that one
-        // print can itself contain embedded newlines (the JSON text, plus the warnings marker) —
-        // PythonRuntime.run() delivers it back one line at a time, so it has to be rejoined into
-        // the single block of text list_items() originally returned before parsing it as JSON.
-        val lines = mutableListOf<String>()
         val rawText = runCatching {
-            PythonRuntime.run(context, "gallery_dl_wrapper.py", listOf("list_items", url, cookiesArg, extraArgs)) { line ->
-                lines.add(line)
+            PythonEngineLock.withLock {
+                wrapper.callAttr("list_items", url, cookiesArg, extraArgs).toString()
             }
-            lines.joinToString("\n")
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return@withContext emptyList()
+        }.getOrNull() ?: return@withContext emptyList()
 
         val markerIndex = rawText.indexOf(WARNINGS_MARKER)
         val jsonText: String
