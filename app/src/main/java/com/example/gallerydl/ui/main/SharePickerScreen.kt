@@ -39,7 +39,7 @@ private enum class ListingState { LOADING, LOADED, UNAVAILABLE }
 fun SharePickerScreen(
     url: String,
     onDismiss: () -> Unit,
-    onDownload: (url: String, itemFilter: String?) -> Unit,
+    onDownload: (url: String, itemFilter: String?, totalItems: Int) -> Unit,
     modifier: Modifier = Modifier,
     onHeightChange: (Dp) -> Unit = {},
 ) {
@@ -88,7 +88,7 @@ fun SharePickerScreen(
     // a normal whole-gallery download instead of leaving the user stuck on an empty picker.
     LaunchedEffect(state) {
         if (state == ListingState.UNAVAILABLE) {
-            onDownload(url, null)
+            onDownload(url, null, 0)
         }
     }
 
@@ -131,7 +131,10 @@ fun SharePickerScreen(
                             onClick = {
                                 val filter = if (selectedNums.size == items.size) null
                                     else "num in {${selectedNums.sorted().joinToString(",")}}"
-                                onDownload(url, filter)
+                                // The --filter above (when set) restricts the download to exactly
+                                // these items, so this count is exact regardless of whether the
+                                // picker's own listing got truncated at GalleryDlListing.MAX_ITEMS.
+                                onDownload(url, filter, selectedNums.size)
                             },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = MaterialTheme.shapes.medium,

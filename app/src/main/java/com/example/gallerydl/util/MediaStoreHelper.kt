@@ -13,12 +13,30 @@ import java.net.URLConnection
 
 object MediaStoreHelper {
 
-    private const val RELATIVE_DIR = "Pictures/gallery-dl"
+    private const val IMAGE_RELATIVE_DIR = "Pictures/gallery-dl"
+    private const val VIDEO_RELATIVE_DIR = "Movies/gallery-dl"
+    private const val AUDIO_RELATIVE_DIR = "Music/gallery-dl"
+
+    /** Whether the Uri a download saved still resolves to a real file — false once the user has
+     * deleted it from their gallery (or the SAF folder) outside the app. Errors fail open (return
+     * true) since wrongly flagging a still-live file as deleted is worse than occasionally missing
+     * a real deletion. */
+    fun exists(context: Context, uriString: String): Boolean {
+        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return true
+        return runCatching {
+            if (uri.authority == MediaStore.AUTHORITY) {
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)
+                    ?.use { it.moveToFirst() } ?: false
+            } else {
+                DocumentFile.fromSingleUri(context, uri)?.exists() ?: false
+            }
+        }.getOrDefault(true)
+    }
 
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if
      * one is set, otherwise the public Pictures/gallery-dl gallery folder — and returns its
      * content Uri. */
-    fun saveImageToGallery(context: Context, sourceFile: File): Uri? {
+    fun saveMediaToGallery(context: Context, sourceFile: File): Uri? {
         val mimeType = URLConnection.guessContentTypeFromName(sourceFile.name) ?: "image/jpeg"
 
         val customTreeUri = GalleryDlPreferences.getDownloadLocationUri(context)
@@ -66,15 +84,22 @@ object MediaStoreHelper {
 
     private fun saveToMediaStore(context: Context, sourceFile: File, mimeType: String): Uri? {
         val resolver = context.contentResolver
-
+        // gallery-dl posts (Instagram reels/carousels especially) can include video or
+        // audio-only files alongside images — MediaStore rejects any of these MIME types
+        // inserted into a mismatched collection, so route each into its matching one.
+        val (collection, relativeDir) = when {
+            mimeType.startsWith("video/") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI to VIDEO_RELATIVE_DIR
+            mimeType.startsWith("audio/") -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI to AUDIO_RELATIVE_DIR
+            else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI to IMAGE_RELATIVE_DIR
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, sourceFile.name)
-                put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                put(MediaStore.Images.Media.RELATIVE_PATH, RELATIVE_DIR)
-                put(MediaStore.Images.Media.IS_PENDING, 1)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, sourceFile.name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relativeDir)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
-            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+            val uri = resolver.insert(collection, values) ?: return null
             val copied = resolver.openOutputStream(uri)?.use { out ->
                 sourceFile.inputStream().use { it.copyTo(out) }
                 true
@@ -84,25 +109,32 @@ object MediaStoreHelper {
                 return null
             }
             values.clear()
-            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
             uri
         } else {
             // Pre-scoped-storage devices (API 24-28): write straight into the public dir, then index it.
             @Suppress("DEPRECATION")
-            val publicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "gallery-dl")
+            val publicRoot = Environment.getExternalStoragePublicDirectory(
+                when {
+                    mimeType.startsWith("video/") -> Environment.DIRECTORY_MOVIES
+                    mimeType.startsWith("audio/") -> Environment.DIRECTORY_MUSIC
+                    else -> Environment.DIRECTORY_PICTURES
+                }
+            )
+            val publicDir = File(publicRoot, "gallery-dl")
             if (!publicDir.exists()) publicDir.mkdirs()
             val destFile = File(publicDir, sourceFile.name)
             sourceFile.inputStream().use { input ->
                 destFile.outputStream().use { output -> input.copyTo(output) }
             }
             val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, destFile.name)
-                put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, destFile.name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
                 @Suppress("DEPRECATION")
-                put(MediaStore.Images.Media.DATA, destFile.absolutePath)
+                put(MediaStore.MediaColumns.DATA, destFile.absolutePath)
             }
-            resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            resolver.insert(collection, values)
         }
     }
 }
