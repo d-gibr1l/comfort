@@ -822,9 +822,12 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 }
 
 /** Shared by the Cookies & Login settings screen and the Queue's per-download "Add cookies"
- * error-card action — a built-in WebView pointed at [loginUrl] so the user can sign in normally,
- * then "Extract Cookies" pulls whatever CookieManager captured for that site and merges it into
- * the saved cookies.txt (replacing only that site's prior lines, not the whole file). */
+ * error-card action — a real navigable browser (URL bar, back/forward/refresh) starting at
+ * [loginUrl] so the user can sign in normally, or browse anywhere else the site sends them
+ * (an OAuth redirect, a "verify it's you" subdomain, ...) without getting stuck on one fixed
+ * page. The single FAB extracts whatever CookieManager captured for the page currently on screen
+ * and merges it into the saved cookies.txt (replacing only that site's prior lines, not the whole
+ * file), then closes. */
 @Composable
 fun CookieLoginDialog(
     loginUrl: String,
@@ -832,6 +835,16 @@ fun CookieLoginDialog(
     onCookiesSaved: (String) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    var addressBarText by remember { mutableStateOf(loginUrl) }
+    // The single source of truth for what's actually loaded — addressBarText tracks the user's
+    // in-progress edits separately so typing a new URL doesn't fight with the WebView's own
+    // onPageStarted/onPageFinished updates overwriting the field mid-edit.
+    var currentUrl by remember { mutableStateOf(loginUrl) }
+    var canGoBack by remember { mutableStateOf(false) }
+    var canGoForward by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
+
     Dialog(
         onDismissRequest = onDismiss,
         // Dialog's default width policy caps the window well short of the screen (platform
@@ -845,15 +858,82 @@ fun CookieLoginDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                    Button(
+                    IconButton(onClick = onDismiss) {
+                        Icon(FeatherIcons.X, contentDescription = "Close")
+                    }
+                    IconButton(onClick = { webView?.goBack() }, enabled = canGoBack) {
+                        Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                    }
+                    IconButton(onClick = { webView?.goForward() }, enabled = canGoForward) {
+                        Icon(FeatherIcons.ArrowRight, contentDescription = "Forward")
+                    }
+                    OutlinedTextField(
+                        value = addressBarText,
+                        onValueChange = { addressBarText = it },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                val target = normalizeBrowserAddress(addressBarText)
+                                currentUrl = target
+                                webView?.loadUrl(target)
+                            }) {
+                                Icon(FeatherIcons.ArrowRightCircle, contentDescription = "Go")
+                            }
+                        },
+                    )
+                    IconButton(onClick = { webView?.reload() }) {
+                        Icon(FeatherIcons.RefreshCw, contentDescription = "Reload")
+                    }
+                }
+                if (isLoading) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                } else {
+                    Spacer(Modifier.height(4.dp))
+                }
+
+                Box(modifier = Modifier.weight(1f)) {
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                webViewClient = object : WebViewClient() {
+                                    override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                                        isLoading = true
+                                        if (url != null) {
+                                            currentUrl = url
+                                            addressBarText = url
+                                        }
+                                        canGoBack = view.canGoBack()
+                                        canGoForward = view.canGoForward()
+                                    }
+
+                                    override fun onPageFinished(view: WebView, url: String?) {
+                                        isLoading = false
+                                        if (url != null) {
+                                            currentUrl = url
+                                            addressBarText = url
+                                        }
+                                        canGoBack = view.canGoBack()
+                                        canGoForward = view.canGoForward()
+                                    }
+                                }
+                                loadUrl(loginUrl)
+                                webView = this
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+
+                    ExtendedFloatingActionButton(
                         onClick = {
-                            val host = runCatching { java.net.URI(loginUrl).host }.getOrNull()
-                            val cookieHeader = CookieManager.getInstance().getCookie(loginUrl)
+                            val host = runCatching { java.net.URI(currentUrl).host }.getOrNull()
+                            val cookieHeader = CookieManager.getInstance().getCookie(currentUrl)
                             if (host != null && !cookieHeader.isNullOrBlank()) {
                                 val sharedPreferences = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
                                 val existing = sharedPreferences.getString(GalleryDlPreferences.KEY_COOKIES, "") ?: ""
@@ -865,23 +945,29 @@ fun CookieLoginDialog(
                                 onDismiss()
                             }
                         },
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Text("Extract Cookies")
-                    }
+                        icon = { Icon(FeatherIcons.Lock, contentDescription = null) },
+                        text = { Text("Extract cookies") },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp),
+                    )
                 }
-                AndroidView(
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            webViewClient = WebViewClient()
-                            settings.javaScriptEnabled = true
-                            loadUrl(loginUrl)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
             }
         }
+    }
+}
+
+/** Turns whatever's typed in the address bar into a real URL to load — a bare host/domain gets
+ * "https://" prefixed, anything else (no dot, contains a space, ...) is treated as a search query
+ * instead of a broken navigation attempt. */
+private fun normalizeBrowserAddress(input: String): String {
+    val trimmed = input.trim()
+    return when {
+        trimmed.isBlank() -> "https://www.google.com"
+        trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+        !trimmed.contains(' ') && trimmed.contains('.') && !trimmed.contains("://") ->
+            "https://$trimmed"
+        else -> "https://www.google.com/search?q=" + java.net.URLEncoder.encode(trimmed, "UTF-8")
     }
 }
 
@@ -890,7 +976,8 @@ fun CookieLoginDialog(
  * separated: domain, includeSubdomains, path, secure, expiry, name, value). Converts and merges
  * into [existing], dropping any prior lines for [host] first so re-extracting replaces rather than
  * duplicates/conflicts with them. */
-private fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): String {
+// Not private — BrowserScreen's own "Extract cookies" action reuses this same conversion.
+fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): String {
     val domain = if (host.startsWith(".")) host else ".$host"
     val bareDomain = domain.removePrefix(".")
     // Five years out — CookieManager doesn't expose each cookie's real expiry, and a long-lived
