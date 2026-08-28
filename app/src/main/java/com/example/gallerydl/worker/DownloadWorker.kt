@@ -362,8 +362,9 @@ class DownloadWorker(
                     // Neither engine found anything to save. Previously this silently reported
                     // FINISHED with 0 items regardless — a real error now, since there's a genuine
                     // reason to show the user (unsupported link, blocked request, nothing there).
-                    dao.updateError(downloadId, DownloadStatus.ERRORED, lastErrorLine.get() ?: "No downloadable content found at this link")
-                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle)
+                    val errorMsg = lastErrorLine.get() ?: "No downloadable content found at this link"
+                    dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
+                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
                     // Result.success(), not failure() — see the isStopped branch above for why:
                     // this download's own ERRORED status is already recorded in our DB; returning
                     // failure() here would additionally auto-kill every other download still
@@ -391,7 +392,7 @@ class DownloadWorker(
                     Result.success()
                 } else {
                     dao.updateError(downloadId, DownloadStatus.ERRORED, e.localizedMessage)
-                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle)
+                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, e.localizedMessage)
                     Result.success()
                 }
             }

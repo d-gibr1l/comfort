@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+    <!-- Same silhouette-rendering note as ic_notif_success.xml — an alert-circle-with-exclamation
+         so a failed download reads as clearly wrong at a glance, not just a differently-worded
+         version of the same icon. -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-2h2v2zM13,13h-2L10.75,7h2.5L13,13z" />
+</vector>

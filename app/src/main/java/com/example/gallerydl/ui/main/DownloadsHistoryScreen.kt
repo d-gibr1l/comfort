@@ -500,6 +500,12 @@ private fun HistoryGridItem(
             }
         }
 
+        // A quick, scannable outcome badge in a grid full of thumbnails — a checkmark or an
+        // alert, so you don't have to open each item (or squint at its icon-vs-photo state) to
+        // tell success from failure. DELETED/CANCELLED already read clearly enough from their own
+        // placeholder icon above (trash can, greyed out) not to need one.
+        StatusBadge(status = item.status, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp))
+
         if (selected) {
             Box(
                 modifier = Modifier
@@ -513,6 +519,27 @@ private fun HistoryGridItem(
                 Icon(FeatherIcons.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
             }
         }
+    }
+}
+
+/** Small circular success/failure badge shared by both the grid and list history rows —
+ * FINISHED gets a green check, ERRORED a red alert; every other status (DELETED, CANCELLED)
+ * already reads clearly enough from its own placeholder icon not to need one. */
+@Composable
+private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
+    val (icon, tint, description) = when (status) {
+        DownloadStatus.FINISHED -> Triple(FeatherIcons.CheckCircle, Color(0xFF22C55E), "Succeeded")
+        DownloadStatus.ERRORED -> Triple(FeatherIcons.AlertCircle, MaterialTheme.colorScheme.error, "Failed")
+        else -> return
+    }
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.55f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(12.dp))
     }
 }
 
@@ -622,6 +649,8 @@ private fun HistoryRow(
                         Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = Color(0xFFFACC15), modifier = Modifier.size(11.dp))
                     }
                 }
+
+                StatusBadge(status = item.status, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp))
             }
 
             if (selected) {
