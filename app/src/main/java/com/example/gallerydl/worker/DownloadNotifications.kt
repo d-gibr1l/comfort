@@ -76,7 +76,10 @@ object DownloadNotifications {
     fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?) {
         val text = if (downloadedItems > 0) "$downloadedItems picture${if (downloadedItems == 1) "" else "s"} saved" else "Nothing new to download"
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
+            // still uses — so "this one finished" is visible at a glance in the shade/status bar
+            // without having to read the text.
+            .setSmallIcon(R.drawable.ic_notif_success)
             .setContentTitle(title)
             .setContentText(text)
             .setAutoCancel(true)
@@ -114,11 +117,13 @@ object DownloadNotifications {
         notifySafe(context, downloadId, builder.build())
     }
 
-    fun notifyFailed(context: Context, downloadId: String, title: String) {
+    fun notifyFailed(context: Context, downloadId: String, title: String, errorMessage: String? = null) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            // Same idea as notifyFinished's checkmark, mirrored — a distinct error glyph instead
+            // of the plain app icon, so a failure reads as clearly wrong at a glance.
+            .setSmallIcon(R.drawable.ic_notif_error)
             .setContentTitle(title)
-            .setContentText("Download failed")
+            .setContentText(errorMessage?.takeIf { it.isNotBlank() } ?: "Download failed")
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
