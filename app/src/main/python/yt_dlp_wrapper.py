@@ -202,6 +202,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         "quiet": True,
         "no_color": True,
         "restrictfilenames": True,
+        # The CLI sets this by default (unless --abort-on-error is passed); the raw YoutubeDL API
+        # does not — without it, one bad item in a multi-item URL (e.g. an Instagram carousel's
+        # non-video photo entries, which legitimately have "No video formats found") raises
+        # immediately out of ydl.download() and aborts the whole call, silently skipping every
+        # item after it — including any real videos later in the same carousel. Reproduced live:
+        # a 3-item Instagram post (1 photo + 2 real videos) downloaded zero videos without this,
+        # because the photo item (processed first) raised before yt-dlp ever reached the videos.
+        # "only_download" still lets a genuine extraction-level failure (bad URL, private/deleted
+        # post, etc.) raise normally — it only tolerates individual items failing mid-playlist.
+        "ignoreerrors": "only_download",
     }
     if resolution_cap and not audio_only:
         # "res" sorts by min(height, width) rather than raw height — the conventional quality
