@@ -94,6 +94,9 @@ class DownloadWorker(
                 }
 
                 val cookiesPath = applicationContext.filesDir.resolve("cookies.txt")
+                if (cookiesPath.exists()) {
+                    cookiesPath.writeText(cookiesPath.readText().replace("\r\n", "\n"))
+                }
 
                 // gallery-dl needs a real filesystem path to write to; stage downloads here,
                 // then move each finished file into the public gallery via MediaStore so it's
