@@ -79,7 +79,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
                 0 -> HomeScreen(onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") })
                 1 -> DownloadsHistoryScreen(
                     viewModel = viewModel,
-                    onOpenQueue = { showQueueScreen = true }
+                    onOpenQueue = { showQueueScreen = true },
+                    isQueueOpen = showQueueScreen,
                 )
                 2 -> MoreScreen()
             }

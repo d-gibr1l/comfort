@@ -15,9 +15,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,7 +59,7 @@ private enum class LibrarySort(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Unit) {
+fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Unit, isQueueOpen: Boolean = false) {
     val historyItems by viewModel.historyFlow.collectAsState()
     val deletedItems by viewModel.deletedFlow.collectAsState()
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsState()
@@ -72,6 +74,20 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var gridView by remember { mutableStateOf(GalleryDlPreferences.isLibraryGridView(context)) }
     val selectionMode = selectedIds.isNotEmpty()
+
+    // MainScreen keeps this screen composed underneath the Download Queue overlay now (needed for
+    // the predictive-back reveal animation), where it used to fully unmount and remount — which
+    // reset scroll position back to the top as a side effect. A freshly-finished download lands at
+    // the top of the newest-first list, so without this, coming back from Queue silently leaves
+    // you scrolled wherever you were before, with the new item off-screen above.
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    LaunchedEffect(isQueueOpen) {
+        if (!isQueueOpen) {
+            listState.scrollToItem(0)
+            gridState.scrollToItem(0)
+        }
+    }
 
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
     BackHandler(enabled = showSearch && !selectionMode) { showSearch = false; searchQuery = "" }
@@ -302,6 +318,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         } else if (gridView) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
+                state = gridState,
                 contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), start = 8.dp, end = 8.dp, bottom = NAV_BAR_RESERVED_HEIGHT),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -323,6 +340,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
             }
         } else {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = NAV_BAR_RESERVED_HEIGHT),
                 modifier = Modifier.fillMaxSize(),
             ) {
