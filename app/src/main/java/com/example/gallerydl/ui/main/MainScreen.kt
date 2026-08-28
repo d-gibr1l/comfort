@@ -1,8 +1,10 @@
 package com.example.gallerydl.ui.main
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -14,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CancellationException
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.PillShape
 import compose.icons.FeatherIcons
@@ -52,19 +56,35 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     var showQueueScreen by remember { mutableStateOf(false) }
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsState()
 
-    BackHandler(enabled = showQueueScreen) { showQueueScreen = false }
+    // Drives the predictive-back "peek" animation below — 0 = QueueScreen fully covering the
+    // screen, 1 = fully swiped away. Tracks the gesture's live progress while a finger is down,
+    // then either finishes the dismiss (gesture completed) or springs back to 0 (gesture
+    // cancelled partway through a swipe).
+    val queueDismissProgress = remember { Animatable(0f) }
 
-    if (showQueueScreen) {
-        QueueScreen(
-            viewModel = viewModel,
-            onBack = { showQueueScreen = false }
-        )
-        return
+    // PredictiveBackHandler (not plain BackHandler) so a system back gesture can be *previewed*
+    // mid-swipe instead of only firing once fully committed — same "peek behind the current
+    // screen as you drag" effect apps like Tachiyomi use, requires
+    // android:enableOnBackInvokedCallback="true" in the manifest to actually animate rather than
+    // fire instantly. A plain tap of QueueScreen's own back button (onBack below) skips the
+    // gesture-progress dance entirely and just dismisses immediately, same as before.
+    PredictiveBackHandler(enabled = showQueueScreen) { progress ->
+        try {
+            progress.collect { backEvent -> queueDismissProgress.snapTo(backEvent.progress) }
+            // Gesture completed (finger lifted past the commit threshold) — finish the dismiss.
+            showQueueScreen = false
+            queueDismissProgress.snapTo(0f)
+        } catch (e: CancellationException) {
+            // Gesture cancelled (finger dragged back, or lifted too early) — spring the sheet
+            // back to fully covering the screen instead of leaving it stuck mid-peek.
+            queueDismissProgress.animateTo(0f, animationSpec = tween(200))
+        }
     }
 
     // Back from a non-Home tab returns to Home first, matching standard bottom-nav behavior,
     // instead of immediately falling through to the empty nav backstack and quitting the app.
-    BackHandler(enabled = selectedTab != 0) { selectedTab = 0 }
+    // Only active when QueueScreen isn't up — its own PredictiveBackHandler above takes priority.
+    BackHandler(enabled = !showQueueScreen && selectedTab != 0) { selectedTab = 0 }
 
     // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
     // measured region — pill height plus FloatingNavBar's own 24dp/16dp padding — and paints
@@ -97,6 +117,33 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        // Rendered on top of (not instead of) the tab content above, specifically so the tab
+        // underneath is actually visible while mid-swipe — an early-return here (the previous
+        // approach) would mean there's nothing behind QueueScreen to peek at during the gesture.
+        if (showQueueScreen) {
+            val progress = queueDismissProgress.value
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // Shrinks and nudges toward the right/bottom as the gesture progresses —
+                        // reveals the tab content already sitting underneath instead of just
+                        // instantly vanishing once the gesture commits.
+                        val scale = 1f - progress * 0.15f
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = size.width * 0.05f * progress
+                        translationY = size.height * 0.03f * progress
+                    }
+                    .clip(RoundedCornerShape((progress * 28).dp))
+            ) {
+                QueueScreen(
+                    viewModel = viewModel,
+                    onBack = { showQueueScreen = false }
+                )
+            }
+        }
     }
 }
 
