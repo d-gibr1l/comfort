@@ -38,16 +38,19 @@ object MediaStoreHelper {
      * content Uri. */
     fun saveMediaToGallery(context: Context, sourceFile: File): Uri? {
         val ext = sourceFile.name.substringAfterLast('.', "").lowercase()
-        val mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+        var mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
             ?: URLConnection.guessContentTypeFromName(sourceFile.name)
             ?: when (ext) {
-                "mkv" -> "video/x-matroska"
-                "mp4", "m4v" -> "video/mp4"
+                "mp4", "m4v", "mkv" -> "video/mp4"
                 "webm" -> "video/webm"
                 "mp3" -> "audio/mpeg"
                 "m4a" -> "audio/mp4"
                 else -> "image/jpeg"
             }
+            
+        if (mimeType == "video/x-matroska") {
+            mimeType = "video/mp4"
+        }
 
         val customTreeUri = GalleryDlPreferences.getDownloadLocationUri(context)
         if (customTreeUri != null) {
