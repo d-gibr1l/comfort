@@ -57,12 +57,9 @@ object PythonRuntime {
     private fun sitePackagesDir(context: Context) =
         File(runtimeRoot(context), "usr/lib/python3.14/site-packages")
 
-    /** Null if the YTDLnis Python helper package isn't installed on the device at all — callers
-     * should surface a clear "install the helper package" error rather than crash. */
+    /** Null if the app's own nativeLibraryDir can't be resolved. */
     private fun helperNativeLibDir(context: Context): File? {
-        val info = runCatching { context.packageManager.getApplicationInfo(HELPER_PACKAGE, 0) }.getOrNull()
-            ?: return null
-        val dir = info.nativeLibraryDir ?: return null
+        val dir = context.applicationInfo.nativeLibraryDir ?: return null
         return File(dir).takeIf { it.exists() }
     }
 
@@ -163,7 +160,7 @@ object PythonRuntime {
         onLine: suspend (String) -> Unit,
     ): Int = withContext(Dispatchers.IO) {
         val nativeLibDir = helperNativeLibDir(context)
-            ?: error("YTDLnis python helper package ($HELPER_PACKAGE) is not installed")
+            ?: error("App nativeLibraryDir not found (this should never happen)")
         if (!ensureProvisioned(context)) {
             error("Failed to provision the Python runtime")
         }
