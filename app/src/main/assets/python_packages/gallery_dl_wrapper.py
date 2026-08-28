@@ -111,7 +111,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         except SystemExit as e:
             if e.code != 0:
                 status = f"Error: exited with code {e.code}"
-                print(f"Error, exited with code {e.code}")
         except KeyboardInterrupt:
             status = "Cancelled"
         except Exception as e:
