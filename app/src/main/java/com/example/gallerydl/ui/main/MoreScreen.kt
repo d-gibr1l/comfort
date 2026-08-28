@@ -5,11 +5,9 @@ import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -48,16 +46,26 @@ private enum class SettingsRoute { ROOT, APPEARANCE, DOWNLOADS, ADVANCED, COOKIE
 fun MoreScreen() {
     var route by remember { mutableStateOf(SettingsRoute.ROOT) }
 
-    BackHandler(enabled = route != SettingsRoute.ROOT) { route = SettingsRoute.ROOT }
+    Box(modifier = Modifier.fillMaxSize()) {
+        // The root settings list is what a sub-screen's back gesture reveals — kept composed
+        // underneath whenever we're not already on it, same reasoning as MainScreen's Home-behind-
+        // a-tab treatment, purely so there's something real to peek at mid-swipe.
+        if (route != SettingsRoute.ROOT) {
+            SettingsRootScreen(onNavigate = { route = it })
+        }
 
-    AnimatedContent(targetState = route, label = "settingsRoute") { current ->
-        when (current) {
-            SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = { route = it })
-            SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { route = SettingsRoute.ROOT })
-            SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { route = SettingsRoute.ROOT })
-            SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { route = SettingsRoute.ROOT })
-            SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { route = SettingsRoute.ROOT })
-            SettingsRoute.ABOUT -> AboutScreen(onBack = { route = SettingsRoute.ROOT })
+        val backProgress = rememberPredictiveBackProgress(enabled = route != SettingsRoute.ROOT) {
+            route = SettingsRoute.ROOT
+        }
+        Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(backProgress)) {
+            when (route) {
+                SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = { route = it })
+                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { route = SettingsRoute.ROOT })
+                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { route = SettingsRoute.ROOT })
+                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { route = SettingsRoute.ROOT })
+                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { route = SettingsRoute.ROOT })
+                SettingsRoute.ABOUT -> AboutScreen(onBack = { route = SettingsRoute.ROOT })
+            }
         }
     }
 }
