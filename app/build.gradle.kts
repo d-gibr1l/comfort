@@ -3,7 +3,6 @@ plugins {
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.ksp)
-  id("com.chaquo.python")
 }
 
 android {
@@ -116,15 +115,5 @@ dependencies {
   implementation("io.github.darkokoa:datetime-wheel-picker:1.4.0")
   implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-}
-
-chaquopy {
-    defaultConfig {
-        version = "3.12"
-        pip {
-            install("git+https://github.com/mikf/gallery-dl.git")
-            install("yt-dlp")
-        }
-    }
 }
 
