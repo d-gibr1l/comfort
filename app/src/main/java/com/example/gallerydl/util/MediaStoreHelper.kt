@@ -37,7 +37,17 @@ object MediaStoreHelper {
      * one is set, otherwise the public Pictures/gallery-dl gallery folder — and returns its
      * content Uri. */
     fun saveMediaToGallery(context: Context, sourceFile: File): Uri? {
-        val mimeType = URLConnection.guessContentTypeFromName(sourceFile.name) ?: "image/jpeg"
+        val ext = sourceFile.name.substringAfterLast('.', "").lowercase()
+        val mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            ?: URLConnection.guessContentTypeFromName(sourceFile.name)
+            ?: when (ext) {
+                "mkv" -> "video/x-matroska"
+                "mp4", "m4v" -> "video/mp4"
+                "webm" -> "video/webm"
+                "mp3" -> "audio/mpeg"
+                "m4a" -> "audio/mp4"
+                else -> "image/jpeg"
+            }
 
         val customTreeUri = GalleryDlPreferences.getDownloadLocationUri(context)
         if (customTreeUri != null) {

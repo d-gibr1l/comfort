@@ -19,6 +19,6 @@ object FfmpegRuntime {
     /** Path to the ffmpeg executable, or null if it wasn't bundled for this device's ABI. */
     fun getExecutablePath(context: Context): String? {
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY_NAME)
-        return binary.takeIf { it.exists() && it.canExecute() }?.absolutePath
+        return binary.takeIf { it.exists() }?.absolutePath
     }
 }
