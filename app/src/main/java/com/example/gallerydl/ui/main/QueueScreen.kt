@@ -161,12 +161,24 @@ fun QueueScreen(
                         "Cancelled" -> queueItems.count { it.status == DownloadStatus.CANCELLED }
                         else -> 0
                     }
-                    FilterChip(
-                        selected = selectedFilter == filter,
-                        onClick = { selectedFilter = filter },
-                        label = { Text("$filter ($count)") },
-                        shape = com.example.gallerydl.theme.PillShape
-                    )
+                    BadgedBox(
+                        badge = {
+                            if (count > 0) {
+                                Badge(
+                                    containerColor = if (selectedFilter == filter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                ) {
+                                    Text(count.toString())
+                                }
+                            }
+                        }
+                    ) {
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { selectedFilter = filter },
+                            label = { Text(filter) },
+                            shape = com.example.gallerydl.theme.PillShape
+                        )
+                    }
                 }
             }
 
