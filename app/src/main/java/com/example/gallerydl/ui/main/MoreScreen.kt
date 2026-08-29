@@ -908,21 +908,46 @@ fun CookieLoginDialog(
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
+                                // 1. Core Web Capabilities
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
-                                // Force a Desktop Chrome User-Agent. Instagram's mobile site often sends intent:// redirects 
-                                // to force opening their native app, which causes WebViews to go completely blank.
-                                // The desktop site works flawlessly and doesn't try to deep-link you away.
-                                settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                settings.databaseEnabled = true
+                                settings.setSupportZoom(true)
+
+                                // 2. Clean the User-Agent to bypass basic bot detection while keeping mobile layout
+                                settings.userAgentString = settings.userAgentString
+                                    .replace("; wv", "")
+                                    .replace("Version/4.0 ", "")
+
                                 android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                                // 3. WebChromeClient prevents crashes on JavaScript alerts or progress updates
+                                webChromeClient = android.webkit.WebChromeClient()
+
+                                // 4. The Intent Interceptor Client
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean {
                                         val url = request.url.toString()
-                                        // Block Android app intents (intent://) which crash the WebView into a blank screen
-                                        if (url.startsWith("intent://") || url.startsWith("android-app://")) {
-                                            return true
+                                        
+                                        // Allow standard web traffic
+                                        if (url.startsWith("http://") || url.startsWith("https://")) {
+                                            return false 
                                         }
-                                        return super.shouldOverrideUrlLoading(view, request)
+
+                                        // Catch and neutralize custom app intents
+                                        try {
+                                            val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                            val fallbackUrl = intent.getStringExtra("browser_fallback_url")
+                                            
+                                            if (!fallbackUrl.isNullOrEmpty()) {
+                                                view.loadUrl(fallbackUrl)
+                                            }
+                                            
+                                            // Return true to absorb the routing and prevent the crash
+                                            return true 
+                                        } catch (e: Exception) {
+                                            return true 
+                                        }
                                     }
 
                                     override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
