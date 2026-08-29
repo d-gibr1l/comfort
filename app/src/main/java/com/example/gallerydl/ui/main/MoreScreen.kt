@@ -759,7 +759,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 
     if (showBrowser) {
         CookieLoginDialog(
-            loginUrl = "https://instagram.com",
+            loginUrl = "https://www.instagram.com/accounts/login/",
             onDismiss = { showBrowser = false },
             onCookiesSaved = { merged ->
                 extractedCookies = merged
@@ -910,10 +910,9 @@ fun CookieLoginDialog(
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
-                                // Force a Desktop Chrome User-Agent. Instagram's mobile site often sends intent:// redirects 
-                                // to force opening their native app, which causes WebViews to go completely blank.
-                                // The desktop site works flawlessly and doesn't try to deep-link you away.
-                                settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                // Strip WebView identifiers to avoid anti-bot blocks, but keep the mobile UA 
+                                // so the site renders properly for phones instead of tiny desktop mode.
+                                settings.userAgentString = settings.userAgentString.replace("; wv", "").replace("Version/4.0 ", "")
                                 android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean {
