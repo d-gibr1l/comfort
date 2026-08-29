@@ -153,10 +153,18 @@ fun QueueScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(filters) { filter ->
+                    val count = when (filter) {
+                        "Running" -> queueItems.count { it.status == DownloadStatus.RUNNING }
+                        "In Queue" -> queueItems.count { it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED }
+                        "Paused" -> queueItems.count { it.status == DownloadStatus.PAUSED }
+                        "Errored" -> queueItems.count { it.status == DownloadStatus.ERRORED }
+                        "Cancelled" -> queueItems.count { it.status == DownloadStatus.CANCELLED }
+                        else -> 0
+                    }
                     FilterChip(
                         selected = selectedFilter == filter,
                         onClick = { selectedFilter = filter },
-                        label = { Text(filter) },
+                        label = { Text("$filter ($count)") },
                         shape = com.example.gallerydl.theme.PillShape
                     )
                 }
