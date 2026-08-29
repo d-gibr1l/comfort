@@ -40,10 +40,21 @@ class DownloadWorker(
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
 
+        // A resumed/retried download already has real progress sitting in the DB from its last
+        // run — starting the notification back at a bare indeterminate spinner (only for the first
+        // real progress line or file to arrive to correct it) would visibly regress what the user
+        // already saw before it paused. Same item-count-wins-over-bytes priority as
+        // computeProgressPercent below (not reused directly — that closure isn't in scope yet here).
+        val initialPercent = when {
+            entity == null -> null
+            entity.totalItems > 1 -> ((entity.downloadedItems.toFloat() / entity.totalItems) * 100).toInt().coerceIn(0, 100)
+            entity.expectedBytes > 0 -> (((entity.totalBytes + entity.liveBytes).toFloat() / entity.expectedBytes) * 100).toInt().coerceIn(0, 100)
+            else -> null
+        }
         setForeground(
             ForegroundInfo(
                 DownloadNotifications.notificationId(downloadId),
-                DownloadNotifications.progressNotification(applicationContext, displayTitle, downloadId, entity?.downloadedItems ?: 0),
+                DownloadNotifications.progressNotification(applicationContext, displayTitle, downloadId, entity?.downloadedItems ?: 0, initialPercent),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
             )
         )
@@ -71,11 +82,17 @@ class DownloadWorker(
                 // know up front whether the gallery contains a video worth a yt-dlp supplement
                 // pass afterward. A count exactly at MAX_ITEMS might just be where the listing got
                 // truncated, not the real total, so it's deliberately not trusted in that case.
+                // Mirrors the totalItems DB column for the notification's own progress percent (see
+                // computeProgressPercent below) — set here upfront and again just below once the
+                // gallery-dl listing pass (if any) determines the real count, same two points that
+                // already write it to the DB.
+                val totalItemsRef = AtomicInteger(entity?.totalItems ?: 0)
                 var hasVideoItem = false
                 if (engine == DownloadEngine.GALLERY_DL && (entity?.totalItems ?: 0) <= 0 && entity?.itemFilter == null) {
                     val listed = GalleryDlListing.listItems(applicationContext, url).items
                     if (listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
                         dao.setTotalItems(downloadId, listed.size)
+                        totalItemsRef.set(listed.size)
                     }
                     hasVideoItem = listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
                 }
@@ -104,6 +121,22 @@ class DownloadWorker(
                 val stagingDir = File(applicationContext.cacheDir, "gallery-dl-staging/$downloadId").apply { mkdirs() }
                 val savedCount = AtomicInteger(entity?.downloadedItems ?: 0)
                 val bytesSoFar = AtomicLong(0)
+                // Local mirror of the [size] line's DB column for the notification's own percent —
+                // cheaper than a DB round-trip per progress line. Same item-count-wins-over-bytes
+                // priority QueueScreen's own progress bar uses, so the notification and the in-app
+                // card never visibly disagree.
+                val expectedBytesRef = AtomicLong(0)
+                val currentFileBytesRef = AtomicLong(0)
+                fun computeProgressPercent(): Int? {
+                    val totalItems = totalItemsRef.get()
+                    if (totalItems > 1) return ((savedCount.get().toFloat() / totalItems) * 100).toInt().coerceIn(0, 100)
+                    val expectedBytes = expectedBytesRef.get()
+                    if (expectedBytes > 0) {
+                        val soFar = bytesSoFar.get() + currentFileBytesRef.get()
+                        return ((soFar.toFloat() / expectedBytes) * 100).toInt().coerceIn(0, 100)
+                    }
+                    return null
+                }
                 // The actual reason nothing came down, straight from gallery-dl/yt-dlp's own
                 // "[error] ..." lines — shown instead of the generic fallback below when nothing
                 // gets saved, so a real cause (blocked, login required, no formats found, ...) is
@@ -136,7 +169,10 @@ class DownloadWorker(
                         // branch and keep using the item-count progress path below untouched.
                         line.startsWith("[size] ") -> {
                             val bytes = line.removePrefix("[size] ").trim().toLongOrNull()
-                            if (bytes != null) dao.setExpectedBytes(downloadId, bytes)
+                            if (bytes != null) {
+                                dao.setExpectedBytes(downloadId, bytes)
+                                expectedBytesRef.set(bytes)
+                            }
                         }
                         line.startsWith("[progress] ") -> {
                             val rest = line.removePrefix("[progress] ")
@@ -145,6 +181,14 @@ class DownloadWorker(
                             if (downloaded != null) {
                                 val speedMbs = (speedBps ?: 0f) / (1024f * 1024f)
                                 dao.updateLiveBytes(downloadId, downloaded, speedMbs)
+                                currentFileBytesRef.set(downloaded)
+                                // yt_dlp_wrapper.py's own progress_hook already throttles these lines
+                                // to roughly once a second, so no extra throttling needed here — this
+                                // is what actually makes the notification's progress bar move at all
+                                // during a single large download instead of sitting indeterminate for
+                                // the whole transfer until the one file finishes (the only other call
+                                // to updateProgress, below, only fires once per completed *file*).
+                                DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent())
                             }
                         }
                         line.startsWith("[thumbnail] ") -> {
@@ -220,6 +264,11 @@ class DownloadWorker(
                                         candidate.delete()
                                         val count = savedCount.incrementAndGet()
                                         val totalBytes = bytesSoFar.addAndGet(fileSize)
+                                        // This file's bytes now live in bytesSoFar (via addAndGet
+                                        // above) instead of being "in flight" — without resetting
+                                        // this, the next file's own progress would double-count
+                                        // everything the previous file already contributed.
+                                        currentFileBytesRef.set(0)
                                         val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
                                         val speedMbs = (totalBytes / (1024f * 1024f)) / elapsedSeconds
                                         dao.updateLiveProgress(downloadId, count, speedMbs)
@@ -232,7 +281,7 @@ class DownloadWorker(
                                         if (hasPlaceholderTitle) {
                                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                                         }
-                                        DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, count)
+                                        DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, count, computeProgressPercent())
                                     }
                                 }
                             } catch (e: Exception) {
