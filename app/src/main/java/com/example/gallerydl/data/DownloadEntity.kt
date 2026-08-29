@@ -51,6 +51,12 @@ data class DownloadEntity(
     // in the share sheet instead of the whole gallery. Persisted so retry/resume re-applies the
     // same selection instead of re-fetching everything.
     val itemFilter: String? = null,
+    // VideoQuality enum name, set when the share-sheet picker offered a per-download quality
+    // choice (only shown when the listing contains a video item) instead of the global Settings
+    // default. Null means "use whatever Settings says at download time" — same as before this
+    // field existed — so a retry/resume still re-applies the quality the user actually picked
+    // rather than silently falling back to the global default if it's since changed.
+    val videoQuality: String? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
@@ -90,8 +92,18 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                // Same top-of-screen gradient as Home/Library (primary fading into background)
+                // instead of a flat bar, so Settings matches the rest of the app's header treatment.
+                modifier = Modifier.background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                            MaterialTheme.colorScheme.background,
+                        )
+                    )
+                ),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 )
             )
@@ -221,8 +233,18 @@ private fun SettingsSubScaffold(
                         Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
                     }
                 },
+                // Same top-of-screen gradient as the Settings root (and Home/Library) instead of a
+                // flat bar, so every sub-page shares the same header treatment as the rest of the app.
+                modifier = Modifier.background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                            MaterialTheme.colorScheme.background,
+                        )
+                    )
+                ),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = Color.Transparent,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 )
             )

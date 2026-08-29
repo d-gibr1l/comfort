@@ -7,7 +7,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 /** One file gallery-dl discovered while enumerating a URL, without downloading it. */
-data class GalleryItem(val num: Int, val url: String, val filename: String?)
+data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?)
 
 object GalleryDlListing {
     // gallery-dl's own Message.Url constant — stable across extractors, see gallery_dl/job.py.
@@ -82,7 +82,14 @@ object GalleryDlListing {
                     extension == null || rawFilename.endsWith(".$extension", ignoreCase = true) -> rawFilename
                     else -> "$rawFilename.$extension"
                 }
-                items.add(GalleryItem(num, fileUrl, filename))
+                // Which keyword actually holds a human-readable title varies a lot by extractor
+                // (Reddit posts use "title", Instagram/Twitter only have a caption-style
+                // "description"/"content") — tried in priority order, first non-blank wins. Kept
+                // short: this renders as a caption under a picker thumbnail, not a headline.
+                val title = listOf("title", "content", "description")
+                    .firstNotNullOfOrNull { key -> keywords?.optString(key)?.trim()?.takeIf { it.isNotBlank() } }
+                    ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
+                items.add(GalleryItem(num, fileUrl, filename, title))
             }
             items
         }.getOrElse { emptyList() }

@@ -163,9 +163,9 @@ private fun SharePickerSheet(url: String, onFinished: () -> Unit) {
                 SharePickerScreen(
                     url = url,
                     onDismiss = { visible = false },
-                    onDownload = { downloadUrl, itemFilter, totalItems ->
+                    onDownload = { downloadUrl, itemFilter, totalItems, videoQuality ->
                         scope.launch {
-                            DownloadDispatcher.enqueueDownload(context, downloadUrl, "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}", itemFilter, totalItems)
+                            DownloadDispatcher.enqueueDownload(context, downloadUrl, "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}", itemFilter, totalItems, videoQuality)
                         }
                         visible = false
                     },
