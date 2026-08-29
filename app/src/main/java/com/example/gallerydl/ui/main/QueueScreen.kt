@@ -438,8 +438,18 @@ fun QueueItemCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    val statusText = when (item.status) {
+                        DownloadStatus.RUNNING -> {
+                            if (item.expectedBytes > 0 || item.totalBytes > 0 || item.liveBytes > 0 || item.totalItems > 0) {
+                                "Downloading"
+                            } else {
+                                "Fetching info..."
+                            }
+                        }
+                        else -> item.status.name.lowercase().replaceFirstChar { it.uppercase() }
+                    }
                     Text(
-                        text = item.status.name.lowercase().replaceFirstChar { it.uppercase() },
+                        text = statusText,
                         style = MaterialTheme.typography.bodySmall,
                         color = when (item.status) {
                             DownloadStatus.ERRORED -> MaterialTheme.colorScheme.error
