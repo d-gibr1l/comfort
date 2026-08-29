@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,16 +23,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import com.example.gallerydl.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.PillShape
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import com.example.gallerydl.viewmodel.DownloadsViewModel
+
+// The Home wordmark's display face — a purchased/downloaded font, not one of Google Fonts'
+// downloadable-at-runtime families, so it ships as a bundled resource like any other static asset.
+private val CrystalRadioKit = FontFamily(Font(R.font.crystal_radio_kit))
 
 private data class NavTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -253,16 +263,34 @@ fun HomeScreen(onDownload: (String) -> Unit) {
         ) {
             // A big, chunky wordmark instead of a name + tagline pair — no separate app-name
             // caption above it (there's nothing to disambiguate it from anymore) and no subtitle
-            // below, just the logo standing on its own the way a launcher icon does.
-            Text(
+            // below, just the logo standing on its own the way a launcher icon does. Manually
+            // shrinks to fit (this Compose Foundation version doesn't have the newer built-in
+            // autoSize) rather than a guessed fixed fontSize — grows/shrinks to actually fill the
+            // available width edge-to-edge like the reference image, on any screen width, instead
+            // of only being right on one specific device.
+            var wordmarkFontSize by remember { mutableStateOf(88.sp) }
+            var wordmarkMeasured by remember { mutableStateOf(false) }
+            BasicText(
                 "COMFORT",
-                style = MaterialTheme.typography.displayLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Black,
-                fontSize = 44.sp,
-                letterSpacing = 0.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                style = TextStyle(
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontFamily = CrystalRadioKit,
+                    textAlign = TextAlign.Center,
+                    fontSize = wordmarkFontSize,
+                ),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer(alpha = if (wordmarkMeasured) 1f else 0f),
+                onTextLayout = { result ->
+                    if (result.didOverflowWidth && wordmarkFontSize > 12.sp) {
+                        wordmarkFontSize *= 0.94f
+                    } else {
+                        wordmarkMeasured = true
+                    }
+                },
             )
         }
 
