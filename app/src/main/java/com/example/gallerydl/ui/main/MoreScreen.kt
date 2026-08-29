@@ -910,37 +910,19 @@ fun CookieLoginDialog(
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
-                                // Strip out the WebView identifiers to look like standard mobile Chrome
-                                settings.userAgentString = settings.userAgentString.replace("; wv", "").replace("Version/4.0 ", "")
+                                // Force a Desktop Chrome User-Agent. Instagram's mobile site often sends intent:// redirects 
+                                // to force opening their native app, which causes WebViews to go completely blank.
+                                // The desktop site works flawlessly and doesn't try to deep-link you away.
+                                settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                                 android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean {
                                         val url = request.url.toString()
-                                        
-                                        // 1. Let standard web traffic pass through normally
-                                        if (url.startsWith("http://") || url.startsWith("https://")) {
-                                            return false 
+                                        // Block Android app intents (intent://) which crash the WebView into a blank screen
+                                        if (url.startsWith("intent://") || url.startsWith("android-app://")) {
+                                            return true
                                         }
-
-                                        // 2. Catch all custom schemes (intent://, fb://, tg://, market://)
-                                        try {
-                                            val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
-                                            
-                                            // 3. Extract the hidden web alternative
-                                            val fallbackUrl = intent.getStringExtra("browser_fallback_url")
-                                            
-                                            if (!fallbackUrl.isNullOrEmpty()) {
-                                                // Safely load the web alternative
-                                                view.loadUrl(fallbackUrl)
-                                                return true
-                                            }
-
-                                            // 4. Absorb the click if no web fallback exists
-                                            return true 
-                                            
-                                        } catch (e: Exception) {
-                                            return true 
-                                        }
+                                        return super.shouldOverrideUrlLoading(view, request)
                                     }
 
                                     override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
