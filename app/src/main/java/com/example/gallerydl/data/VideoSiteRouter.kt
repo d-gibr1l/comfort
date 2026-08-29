@@ -34,6 +34,12 @@ object VideoSiteRouter {
     fun classify(url: String): DownloadEngine {
         val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
             ?: return DownloadEngine.GALLERY_DL
+            
+        // Instagram reels are always videos and handle much better in yt-dlp immediately
+        if ((host == "instagram.com" || host.endsWith(".instagram.com")) && url.contains("/reel/")) {
+            return DownloadEngine.YT_DLP
+        }
+        
         return if (videoOnlyHosts.any { host == it || host.endsWith(".$it") }) {
             DownloadEngine.YT_DLP
         } else {
