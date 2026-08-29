@@ -13,9 +13,9 @@ import java.net.URLConnection
 
 object MediaStoreHelper {
 
-    private const val IMAGE_RELATIVE_DIR = "Pictures/gallery-dl"
-    private const val VIDEO_RELATIVE_DIR = "Movies/gallery-dl"
-    private const val AUDIO_RELATIVE_DIR = "Music/gallery-dl"
+    private const val IMAGE_RELATIVE_DIR = "Pictures/Comfort"
+    private const val VIDEO_RELATIVE_DIR = "Movies/Comfort"
+    private const val AUDIO_RELATIVE_DIR = "Music/Comfort"
 
     /** Whether the Uri a download saved still resolves to a real file — false once the user has
      * deleted it from their gallery (or the SAF folder) outside the app. Errors fail open (return
@@ -135,7 +135,7 @@ object MediaStoreHelper {
                     else -> Environment.DIRECTORY_PICTURES
                 }
             )
-            val publicDir = File(publicRoot, "gallery-dl")
+            val publicDir = File(publicRoot, "Comfort")
             if (!publicDir.exists()) publicDir.mkdirs()
             val destFile = File(publicDir, sourceFile.name)
             sourceFile.inputStream().use { input ->

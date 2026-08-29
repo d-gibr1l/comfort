@@ -353,7 +353,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 }
             }
             Text(
-                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Pictures/gallery-dl folder.",
+                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Pictures/Comfort folder.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1065,7 +1065,7 @@ private fun AboutScreen(onBack: () -> Unit) {
                 )
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("gallery-dl", style = MaterialTheme.typography.titleSmall)
+                    Text("Comfort", style = MaterialTheme.typography.titleSmall)
                     Text("Version $versionName", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
