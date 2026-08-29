@@ -12,9 +12,20 @@ import org.json.JSONObject
 /** One file discovered while enumerating a URL, without downloading it. */
 data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?)
 
+/** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
+ * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
+ * different situations for the picker: the former falls back to a normal whole-gallery download
+ * silently, the latter should tell the user why before doing anything. */
+data class ListingResult(val items: List<GalleryItem>, val errorMessage: String? = null)
+
 object GalleryDlListing {
     // gallery-dl's own Message.Url constant — stable across extractors, see gallery_dl/job.py.
     private const val MESSAGE_URL = 3
+    // gallery-dl's own Message.Error-shaped entry: [-1, {"error": "...", "message": "..."}] — seen
+    // live from an --dump-json run against a login-gated post ({"error": "AbortExtraction",
+    // "message": "HTTP redirect to login page (...)"}), not otherwise documented as a stable
+    // constant the way MESSAGE_URL is, but every real message type gallery-dl defines is positive
+    // (Version/Directory/Url/...), so any negative type is reserved for exactly this.
     // Exposed so callers can tell a genuinely small gallery apart from one that got truncated —
     // a result exactly at this size might just be the cap kicking in, not the real total.
     const val MAX_ITEMS = 200
@@ -25,10 +36,12 @@ object GalleryDlListing {
     // just logged, so a dropped item at least leaves a trace instead of vanishing without one.
     private const val WARNINGS_MARKER = "\n---GALLERY_DL_WARNINGS---\n"
 
-    /** Enumerates the items behind [url] for the share-sheet picker. Returns an empty list if the
-     * source can't be listed at all — callers should fall back to a normal whole-gallery download
-     * in that case. */
-    suspend fun listItems(context: Context, url: String): List<GalleryItem> = withContext(Dispatchers.IO) {
+    /** Enumerates the items behind [url] for the share-sheet picker. An empty result with no
+     * [ListingResult.errorMessage] means the source genuinely can't be listed this way (single-file
+     * links, unsupported extractors) — callers should fall back to a normal whole-gallery download
+     * silently in that case. A non-null errorMessage means listing actually failed (needs login,
+     * network error, ...) and should be shown, not silently swallowed into the same fallback. */
+    suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
         when (VideoSiteRouter.classify(url)) {
             // Video-only sources (Reels, TikTok, YouTube, ...) skip gallery-dl's listing entirely,
             // same as the real download does — gallery-dl either can't parse them at all, or
@@ -38,20 +51,23 @@ object GalleryDlListing {
             // extractor already resolves a real thumbnail as part of normal metadata extraction.
             DownloadEngine.YT_DLP -> listViaYtDlp(context, url)
             DownloadEngine.GALLERY_DL -> {
-                val items = listViaGalleryDl(context, url)
+                val result = listViaGalleryDl(context, url)
                 // Only worth the extra process + network round trip when there's actually a video
                 // item to fix a thumbnail for — most gallery-dl sources are image-only galleries
-                // and never hit this at all.
-                if (items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
-                    enrichVideoThumbnails(context, url, items)
+                // and never hit this at all. Enrichment failing (auth, network, ...) is treated as
+                // a soft miss, not surfaced as an error — the primary listing already succeeded, so
+                // there's a real gallery to show; the affected item(s) just keep gallery-dl's own
+                // unfetchable placeholder URL instead of a real thumbnail.
+                if (result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
+                    result.copy(items = enrichVideoThumbnails(context, url, result.items))
                 } else {
-                    items
+                    result
                 }
             }
         }
     }
 
-    private suspend fun listViaGalleryDl(context: Context, url: String): List<GalleryItem> {
+    private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
         val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
@@ -66,7 +82,18 @@ object GalleryDlListing {
                 lines.add(line)
             }
             lines.joinToString("\n")
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return emptyList()
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return ListingResult(emptyList())
+
+        // gallery_dl_wrapper.py's own "nothing on stdout" fallback — whatever gallery-dl said on
+        // stderr (auth required, unsupported URL, network error, ...), prefixed so this side can
+        // tell "genuinely nothing to list" (plain empty string, falls through to the JSON parse
+        // below and comes back as no items/no error) apart from "listing actually failed and here's
+        // why". Checked before the JSON parse, not as a parse-failure fallback — an unrelated JSON
+        // bug should never get silently reinterpreted as this specific error path.
+        if (rawText.startsWith("ERR:")) {
+            val message = rawText.removePrefix("ERR:").trim()
+            return ListingResult(emptyList(), errorMessage = message.takeIf { it.isNotBlank() })
+        }
 
         val markerIndex = rawText.indexOf(WARNINGS_MARKER)
         val jsonText: String
@@ -83,17 +110,25 @@ object GalleryDlListing {
         return parseGalleryDlItems(jsonText)
     }
 
-    private fun parseGalleryDlItems(jsonText: String): List<GalleryItem> {
+    private fun parseGalleryDlItems(jsonText: String): ListingResult {
         val trimmed = jsonText.trim()
-        if (trimmed.isEmpty()) return emptyList()
+        if (trimmed.isEmpty()) return ListingResult(emptyList())
 
         return runCatching {
             val root = JSONArray(trimmed)
             val items = mutableListOf<GalleryItem>()
+            var errorMessage: String? = null
             for (i in 0 until root.length()) {
                 if (items.size >= MAX_ITEMS) break
                 val entry = root.optJSONArray(i) ?: continue
-                if (entry.length() < 2 || entry.optInt(0, -1) != MESSAGE_URL) continue
+                val messageType = entry.optInt(0, MESSAGE_URL)
+                if (messageType < 0 && errorMessage == null && entry.length() >= 2) {
+                    val errorObj = entry.optJSONObject(1)
+                    errorMessage = errorObj?.optString("message")?.takeIf { it.isNotBlank() }
+                        ?: errorObj?.optString("error")?.takeIf { it.isNotBlank() }
+                    continue
+                }
+                if (entry.length() < 2 || messageType != MESSAGE_URL) continue
                 val fileUrl = entry.optString(1, "").ifBlank { null } ?: continue
                 val keywords = entry.optJSONObject(2)
                 val num = keywords?.optInt("num", items.size + 1) ?: (items.size + 1)
@@ -116,16 +151,18 @@ object GalleryDlListing {
                     ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
                 items.add(GalleryItem(num, fileUrl, filename, title))
             }
-            items
-        }.getOrElse { emptyList() }
+            // Real items found despite an error entry also being present (a partial failure) still
+            // count as a usable listing — only surface the error when there's nothing else to show.
+            ListingResult(items, errorMessage = errorMessage.takeIf { items.isEmpty() })
+        }.getOrElse { ListingResult(emptyList()) }
     }
 
     /** Runs yt-dlp's own metadata-only extraction on [url] directly — used for sources
      * VideoSiteRouter already routes entirely to yt-dlp for the real download too, so this listing
      * matches what actually gets fetched. Almost always a single item; some of these hosts
      * (YouTube playlists, Twitter threads) can still return several. */
-    private suspend fun listViaYtDlp(context: Context, url: String): List<GalleryItem> {
-        val info = runYtDlpListInfo(context, url) ?: return emptyList()
+    private suspend fun listViaYtDlp(context: Context, url: String): ListingResult {
+        val info = runYtDlpListInfo(context, url) ?: return ListingResult(emptyList())
         val entries = info.optJSONArray("entries")
         if (entries != null) {
             val items = mutableListOf<GalleryItem>()
@@ -134,10 +171,11 @@ object GalleryDlListing {
                 val entry = entries.optJSONObject(i) ?: continue
                 items.add(entryToGalleryItem(entry, items.size + 1))
             }
-            return items
+            return ListingResult(items)
         }
-        if (info.has("error")) return emptyList()
-        return listOf(entryToGalleryItem(info, 1))
+        val error = info.optString("error", "").takeIf { it.isNotBlank() }
+        if (error != null) return ListingResult(emptyList(), errorMessage = error)
+        return ListingResult(listOf(entryToGalleryItem(info, 1)))
     }
 
     private fun entryToGalleryItem(entry: JSONObject, num: Int): GalleryItem {

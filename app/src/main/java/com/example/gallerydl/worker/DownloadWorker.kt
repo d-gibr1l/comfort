@@ -73,7 +73,7 @@ class DownloadWorker(
                 // truncated, not the real total, so it's deliberately not trusted in that case.
                 var hasVideoItem = false
                 if (engine == DownloadEngine.GALLERY_DL && (entity?.totalItems ?: 0) <= 0 && entity?.itemFilter == null) {
-                    val listed = GalleryDlListing.listItems(applicationContext, url)
+                    val listed = GalleryDlListing.listItems(applicationContext, url).items
                     if (listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
                         dao.setTotalItems(downloadId, listed.size)
                     }

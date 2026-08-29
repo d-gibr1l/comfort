@@ -34,7 +34,7 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import kotlinx.coroutines.launch
 
-private enum class ListingState { LOADING, LOADED, UNAVAILABLE }
+private enum class ListingState { LOADING, LOADED, UNAVAILABLE, ERROR }
 
 /** Shown when a link is shared in from another app (and instant mode is off): lets the user
  * preview the gallery's items and pick which ones to actually download, instead of always
@@ -51,6 +51,8 @@ fun SharePickerScreen(
     val context = LocalContext.current
     var state by remember { mutableStateOf(ListingState.LOADING) }
     var items by remember { mutableStateOf<List<GalleryItem>>(emptyList()) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showLoginDialog by remember { mutableStateOf(false) }
     var selectedNums by remember { mutableStateOf<Set<Int>>(emptySet()) }
     // Seeded from the global Settings default once the listing loads, then only ever changed by
     // the quality chips below — a per-download override, not a change to the global default.
@@ -88,17 +90,18 @@ fun SharePickerScreen(
             val columns = minOf(items.size, 3)
             val cellSize = (configuration.screenWidthDp.dp - gridPadding - spacing * (columns - 1)) / columns
             val rows = ceil(items.size / columns.toFloat()).toInt()
-            // A row is only as short as its shortest item's neighbors let it be — Compose aligns
-            // every cell in a grid row to the tallest one. So this only shrinks the estimate for
-            // an all-video listing (every row genuinely is the shorter 16:9-plus-caption height);
-            // anything with even one image in the mix keeps the full square estimate, since a
-            // mixed row is exactly as tall as its image cells regardless of the video cells beside
-            // them — a slight overestimate there is harmless (the sheet just has a bit of trailing
-            // space), unlike an underestimate, which would clip the grid's own internal scroll.
-            val allVideo = items.isNotEmpty() && items.all { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }
-            val rowHeight = if (allVideo) cellSize * 9f / 16f + 36.dp else cellSize
+            // The compact 16:9-plus-caption treatment only ever applies to a single, full-row video
+            // item (see the grid below) — a multi-item grid (whether all-video or mixed) uses the
+            // same square cells as photos throughout, so the shorter estimate only applies to that
+            // one specific case.
+            val singleVideoItem = items.size == 1 && items.first().filename?.let(VideoSiteRouter::isVideoFilename) == true
+            val rowHeight = if (singleVideoItem) cellSize * 9f / 16f + 36.dp else cellSize
             val gridHeight = rowHeight * rows + spacing * (rows - 1).coerceAtLeast(0) + gridPadding
             topBarHeight + qualityStripHeight + gridHeight + bottomBarHeight
+        } else if (state == ListingState.ERROR) {
+            // Icon + title + message + up to three stacked buttons (Log in / Try anyway / Cancel)
+            // needs more room than the plain LOADING/UNAVAILABLE spinner frame below.
+            440.dp
         } else {
             280.dp
         }
@@ -109,18 +112,29 @@ fun SharePickerScreen(
 
     LaunchedEffect(url) {
         state = ListingState.LOADING
-        val found = GalleryDlListing.listItems(context, url)
-        if (found.isEmpty()) {
-            state = ListingState.UNAVAILABLE
-        } else {
-            items = found
-            selectedNums = found.map { it.num }.toSet()
-            state = ListingState.LOADED
+        errorMessage = null
+        val result = GalleryDlListing.listItems(context, url)
+        when {
+            result.items.isNotEmpty() -> {
+                items = result.items
+                selectedNums = result.items.map { it.num }.toSet()
+                state = ListingState.LOADED
+            }
+            // A genuine failure (needs login, network error, ...) — surfaced to the user instead
+            // of silently falling through to a download that's just going to fail the same way a
+            // moment later with no explanation (reproduced live: a login-gated post went straight
+            // to the queue and errored there with no indication why).
+            result.errorMessage != null -> {
+                errorMessage = result.errorMessage
+                state = ListingState.ERROR
+            }
+            // A source that genuinely can't be listed this way (single-file links, unsupported
+            // extractors) falls back to a normal whole-gallery download — there's no error here,
+            // just nothing this picker knows how to preview ahead of time.
+            else -> state = ListingState.UNAVAILABLE
         }
     }
 
-    // A source that can't be listed (single-file links, unsupported extractors) falls back to
-    // a normal whole-gallery download instead of leaving the user stuck on an empty picker.
     LaunchedEffect(state) {
         if (state == ListingState.UNAVAILABLE) {
             onDownload(url, null, 0, null)
@@ -139,7 +153,11 @@ fun SharePickerScreen(
                 windowInsets = WindowInsets(0.dp),
                 title = {
                     Text(
-                        if (state == ListingState.LOADED) "${selectedNums.size} of ${items.size} selected" else "Loading…",
+                        when (state) {
+                            ListingState.LOADED -> "${selectedNums.size} of ${items.size} selected"
+                            ListingState.ERROR -> "Preview unavailable"
+                            else -> "Loading…"
+                        },
                         fontWeight = FontWeight.Bold,
                     )
                 },
@@ -206,6 +224,87 @@ fun SharePickerScreen(
                         )
                     }
                 }
+                ListingState.ERROR -> {
+                    val needsLogin = errorMessage?.let { msg ->
+                        listOf("login", "cookie", "sign in", "sign-in", "authentication").any { msg.contains(it, ignoreCase = true) }
+                    } == true
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            FeatherIcons.AlertTriangle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Couldn't load a preview",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            errorMessage.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        if (needsLogin) {
+                            Button(
+                                onClick = { showLoginDialog = true },
+                                modifier = Modifier.fillMaxWidth().height(50.dp),
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Icon(FeatherIcons.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Log in")
+                            }
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        OutlinedButton(
+                            onClick = { onDownload(url, null, 0, null) },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text("Try downloading anyway")
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                            Text("Cancel")
+                        }
+                    }
+                    if (showLoginDialog) {
+                        CookieLoginDialog(
+                            loginUrl = "https://instagram.com",
+                            onDismiss = { showLoginDialog = false },
+                            onCookiesSaved = {
+                                showLoginDialog = false
+                                // Cookies just changed — the same URL is worth re-listing rather
+                                // than leaving the user stuck on the same error they just fixed.
+                                state = ListingState.LOADING
+                                scope.launch {
+                                    val retry = GalleryDlListing.listItems(context, url)
+                                    when {
+                                        retry.items.isNotEmpty() -> {
+                                            items = retry.items
+                                            selectedNums = retry.items.map { it.num }.toSet()
+                                            state = ListingState.LOADED
+                                        }
+                                        retry.errorMessage != null -> {
+                                            errorMessage = retry.errorMessage
+                                            state = ListingState.ERROR
+                                        }
+                                        else -> state = ListingState.UNAVAILABLE
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
                 ListingState.UNAVAILABLE -> {
                     // Handled by the LaunchedEffect above (falls back to a full download); this
                     // frame is only visible for an instant before onDismiss/onDownload fires.
@@ -259,21 +358,22 @@ fun SharePickerScreen(
                             val isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename) == true
                             val toggle = { selectedNums = if (selected) selectedNums - item.num else selectedNums + item.num }
 
-                            // Video items get a shorter 16:9 thumbnail instead of the full square —
-                            // a whole-row-wide 1:1 tile (especially the common case of a single video
-                            // post, which fills the entire row on its own) read as oversized, and with
-                            // no real content to fill besides a play icon there was nothing earning
-                            // that height. The title caption below only applies to video items too —
-                            // images don't reliably have one (see GalleryDlListing's per-extractor
-                            // keyword fallback), and repeating the same caption-less layout for both
-                            // would leave a dangling empty label under every photo.
+                            // The shorter 16:9-plus-caption treatment is reserved for the single,
+                            // full-row video case — a lone video post filling the entire row at a
+                            // full 1:1 square read as oversized for just a play icon. In a multi-item
+                            // grid (a carousel mixing photos and videos, or several videos at once)
+                            // every cell stays the same square size regardless of type instead —
+                            // a video tile a different shape/size than its photo neighbors in the
+                            // same grid looked broken rather than intentional (reported live: "make
+                            // the video thumbnail the same size as the picture thumbnail").
+                            val compactVideo = isVideo && items.size == 1
                             Column(
                                 modifier = Modifier.clickable(onClick = toggle),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                             Box(
                                 modifier = Modifier
-                                    .aspectRatio(if (isVideo) 16f / 9f else 1f)
+                                    .aspectRatio(if (compactVideo) 16f / 9f else 1f)
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surfaceContainer),
                             ) {
@@ -347,7 +447,7 @@ fun SharePickerScreen(
                                     }
                                 }
                             }
-                            if (isVideo && item.title != null) {
+                            if (compactVideo && item.title != null) {
                                 Text(
                                     item.title,
                                     style = MaterialTheme.typography.bodySmall,
