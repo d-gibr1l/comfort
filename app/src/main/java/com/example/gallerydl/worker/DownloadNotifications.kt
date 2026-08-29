@@ -48,15 +48,25 @@ object DownloadNotifications {
         )
     }
 
-    fun progressNotification(context: Context, title: String, downloadId: String, downloadedItems: Int): Notification {
+    /** [progressPercent] null means indeterminate (still extracting, or genuinely nothing known
+     * about size/item-count yet) — otherwise a real 0-100 value renders an actual filling bar
+     * instead of the perpetual spinner this used to hardcode regardless of how much was actually
+     * known, which was the whole reason download notifications never visibly showed progress. */
+    fun progressNotification(context: Context, title: String, downloadId: String, downloadedItems: Int, progressPercent: Int? = null): Notification {
         ensureChannel(context)
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
-            .setContentText(if (downloadedItems > 0) "$downloadedItems downloaded" else "Starting…")
+            .setContentText(
+                when {
+                    progressPercent != null -> "$progressPercent% · ${if (downloadedItems > 0) "$downloadedItems downloaded" else "Downloading…"}"
+                    downloadedItems > 0 -> "$downloadedItems downloaded"
+                    else -> "Starting…"
+                }
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setProgress(0, 0, true)
+            .setProgress(100, progressPercent ?: 0, progressPercent == null)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(
                 0, "Pause",
@@ -69,8 +79,8 @@ object DownloadNotifications {
             .build()
     }
 
-    fun updateProgress(context: Context, downloadId: String, title: String, downloadedItems: Int) {
-        notifySafe(context, downloadId, progressNotification(context, title, downloadId, downloadedItems))
+    fun updateProgress(context: Context, downloadId: String, title: String, downloadedItems: Int, progressPercent: Int? = null) {
+        notifySafe(context, downloadId, progressNotification(context, title, downloadId, downloadedItems, progressPercent))
     }
 
     fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?) {
