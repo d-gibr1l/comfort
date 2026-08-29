@@ -26,6 +26,11 @@ import com.example.gallerydl.theme.LocalThemeState
 import com.example.gallerydl.theme.ThemePreferences
 import com.example.gallerydl.theme.ThemeState
 import com.example.gallerydl.util.AppImageLoader
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
+import com.example.gallerydl.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,11 +38,30 @@ class MainActivity : ComponentActivity() {
 
     AppImageLoader.install(applicationContext)
 
-    enableEdgeToEdge()
     setContent {
       val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
       ) {}
+
+      val context = LocalContext.current
+      var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode(context)) }
+      
+      val isSystemDark = isSystemInDarkTheme()
+      val isDark = when (themeMode) {
+          ThemeMode.LIGHT -> false
+          ThemeMode.DARK -> true
+          ThemeMode.SYSTEM -> isSystemDark
+      }
+
+      DisposableEffect(isDark) {
+          val style = if (isDark) {
+              SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+          } else {
+              SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+          }
+          enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+          onDispose {}
+      }
 
       LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -47,8 +71,6 @@ class MainActivity : ComponentActivity() {
         }
       }
 
-      val context = LocalContext.current
-      var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode(context)) }
       var lightTheme by remember { mutableStateOf(ThemePreferences.getLightTheme(context)) }
       var darkTheme by remember { mutableStateOf(ThemePreferences.getDarkTheme(context)) }
       var pureBlack by remember { mutableStateOf(ThemePreferences.isPureBlack(context)) }

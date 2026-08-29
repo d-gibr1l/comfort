@@ -102,7 +102,12 @@ fun AppearanceScreen(onBack: () -> Unit) {
                         theme = theme,
                         isDark = false,
                         selected = themeState.lightTheme == theme,
-                        onClick = { themeState.setLightTheme(theme) },
+                        onClick = { 
+                            themeState.setLightTheme(theme)
+                            if (themeState.mode != ThemeMode.SYSTEM) {
+                                themeState.setMode(ThemeMode.LIGHT)
+                            }
+                        },
                     )
                 }
             }
@@ -116,7 +121,12 @@ fun AppearanceScreen(onBack: () -> Unit) {
                         theme = theme,
                         isDark = true,
                         selected = themeState.darkTheme == theme,
-                        onClick = { themeState.setDarkTheme(theme) },
+                        onClick = { 
+                            themeState.setDarkTheme(theme)
+                            if (themeState.mode != ThemeMode.SYSTEM) {
+                                themeState.setMode(ThemeMode.DARK)
+                            }
+                        },
                     )
                 }
             }
