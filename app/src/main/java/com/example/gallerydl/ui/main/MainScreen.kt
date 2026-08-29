@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.gallerydl.data.VideoSiteRouter
@@ -249,20 +251,19 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                 .statusBarsPadding()
                 .padding(top = 32.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
         ) {
-            Column {
-                Text(
-                    "gallery-dl",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Save from anywhere",
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onBackground,
-                )
-            }
+            // A big, chunky wordmark instead of a name + tagline pair — no separate app-name
+            // caption above it (there's nothing to disambiguate it from anymore) and no subtitle
+            // below, just the logo standing on its own the way a launcher icon does.
+            Text(
+                "COMFORT",
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Black,
+                fontSize = 44.sp,
+                letterSpacing = 0.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
         Column(
@@ -282,10 +283,12 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                     OutlinedTextField(
                         value = url,
                         onValueChange = { url = it },
-                        label = { Text("Paste a link") },
-                        placeholder = { Text("https://...") },
+                        // A plain placeholder (no floating label) so the field reads as one
+                        // resting pill with "Paste a link" sitting centered inside it, rather than
+                        // a caption perched above the field's own border.
+                        placeholder = { Text("Paste a link") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium,
+                        shape = MaterialTheme.shapes.extraLarge,
                         leadingIcon = { Icon(FeatherIcons.Link, contentDescription = null) },
                         trailingIcon = {
                             if (url.isNotEmpty()) {
@@ -309,7 +312,7 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                                 if (!clipText.isNullOrBlank()) url = clipText
                             },
                             modifier = Modifier.weight(1f).height(52.dp),
-                            shape = MaterialTheme.shapes.medium,
+                            shape = MaterialTheme.shapes.extraLarge,
                         ) {
                             Icon(FeatherIcons.Clipboard, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
@@ -324,7 +327,7 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                                 }
                             },
                             modifier = Modifier.weight(1f).height(52.dp),
-                            shape = MaterialTheme.shapes.medium,
+                            shape = MaterialTheme.shapes.extraLarge,
                             enabled = url.isNotBlank(),
                         ) {
                             Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
