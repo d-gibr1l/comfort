@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -303,6 +304,79 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             callback(f"[error] {e}")
         return f"Error: {e}"
 
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
+    """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
+    item picker's preview, specifically to get a *real*, directly fetchable thumbnail image URL
+    for video items. gallery-dl's own listing gives every video item an internal "ytdl:"-prefixed
+    pseudo-URL for its delegated yt-dlp download path (see gallery_dl_wrapper.py's CallbackWriter
+    comment) rather than a plain image — Coil can't render a preview frame from that, so it shows
+    up blank. yt-dlp's extractor, run here in metadata-only mode, already resolves each item's real
+    poster-frame URL as part of normal extraction (see download()'s own `[thumbnail]` callback
+    line above), regardless of whether anything actually downloads.
+
+    Returns JSON on stdout: a single video is {"title":..., "thumbnail":...}; a multi-item source
+    (a carousel/playlist url given to yt-dlp directly) is {"entries": [{"title", "thumbnail"}, ...]}
+    in the same top-to-bottom order gallery-dl's own listing enumerates the same post in — the
+    Kotlin side correlates the two listings by that shared ordering, not by id (the two engines
+    don't share an item-numbering scheme). {"error": "..."} on failure — callers fall back to
+    treating this the same as "nothing usable came back" rather than crashing the whole listing
+    over a preview-only enrichment step."""
+    ydl_opts = {
+        "quiet": True,
+        # "quiet" alone only suppresses yt-dlp's normal progress/info output — WARNING/ERROR lines
+        # (e.g. a missing JS-challenge-solver component) still print straight to stdout by default.
+        # This module has no logger wired in here (unlike download()'s own _Logger, which routes
+        # through the per-line callback instead), so those warnings were landing directly in the
+        # same stdout stream this function's single JSON line is printed to — corrupting it into
+        # "WARNING: ...\n{...real json...}", which then fails to parse as JSON on the Kotlin side.
+        # Reproduced live: every YouTube/Instagram listing failed this way until this was added.
+        "no_warnings": True,
+        "no_color": True,
+        "skip_download": True,
+        # Same reasoning as download()'s own use of this: one bad item (a carousel's non-video
+        # photo entries, which yt-dlp can't extract at all) shouldn't abort metadata extraction
+        # for the whole post — those entries just come back as None in "entries" below instead.
+        "ignoreerrors": "only_download",
+        # Deliberately NOT setting "noplaylist" at all (not even False) — reproduced live that an
+        # *explicit* noplaylist=False on a single Instagram Reel URL sends its extractor down a
+        # different internal path that comes back "Failed to parse JSON (... Expecting value in
+        # '': line 1 column 1 ...)" every time, while leaving it unset (yt-dlp's own default,
+        # matching what download() above already does successfully for the exact same URLs)
+        # extracts the same Reel cleanly. Playlists/multi-item sources still expand into "entries"
+        # normally either way — this only affects *which* code path a single item takes.
+    }
+    if cookies_path:
+        ydl_opts["cookiefile"] = cookies_path
+    if js_runtime_path:
+        # Same reasoning as download()'s own use of this: sites like Instagram/YouTube now
+        # require solving a JavaScript challenge to extract *any* real metadata, not just format
+        # URLs — without this, extract_info() below fails outright for them instead of just
+        # returning fewer fields.
+        ydl_opts["js_runtimes"] = {"quickjs": {"path": js_runtime_path}}
+    if extra_args:
+        for token in extra_args.split():
+            if "=" in token:
+                key, _, value = token.partition("=")
+                ydl_opts[key] = value
+
+    def _pick(entry):
+        if not entry:
+            return None
+        return {"title": entry.get("title"), "thumbnail": entry.get("thumbnail")}
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+    if info is None:
+        return json.dumps({"error": "no info extracted"})
+    entries = info.get("entries")
+    if entries is not None:
+        return json.dumps({"entries": [_pick(e) for e in entries]})
+    return json.dumps(_pick(info) or {"error": "no info extracted"})
+
 
 # CLI entry point for PythonRuntime.kt (subprocess model, replacing Chaquopy's direct callAttr()).
 # should_cancel is deliberately not wired here — with each download now its own OS process,
@@ -321,9 +395,14 @@ if __name__ == "__main__":
     def _emit(line):
         print(line, flush=True)
 
-    if len(_sys.argv) < 2 or _sys.argv[1] != "download":
-        print("Usage: yt_dlp_wrapper.py download <18 positional args>", file=_sys.stderr)
+    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
+        print("Usage: yt_dlp_wrapper.py download <18 positional args> | list <4 positional args>", file=_sys.stderr)
         _sys.exit(2)
+
+    if _sys.argv[1] == "list":
+        a = _sys.argv[2:]
+        print(list_info(url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3])), flush=True)
+        _sys.exit(0)
 
     a = _sys.argv[2:]
     status = download(

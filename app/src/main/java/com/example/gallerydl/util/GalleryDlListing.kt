@@ -1,12 +1,15 @@
 package com.example.gallerydl.util
 
 import android.content.Context
+import com.example.gallerydl.data.DownloadEngine
 import com.example.gallerydl.data.GalleryDlPreferences
+import com.example.gallerydl.data.VideoSiteRouter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 
-/** One file gallery-dl discovered while enumerating a URL, without downloading it. */
+/** One file discovered while enumerating a URL, without downloading it. */
 data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?)
 
 object GalleryDlListing {
@@ -22,11 +25,33 @@ object GalleryDlListing {
     // just logged, so a dropped item at least leaves a trace instead of vanishing without one.
     private const val WARNINGS_MARKER = "\n---GALLERY_DL_WARNINGS---\n"
 
-    /** Enumerates the items behind [url] via gallery-dl's simulate+dump-json mode. Returns an
-     * empty list if the source can't be listed this way (single-file links, parsing failures,
-     * extractors that don't emit the expected shape) — callers should fall back to a normal
-     * whole-gallery download in that case. */
+    /** Enumerates the items behind [url] for the share-sheet picker. Returns an empty list if the
+     * source can't be listed at all — callers should fall back to a normal whole-gallery download
+     * in that case. */
     suspend fun listItems(context: Context, url: String): List<GalleryItem> = withContext(Dispatchers.IO) {
+        when (VideoSiteRouter.classify(url)) {
+            // Video-only sources (Reels, TikTok, YouTube, ...) skip gallery-dl's listing entirely,
+            // same as the real download does — gallery-dl either can't parse them at all, or
+            // (Instagram Reels specifically) lists them fine but only with an internal
+            // "ytdl:"-prefixed pseudo-URL as the item's own "url", which isn't a real fetchable
+            // preview image (see yt_dlp_wrapper.py's list_info() doc comment). yt-dlp's own
+            // extractor already resolves a real thumbnail as part of normal metadata extraction.
+            DownloadEngine.YT_DLP -> listViaYtDlp(context, url)
+            DownloadEngine.GALLERY_DL -> {
+                val items = listViaGalleryDl(context, url)
+                // Only worth the extra process + network round trip when there's actually a video
+                // item to fix a thumbnail for — most gallery-dl sources are image-only galleries
+                // and never hit this at all.
+                if (items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
+                    enrichVideoThumbnails(context, url, items)
+                } else {
+                    items
+                }
+            }
+        }
+    }
+
+    private suspend fun listViaGalleryDl(context: Context, url: String): List<GalleryItem> {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
         val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
@@ -41,7 +66,7 @@ object GalleryDlListing {
                 lines.add(line)
             }
             lines.joinToString("\n")
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return@withContext emptyList()
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return emptyList()
 
         val markerIndex = rawText.indexOf(WARNINGS_MARKER)
         val jsonText: String
@@ -55,10 +80,10 @@ object GalleryDlListing {
             jsonText = rawText
         }
 
-        parseItems(jsonText)
+        return parseGalleryDlItems(jsonText)
     }
 
-    private fun parseItems(jsonText: String): List<GalleryItem> {
+    private fun parseGalleryDlItems(jsonText: String): List<GalleryItem> {
         val trimmed = jsonText.trim()
         if (trimmed.isEmpty()) return emptyList()
 
@@ -93,5 +118,88 @@ object GalleryDlListing {
             }
             items
         }.getOrElse { emptyList() }
+    }
+
+    /** Runs yt-dlp's own metadata-only extraction on [url] directly — used for sources
+     * VideoSiteRouter already routes entirely to yt-dlp for the real download too, so this listing
+     * matches what actually gets fetched. Almost always a single item; some of these hosts
+     * (YouTube playlists, Twitter threads) can still return several. */
+    private suspend fun listViaYtDlp(context: Context, url: String): List<GalleryItem> {
+        val info = runYtDlpListInfo(context, url) ?: return emptyList()
+        val entries = info.optJSONArray("entries")
+        if (entries != null) {
+            val items = mutableListOf<GalleryItem>()
+            for (i in 0 until entries.length()) {
+                if (items.size >= MAX_ITEMS) break
+                val entry = entries.optJSONObject(i) ?: continue
+                items.add(entryToGalleryItem(entry, items.size + 1))
+            }
+            return items
+        }
+        if (info.has("error")) return emptyList()
+        return listOf(entryToGalleryItem(info, 1))
+    }
+
+    private fun entryToGalleryItem(entry: JSONObject, num: Int): GalleryItem {
+        val thumbnail = entry.optString("thumbnail", "").ifBlank { null } ?: ""
+        val title = entry.optString("title", "").trim().ifBlank { null }
+            ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
+        // Synthetic filename purely so the existing isVideoFilename() extension check (shared with
+        // the gallery-dl path below, and with SharePickerScreen's own video/quality-picker gating)
+        // recognizes this as a video — the real download never uses this filename, only the
+        // picker's video detection does.
+        return GalleryItem(num, thumbnail, "$num.mp4", title)
+    }
+
+    /** For a gallery-dl-sourced carousel that contains a video item: fetches yt-dlp's own listing
+     * of the *same* post URL and swaps in its real per-item thumbnail for gallery-dl's video items,
+     * which otherwise carry gallery-dl's own internal "ytdl:" pseudo-URL as their "url" (renders
+     * blank when Coil tries to load it — see yt_dlp_wrapper.py's list_info() doc comment for the
+     * full story). The two engines don't share an item-numbering scheme, so items are correlated
+     * purely by *order among the video items themselves* — both engines enumerate the same post
+     * top-to-bottom, so the Nth video gallery-dl found should be the Nth video yt-dlp found too. A
+     * mismatch (yt-dlp failing entirely, or the counts not lining up) just leaves the original
+     * items untouched rather than guessing wrong. */
+    private suspend fun enrichVideoThumbnails(context: Context, url: String, items: List<GalleryItem>): List<GalleryItem> {
+        val info = runYtDlpListInfo(context, url) ?: return items
+        val ytEntries = info.optJSONArray("entries")?.let { arr ->
+            (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        } ?: listOfNotNull(info.takeIf { !it.has("error") })
+        val ytThumbnails = ytEntries.mapNotNull { entry -> entry.optString("thumbnail", "").ifBlank { null } }
+        if (ytThumbnails.isEmpty()) return items
+
+        var videoIndex = 0
+        return items.map { item ->
+            val isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename) == true
+            if (!isVideo) return@map item
+            val thumbnail = ytThumbnails.getOrNull(videoIndex)
+            videoIndex++
+            if (thumbnail != null) item.copy(url = thumbnail) else item
+        }
+    }
+
+    private suspend fun runYtDlpListInfo(context: Context, url: String): JSONObject? {
+        val cookiesPath = context.filesDir.resolve("cookies.txt")
+        val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
+        val extraArgs = GalleryDlPreferences.getExtraArgs(context)
+        // Same JS-challenge runtime the real download() call gets — without it, extraction on
+        // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
+        // just returning fewer fields, which was silently sending every one of these listings
+        // straight to the UNAVAILABLE/instant-whole-download fallback (reproduced live: the
+        // picker sheet flashed and closed in under a second instead of showing anything).
+        val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
+
+        // list_info() only ever prints once (a single line — json.dumps() escapes any embedded
+        // newlines within the JSON strings themselves), but joined the same defensive way as
+        // listViaGalleryDl() above in case that ever isn't true for some entry's data.
+        val lines = mutableListOf<String>()
+        val rawText = runCatching {
+            PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
+                lines.add(line)
+            }
+            lines.joinToString("\n")
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+
+        return runCatching { JSONObject(rawText.trim()) }.getOrNull()
     }
 }
