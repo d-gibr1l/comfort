@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Reading current network capabilities (validated/metered/...) for the Queue's "waiting for
+         network" indicator on a stuck download — a normal permission, granted automatically. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Only needed on API 24-28; API 29+ (scoped storage) writes to the gallery via MediaStore without it. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

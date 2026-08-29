@@ -25,6 +25,7 @@ import compose.icons.feathericons.*
 import com.example.gallerydl.viewmodel.DownloadsViewModel
 import com.example.gallerydl.data.DownloadEntity
 import com.example.gallerydl.data.DownloadStatus
+import com.example.gallerydl.util.rememberIsNetworkAvailable
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -50,6 +51,11 @@ fun QueueScreen(
 ) {
     val queueItems by viewModel.queueFlow.collectAsState()
     val isGloballyPaused by viewModel.isGloballyPaused.collectAsState()
+    // Lets a QUEUED item's card explain *why* it's stuck (no usable network right now) instead of
+    // just "Waiting to start…" forever with no visible reason — reproduced live: a WorkManager job
+    // sitting on an unsatisfied CONNECTIVITY constraint because the current Wi-Fi network was
+    // connected but never validated by the OS (some hotspot/captive-portal setups never do).
+    val isNetworkAvailable = rememberIsNetworkAvailable()
     var selectedFilter by remember { mutableStateOf("Running") }
     val filters = listOf("Running", "In Queue", "Paused", "Errored", "Cancelled")
 
@@ -209,6 +215,7 @@ fun QueueScreen(
                             } else {
                                 QueueItemCard(
                                     item = item,
+                                    isNetworkAvailable = isNetworkAvailable,
                                     onCancel = { viewModel.cancelDownload(item.id) },
                                     onDelete = { viewModel.deleteDownload(item.id) },
                                     onPauseResume = { viewModel.pauseDownload(item.id) },
@@ -398,6 +405,7 @@ private fun StoppedRow(
 @Composable
 fun QueueItemCard(
     item: DownloadEntity,
+    isNetworkAvailable: Boolean = true,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
     onPauseResume: () -> Unit,
@@ -483,6 +491,26 @@ fun QueueItemCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             if (item.status == DownloadStatus.RUNNING) {
+                if (!isNetworkAvailable) {
+                    // The subprocess itself is still running and will eventually time out and error
+                    // on its own once the network is actually gone — this just gives an immediate,
+                    // visible reason for a running download that's stopped making progress, instead
+                    // of leaving the user watching a stalled progress bar with no explanation.
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                        Icon(
+                            FeatherIcons.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "No internet connection",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
                 // Item count wins whenever there's more than one item, even once expectedBytes is
                 // also known — the case that matters is a gallery-dl gallery (several pictures,
                 // item-count progress climbing normally) that yt-dlp then supplements with the
@@ -586,11 +614,32 @@ fun QueueItemCard(
                     )
                 }
             } else if (item.status == DownloadStatus.QUEUED) {
-                Text(
-                    text = "Waiting to start…",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (isNetworkAvailable) {
+                    Text(
+                        text = "Waiting to start…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // WorkManager's own CONNECTIVITY constraint (see DownloadDispatcher.enqueueWork)
+                    // never resolves without this, so a QUEUED item just sits at the generic
+                    // "Waiting to start…" forever with no visible reason otherwise — reproduced live
+                    // against a Wi-Fi network that was connected but never validated by the OS.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            FeatherIcons.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Waiting for a network connection…",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             } else if (item.status == DownloadStatus.SCHEDULED) {
                 Text(
                     text = "Waiting for the scheduled time window…",

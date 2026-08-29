@@ -30,6 +30,7 @@ import com.example.gallerydl.data.VideoQuality
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.util.GalleryDlListing
 import com.example.gallerydl.util.GalleryItem
+import com.example.gallerydl.util.rememberIsNetworkAvailable
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import kotlinx.coroutines.launch
@@ -58,6 +59,7 @@ fun SharePickerScreen(
     // the quality chips below — a per-download override, not a change to the global default.
     var selectedQuality by remember { mutableStateOf<VideoQuality?>(null) }
     val scope = rememberCoroutineScope()
+    val isNetworkAvailable = rememberIsNetworkAvailable()
 
     // Whether any item this listing found is a video — gates both the play-icon overlay on that
     // item's thumbnail and the quality picker strip, since there's nothing to pick a quality for
@@ -207,7 +209,34 @@ fun SharePickerScreen(
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+        Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            // Shown above whatever the picker is doing (still loading, or already showing the
+            // grid) — the ERROR state already explains itself in detail, so this would just be
+            // redundant clutter there. A dropped connection here means the listing that's either
+            // in flight or about to be acted on (tapping Download) is heading for the same kind of
+            // silent failure the picker's own error card exists to catch, just before it happens.
+            if (!isNetworkAvailable && state != ListingState.ERROR) {
+                Surface(color = MaterialTheme.colorScheme.errorContainer) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            FeatherIcons.WifiOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "No internet connection",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                    }
+                }
+            }
+            Box(modifier = Modifier.weight(1f)) {
             when (state) {
                 ListingState.LOADING -> {
                     Column(
@@ -462,6 +491,7 @@ fun SharePickerScreen(
                         }
                     }
                 }
+            }
             }
         }
     }
