@@ -280,7 +280,11 @@ class DownloadWorker(
                 val jsRuntimePath = QuickJsRuntime.getExecutablePath(applicationContext).orEmpty()
                 val ffmpegPath = FfmpegRuntime.getExecutablePath(applicationContext).orEmpty()
 
-                val videoQuality = GalleryDlPreferences.getVideoQuality(applicationContext)
+                // A per-download override the share-sheet picker set (only offered when its
+                // listing found a video item) takes priority over the global Settings default —
+                // falls back to it when null, same as before this override existed.
+                val videoQuality = entity?.videoQuality?.let { stored -> runCatching { VideoQuality.valueOf(stored) }.getOrNull() }
+                    ?: GalleryDlPreferences.getVideoQuality(applicationContext)
                 val audioOnly = videoQuality == VideoQuality.AUDIO_ONLY
                 val downloadSubtitles = GalleryDlPreferences.isDownloadSubtitles(applicationContext)
                 val subtitleLangs = GalleryDlPreferences.getSubtitleLanguages(applicationContext)

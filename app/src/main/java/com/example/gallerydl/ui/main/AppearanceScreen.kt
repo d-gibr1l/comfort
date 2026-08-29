@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -72,7 +73,18 @@ fun AppearanceScreen(onBack: () -> Unit) {
                         Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                // Same top-of-screen gradient as the rest of Settings (and Home/Library) — this
+                // screen has its own Scaffold/TopAppBar separate from SettingsSubScaffold, so it
+                // was left out when the gradient was added there.
+                modifier = Modifier.background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                            MaterialTheme.colorScheme.background,
+                        )
+                    )
+                ),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         }
     ) { paddingValues ->

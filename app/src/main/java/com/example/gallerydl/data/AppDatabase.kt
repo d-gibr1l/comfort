@@ -30,7 +30,15 @@ private val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
-@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 8, exportSchema = false)
+// Added videoQuality (a VideoQuality enum name) — a per-download quality choice the share-sheet
+// picker can now set, overriding the global Settings default for just that one download.
+private val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN videoQuality TEXT")
+    }
+}
+
+@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 9, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
@@ -41,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration
                     // above instead, so this never actually triggers and wipes the user's

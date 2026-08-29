@@ -53,7 +53,7 @@ object DownloadDispatcher {
         }
     }
 
-    suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0): String {
+    suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, videoQuality: VideoQuality? = null): String {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val id = UUID.randomUUID().toString()
         dao.insert(
@@ -74,6 +74,7 @@ object DownloadDispatcher {
                 errorMessage = null,
                 dateAdded = System.currentTimeMillis(),
                 itemFilter = itemFilter,
+                videoQuality = videoQuality?.name,
             )
         )
         // While globally paused, new downloads sit in the queue undispatched — resumeAll()

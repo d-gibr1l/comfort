@@ -2,7 +2,9 @@ package com.example.gallerydl.ui.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -23,6 +25,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlin.math.ceil
+import com.example.gallerydl.data.GalleryDlPreferences
+import com.example.gallerydl.data.VideoQuality
+import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.util.GalleryDlListing
 import com.example.gallerydl.util.GalleryItem
 import compose.icons.FeatherIcons
@@ -39,7 +44,7 @@ private enum class ListingState { LOADING, LOADED, UNAVAILABLE }
 fun SharePickerScreen(
     url: String,
     onDismiss: () -> Unit,
-    onDownload: (url: String, itemFilter: String?, totalItems: Int) -> Unit,
+    onDownload: (url: String, itemFilter: String?, totalItems: Int, videoQuality: VideoQuality?) -> Unit,
     modifier: Modifier = Modifier,
     onHeightChange: (Dp) -> Unit = {},
 ) {
@@ -47,23 +52,53 @@ fun SharePickerScreen(
     var state by remember { mutableStateOf(ListingState.LOADING) }
     var items by remember { mutableStateOf<List<GalleryItem>>(emptyList()) }
     var selectedNums by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    // Seeded from the global Settings default once the listing loads, then only ever changed by
+    // the quality chips below — a per-download override, not a change to the global default.
+    var selectedQuality by remember { mutableStateOf<VideoQuality?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Whether any item this listing found is a video — gates both the play-icon overlay on that
+    // item's thumbnail and the quality picker strip, since there's nothing to pick a quality for
+    // in an all-image gallery.
+    val hasVideoItems = remember(items) { items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true } }
+
+    LaunchedEffect(hasVideoItems) {
+        if (hasVideoItems && selectedQuality == null) {
+            selectedQuality = GalleryDlPreferences.getVideoQuality(context)
+        }
+    }
 
     // Sizes the sheet to fit however many rows the picker actually needs (a 2-image post
     // shouldn't get the same tall sheet as a 40-image profile), capped so it never exceeds a
     // comfortable fraction of the screen — beyond that the grid scrolls internally instead.
     val configuration = LocalConfiguration.current
-    LaunchedEffect(state, items.size, configuration.screenWidthDp, configuration.screenHeightDp) {
+    LaunchedEffect(state, items.size, hasVideoItems, configuration.screenWidthDp, configuration.screenHeightDp) {
         val topBarHeight = 64.dp
         val bottomBarHeight = 84.dp
+        // The quality picker strip (section label + a row of chips) only renders when the
+        // listing actually contains a video — has to be accounted for here too, or the sheet
+        // ends up too short and the strip gets clipped/scrolled instead of just fitting.
+        val qualityStripHeight = if (hasVideoItems) 76.dp else 0.dp
         val target = if (state == ListingState.LOADED && items.isNotEmpty()) {
             val gridPadding = 24.dp
             val spacing = 8.dp
-            val columns = 3
+            // Matches the grid below: fewer than 3 items gets that many columns instead of always
+            // reserving 3, so a lone item's cell actually fills the row's width instead of sitting
+            // pinned to the left with two empty columns of dead space next to it.
+            val columns = minOf(items.size, 3)
             val cellSize = (configuration.screenWidthDp.dp - gridPadding - spacing * (columns - 1)) / columns
             val rows = ceil(items.size / columns.toFloat()).toInt()
-            val gridHeight = cellSize * rows + spacing * (rows - 1).coerceAtLeast(0) + gridPadding
-            topBarHeight + gridHeight + bottomBarHeight
+            // A row is only as short as its shortest item's neighbors let it be — Compose aligns
+            // every cell in a grid row to the tallest one. So this only shrinks the estimate for
+            // an all-video listing (every row genuinely is the shorter 16:9-plus-caption height);
+            // anything with even one image in the mix keeps the full square estimate, since a
+            // mixed row is exactly as tall as its image cells regardless of the video cells beside
+            // them — a slight overestimate there is harmless (the sheet just has a bit of trailing
+            // space), unlike an underestimate, which would clip the grid's own internal scroll.
+            val allVideo = items.isNotEmpty() && items.all { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }
+            val rowHeight = if (allVideo) cellSize * 9f / 16f + 36.dp else cellSize
+            val gridHeight = rowHeight * rows + spacing * (rows - 1).coerceAtLeast(0) + gridPadding
+            topBarHeight + qualityStripHeight + gridHeight + bottomBarHeight
         } else {
             280.dp
         }
@@ -88,7 +123,7 @@ fun SharePickerScreen(
     // a normal whole-gallery download instead of leaving the user stuck on an empty picker.
     LaunchedEffect(state) {
         if (state == ListingState.UNAVAILABLE) {
-            onDownload(url, null, 0)
+            onDownload(url, null, 0, null)
         }
     }
 
@@ -97,6 +132,11 @@ fun SharePickerScreen(
         containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
+                // TopAppBar reserves top system-bar inset padding by default, assuming it sits at
+                // the physical top of the screen — this one floats inside a bottom sheet well
+                // below the real status bar, so that reserved padding was pure dead space above
+                // the title (reproduced live: a noticeably oversized gap before "N of M selected").
+                windowInsets = WindowInsets(0.dp),
                 title = {
                     Text(
                         if (state == ListingState.LOADED) "${selectedNums.size} of ${items.size} selected" else "Loading…",
@@ -134,7 +174,7 @@ fun SharePickerScreen(
                                 // The --filter above (when set) restricts the download to exactly
                                 // these items, so this count is exact regardless of whether the
                                 // picker's own listing got truncated at GalleryDlListing.MAX_ITEMS.
-                                onDownload(url, filter, selectedNums.size)
+                                onDownload(url, filter, selectedNums.size, if (hasVideoItems) selectedQuality else null)
                             },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = MaterialTheme.shapes.medium,
@@ -171,23 +211,71 @@ fun SharePickerScreen(
                     // frame is only visible for an instant before onDismiss/onDownload fires.
                 }
                 ListingState.LOADED -> {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        contentPadding = PaddingValues(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (hasVideoItems) {
+                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Text(
+                                    "Video quality",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    VideoQuality.entries.forEach { quality ->
+                                        val isSelected = selectedQuality == quality
+                                        Surface(
+                                            shape = MaterialTheme.shapes.medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            onClick = { selectedQuality = quality },
+                                        ) {
+                                            Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                                Text(
+                                                    quality.label,
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        LazyVerticalGrid(
+                            // Same reasoning as the height calculation above — caps at 3 but never
+                            // reserves more columns than there are items to fill them.
+                            columns = GridCells.Fixed(minOf(items.size, 3)),
+                            contentPadding = PaddingValues(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
                         items(items, key = { it.num }) { item ->
                             val selected = item.num in selectedNums
+                            val isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename) == true
+                            val toggle = { selectedNums = if (selected) selectedNums - item.num else selectedNums + item.num }
+
+                            // Video items get a shorter 16:9 thumbnail instead of the full square —
+                            // a whole-row-wide 1:1 tile (especially the common case of a single video
+                            // post, which fills the entire row on its own) read as oversized, and with
+                            // no real content to fill besides a play icon there was nothing earning
+                            // that height. The title caption below only applies to video items too —
+                            // images don't reliably have one (see GalleryDlListing's per-extractor
+                            // keyword fallback), and repeating the same caption-less layout for both
+                            // would leave a dangling empty label under every photo.
+                            Column(
+                                modifier = Modifier.clickable(onClick = toggle),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
                             Box(
                                 modifier = Modifier
-                                    .aspectRatio(1f)
+                                    .aspectRatio(if (isVideo) 16f / 9f else 1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                                    .clickable {
-                                        selectedNums = if (selected) selectedNums - item.num else selectedNums + item.num
-                                    },
+                                    .background(MaterialTheme.colorScheme.surfaceContainer),
                             ) {
                                 coil.compose.SubcomposeAsyncImage(
                                     model = coil.request.ImageRequest.Builder(context)
@@ -238,7 +326,39 @@ fun SharePickerScreen(
                                         Icon(FeatherIcons.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
                                     }
                                 }
+                                if (isVideo) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.Black.copy(alpha = 0.45f)),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            FeatherIcons.Play,
+                                            contentDescription = "Video",
+                                            tint = Color.White,
+                                            // Nudged right so the triangle's own visual weight
+                                            // (its point sits left of the glyph's bounding box)
+                                            // actually looks centered inside the circle.
+                                            modifier = Modifier.size(16.dp).padding(start = 2.dp),
+                                        )
+                                    }
+                                }
                             }
+                            if (isVideo && item.title != null) {
+                                Text(
+                                    item.title,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 2.dp),
+                                )
+                            }
+                            }
+                        }
                         }
                     }
                 }
