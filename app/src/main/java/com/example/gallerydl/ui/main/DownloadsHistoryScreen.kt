@@ -64,7 +64,13 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     val deletedItems by viewModel.deletedFlow.collectAsState()
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsState()
     val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsState()
+    // Only watched here for the finished/failed snackbar below — errored downloads never appear
+    // in historyFlow itself (see DownloadDao.getHistoryFlow's own FINISHED/SAVED-only WHERE
+    // clause), so queueFlow is the only place an ERRORED transition is visible at all.
+    val queueItems by viewModel.queueFlow.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var showDeletedOnly by remember { mutableStateOf(false) }
@@ -97,6 +103,47 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     // user deleted from their gallery outside the app.
     LaunchedEffect(Unit) { viewModel.scanForDeletedMedia() }
 
+    // Snackbar when a download finishes or fails while the user is sitting in the Library tab —
+    // seeded to null (not emptySet()) on first composition so the very first emission from each
+    // flow (whatever's already in the DB) never fires a snackbar for pre-existing history; only
+    // ids that appear *after* that baseline do.
+    var seenFinishedIds by remember { mutableStateOf<Set<String>?>(null) }
+    LaunchedEffect(historyItems) {
+        val currentIds = historyItems.map { it.id }.toSet()
+        val previous = seenFinishedIds
+        if (previous != null) {
+            (currentIds - previous).forEach { id ->
+                val item = historyItems.firstOrNull { it.id == id } ?: return@forEach
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "${item.title.ifBlank { "Download" }} finished",
+                        duration = SnackbarDuration.Short,
+                    )
+                }
+            }
+        }
+        seenFinishedIds = currentIds
+    }
+
+    var seenErroredIds by remember { mutableStateOf<Set<String>?>(null) }
+    LaunchedEffect(queueItems) {
+        val erroredNow = queueItems.filter { it.status == DownloadStatus.ERRORED }.map { it.id }.toSet()
+        val previous = seenErroredIds
+        if (previous != null) {
+            (erroredNow - previous).forEach { id ->
+                val item = queueItems.firstOrNull { it.id == id } ?: return@forEach
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "${item.title.ifBlank { "Download" }} failed" +
+                            (item.errorMessage?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""),
+                        duration = SnackbarDuration.Long,
+                    )
+                }
+            }
+        }
+        seenErroredIds = erroredNow
+    }
+
     val visibleItems = (if (showDeletedOnly) deletedItems else historyItems)
         .let { if (favoritesOnly) it.filter { item -> item.isFavorite } else it }
         .let { list ->
@@ -116,6 +163,17 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // Padded well clear of the floating bottom nav pill — that pill isn't part of this
+        // Scaffold at all (MainScreen draws it in its own outer Box, layered on top of this whole
+        // screen — see MainScreen's own comment on why), so Scaffold's default bottom-center
+        // snackbar position sits directly *underneath* it, completely hidden the whole time
+        // (reproduced live: showSnackbar() was confirmed firing via logcat, correct message and
+        // all, but nothing was ever visible on screen).
+        snackbarHost = {
+            Box(modifier = Modifier.padding(bottom = 100.dp)) {
+                SnackbarHost(snackbarHostState)
+            }
+        },
         topBar = {
             if (selectionMode) {
                 TopAppBar(
