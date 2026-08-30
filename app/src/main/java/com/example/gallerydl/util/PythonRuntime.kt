@@ -54,7 +54,9 @@ object PythonRuntime {
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
-    private fun sitePackagesDir(context: Context) =
+    // internal, not private — EngineUpdater.kt reuses this to find/replace an installed engine's
+    // package directory in place when the user updates yt-dlp/gallery-dl from Settings.
+    internal fun sitePackagesDir(context: Context) =
         File(runtimeRoot(context), "usr/lib/python3.14/site-packages")
 
     /** Null if the app's own nativeLibraryDir can't be resolved. */
@@ -96,7 +98,9 @@ object PythonRuntime {
         return true
     }
 
-    private fun unzipStreamTo(input: InputStream, destDir: File) {
+    // internal, not private — EngineUpdater.kt reuses this to unpack a freshly downloaded engine
+    // wheel the same way a bundled one gets unpacked here.
+    internal fun unzipStreamTo(input: InputStream, destDir: File) {
         ZipInputStream(input).use { zis ->
             var entry: ZipEntry? = zis.nextEntry
             while (entry != null) {

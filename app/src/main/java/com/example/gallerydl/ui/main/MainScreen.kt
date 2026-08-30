@@ -33,8 +33,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.example.gallerydl.R
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.gallerydl.data.GalleryDlPreferences
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.PillShape
+import com.example.gallerydl.util.EngineUpdater
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import com.example.gallerydl.viewmodel.DownloadsViewModel
@@ -62,6 +64,31 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsState()
+
+    // Rate-limited auto-check for a newer yt-dlp/gallery-dl release — seeded from the cached
+    // result of the last check (so the badge shows immediately without waiting on a fresh network
+    // round trip), then only actually re-hits PyPI if ENGINE_UPDATE_CHECK_INTERVAL_MS has actually
+    // elapsed since the last one, so relaunching the app repeatedly doesn't spam it. The Engines
+    // section in Settings > About always does its own fresh check regardless of this cache.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var hasEngineUpdate by remember { mutableStateOf(GalleryDlPreferences.isEngineUpdateAvailable(context)) }
+    LaunchedEffect(Unit) {
+        val lastCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
+        if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
+        val statuses = EngineUpdater.checkAll(context)
+        val available = statuses.any { it.updateAvailable }
+        hasEngineUpdate = available
+        GalleryDlPreferences.setEngineUpdateAvailable(context, available)
+        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+    }
+    // Re-syncs from the same cached flag whenever the Settings tab is left — the Engines section
+    // (Settings > About) writes to it directly the moment its own check/update finishes, but that's
+    // a different composable with no other link back to this one, so without this the nav-bar badge
+    // would otherwise only catch up on the next full app launch instead of right away. selectedTab
+    // is read as a key here, not for its own value, purely to fire on every tab change.
+    LaunchedEffect(selectedTab) {
+        hasEngineUpdate = GalleryDlPreferences.isEngineUpdateAvailable(context)
+    }
 
     // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
     // measured region — pill height plus FloatingNavBar's own 24dp/16dp padding — and paints
@@ -101,6 +128,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         FloatingNavBar(
             selectedTab = selectedTab,
             hasActiveDownloads = hasActiveDownloads,
+            hasEngineUpdate = hasEngineUpdate,
             onSelect = { index ->
                 // Tapping the already-selected Library tab again jumps to the Queue, matching
                 // the "tap again for more" pattern used elsewhere in the app.
@@ -134,6 +162,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
 private fun FloatingNavBar(
     selectedTab: Int,
     hasActiveDownloads: Boolean,
+    hasEngineUpdate: Boolean,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -199,7 +228,7 @@ private fun FloatingNavBar(
                                     Modifier
                                 }
                             )
-                        if (index == 1 && hasActiveDownloads) {
+                        if ((index == 1 && hasActiveDownloads) || (index == 2 && hasEngineUpdate)) {
                             BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) }) {
                                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                             }

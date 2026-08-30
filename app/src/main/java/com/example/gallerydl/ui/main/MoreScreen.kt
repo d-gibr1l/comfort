@@ -34,6 +34,7 @@ import com.example.gallerydl.data.GalleryDlPreferences
 import com.example.gallerydl.data.VideoQuality
 import com.example.gallerydl.theme.LocalThemeState
 import com.example.gallerydl.theme.ThemeMode
+import com.example.gallerydl.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
@@ -1071,11 +1072,124 @@ private fun AboutScreen(onBack: () -> Unit) {
             }
         }
 
+        EnginesSection()
+
         SettingsSection(title = "Links", icon = FeatherIcons.Link) {
             LinkRow(
                 icon = FeatherIcons.Code,
                 title = "gallery-dl source code",
                 url = "https://github.com/mikf/gallery-dl",
+            )
+        }
+    }
+}
+
+/** yt-dlp and gallery-dl are bundled as static wheels (see PythonRuntime's own doc comment) that
+ * only get refreshed when this app itself ships a new APK — but site extractors break against the
+ * live site far more often than that. This lets either engine be updated independently, straight
+ * from PyPI, without waiting on an app release — the in-app equivalent of yt-dlp's own `-U` flag. */
+@Composable
+private fun EnginesSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var statuses by remember { mutableStateOf<List<EngineUpdater.VersionStatus>?>(null) }
+    var checking by remember { mutableStateOf(false) }
+    var updatingEngine by remember { mutableStateOf<String?>(null) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    fun runCheck() {
+        checking = true
+        errorText = null
+        scope.launch {
+            val result = EngineUpdater.checkAll(context)
+            statuses = result
+            checking = false
+            // Refreshes the same cached flag MainScreen's own rate-limited auto-check reads for
+            // the nav-bar badge — opening this screen and checking here is itself a fresh signal,
+            // no reason to wait for the next auto-check interval to clear/set it.
+            GalleryDlPreferences.setEngineUpdateAvailable(context, result.any { it.updateAvailable })
+            GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+        }
+    }
+
+    LaunchedEffect(Unit) { runCheck() }
+
+    SettingsSection(title = "Engines", icon = FeatherIcons.RefreshCw) {
+        val currentStatuses = statuses
+        if (currentStatuses == null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("Checking for updates…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            currentStatuses.forEachIndexed { index, status ->
+                EngineUpdateRow(
+                    status = status,
+                    updating = updatingEngine == status.engine.packageDirName,
+                    onUpdate = {
+                        val wheelUrl = status.wheelUrl ?: return@EngineUpdateRow
+                        updatingEngine = status.engine.packageDirName
+                        errorText = null
+                        scope.launch {
+                            val result = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                            updatingEngine = null
+                            result.onSuccess { newVersion ->
+                                val updated = currentStatuses.map {
+                                    if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
+                                }
+                                statuses = updated
+                                GalleryDlPreferences.setEngineUpdateAvailable(context, updated.any { it.updateAvailable })
+                            }
+                            result.onFailure { e ->
+                                errorText = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
+                            }
+                        }
+                    },
+                )
+                if (index != currentStatuses.lastIndex) Spacer(Modifier.height(12.dp))
+            }
+        }
+        if (errorText != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        Spacer(Modifier.height(14.dp))
+        OutlinedButton(onClick = { runCheck() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
+            if (checking) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(FeatherIcons.RefreshCw, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Check for updates")
+            }
+        }
+    }
+}
+
+@Composable
+private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boolean, onUpdate: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                status.installedVersion?.let { "v$it" } ?: "Version unknown",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        when {
+            updating -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            status.updateAvailable -> TextButton(onClick = onUpdate) { Text("Update to ${status.latestVersion}") }
+            status.latestVersion != null -> Text(
+                "Up to date",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            else -> Text(
+                "Couldn't check",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
