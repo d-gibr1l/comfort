@@ -4,7 +4,13 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- White, matching "comfort logo clean.svg" own background rect — the old raster foreground
+         PNG had a white background baked directly into its own pixels (not real transparency), so
+         this adaptive-icon background layer's real color never actually showed through until the
+         foreground became a true vector; #4F46E5 (an unrelated generic default) was hidden the
+         whole time, revealed as a jarring blue the moment the switch happened. White is what was
+         actually visible before, and it's what the source artwork itself specifies. -->
     <path
-        android:fillColor="#4F46E5"
+        android:fillColor="#FFFFFF"
         android:pathData="M0,0h108v108h-108z" />
 </vector>
