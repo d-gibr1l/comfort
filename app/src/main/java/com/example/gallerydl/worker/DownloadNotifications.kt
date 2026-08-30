@@ -13,11 +13,55 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import android.os.Handler
+import android.os.Looper
 import com.example.gallerydl.R
 import com.example.gallerydl.ui.main.formatFileSize
+import java.util.concurrent.atomic.AtomicInteger
 
 object DownloadNotifications {
     const val CHANNEL_ID = "downloads"
+
+    // How many DownloadWorkers currently have the shared foreground notification "checked out" —
+    // see FOREGROUND_SERVICE_NOTIFICATION_ID's doc comment. Only cancel that notification once
+    // this drops back to zero, so one download finishing doesn't wipe it out from under sibling
+    // downloads still running concurrently in other WorkManager queues.
+    private val activeForegroundCount = AtomicInteger(0)
+
+    /** Call once, right after setForeground(ForegroundInfo(FOREGROUND_SERVICE_NOTIFICATION_ID, ...))
+     * succeeds. Must be paired with exactly one [markForegroundStopped] call (in a finally block)
+     * regardless of how the worker finishes — success, failure, or cancellation. */
+    fun markForegroundStarted() {
+        activeForegroundCount.incrementAndGet()
+    }
+
+    /** Call once doWork() is about to return, unconditionally (finally block) — decrements the
+     * count and, once no worker is using the shared foreground notification any more, explicitly
+     * cancels it. Needed because WorkManager's own teardown of it isn't reliable on every device:
+     * reproduced live on this one, the notification was left permanently stuck (flags
+     * ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE, not even swipeable) minutes after every worker
+     * using it had already returned and dumpsys activity services confirmed no service was even
+     * running any more — this cancel() call is what actually clears it, since by this point no
+     * foreground service is bound to it any more (that binding, while it lasts, is what makes the
+     * platform refuse a plain NotificationManager.cancel() on this same id — verified live too:
+     * calling cancel() on it earlier, before every worker had returned, silently did nothing). */
+    fun markForegroundStopped(context: Context) {
+        if (activeForegroundCount.updateAndGet { (it - 1).coerceAtLeast(0) } == 0) {
+            val appContext = context.applicationContext
+            // A cancel() fired synchronously here, right as doWork() is returning, sometimes lost
+            // the race against WorkManager's own (also-unreliable) foreground teardown re-touching
+            // this same id right after — reproduced live: the notification came right back even
+            // though activeForegroundCount had already reached zero and this ran. A short delay
+            // lets that settle first.
+            Handler(Looper.getMainLooper()).postDelayed({
+                // Only actually cancel if still nobody's using it — a new download could have
+                // started during the delay.
+                if (activeForegroundCount.get() == 0) {
+                    NotificationManagerCompat.from(appContext).cancel(FOREGROUND_SERVICE_NOTIFICATION_ID)
+                }
+            }, 1500)
+        }
+    }
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -35,18 +79,33 @@ object DownloadNotifications {
 
     fun notificationId(downloadId: String): Int = downloadId.hashCode()
 
-    /** A deliberately *different* id from [notificationId] for the terminal (finished/failed)
-     * notification — sharing the ongoing notification's id doesn't work: that id is also what
-     * setForeground(ForegroundInfo(...)) in DownloadWorker registers as *the* foreground-service
-     * notification, and the instant doWork() returns (right after notifyFinished()/notifyFailed()
-     * posts its update), WorkManager tears the foreground service down — which removes whatever
-     * notification currently sits at that id, silently wiping out the finished/failed notification
-     * that was just posted a moment earlier. Reproduced live: notifyFailed()'s own notify() call
-     * showed up correctly in logcat every time, but nothing ever appeared in the shade. A distinct
-     * id sidesteps the whole race — it's never tied to the foreground service, so nothing tears it
-     * down when the worker finishes. xor rather than +1 so it can't collide via integer overflow at
-     * the Int.MAX_VALUE/MIN_VALUE edges the way a plain increment could. */
-    private fun terminalNotificationId(downloadId: String): Int = notificationId(downloadId) xor 0x5A5A5A5A
+    /** The *only* id ever passed to setForeground(ForegroundInfo(...)) in DownloadWorker — a
+     * single id shared by every concurrently running download, never a per-download one.
+     *
+     * Earlier versions of this file gave each download's own ongoing/progress notification the
+     * FOREGROUND_SERVICE role directly (id = notificationId(downloadId)), and separately tried a
+     * distinct id just for the terminal (finished/failed) notification to dodge WorkManager
+     * wiping it out when the foreground service tore down. That papered over one symptom but not
+     * the real problem: reproduced live that the *ongoing* notification itself then got stuck
+     * forever — flags ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE still set, not even swipeable,
+     * long after dumpsys confirmed the underlying service was fully destroyed. Android refuses to
+     * let a plain NotificationManager.cancel() remove a notification that was ever posted via
+     * startForeground()/ForegroundInfo — only the owning service calling stopForeground() can —
+     * and WorkManager's own teardown of that specific id just wasn't reliably happening on this
+     * device/OS build (also reproduced live, including with a deliberate post-return delay before
+     * cancelling — still stuck).
+     *
+     * The fix is to never let a per-download notification carry the FOREGROUND_SERVICE flag at
+     * all. This fixed, generic id is the one and only notification WorkManager ever manages via
+     * ForegroundInfo — sharing one id across every concurrently running worker is a pattern
+     * WorkManager explicitly supports (it keeps the shared notification up as long as *any*
+     * worker using that id is still foreground, and only tears it down once the last one
+     * finishes), so its teardown machinery gets exercised the way it's actually designed for,
+     * rather than once per unique per-download id. Every notification the user actually reads
+     * (progress/finished/failed) is posted separately via a plain notify() to
+     * [notificationId], completely untouched by setForeground — always freely updatable and
+     * cancellable, no service lifecycle involved. */
+    const val FOREGROUND_SERVICE_NOTIFICATION_ID = 0x646C664B // "dlfK" — arbitrary but stable
 
     private fun actionPendingIntent(context: Context, action: String, downloadId: String): PendingIntent {
         val intent = Intent(context, DownloadActionReceiver::class.java).apply {
@@ -60,6 +119,23 @@ object DownloadNotifications {
             context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    /** The generic, non-cancellable notification posted only via setForeground(ForegroundInfo(...))
+     * at [FOREGROUND_SERVICE_NOTIFICATION_ID] — deliberately content-free about *which* download
+     * is running (that's what the real per-download notification from [progressNotification],
+     * posted separately, is for). Shared across every concurrently running worker, so its exact
+     * text is necessarily generic ("Downloading…") rather than naming any one of them. */
+    fun foregroundServiceNotification(context: Context): Notification {
+        ensureChannel(context)
+        return NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notif_logo)
+            .setContentTitle("Downloading…")
+            .setContentText("Comfort is downloading in the background")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .build()
     }
 
     /** [progressPercent] null means indeterminate (still extracting, or genuinely nothing known
@@ -169,7 +245,11 @@ object DownloadNotifications {
                     ),
                 )
         }
-        notifySafe(context, downloadId, builder.build(), terminalNotificationId(downloadId))
+        // Same id as the ongoing progress notification — since that id is never the
+        // FOREGROUND_SERVICE one anymore (see FOREGROUND_SERVICE_NOTIFICATION_ID's doc comment),
+        // this plain notify() call just replaces it in place, cleanly and immediately, no
+        // separate cancel needed.
+        notifySafe(context, downloadId, builder.build())
     }
 
     fun notifyFailed(context: Context, downloadId: String, title: String, errorMessage: String? = null) {
@@ -182,23 +262,19 @@ object DownloadNotifications {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        notifySafe(context, downloadId, notification, terminalNotificationId(downloadId))
+        notifySafe(context, downloadId, notification)
     }
 
     fun cancel(context: Context, downloadId: String) {
         NotificationManagerCompat.from(context).cancel(notificationId(downloadId))
-        NotificationManagerCompat.from(context).cancel(terminalNotificationId(downloadId))
     }
 
-    /** [id] defaults to the ongoing/progress id ([notificationId]) so [updateProgress]'s existing
-     * call site doesn't need to change — [notifyFinished]/[notifyFailed] explicitly pass
-     * [terminalNotificationId] instead, per the doc comment on that function. */
-    private fun notifySafe(context: Context, downloadId: String, notification: Notification, id: Int = notificationId(downloadId)) {
+    private fun notifySafe(context: Context, downloadId: String, notification: Notification) {
         ensureChannel(context)
         val hasPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
-            NotificationManagerCompat.from(context).notify(id, notification)
+            NotificationManagerCompat.from(context).notify(notificationId(downloadId), notification)
         }
     }
 }
