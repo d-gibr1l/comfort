@@ -162,7 +162,16 @@ object GalleryDlListing {
      * matches what actually gets fetched. Almost always a single item; some of these hosts
      * (YouTube playlists, Twitter threads) can still return several. */
     private suspend fun listViaYtDlp(context: Context, url: String): ListingResult {
-        val info = runYtDlpListInfo(context, url) ?: return ListingResult(emptyList())
+        // Unlike gallery-dl's routing (where "nothing usable came back" can legitimately mean "this
+        // extractor just doesn't support listing"), every URL VideoSiteRouter sends here is always
+        // meant to produce a real listing — runYtDlpListInfo() returning null only ever means the
+        // subprocess itself failed or its output couldn't be parsed, a genuine failure that
+        // deserves the same "tell the user why" treatment as an {"error": ...} JSON result, not the
+        // silent whole-gallery-download fallback (reproduced live: an expired-cookie listing failed
+        // this way and the picker sheet just flashed and vanished into a download doomed to fail
+        // the same way a moment later).
+        val info = runYtDlpListInfo(context, url)
+            ?: return ListingResult(emptyList(), errorMessage = "Couldn't check this link — the download may still work, but its content couldn't be previewed.")
         val entries = info.optJSONArray("entries")
         if (entries != null) {
             val items = mutableListOf<GalleryItem>()
@@ -227,17 +236,26 @@ object GalleryDlListing {
         // picker sheet flashed and closed in under a second instead of showing anything).
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
 
-        // list_info() only ever prints once (a single line — json.dumps() escapes any embedded
-        // newlines within the JSON strings themselves), but joined the same defensive way as
-        // listViaGalleryDl() above in case that ever isn't true for some entry's data.
+        // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
+        // prints (see yt_dlp_wrapper.py) — but PythonRuntime.run() merges the subprocess's stderr
+        // into this same stream (redirectErrorStream(true)), and "no_warnings"/the try/except
+        // inside list_info() only cover yt-dlp's own warnings/exceptions, not everything else that
+        // can land on stderr first (a Python DeprecationWarning, curl_cffi/cffi's own startup
+        // chatter, ...). Reproduced live with expired cookies: extra lines ahead of the real JSON
+        // made the whole-string JSONObject() parse below throw, come back null with no error
+        // message, and get silently treated as "nothing to list" — the picker sheet flashed and
+        // disappeared into an instant whole-gallery download that just failed the same way a
+        // moment later with no explanation. Taking only the *last* non-blank line sidesteps that:
+        // whatever came before it on stderr doesn't matter, only the one guaranteed-last print
+        // does.
         val lines = mutableListOf<String>()
-        val rawText = runCatching {
+        val lastLine = runCatching {
             PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
                 lines.add(line)
             }
-            lines.joinToString("\n")
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+            lines.lastOrNull { it.isNotBlank() }
+        }.getOrNull() ?: return null
 
-        return runCatching { JSONObject(rawText.trim()) }.getOrNull()
+        return runCatching { JSONObject(lastLine.trim()) }.getOrNull()
     }
 }
