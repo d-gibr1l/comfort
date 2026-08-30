@@ -55,7 +55,7 @@ object DownloadNotifications {
     fun progressNotification(context: Context, title: String, downloadId: String, downloadedItems: Int, progressPercent: Int? = null): Notification {
         ensureChannel(context)
         return NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notif_logo)
             .setContentTitle(title)
             .setContentText(
                 when {
