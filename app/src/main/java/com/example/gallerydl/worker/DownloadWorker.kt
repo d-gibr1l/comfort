@@ -159,7 +159,15 @@ class DownloadWorker(
                 // another worker's concurrent readText()). A private copy per worker sidesteps the
                 // shared-mutable-file problem entirely instead of trying to lock around it.
                 val cookiesPath = applicationContext.filesDir.resolve("cookies.txt")
-                val normalizedCookiesPath = if (cookiesPath.exists()) {
+                // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a
+                // corrupted 0-byte file, from the very race this normalization step used to cause)
+                // still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like a
+                // real Netscape cookies file, which used to fail every download outright even
+                // though a *missing* cookies file downloads just fine anonymously. Treating "empty"
+                // the same as "absent" means a bad cookies file degrades to normal anonymous
+                // behavior instead of breaking every download regardless of whether that particular
+                // site even needs cookies.
+                val normalizedCookiesPath = if (cookiesPath.exists() && cookiesPath.length() > 0) {
                     File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
                         writeText(cookiesPath.readText().replace("\r\n", "\n"))
                     }
