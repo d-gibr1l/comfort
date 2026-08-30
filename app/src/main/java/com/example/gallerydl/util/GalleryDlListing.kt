@@ -45,6 +45,26 @@ object GalleryDlListing {
     // just logged, so a dropped item at least leaves a trace instead of vanishing without one.
     private const val WARNINGS_MARKER = "\n---GALLERY_DL_WARNINGS---\n"
 
+    // A real error string from gallery-dl/yt-dlp is a short human sentence. Reproduced live
+    // against a Reddit subreddit-index listing: gallery-dl's own exception message occasionally
+    // *is* raw HTML/CSS from a blocked/redirected response instead (a whole Reddit stylesheet's
+    // ":root{...}" custom-property block, hundreds of "--name:value;" declarations packed with no
+    // spaces) — something upstream in gallery-dl's own error handling, not this app's JSON parsing
+    // (see the Message.Error branch below, and the ERR: fallback, where this is applied — both are
+    // gallery-dl's own stderr/exception text verbatim). Showing that verbatim in the picker's error
+    // card is useless and looks broken, so anything implausibly long or shaped like markup instead
+    // of a sentence gets swapped for a generic message. The full original text is still logged
+    // (see the two call sites) for whenever this needs to be actually debugged.
+    private val MARKUP_LIKE_REGEX = Regex("""[{}<>]|--[a-zA-Z-]+:""")
+
+    private fun sanitizeErrorMessage(raw: String): String? {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return null
+        val looksLikeMarkup = trimmed.length > 400 || MARKUP_LIKE_REGEX.containsMatchIn(trimmed.take(200))
+        if (!looksLikeMarkup) return trimmed
+        return "This site didn't return a usable response for this link — it may require login, or this URL might not be supported."
+    }
+
     /** Enumerates the items behind [url] for the share-sheet picker. An empty result with no
      * [ListingResult.errorMessage] means the source genuinely can't be listed this way (single-file
      * links, unsupported extractors) — callers should fall back to a normal whole-gallery download
@@ -101,7 +121,13 @@ object GalleryDlListing {
         // bug should never get silently reinterpreted as this specific error path.
         if (rawText.startsWith("ERR:")) {
             val message = rawText.removePrefix("ERR:").trim()
-            return ListingResult(emptyList(), errorMessage = message.takeIf { it.isNotBlank() })
+            // Diagnostic only — this whole branch is gallery-dl's own stderr verbatim (see
+            // gallery_dl_wrapper.py's list_items()), which occasionally turns out to be raw
+            // HTML/CSS from a blocked/redirected response rather than a real error string (seen
+            // live against a Reddit listing) — logged in full so that's visible in logcat instead
+            // of only ever showing up truncated in the picker's own error card.
+            android.util.Log.w("GalleryDlListing", "gallery-dl ERR: fallback while listing $url:\n$message")
+            return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(message))
         }
 
         val markerIndex = rawText.indexOf(WARNINGS_MARKER)
@@ -116,10 +142,10 @@ object GalleryDlListing {
             jsonText = rawText
         }
 
-        return parseGalleryDlItems(jsonText)
+        return parseGalleryDlItems(jsonText, url)
     }
 
-    private fun parseGalleryDlItems(jsonText: String): ListingResult {
+    private fun parseGalleryDlItems(jsonText: String, url: String): ListingResult {
         val trimmed = jsonText.trim()
         if (trimmed.isEmpty()) return ListingResult(emptyList())
 
@@ -162,8 +188,18 @@ object GalleryDlListing {
             }
             // Real items found despite an error entry also being present (a partial failure) still
             // count as a usable listing — only surface the error when there's nothing else to show.
-            ListingResult(items, errorMessage = errorMessage.takeIf { items.isEmpty() })
-        }.getOrElse { ListingResult(emptyList()) }
+            if (items.isEmpty() && errorMessage != null) {
+                android.util.Log.w("GalleryDlListing", "gallery-dl Message.Error while listing $url:\n$errorMessage")
+            }
+            ListingResult(items, errorMessage = errorMessage?.takeIf { items.isEmpty() }?.let(::sanitizeErrorMessage))
+        }.getOrElse {
+            // A JSON parse failure here means gallery-dl's own --dump-json output wasn't valid
+            // JSON at all — worth seeing what it actually was (the raw text this app's own error
+            // card ends up not showing, since a parse failure just falls back to "nothing to
+            // list" below) rather than only ever seeing this as a silent empty result.
+            android.util.Log.w("GalleryDlListing", "Failed to parse gallery-dl JSON while listing $url:\n$trimmed", it)
+            ListingResult(emptyList())
+        }
     }
 
     /** Runs yt-dlp's own metadata-only extraction on [url] directly — used for sources
@@ -192,7 +228,7 @@ object GalleryDlListing {
             return ListingResult(items)
         }
         val error = info.optString("error", "").takeIf { it.isNotBlank() }
-        if (error != null) return ListingResult(emptyList(), errorMessage = error)
+        if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error))
         return ListingResult(listOf(entryToGalleryItem(info, 1, listIndex = 0)))
     }
 
@@ -265,6 +301,9 @@ object GalleryDlListing {
             lines.lastOrNull { it.isNotBlank() }
         }.getOrNull() ?: return null
 
-        return runCatching { JSONObject(lastLine.trim()) }.getOrNull()
+        return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
+            android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
+            null
+        }
     }
 }
