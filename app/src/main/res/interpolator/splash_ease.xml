@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same curve as the web mockup's cubic-bezier(0.2, 1, 0.35, 1) — a quick, slightly overshooting
+     ease-out, not the flatter default Android interpolators. -->
+<pathInterpolator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:controlX1="0.2"
+    android:controlY1="1"
+    android:controlX2="0.35"
+    android:controlY2="1" />

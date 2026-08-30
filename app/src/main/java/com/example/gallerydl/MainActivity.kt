@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.gallerydl.theme.GalleryDLTheme
 import com.example.gallerydl.theme.LocalThemeState
 import com.example.gallerydl.theme.ThemePreferences
@@ -34,6 +35,10 @@ import com.example.gallerydl.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Must be called before super.onCreate() — it reads the activity's theme (Theme.App.Starting,
+    // set in the manifest) to know which splash to show, and installs the exit-animation hook
+    // before the window's normal onCreate machinery runs.
+    installSplashScreen()
     super.onCreate(savedInstanceState)
 
     AppImageLoader.install(applicationContext)
