@@ -38,8 +38,21 @@ class MainActivity : ComponentActivity() {
     // Must be called before super.onCreate() — it reads the activity's theme (Theme.App.Starting,
     // set in the manifest) to know which splash to show, and installs the exit-animation hook
     // before the window's normal onCreate machinery runs.
-    installSplashScreen()
+    val splashScreen = installSplashScreen()
     super.onCreate(savedInstanceState)
+
+    // The androidx compat SplashScreen dismisses as soon as the first frame is drawn — for a
+    // lightweight Compose screen like this one that can happen well before the 700ms staggered
+    // entrance (COM/FOR/arrow) has actually finished playing, cutting the animation short
+    // (reproduced live: it visibly vanished mid-animation). windowSplashScreenAnimationDuration in
+    // the theme is only used for the library's own exit-transition bookkeeping — it does not by
+    // itself hold the splash up. Holding it here with a real elapsed-time check is the officially
+    // documented fix for exactly this gap.
+    val splashStartTime = System.currentTimeMillis()
+    val splashMinDurationMs = 700L
+    splashScreen.setKeepOnScreenCondition {
+      System.currentTimeMillis() - splashStartTime < splashMinDurationMs
+    }
 
     AppImageLoader.install(applicationContext)
 
