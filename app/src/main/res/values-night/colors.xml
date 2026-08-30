@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same values as the app's actual dark theme (Color.kt's Neutral00/Neutral90) — the splash
+         should look like a natural extension of the real dark UI it hands off to, not a flash of
+         plain white before it. -->
+    <color name="splash_background">#0B0A0F</color>
+    <color name="splash_icon">#E4E2ED</color>
+</resources>

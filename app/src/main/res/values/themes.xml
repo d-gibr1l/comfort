@@ -9,7 +9,7 @@
          work identically across every API level instead of only 31+. postSplashScreenTheme is what
          switches the activity's real theme back once installSplashScreen()'s condition is met. -->
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_logo</item>
         <item name="windowSplashScreenAnimationDuration">700</item>
         <item name="postSplashScreenTheme">@style/Theme.GalleryDL</item>
