@@ -9,8 +9,17 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** One file discovered while enumerating a URL, without downloading it. */
-data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?)
+/** One file discovered while enumerating a URL, without downloading it. [num] is gallery-dl's own
+ * "num" keyword (or, for the yt-dlp path, a locally synthesized 1-based sequence) — real download
+ * selection depends on it matching gallery-dl's own numbering exactly (see SharePickerScreen's
+ * "num in {...}" --filter string), so it's NOT safe to use as a Compose list key on its own: it's
+ * only guaranteed unique *within one source's own file sequence*, not across a combined listing
+ * that spans several separate posts (a subreddit-index URL like reddit.com/r/pics/top/, for
+ * instance) — reproduced live as a hard crash ("Key "0" was already used") the moment two different
+ * posts' items both happened to be numbered 0. [listIndex] is this item's actual position in the
+ * combined list — always unique regardless of what gallery-dl's own numbering does — kept as a
+ * separate field precisely so nothing downstream is tempted to reuse [num] for identity again. */
+data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?, val listIndex: Int)
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
@@ -149,7 +158,7 @@ object GalleryDlListing {
                 val title = listOf("title", "content", "description")
                     .firstNotNullOfOrNull { key -> keywords?.optString(key)?.trim()?.takeIf { it.isNotBlank() } }
                     ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
-                items.add(GalleryItem(num, fileUrl, filename, title))
+                items.add(GalleryItem(num, fileUrl, filename, title, listIndex = items.size))
             }
             // Real items found despite an error entry also being present (a partial failure) still
             // count as a usable listing — only surface the error when there's nothing else to show.
@@ -178,16 +187,16 @@ object GalleryDlListing {
             for (i in 0 until entries.length()) {
                 if (items.size >= MAX_ITEMS) break
                 val entry = entries.optJSONObject(i) ?: continue
-                items.add(entryToGalleryItem(entry, items.size + 1))
+                items.add(entryToGalleryItem(entry, items.size + 1, listIndex = items.size))
             }
             return ListingResult(items)
         }
         val error = info.optString("error", "").takeIf { it.isNotBlank() }
         if (error != null) return ListingResult(emptyList(), errorMessage = error)
-        return ListingResult(listOf(entryToGalleryItem(info, 1)))
+        return ListingResult(listOf(entryToGalleryItem(info, 1, listIndex = 0)))
     }
 
-    private fun entryToGalleryItem(entry: JSONObject, num: Int): GalleryItem {
+    private fun entryToGalleryItem(entry: JSONObject, num: Int, listIndex: Int): GalleryItem {
         val thumbnail = entry.optString("thumbnail", "").ifBlank { null } ?: ""
         val title = entry.optString("title", "").trim().ifBlank { null }
             ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
@@ -195,7 +204,7 @@ object GalleryDlListing {
         // the gallery-dl path below, and with SharePickerScreen's own video/quality-picker gating)
         // recognizes this as a video — the real download never uses this filename, only the
         // picker's video detection does.
-        return GalleryItem(num, thumbnail, "$num.mp4", title)
+        return GalleryItem(num, thumbnail, "$num.mp4", title, listIndex = listIndex)
     }
 
     /** For a gallery-dl-sourced carousel that contains a video item: fetches yt-dlp's own listing

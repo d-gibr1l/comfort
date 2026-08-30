@@ -382,7 +382,11 @@ fun SharePickerScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.weight(1f),
                         ) {
-                        items(items, key = { it.num }) { item ->
+                        // listIndex, not num — see GalleryItem's own doc comment: num is only
+                        // guaranteed unique within one source's own file sequence, not across a
+                        // listing spanning several separate posts (a subreddit-index URL, e.g.),
+                        // and reused duplicate keys crash LazyVerticalGrid outright.
+                        items(items, key = { it.listIndex }) { item ->
                             val selected = item.num in selectedNums
                             val isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename) == true
                             val toggle = { selectedNums = if (selected) selectedNums - item.num else selectedNums + item.num }
