@@ -188,7 +188,10 @@ class DownloadWorker(
                                 // during a single large download instead of sitting indeterminate for
                                 // the whole transfer until the one file finishes (the only other call
                                 // to updateProgress, below, only fires once per completed *file*).
-                                DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent())
+                                DownloadNotifications.updateProgress(
+                                    applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
+                                    speedMbs = speedMbs, currentBytes = bytesSoFar.get() + downloaded, expectedBytes = expectedBytesRef.get(),
+                                )
                             }
                         }
                         line.startsWith("[thumbnail] ") -> {
@@ -281,7 +284,10 @@ class DownloadWorker(
                                         if (hasPlaceholderTitle) {
                                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                                         }
-                                        DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, count, computeProgressPercent())
+                                        DownloadNotifications.updateProgress(
+                                            applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
+                                            speedMbs = speedMbs, currentBytes = totalBytes, expectedBytes = expectedBytesRef.get(),
+                                        )
                                     }
                                 }
                             } catch (e: Exception) {
