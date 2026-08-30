@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.gallerydl.R
+import com.example.gallerydl.ui.main.formatFileSize
 
 object DownloadNotifications {
     const val CHANNEL_ID = "downloads"
@@ -34,6 +35,19 @@ object DownloadNotifications {
 
     fun notificationId(downloadId: String): Int = downloadId.hashCode()
 
+    /** A deliberately *different* id from [notificationId] for the terminal (finished/failed)
+     * notification — sharing the ongoing notification's id doesn't work: that id is also what
+     * setForeground(ForegroundInfo(...)) in DownloadWorker registers as *the* foreground-service
+     * notification, and the instant doWork() returns (right after notifyFinished()/notifyFailed()
+     * posts its update), WorkManager tears the foreground service down — which removes whatever
+     * notification currently sits at that id, silently wiping out the finished/failed notification
+     * that was just posted a moment earlier. Reproduced live: notifyFailed()'s own notify() call
+     * showed up correctly in logcat every time, but nothing ever appeared in the shade. A distinct
+     * id sidesteps the whole race — it's never tied to the foreground service, so nothing tears it
+     * down when the worker finishes. xor rather than +1 so it can't collide via integer overflow at
+     * the Int.MAX_VALUE/MIN_VALUE edges the way a plain increment could. */
+    private fun terminalNotificationId(downloadId: String): Int = notificationId(downloadId) xor 0x5A5A5A5A
+
     private fun actionPendingIntent(context: Context, action: String, downloadId: String): PendingIntent {
         val intent = Intent(context, DownloadActionReceiver::class.java).apply {
             this.action = action
@@ -51,14 +65,33 @@ object DownloadNotifications {
     /** [progressPercent] null means indeterminate (still extracting, or genuinely nothing known
      * about size/item-count yet) — otherwise a real 0-100 value renders an actual filling bar
      * instead of the perpetual spinner this used to hardcode regardless of how much was actually
-     * known, which was the whole reason download notifications never visibly showed progress. */
-    fun progressNotification(context: Context, title: String, downloadId: String, downloadedItems: Int, progressPercent: Int? = null): Notification {
+     * known, which was the whole reason download notifications never visibly showed progress.
+     * [speedMbs]/[currentBytes]/[expectedBytes] are only meaningfully non-zero for a byte-tracked
+     * single-file download (see DownloadWorker's own comment on why item-count wins over bytes for
+     * a multi-item gallery) — a gallery download just falls back to the item-count text below,
+     * same as before this was added. */
+    fun progressNotification(
+        context: Context,
+        title: String,
+        downloadId: String,
+        downloadedItems: Int,
+        progressPercent: Int? = null,
+        speedMbs: Float = 0f,
+        currentBytes: Long = 0L,
+        expectedBytes: Long = 0L,
+    ): Notification {
         ensureChannel(context)
+        val sizeText = if (expectedBytes > 0) "${formatFileSize(currentBytes)} of ${formatFileSize(expectedBytes)}" else null
+        val speedText = if (speedMbs > 0.01f) "%.1f MB/s".format(speedMbs) else null
+        val byteDetail = listOfNotNull(sizeText, speedText).joinToString(" · ")
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_logo)
             .setContentTitle(title)
             .setContentText(
                 when {
+                    // Real byte-level detail (size + speed) already implies progress more
+                    // usefully than a bare percent would, so it takes priority when available.
+                    byteDetail.isNotBlank() -> byteDetail
                     progressPercent != null -> "$progressPercent% · ${if (downloadedItems > 0) "$downloadedItems downloaded" else "Downloading…"}"
                     downloadedItems > 0 -> "$downloadedItems downloaded"
                     else -> "Starting…"
@@ -79,8 +112,20 @@ object DownloadNotifications {
             .build()
     }
 
-    fun updateProgress(context: Context, downloadId: String, title: String, downloadedItems: Int, progressPercent: Int? = null) {
-        notifySafe(context, downloadId, progressNotification(context, title, downloadId, downloadedItems, progressPercent))
+    fun updateProgress(
+        context: Context,
+        downloadId: String,
+        title: String,
+        downloadedItems: Int,
+        progressPercent: Int? = null,
+        speedMbs: Float = 0f,
+        currentBytes: Long = 0L,
+        expectedBytes: Long = 0L,
+    ) {
+        notifySafe(
+            context, downloadId,
+            progressNotification(context, title, downloadId, downloadedItems, progressPercent, speedMbs, currentBytes, expectedBytes),
+        )
     }
 
     fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?) {
@@ -124,7 +169,7 @@ object DownloadNotifications {
                     ),
                 )
         }
-        notifySafe(context, downloadId, builder.build())
+        notifySafe(context, downloadId, builder.build(), terminalNotificationId(downloadId))
     }
 
     fun notifyFailed(context: Context, downloadId: String, title: String, errorMessage: String? = null) {
@@ -137,19 +182,23 @@ object DownloadNotifications {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        notifySafe(context, downloadId, notification)
+        notifySafe(context, downloadId, notification, terminalNotificationId(downloadId))
     }
 
     fun cancel(context: Context, downloadId: String) {
         NotificationManagerCompat.from(context).cancel(notificationId(downloadId))
+        NotificationManagerCompat.from(context).cancel(terminalNotificationId(downloadId))
     }
 
-    private fun notifySafe(context: Context, downloadId: String, notification: Notification) {
+    /** [id] defaults to the ongoing/progress id ([notificationId]) so [updateProgress]'s existing
+     * call site doesn't need to change — [notifyFinished]/[notifyFailed] explicitly pass
+     * [terminalNotificationId] instead, per the doc comment on that function. */
+    private fun notifySafe(context: Context, downloadId: String, notification: Notification, id: Int = notificationId(downloadId)) {
         ensureChannel(context)
         val hasPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
-            NotificationManagerCompat.from(context).notify(notificationId(downloadId), notification)
+            NotificationManagerCompat.from(context).notify(id, notification)
         }
     }
 }
