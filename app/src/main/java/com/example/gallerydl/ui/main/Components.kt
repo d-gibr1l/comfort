@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.gallerydl.data.DownloadEntity
 import com.example.gallerydl.data.DownloadStatus
@@ -82,7 +83,16 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(visuals.message, style = MaterialTheme.typography.bodyMedium)
+                // Capped regardless of how long visuals.message turns out to be — error text is
+                // sanitized at the source now (see GalleryDlListing.sanitizeErrorMessage), but this
+                // is the last line of defense against a toast ever filling the whole screen the way
+                // one reproduced live before that existed, not something to rely on that alone for.
+                Text(
+                    visuals.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

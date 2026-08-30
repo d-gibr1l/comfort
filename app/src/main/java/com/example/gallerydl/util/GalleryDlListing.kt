@@ -55,9 +55,14 @@ object GalleryDlListing {
     // card is useless and looks broken, so anything implausibly long or shaped like markup instead
     // of a sentence gets swapped for a generic message. The full original text is still logged
     // (see the two call sites) for whenever this needs to be actually debugged.
+    //
+    // Not private: reproduced live a second time in DownloadWorker's own terminal-failure toast/DB
+    // errorMessage — the *real download* attempt (not just this file's listing/preview step) can
+    // hit the exact same gallery-dl behavior, on an entirely separate code path with its own error
+    // capture, so this needs to be reusable there too rather than duplicated.
     private val MARKUP_LIKE_REGEX = Regex("""[{}<>]|--[a-zA-Z-]+:""")
 
-    private fun sanitizeErrorMessage(raw: String): String? {
+    fun sanitizeErrorMessage(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
         val looksLikeMarkup = trimmed.length > 400 || MARKUP_LIKE_REGEX.containsMatchIn(trimmed.take(200))

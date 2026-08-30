@@ -532,7 +532,13 @@ class DownloadWorker(
                     // Neither engine found anything to save. Previously this silently reported
                     // FINISHED with 0 items regardless — a real error now, since there's a genuine
                     // reason to show the user (unsupported link, blocked request, nothing there).
-                    val errorMsg = lastErrorLine.get() ?: "No downloadable content found at this link"
+                    // Sanitized the same way GalleryDlListing's own error messages are — reproduced
+                    // live a second time here: a real download attempt (not just the listing/
+                    // preview step) can also surface gallery-dl's raw HTML/CSS-blob exception text
+                    // verbatim as its "error", which used to show up unfiltered in this terminal
+                    // failure notification and toast.
+                    val errorMsg = GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: "No downloadable content found at this link")
+                        ?: "No downloadable content found at this link"
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
                     // Result.success(), not failure() — see the isStopped branch above for why:
@@ -561,8 +567,9 @@ class DownloadWorker(
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     Result.success()
                 } else {
-                    dao.updateError(downloadId, DownloadStatus.ERRORED, e.localizedMessage)
-                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, e.localizedMessage)
+                    val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it) }
+                    dao.updateError(downloadId, DownloadStatus.ERRORED, sanitized)
+                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, sanitized)
                     Result.success()
                 }
             }
