@@ -51,16 +51,35 @@ class DownloadWorker(
             entity.expectedBytes > 0 -> (((entity.totalBytes + entity.liveBytes).toFloat() / entity.expectedBytes) * 100).toInt().coerceIn(0, 100)
             else -> null
         }
+        // A single, fixed, generic notification id shared by every concurrently running download
+        // — never a per-download one — is the only thing setForeground(ForegroundInfo(...)) ever
+        // registers now. See FOREGROUND_SERVICE_NOTIFICATION_ID's doc comment for why: a
+        // per-download id here used to leave that exact notification permanently stuck (flags
+        // ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE, uncancellable) once this worker finished,
+        // reproduced live even long after the underlying service was confirmed destroyed.
         setForeground(
             ForegroundInfo(
-                DownloadNotifications.notificationId(downloadId),
-                DownloadNotifications.progressNotification(applicationContext, displayTitle, downloadId, entity?.downloadedItems ?: 0, initialPercent),
+                DownloadNotifications.FOREGROUND_SERVICE_NOTIFICATION_ID,
+                DownloadNotifications.foregroundServiceNotification(applicationContext),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
             )
         )
+        // The real, per-download notification the user actually reads — posted as a plain notify()
+        // to its own id, entirely separate from the foreground-service one above, so it's always
+        // freely updatable/cancellable regardless of that service's lifecycle.
+        DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, entity?.downloadedItems ?: 0, initialPercent)
 
-        return withContext(Dispatchers.IO) {
-            try {
+        // Reproduced live: WorkManager's own teardown of the shared foreground notification once
+        // this (or every concurrently running) worker finishes isn't reliable on this device/OS
+        // build — dumpsys still showed it stuck with ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE
+        // minutes after the worker returned SUCCESS *and* dumpsys activity services confirmed no
+        // service was even running any more. markForegroundStarted/Stopped keep our own count of
+        // how many downloads are actually still using it, and explicitly cancel it once that count
+        // hits zero — not tied to (or trusting) WorkManager's own foreground-service bookkeeping.
+        DownloadNotifications.markForegroundStarted()
+        try {
+            return withContext(Dispatchers.IO) {
+                try {
                 dao.updateStatus(downloadId, DownloadStatus.RUNNING)
                 val startTime = System.currentTimeMillis()
                 dao.setStartTime(downloadId, startTime)
@@ -458,6 +477,9 @@ class DownloadWorker(
                     Result.success()
                 }
             }
+        }
+        } finally {
+            DownloadNotifications.markForegroundStopped(applicationContext)
         }
     }
 }
