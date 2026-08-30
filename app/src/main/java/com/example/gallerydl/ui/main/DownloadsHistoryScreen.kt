@@ -70,7 +70,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     val queueItems by viewModel.queueFlow.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val snackbarScope = rememberCoroutineScope()
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var showDeletedOnly by remember { mutableStateOf(false) }
@@ -103,45 +102,16 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     // user deleted from their gallery outside the app.
     LaunchedEffect(Unit) { viewModel.scanForDeletedMedia() }
 
-    // Snackbar when a download finishes or fails while the user is sitting in the Library tab —
-    // seeded to null (not emptySet()) on first composition so the very first emission from each
-    // flow (whatever's already in the DB) never fires a snackbar for pre-existing history; only
-    // ids that appear *after* that baseline do.
-    var seenFinishedIds by remember { mutableStateOf<Set<String>?>(null) }
-    LaunchedEffect(historyItems) {
-        val currentIds = historyItems.map { it.id }.toSet()
-        val previous = seenFinishedIds
-        if (previous != null) {
-            (currentIds - previous).forEach { id ->
-                val item = historyItems.firstOrNull { it.id == id } ?: return@forEach
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(
-                        message = "${item.title.ifBlank { "Download" }} finished",
-                        duration = SnackbarDuration.Short,
-                    )
-                }
-            }
-        }
-        seenFinishedIds = currentIds
-    }
-
-    var seenErroredIds by remember { mutableStateOf<Set<String>?>(null) }
-    LaunchedEffect(queueItems) {
-        val erroredNow = queueItems.filter { it.status == DownloadStatus.ERRORED }.map { it.id }.toSet()
-        val previous = seenErroredIds
-        if (previous != null) {
-            (erroredNow - previous).forEach { id ->
-                val item = queueItems.firstOrNull { it.id == id } ?: return@forEach
-                snackbarScope.launch {
-                    snackbarHostState.showSnackbar(
-                        message = "${item.title.ifBlank { "Download" }} failed" +
-                            (item.errorMessage?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""),
-                        duration = SnackbarDuration.Long,
-                    )
-                }
-            }
-        }
-        seenErroredIds = erroredNow
+    // Snackbar when a download finishes or fails while the user is actually looking at Library —
+    // gated on !isQueueOpen since MainScreen keeps this screen composed *underneath* the Queue
+    // overlay (for its own predictive-back reveal), not unmounted the way switching tabs away from
+    // Library does. Without this gate, a download finishing while the user has Queue open on top
+    // would fire a toast on this hidden screen too, on top of Queue's own — this composable exiting
+    // composition while Queue is up (rather than just conditionally not-showing) is what makes it
+    // re-seed its "seen" baseline fresh next time Library becomes visible again, instead of
+    // replaying anything that happened while it was hidden.
+    if (!isQueueOpen) {
+        DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems, snackbarHostState = snackbarHostState)
     }
 
     val visibleItems = (if (showDeletedOnly) deletedItems else historyItems)
@@ -171,7 +141,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         // all, but nothing was ever visible on screen).
         snackbarHost = {
             Box(modifier = Modifier.padding(bottom = 100.dp)) {
-                SnackbarHost(snackbarHostState)
+                DownloadEventSnackbarHost(snackbarHostState)
             }
         },
         topBar = {

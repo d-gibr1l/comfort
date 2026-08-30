@@ -51,6 +51,12 @@ fun QueueScreen(
 ) {
     val queueItems by viewModel.queueFlow.collectAsState()
     val isGloballyPaused by viewModel.isGloballyPaused.collectAsState()
+    // Only watched here for the finished-download toast below — the Queue's own list is
+    // everything NOT finished/saved/deleted (see DownloadDao.getQueueFlow), so a finished item is
+    // only ever visible via historyFlow, never queueItems itself.
+    val historyItems by viewModel.historyFlow.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems, snackbarHostState = snackbarHostState)
     // Lets a QUEUED item's card explain *why* it's stuck (no usable network right now) instead of
     // just "Waiting to start…" forever with no visible reason — reproduced live: a WorkManager job
     // sitting on an unsatisfied CONNECTIVITY constraint because the current Wi-Fi network was
@@ -103,6 +109,10 @@ fun QueueScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        // No floating bottom nav bar overlaying this screen (it's a full-screen overlay on top of
+        // MainScreen, not one of its tabs — see MainScreen's own showQueueScreen handling), so
+        // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
+        snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (retryAllStatus != null && filteredItems.isNotEmpty()) {
                 ExtendedFloatingActionButton(
