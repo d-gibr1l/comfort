@@ -149,10 +149,21 @@ class DownloadWorker(
                     return@withContext Result.success()
                 }
 
+                // Normalized into a private per-download temp copy — NOT rewritten in place on the
+                // real cookies.txt, which this used to do. cookies.txt is shared by every
+                // concurrently running download (see DownloadDispatcher's round-robin queues), and
+                // an in-place read-then-write with no locking around it is a genuine TOCTOU race:
+                // reproduced live as the real cookies.txt getting reduced to 0 bytes — permanently,
+                // no way to recover the content — after enough concurrent downloads hit this same
+                // line close together (one worker's writeText() truncating the file out from under
+                // another worker's concurrent readText()). A private copy per worker sidesteps the
+                // shared-mutable-file problem entirely instead of trying to lock around it.
                 val cookiesPath = applicationContext.filesDir.resolve("cookies.txt")
-                if (cookiesPath.exists()) {
-                    cookiesPath.writeText(cookiesPath.readText().replace("\r\n", "\n"))
-                }
+                val normalizedCookiesPath = if (cookiesPath.exists()) {
+                    File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
+                        writeText(cookiesPath.readText().replace("\r\n", "\n"))
+                    }
+                } else null
 
                 // gallery-dl needs a real filesystem path to write to; stage downloads here,
                 // then move each finished file into the public gallery via MediaStore so it's
@@ -336,7 +347,7 @@ class DownloadWorker(
                     }
                 }
 
-                val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
+                val cookiesArg = normalizedCookiesPath?.absolutePath ?: ""
                 val filenameFormat = GalleryDlPreferences.getFilenameFormat(applicationContext)
                 val extraArgs = GalleryDlPreferences.getExtraArgs(applicationContext)
                 // Tracks already-fetched item IDs across retries, so pausing/retrying a download
@@ -500,6 +511,10 @@ class DownloadWorker(
         }
         } finally {
             DownloadNotifications.markForegroundStopped(applicationContext)
+            // Matches the temp file created above for the cookies-normalization fix — cleaned up
+            // unconditionally here (success, failure, or cancellation) rather than only on the
+            // success path, same reasoning as markForegroundStopped needing its own finally.
+            File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").delete()
         }
     }
 }
