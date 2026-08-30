@@ -49,6 +49,13 @@ object GalleryDlPreferences {
     const val KEY_EMBED_THUMBNAIL = "embed_thumbnail"
     const val KEY_EMBED_METADATA = "embed_metadata"
     const val KEY_NO_PLAYLIST = "no_playlist"
+    const val KEY_ENGINE_UPDATE_LAST_CHECK_MS = "engine_update_last_check_ms"
+    const val KEY_ENGINE_UPDATE_AVAILABLE = "engine_update_available"
+    // How often MainScreen's auto-check (see its own LaunchedEffect) is allowed to actually hit
+    // PyPI on app launch — not on literally every launch, so relaunching the app repeatedly in a
+    // short span doesn't spam it. 6h is frequent enough to catch a same-day extractor fix without
+    // being effectively "every launch" for typical usage.
+    const val ENGINE_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
     // The naive "{uploader} - {title} - {id}" pattern collapses to the literal string
     // "None - None - None" on sources that don't expose that metadata, which makes every item
     // in the gallery resolve to the same filename — only the first survives, the rest are
@@ -225,5 +232,21 @@ object GalleryDlPreferences {
 
     fun setNoPlaylist(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_NO_PLAYLIST, enabled).apply()
+    }
+
+    // Drives the small red badge on the Settings tab / About row — set by MainScreen's rate-limited
+    // auto-check (see ENGINE_UPDATE_CHECK_INTERVAL_MS) so the badge survives without re-hitting
+    // PyPI on every recomposition, and cleared once the user actually opens the Engines section
+    // (which always does its own fresh check regardless of this cached flag).
+    fun getEngineUpdateLastCheckMs(context: Context): Long = prefs(context).getLong(KEY_ENGINE_UPDATE_LAST_CHECK_MS, 0L)
+
+    fun setEngineUpdateLastCheckMs(context: Context, ms: Long) {
+        prefs(context).edit().putLong(KEY_ENGINE_UPDATE_LAST_CHECK_MS, ms).apply()
+    }
+
+    fun isEngineUpdateAvailable(context: Context): Boolean = prefs(context).getBoolean(KEY_ENGINE_UPDATE_AVAILABLE, false)
+
+    fun setEngineUpdateAvailable(context: Context, available: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ENGINE_UPDATE_AVAILABLE, available).apply()
     }
 }
