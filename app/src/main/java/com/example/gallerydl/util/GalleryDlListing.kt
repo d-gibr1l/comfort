@@ -98,7 +98,13 @@ object GalleryDlListing {
 
     private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
-        val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
+        // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a corrupted
+        // 0-byte file) still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like
+        // a real Netscape cookies file, which used to fail every download outright even though a
+        // *missing* cookies file downloads just fine anonymously. Treating "empty" the same as
+        // "absent" here means a bad cookies file degrades to normal anonymous behavior instead of
+        // breaking every download regardless of whether that particular site even needs cookies.
+        val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
 
         // list_items() only ever prints once (see gallery_dl_wrapper.py's __main__), but that one
@@ -272,7 +278,13 @@ object GalleryDlListing {
 
     private suspend fun runYtDlpListInfo(context: Context, url: String): JSONObject? {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
-        val cookiesArg = if (cookiesPath.exists()) cookiesPath.absolutePath else ""
+        // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a corrupted
+        // 0-byte file) still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like
+        // a real Netscape cookies file, which used to fail every download outright even though a
+        // *missing* cookies file downloads just fine anonymously. Treating "empty" the same as
+        // "absent" here means a bad cookies file degrades to normal anonymous behavior instead of
+        // breaking every download regardless of whether that particular site even needs cookies.
+        val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
