@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash screen — light-mode defaults, overridden in values-night/colors.xml. Referenced by
+         both Theme.App.Starting (background) and ic_splash_logo.xml (icon fill) so the splash
+         actually follows the system theme instead of always being the SVG's own literal white. -->
+    <color name="splash_background">#FFFFFF</color>
+    <color name="splash_icon">#000000</color>
+</resources>
