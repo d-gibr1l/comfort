@@ -19,10 +19,30 @@ import com.example.gallerydl.util.PythonRuntime
 import com.example.gallerydl.util.QuickJsRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+
+/** Wraps setForeground(info) with a short settle delay and a safe catch for
+ * ForegroundServiceStartNotAllowedException (a subclass of IllegalStateException on API 31+,
+ * thrown when the app isn't currently allowed to start a new foreground service — e.g. already
+ * backgrounded past the OS's grace period). Modeled directly on YTDLnis's own
+ * setForegroundSafely() (work/WorkManagerExtensions.kt) — studied their source while chasing a
+ * related foreground-notification issue this session; the delay(500) mirrors theirs verbatim
+ * ("avoiding system crash" per their own comment there — a real timing issue with calling
+ * Service.startForeground() and then immediately doing more work, separate from the stuck-
+ * notification problem the comments below describe). Failing to become foreground this way just
+ * means the download proceeds without one, rather than crashing the whole worker over it. */
+private suspend fun CoroutineWorker.setForegroundSafely(info: ForegroundInfo) {
+    try {
+        setForeground(info)
+        delay(500)
+    } catch (e: IllegalStateException) {
+        android.util.Log.e("DownloadWorker", "Not allowed to set foreground state", e)
+    }
+}
 
 class DownloadWorker(
     appContext: Context,
@@ -57,7 +77,7 @@ class DownloadWorker(
         // per-download id here used to leave that exact notification permanently stuck (flags
         // ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE, uncancellable) once this worker finished,
         // reproduced live even long after the underlying service was confirmed destroyed.
-        setForeground(
+        setForegroundSafely(
             ForegroundInfo(
                 DownloadNotifications.FOREGROUND_SERVICE_NOTIFICATION_ID,
                 DownloadNotifications.foregroundServiceNotification(applicationContext),
