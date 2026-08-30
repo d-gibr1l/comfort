@@ -44,6 +44,47 @@ private suspend fun CoroutineWorker.setForegroundSafely(info: ForegroundInfo) {
     }
 }
 
+/** Hard cap on how many DownloadWorkers can be doing real download work at once, independent of
+ * DownloadDispatcher's own round-robin unique-work-chain scheduling. Reported live: 5 downloads
+ * running concurrently while "Concurrent downloads" was set to 2. That round-robin design assumes
+ * WorkManager's APPEND_OR_REPLACE unique-work chains guarantee only one active job per chain at a
+ * time — a real, normally-reliable WorkManager guarantee, but retries/reschedules re-picking a
+ * slot via the same shared counter, a chain getting silently replaced (not appended) once its head
+ * reaches a terminal cancelled/failed state, etc. leave real room for more chains to exist, and
+ * therefore more simultaneously-active heads, than the configured limit intends. Rather than fully
+ * re-audit every one of those WorkManager edge cases, this enforces the cap directly at the one
+ * place that actually matters — whether a worker is allowed to start doing its real work — no
+ * matter how many chains/slots exist or how they got there.
+ *
+ * Poll-based (checked once per [POLL_INTERVAL_MS]) rather than a fixed-size Semaphore specifically
+ * so it keeps respecting a concurrency-limit change made mid-session without needing to recreate or
+ * resize anything — each wait iteration re-reads the current preference value fresh. */
+private object DownloadConcurrencyGate {
+    private const val POLL_INTERVAL_MS = 500L
+    private val active = AtomicInteger(0)
+
+    suspend fun acquire(context: Context) {
+        while (true) {
+            val limit = GalleryDlPreferences.getConcurrentDownloads(context).coerceAtLeast(1)
+            // Not perfectly atomic against another waiter passing this same check at the same
+            // moment — worst case briefly overshoots the limit by however many racing waiters all
+            // read a stale "still under limit" value together, and self-corrects on the very next
+            // poll once their increments are visible. An acceptable trade for not needing a real
+            // lock around a value that has to be re-read fresh from preferences every iteration
+            // anyway (a plain Semaphore can't be resized once constructed).
+            if (active.get() < limit) {
+                active.incrementAndGet()
+                return
+            }
+            delay(POLL_INTERVAL_MS)
+        }
+    }
+
+    fun release() {
+        active.updateAndGet { (it - 1).coerceAtLeast(0) }
+    }
+}
+
 class DownloadWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -59,6 +100,15 @@ class DownloadWorker(
         val dao = AppDatabase.getDatabase(applicationContext).downloadDao()
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
+
+        // Blocks here (not a hard failure) until a concurrency slot is actually free — see
+        // DownloadConcurrencyGate's own doc comment for why this exists alongside the round-robin
+        // unique-work-chain system rather than trusting that alone. release() is in this function's
+        // own outer finally below — the try starts right here, not any later, specifically so that
+        // finally still runs (and releases the slot) even if something between here and the
+        // existing try block below throws (setForegroundSafely, updateProgress, ...).
+        DownloadConcurrencyGate.acquire(applicationContext)
+        try {
 
         // A resumed/retried download already has real progress sitting in the DB from its last
         // run — starting the notification back at a bare indeterminate spinner (only for the first
@@ -523,6 +573,9 @@ class DownloadWorker(
             // unconditionally here (success, failure, or cancellation) rather than only on the
             // success path, same reasoning as markForegroundStopped needing its own finally.
             File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").delete()
+        }
+        } finally {
+            DownloadConcurrencyGate.release()
         }
     }
 }
