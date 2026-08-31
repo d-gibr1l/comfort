@@ -355,6 +355,11 @@ class DownloadWorker(
                         // yt-dlp's own non-fatal warnings — never file paths, nothing to act on,
                         // just kept out of the file-path branch below.
                         line.startsWith("[warning] ") -> Unit
+                        // Only ever emitted when a caller explicitly opts a run into
+                        // ydl_opts["verbose"] (see yt_dlp_wrapper.py's _Logger.debug()) — not
+                        // something a normal download run produces, kept out of the file-path
+                        // branch below the same as [warning].
+                        line.startsWith("[debug] ") -> Unit
                         // The wrapper script's own final status line (see its __main__ block) —
                         // never consumed (status is derived from lastErrorLine/savedCount instead,
                         // same as when this was Chaquopy's callAttr() return value), just kept out

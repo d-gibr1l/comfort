@@ -38,7 +38,11 @@ class _Logger:
         self.callback = callback
 
     def debug(self, msg):
-        pass
+        # Only ever reaches here when the caller opted into ydl_opts["verbose"] — write_debug()
+        # itself is gated behind that flag before it calls logger.debug() at all (see YoutubeDL's
+        # own write_debug()), so this doesn't add any output/overhead to a normal (non-verbose) run.
+        if self.callback:
+            self.callback(f"[debug] {msg}")
 
     def warning(self, msg):
         if self.callback:
