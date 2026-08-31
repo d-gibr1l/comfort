@@ -777,9 +777,16 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     val cookiesFile = remember { java.io.File(context.filesDir, "cookies.txt") }
 
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val scope = rememberCoroutineScope()
     var showBrowser by remember { mutableStateOf(false) }
     var extractedCookies by remember { mutableStateOf("") }
-    var pastedCookies by remember { mutableStateOf(sharedPreferences.getString(GalleryDlPreferences.KEY_COOKIES, "") ?: "") }
+    // Deliberately empty, not seeded from whatever's already saved — this box is for pasting a
+    // *new* cookies.txt in, not for displaying/re-editing what's already saved (that's what the
+    // per-site table below is for). Reported live: pre-filling it with the current save meant this
+    // one field alone could end up showing every cookie for every site as one giant wall of raw
+    // text, duplicating what the table already shows more usefully.
+    var pastedCookies by remember { mutableStateOf("") }
     var savedConfirmation by remember { mutableStateOf(false) }
     // The real, on-disk cookies.txt is the one source of truth gallery-dl/yt-dlp actually read
     // (see GalleryDlListing.kt/DownloadWorker.kt) — SharedPreferences' own KEY_COOKIES is only ever
@@ -804,7 +811,6 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
             onDismiss = { showBrowser = false },
             onCookiesSaved = { merged ->
                 extractedCookies = merged
-                pastedCookies = merged
                 savedCookiesContent = merged
                 showBrowser = false
             },
@@ -851,7 +857,22 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 
             OutlinedButton(
                 onClick = {
-                    persist(pastedCookies)
+                    // Merges into whatever's already saved rather than replacing it wholesale — a
+                    // manual paste is almost always meant to *add* a site's cookies (or refresh
+                    // one), not wipe out every other site's already-saved login in the process.
+                    // Works on the already-parsed rawLine form (not mergeNetscapeCookies, which
+                    // rebuilds each line from scratch with a fixed 5-year expiry and TRUE/TRUE
+                    // flags — fine for a browser-extracted cookie header with no real field values
+                    // of its own, but would silently overwrite a *pasted* file's own genuine
+                    // expiry/secure/subdomain flags) — only the touched registrable domains get
+                    // replaced, everything else already saved is left exactly as it was.
+                    val pastedParsed = parseCookiesFile(pastedCookies)
+                    val touchedDomains = pastedParsed.map { it.domain.removePrefix(".") }.toSet()
+                    val keptExisting = parseCookiesFile(savedCookiesContent)
+                        .filterNot { it.domain.removePrefix(".") in touchedDomains }
+                    val merged = (keptExisting + pastedParsed).joinToString("\n") { it.rawLine }
+                    persist(merged)
+                    pastedCookies = ""
                     savedConfirmation = true
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -909,6 +930,14 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                             )
                         }
                         IconButton(onClick = {
+                            val text = site.cookies.joinToString("\n") { it.rawLine }
+                            scope.launch {
+                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
+                            }
+                        }) {
+                            Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = {
                             val toRemove = site.cookies.toSet()
                             val updated = parsedCookies
                                 .filter { it !in toRemove }
@@ -923,15 +952,30 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { persist("") },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Clear all cookies")
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("cookies.txt", savedCookiesContent)))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(FeatherIcons.Copy, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Copy all")
+                    }
+                    OutlinedButton(
+                        onClick = { persist("") },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) {
+                        Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Clear all")
+                    }
                 }
             }
         }
