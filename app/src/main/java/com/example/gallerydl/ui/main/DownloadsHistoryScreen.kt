@@ -5,8 +5,13 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -353,17 +358,30 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                 modifier = Modifier.fillMaxSize(),
             ) {
                 gridItems(visibleItems, key = { it.id }) { item ->
-                    HistoryGridItem(
-                        item = item,
-                        selected = item.id in selectedIds,
-                        selectionMode = selectionMode,
-                        onTap = {
-                            if (selectionMode) {
-                                selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
-                            }
-                        },
-                        onLongPress = { selectedIds = selectedIds + item.id },
-                    )
+                    // Same slide-up + fade-in entrance / crossfade-out + reflow-on-removal pattern
+                    // as the Download Queue's own cards (see QueueScreen.kt's own comment on this)
+                    // — visibleState never flips back to false from here, so the removal half is
+                    // entirely animateItem()'s own built-in fade-out + placement animation below,
+                    // not this AnimatedVisibility's exit (deliberately ExitTransition.None).
+                    val visibleState = remember(item.id) { MutableTransitionState(false).apply { targetState = true } }
+                    AnimatedVisibility(
+                        visibleState = visibleState,
+                        enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                        exit = ExitTransition.None,
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        HistoryGridItem(
+                            item = item,
+                            selected = item.id in selectedIds,
+                            selectionMode = selectionMode,
+                            onTap = {
+                                if (selectionMode) {
+                                    selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
+                                }
+                            },
+                            onLongPress = { selectedIds = selectedIds + item.id },
+                        )
+                    }
                 }
             }
         } else {
@@ -389,32 +407,42 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                         )
                     }
-                    if (selectionMode) {
-                        row()
-                    } else {
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { value ->
-                                if (value != SwipeToDismissBoxValue.Settled) {
-                                    viewModel.deleteDownload(item.id)
-                                }
-                                true
-                            },
-                        )
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            backgroundContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.errorContainer)
-                                        .padding(horizontal = 24.dp),
-                                    contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
-                                ) {
-                                    Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
-                                }
-                            },
-                        ) {
+                    // Same entrance/removal pattern as the grid above and the Download Queue's own
+                    // cards — see either's own comment on why exit is deliberately ExitTransition.None.
+                    val visibleState = remember(item.id) { MutableTransitionState(false).apply { targetState = true } }
+                    AnimatedVisibility(
+                        visibleState = visibleState,
+                        enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                        exit = ExitTransition.None,
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        if (selectionMode) {
                             row()
+                        } else {
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    if (value != SwipeToDismissBoxValue.Settled) {
+                                        viewModel.deleteDownload(item.id)
+                                    }
+                                    true
+                                },
+                            )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                backgroundContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.errorContainer)
+                                            .padding(horizontal = 24.dp),
+                                        contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
+                                    ) {
+                                        Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                                    }
+                                },
+                            ) {
+                                row()
+                            }
                         }
                     }
                 }
