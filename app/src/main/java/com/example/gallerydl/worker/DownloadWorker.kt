@@ -334,14 +334,23 @@ class DownloadWorker(
                         // same callback.
                         line.startsWith("[error] ") || GALLERY_DL_ERROR_LINE.containsMatchIn(line) ||
                             line.startsWith("Error,") || line.startsWith("Exception:") -> {
-                            // First error wins, not last: when gallery-dl (the primary engine) and
-                            // a yt-dlp fallback/supplement pass both fail, gallery-dl's own message
-                            // is normally the actual root cause (e.g. that login-redirect) and
-                            // yt-dlp's is just a downstream symptom of the same block ("no video
-                            // formats found" — of course not, it's not logged in either) — showing
-                            // whichever came first keeps the diagnostic one instead of the vaguer
-                            // one that happened to run last.
-                            lastErrorLine.compareAndSet(null, line.substringAfter("[error] ").trim())
+                            // First error wins, not last, *unless* that first one turns out to be
+                            // unusable garbage. The general rule (when gallery-dl and a yt-dlp
+                            // fallback/supplement pass both fail, gallery-dl's message is normally
+                            // the actual root cause and yt-dlp's is just a downstream symptom of the
+                            // same block) doesn't hold for gallery-dl's own "AbortExtraction(raw
+                            // HTML/CSS blob)" failure mode (see GalleryDlListing.sanitizeErrorMessage's
+                            // doc comment) — reproduced live against Reddit: gallery-dl's own error
+                            // was that unusable blob, while yt-dlp's fallback attempt gave a real,
+                            // actionable one ("Account authentication is required") that a strict
+                            // first-wins policy was silently discarding in favor of the useless one.
+                            // sanitizeErrorMessage() changing the text is exactly the signal that the
+                            // captured error is that class of garbage, not a real diagnostic message
+                            // worth protecting from being overwritten.
+                            val candidate = line.substringAfter("[error] ").trim()
+                            lastErrorLine.getAndUpdate { current ->
+                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) candidate else current
+                            }
                         }
                         // yt-dlp's own non-fatal warnings — never file paths, nothing to act on,
                         // just kept out of the file-path branch below.
