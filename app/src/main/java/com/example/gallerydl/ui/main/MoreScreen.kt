@@ -32,6 +32,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.gallerydl.data.GalleryDlPreferences
 import com.example.gallerydl.data.VideoQuality
+import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.LocalThemeState
 import com.example.gallerydl.theme.ThemeMode
 import com.example.gallerydl.util.EngineUpdater
@@ -867,28 +868,32 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
             }
         }
 
-        // A real per-cookie list — domain, name, expiry, each individually removable — instead of
-        // only ever being able to see/edit cookies as one opaque blob of raw text above. Sourced
-        // from the real cookies.txt (see savedCookiesContent's own comment), so it always reflects
-        // exactly what a download would actually send, including cookies that arrived via the
-        // browser-login flow above or the Queue screen's own per-download "Add cookies" action —
-        // not just ones saved through this screen's own paste box.
-        SettingsSection(title = "Saved cookies (${parsedCookies.size})", icon = FeatherIcons.List) {
-            if (parsedCookies.isEmpty()) {
+        // One row per *site*, not per individual cookie — a real login legitimately saves a dozen-
+        // plus individual cookies together (sessionid, csrftoken, a device id, ...; see
+        // groupCookiesBySite's own doc comment for why), and showing every single one as its own
+        // row read as "the app is duplicating my cookies" rather than "this is what one login
+        // actually consists of" (reported live). Grouped by registrable domain instead — Instagram
+        // shows as one row regardless of how many individual cookies back that session, same for
+        // Reddit, etc. — with a per-site delete that removes that whole group's cookies at once.
+        // Still sourced from the real cookies.txt (see savedCookiesContent's own comment), so it
+        // always reflects exactly what a download would actually send.
+        val cookieSites = remember(parsedCookies) { groupCookiesBySite(parsedCookies) }
+        SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = FeatherIcons.List) {
+            if (cookieSites.isEmpty()) {
                 Text(
                     "No cookies saved yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                parsedCookies.forEachIndexed { index, cookie ->
+                cookieSites.forEachIndexed { index, site ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                cookie.domain,
+                                site.label,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -896,7 +901,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                "${cookie.name} · ${formatCookieExpiry(cookie.expiryEpochSeconds)}",
+                                "${site.cookies.size} cookie${if (site.cookies.size == 1) "" else "s"} · ${formatCookieExpiry(site.soonestExpiryEpochSeconds)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -904,15 +909,16 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                             )
                         }
                         IconButton(onClick = {
+                            val toRemove = site.cookies.toSet()
                             val updated = parsedCookies
-                                .filterIndexed { i, _ -> i != index }
+                                .filter { it !in toRemove }
                                 .joinToString("\n") { it.rawLine }
                             persist(updated)
                         }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "Remove this cookie", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
                     }
-                    if (index != parsedCookies.lastIndex) {
+                    if (index != cookieSites.lastIndex) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     }
                 }
@@ -965,6 +971,43 @@ private fun parseCookiesFile(content: String): List<ParsedCookie> {
             rawLine = rawLine,
         )
     }.toList()
+}
+
+/** One "site" worth of cookies for the grouped summary row — [cookies] keeps every individual
+ * [ParsedCookie] that belongs to it (needed to actually delete them, and to compute
+ * [soonestExpiryEpochSeconds]), while the row itself only ever shows [label] and a count. */
+private data class SiteCookies(
+    val label: String,
+    val cookies: List<ParsedCookie>,
+) {
+    // The soonest of the group's own expiries is what actually determines when this login first
+    // needs refreshing — showing the *latest* one instead would understate how soon a session
+    // might already be partly stale (a real login session's individual cookies don't all share one
+    // expiry; some non-essential ones (display prefs, A/B-test bucketing) are often set to expire
+    // far sooner than the actual session token itself, without meaning the session as a whole
+    // isn't still good).
+    val soonestExpiryEpochSeconds: Long = cookies
+        .map { it.expiryEpochSeconds }
+        .filter { it > 0L }
+        .minOrNull() ?: 0L
+}
+
+/** Groups by *registrable* domain (the last two dot-separated labels — "www.reddit.com" and
+ * ".reddit.com" both collapse to the same "reddit.com" group, same simplification VideoSiteRouter
+ * itself already makes) rather than by the exact domain string each cookie's own line happens to
+ * carry, since a single real login often spans a mix of exact-domain and subdomain-inclusive
+ * ("TRUE" in the Netscape format's own includeSubdomains column) cookies for what's really one
+ * site as far as a user setting up a login is concerned. Sorted by site label for a stable,
+ * predictable display order rather than whatever order cookies.txt's own lines happen to be in. */
+private fun groupCookiesBySite(cookies: List<ParsedCookie>): List<SiteCookies> {
+    return cookies
+        .groupBy { cookie ->
+            val bare = cookie.domain.removePrefix(".")
+            val labelParts = bare.split(".")
+            if (labelParts.size <= 2) bare else labelParts.takeLast(2).joinToString(".")
+        }
+        .map { (rootDomain, group) -> SiteCookies(label = VideoSiteRouter.siteName("https://$rootDomain"), cookies = group) }
+        .sortedBy { it.label.lowercase() }
 }
 
 private fun formatCookieExpiry(epochSeconds: Long): String {
