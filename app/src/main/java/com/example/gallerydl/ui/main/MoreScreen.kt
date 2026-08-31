@@ -774,11 +774,28 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
 private fun CookiesSettingsScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
+    val cookiesFile = remember { java.io.File(context.filesDir, "cookies.txt") }
 
     var showBrowser by remember { mutableStateOf(false) }
     var extractedCookies by remember { mutableStateOf("") }
     var pastedCookies by remember { mutableStateOf(sharedPreferences.getString(GalleryDlPreferences.KEY_COOKIES, "") ?: "") }
     var savedConfirmation by remember { mutableStateOf(false) }
+    // The real, on-disk cookies.txt is the one source of truth gallery-dl/yt-dlp actually read
+    // (see GalleryDlListing.kt/DownloadWorker.kt) — SharedPreferences' own KEY_COOKIES is only ever
+    // a same-content mirror written alongside it, kept for the raw-paste textbox's own persistence.
+    // Reading the file fresh (not the mirror) for the parsed table below means it can never drift
+    // out of sync with what a download actually uses, the way two independently-updated copies of
+    // the same data always eventually can.
+    var savedCookiesContent by remember {
+        mutableStateOf(runCatching { cookiesFile.takeIf { it.exists() }?.readText() }.getOrNull().orEmpty())
+    }
+    val parsedCookies = remember(savedCookiesContent) { parseCookiesFile(savedCookiesContent) }
+
+    fun persist(content: String) {
+        sharedPreferences.edit().putString(GalleryDlPreferences.KEY_COOKIES, content).apply()
+        cookiesFile.writeText(content)
+        savedCookiesContent = content
+    }
 
     if (showBrowser) {
         CookieLoginDialog(
@@ -787,6 +804,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
             onCookiesSaved = { merged ->
                 extractedCookies = merged
                 pastedCookies = merged
+                savedCookiesContent = merged
                 showBrowser = false
             },
         )
@@ -832,8 +850,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 
             OutlinedButton(
                 onClick = {
-                    sharedPreferences.edit().putString(GalleryDlPreferences.KEY_COOKIES, pastedCookies).apply()
-                    java.io.File(context.filesDir, "cookies.txt").writeText(pastedCookies)
+                    persist(pastedCookies)
                     savedConfirmation = true
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -849,7 +866,112 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                 StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies saved and applied", tint = MaterialTheme.colorScheme.secondary)
             }
         }
+
+        // A real per-cookie list — domain, name, expiry, each individually removable — instead of
+        // only ever being able to see/edit cookies as one opaque blob of raw text above. Sourced
+        // from the real cookies.txt (see savedCookiesContent's own comment), so it always reflects
+        // exactly what a download would actually send, including cookies that arrived via the
+        // browser-login flow above or the Queue screen's own per-download "Add cookies" action —
+        // not just ones saved through this screen's own paste box.
+        SettingsSection(title = "Saved cookies (${parsedCookies.size})", icon = FeatherIcons.List) {
+            if (parsedCookies.isEmpty()) {
+                Text(
+                    "No cookies saved yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                parsedCookies.forEachIndexed { index, cookie ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                cookie.domain,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "${cookie.name} · ${formatCookieExpiry(cookie.expiryEpochSeconds)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        IconButton(onClick = {
+                            val updated = parsedCookies
+                                .filterIndexed { i, _ -> i != index }
+                                .joinToString("\n") { it.rawLine }
+                            persist(updated)
+                        }) {
+                            Icon(FeatherIcons.Trash2, contentDescription = "Remove this cookie", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    if (index != parsedCookies.lastIndex) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { persist("") },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Clear all cookies")
+                }
+            }
+        }
     }
+}
+
+/** One row of a Netscape-format cookies.txt (the format gallery-dl/yt-dlp's --cookies flag reads —
+ * see mergeNetscapeCookies' own doc comment for the field layout). [rawLine] is kept verbatim
+ * (rather than reconstructed from the parsed fields) so deleting a cookie can just drop its exact
+ * original line instead of risking a lossy round-trip through re-serialization. */
+private data class ParsedCookie(
+    val domain: String,
+    val name: String,
+    val expiryEpochSeconds: Long,
+    val rawLine: String,
+)
+
+/** Real comment lines start with "#" and nothing else meaningful follows on that line; a
+ * "#HttpOnly_"-prefixed line (a real convention plenty of cookies.txt exports — Chrome's own
+ * cookie-export extensions among them — actually use) is NOT a comment despite the leading "#": the
+ * rest of the line past that exact prefix is a genuine tab-separated cookie row, just one flagged
+ * httpOnly. Reproduced live in this app's own "paste raw cookies" flow: without stripping that
+ * prefix first, every httpOnly cookie in a real exported file silently vanished from the parsed
+ * list, showing as if the file were mostly empty. */
+private fun parseCookiesFile(content: String): List<ParsedCookie> {
+    return content.lineSequence().mapNotNull { rawLine ->
+        val trimmed = rawLine.trimEnd('\r')
+        if (trimmed.isBlank()) return@mapNotNull null
+        val dataLine = trimmed.removePrefix("#HttpOnly_")
+        if (dataLine.startsWith("#")) return@mapNotNull null
+        val fields = dataLine.split("\t")
+        if (fields.size < 7) return@mapNotNull null
+        ParsedCookie(
+            domain = fields[0],
+            expiryEpochSeconds = fields[4].toLongOrNull() ?: 0L,
+            name = fields[5],
+            rawLine = rawLine,
+        )
+    }.toList()
+}
+
+private fun formatCookieExpiry(epochSeconds: Long): String {
+    if (epochSeconds <= 0L) return "Session"
+    val millis = epochSeconds * 1000
+    if (millis < System.currentTimeMillis()) return "Expired"
+    return java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
 }
 
 /** Shared by the Cookies & Login settings screen and the Queue's per-download "Add cookies"
