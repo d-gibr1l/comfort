@@ -1,7 +1,12 @@
 package com.example.gallerydl.ui.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -215,6 +220,16 @@ fun QueueScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(filteredItems, key = { it.id }) { item ->
+                        // Slide-up + fade-in on first appearance (a newly queued download, or one
+                        // scrolling into view for the first time) — targetState flips true right
+                        // after this item enters composition, MutableTransitionState's own initial
+                        // "false" giving Compose something to animate *from*. Never flips back to
+                        // false again from here — a finished/removed item just leaves
+                        // filteredItems and this composable is disposed outright, so the "crossfade
+                        // out and slide the rest up to fill the gap" half of this is entirely
+                        // animateItem()'s own built-in fade-out + placement animation below, not
+                        // this AnimatedVisibility's exit (deliberately ExitTransition.None).
+                        val visibleState = remember(item.id) { MutableTransitionState(false).apply { targetState = true } }
                         val row = @Composable {
                             if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED) {
                                 StoppedRow(
@@ -239,6 +254,12 @@ fun QueueScreen(
                             }
                         }
 
+                        AnimatedVisibility(
+                            visibleState = visibleState,
+                            enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                            exit = ExitTransition.None,
+                            modifier = Modifier.animateItem(),
+                        ) {
                         // Swipe-to-delete is only offered for downloads that are already stopped
                         // for good (errored or cancelled) — everything still active or resumable
                         // (running, queued, scheduled, paused) should require a deliberate tap
@@ -271,6 +292,7 @@ fun QueueScreen(
                             }
                         } else {
                             row()
+                        }
                         }
                     }
                 }
