@@ -433,6 +433,7 @@ class DownloadWorker(
                     .apply { parentFile?.mkdirs() }
                     .absolutePath
                 val limitRate = GalleryDlPreferences.getSpeedLimit(applicationContext)
+                val networkRetries = GalleryDlPreferences.getNetworkRetries(applicationContext).toString()
 
                 // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
                 // call into one shared interpreter — the race PythonEngineLock existed to prevent
@@ -446,6 +447,7 @@ class DownloadWorker(
                             "download", url, stagingDir.absolutePath, cookiesArg,
                             filenameFormat, extraArgs, galleryArchivePath, limitRate,
                             entity?.itemFilter.orEmpty(), if (excludeVideo) "1" else "0",
+                            networkRetries,
                         ),
                         actualCallback,
                     )
@@ -468,6 +470,7 @@ class DownloadWorker(
                 val embedThumbnail = GalleryDlPreferences.isEmbedThumbnail(applicationContext)
                 val embedMetadata = GalleryDlPreferences.isEmbedMetadata(applicationContext)
                 val noPlaylist = GalleryDlPreferences.isNoPlaylist(applicationContext)
+                val outputFormat = GalleryDlPreferences.getOutputFormat(applicationContext)
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -482,6 +485,7 @@ class DownloadWorker(
                             if (audioOnly) "1" else "0", if (downloadSubtitles) "1" else "0", subtitleLangs,
                             if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
                             videoQuality.resolutionCap()?.toString().orEmpty(),
+                            outputFormat.extension, networkRetries,
                         ),
                         actualCallback,
                     )

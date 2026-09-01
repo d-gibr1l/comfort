@@ -28,6 +28,11 @@ enum class VideoQuality(val label: String) {
     }
 }
 
+enum class OutputFormat(val label: String, val extension: String) {
+    MKV("MKV", "mkv"),
+    MP4("MP4", "mp4"),
+}
+
 object GalleryDlPreferences {
     const val PREFS_NAME = "GalleryDlPrefs"
     const val KEY_COOKIES = "cookies"
@@ -51,6 +56,13 @@ object GalleryDlPreferences {
     const val KEY_NO_PLAYLIST = "no_playlist"
     const val KEY_ENGINE_UPDATE_LAST_CHECK_MS = "engine_update_last_check_ms"
     const val KEY_ENGINE_UPDATE_AVAILABLE = "engine_update_available"
+    const val KEY_OUTPUT_FORMAT = "output_format"
+    const val KEY_NETWORK_RETRIES = "network_retries"
+    // yt-dlp's own built-in default (used whenever this preference hasn't been touched) — chosen
+    // to match rather than invent a different "app default", so leaving the setting alone behaves
+    // exactly like it always did before this preference existed.
+    const val DEFAULT_NETWORK_RETRIES = 10
+    const val MAX_NETWORK_RETRIES = 50
     // How often MainScreen's auto-check (see its own LaunchedEffect) is allowed to actually hit
     // PyPI on app launch — not on literally every launch, so relaunching the app repeatedly in a
     // short span doesn't spam it. 6h is frequent enough to catch a same-day extractor fix without
@@ -248,5 +260,31 @@ object GalleryDlPreferences {
 
     fun setEngineUpdateAvailable(context: Context, available: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENGINE_UPDATE_AVAILABLE, available).apply()
+    }
+
+    /** Only affects a merged video (audio+video muxed via ffmpeg) — a single already-muxed format
+     * downloads straight through regardless of this setting, and gallery-dl-sourced items keep
+     * whatever extension the site actually served. MKV stays the default: see
+     * yt_dlp_wrapper.py's own merge_output_format comment for why MP4 needed real work (a
+     * format_sort codec bias) to avoid producing unplayable output on some sources. */
+    fun getOutputFormat(context: Context): OutputFormat {
+        val stored = prefs(context).getString(KEY_OUTPUT_FORMAT, OutputFormat.MKV.name)
+        return runCatching { OutputFormat.valueOf(stored ?: OutputFormat.MKV.name) }.getOrDefault(OutputFormat.MKV)
+    }
+
+    fun setOutputFormat(context: Context, format: OutputFormat) {
+        prefs(context).edit().putString(KEY_OUTPUT_FORMAT, format.name).apply()
+    }
+
+    /** How many times a failed request (extraction, or an individual file/fragment fetch) gets
+     * retried before the download actually fails. Shared by both engines — see
+     * yt_dlp_wrapper.py's retries/fragment_retries and gallery_dl_wrapper.py's
+     * extractor.retries/downloader.retries. */
+    fun getNetworkRetries(context: Context): Int {
+        return prefs(context).getInt(KEY_NETWORK_RETRIES, DEFAULT_NETWORK_RETRIES).coerceIn(1, MAX_NETWORK_RETRIES)
+    }
+
+    fun setNetworkRetries(context: Context, retries: Int) {
+        prefs(context).edit().putInt(KEY_NETWORK_RETRIES, retries.coerceIn(1, MAX_NETWORK_RETRIES)).apply()
     }
 }

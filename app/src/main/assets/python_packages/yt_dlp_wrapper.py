@@ -57,7 +57,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
-             resolution_cap=None):
+             resolution_cap=None, output_format=None, retries=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -218,13 +218,32 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # post, etc.) raise normally — it only tolerates individual items failing mid-playlist.
         "ignoreerrors": "only_download",
     }
+    if retries:
+        # Same count for both — "retries" alone only covers whole-request failures (extraction,
+        # a plain single-file fetch); a merge download's separate video/audio fragments each get
+        # their own retry budget via "fragment_retries", uncovered by the first one on its own.
+        ydl_opts["retries"] = int(retries)
+        ydl_opts["fragment_retries"] = int(retries)
+    # Built once, combining every reason to prefer one format over another, rather than each
+    # concern setting "format_sort" independently and silently clobbering whichever ran last.
+    format_sort_terms = []
     if resolution_cap and not audio_only:
         # "res" sorts by min(height, width) rather than raw height — the conventional quality
         # number regardless of portrait/landscape orientation — so this correctly biases
         # "bestvideo"/"best" in chosen_format toward the closest resolution at-or-under the cap
         # instead of the raw-height filter this replaced, which broke on portrait video (see
         # GalleryDlPreferences.VideoQuality.resolutionCap()'s comment for the full story).
-        ydl_opts["format_sort"] = [f"res:{resolution_cap}"]
+        format_sort_terms.append(f"res:{resolution_cap}")
+    if output_format == "mp4" and not audio_only:
+        # Muxing VP9 video into an MP4 container needs a "vpcC" codec-configuration box this
+        # build's ffmpeg doesn't reliably write (see merge_output_format below) — biasing toward
+        # h264 up front means an MP4-output download actually picks a source that mixes cleanly
+        # instead of picking VP9 (yt-dlp's usual preference) and then failing to mux it. Still
+        # falls back to whatever's actually available (av1/vp9/...) when a source has no h264
+        # variant at all — this only reorders the preference, it doesn't exclude anything.
+        format_sort_terms.append("vcodec:h264")
+    if format_sort_terms:
+        ydl_opts["format_sort"] = format_sort_terms
     if no_playlist:
         # Only set when actually requested, not unconditionally — verified live (same URL, single
         # variable changed) that passing this at all turns a ~6s extraction into 60-250+s in this
@@ -238,13 +257,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
         # Letting yt-dlp pick MP4 for a merge (its own default when the video track allows it)
-        # produced unplayable output on real devices — some sites (Instagram among them) serve
-        # VP9 video, and muxing VP9 into an MP4 container needs a "vpcC" codec-configuration box
-        # that this build's ffmpeg doesn't reliably write, silently producing a file every player
-        # rejects with "Empty VP Codec Configuration box". MKV has no such requirement for any
-        # codec combination, so forcing it here sidesteps the whole class of bug rather than
-        # special-casing it per codec.
-        ydl_opts["merge_output_format"] = "mkv"
+        # used to produce unplayable output on real devices — some sites (Instagram among them)
+        # serve VP9 video, and muxing VP9 into an MP4 container needs a "vpcC" codec-configuration
+        # box that this build's ffmpeg doesn't reliably write, silently producing a file every
+        # player rejects with "Empty VP Codec Configuration box". MKV has no such requirement for
+        # any codec combination, which is why it stayed the hardcoded default — now that
+        # output_format is a real user choice (Settings > Downloads), MP4 additionally gets the
+        # vcodec:h264 format_sort bias above so it actually picks a source that mixes cleanly
+        # instead of hitting the same box error; MKV needs no such steering.
+        ydl_opts["merge_output_format"] = output_format or "mkv"
         # Built in the same order as custom_pp_keys above — get_postprocessor() resolves each
         # "key" to a "<key>PP" class (e.g. "FFmpegExtractAudio" -> FFmpegExtractAudioPP), while
         # the runtime hook event names strip the "Ffmpeg" prefix (-> "ExtractAudio"), which is
@@ -400,7 +421,7 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: yt_dlp_wrapper.py download <18 positional args> | list <4 positional args>", file=_sys.stderr)
+        print("Usage: yt_dlp_wrapper.py download <20 positional args> | list <4 positional args>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "list":
@@ -417,5 +438,7 @@ if __name__ == "__main__":
         audio_only=_b(a[10]), download_subtitles=_b(a[11]), subtitle_langs=_s(a[12]),
         embed_thumbnail=_b(a[13]), embed_metadata=_b(a[14]), no_playlist=_b(a[15]),
         resolution_cap=(int(a[16]) if a[16] else None),
+        output_format=_s(a[17]) if len(a) > 17 else None,
+        retries=_s(a[18]) if len(a) > 18 else None,
     )
     print(f"[__status__] {status}", flush=True)

@@ -67,7 +67,7 @@ class CallbackWriter:
             self._emit(self.buffer)
             self.buffer = ""
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False):
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -95,6 +95,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # Tracks already-downloaded item IDs so a retried/resumed download only fetches what's
         # still missing, instead of re-downloading the whole gallery from scratch.
         args.extend(["--download-archive", archive_path])
+    if retries:
+        # Two separate gallery-dl config paths cover the two places a request can fail:
+        # "extractor.retries" for the metadata/listing fetch itself, "downloader.retries" for
+        # each individual file's download — setting only one leaves the other at gallery-dl's
+        # own default (4) regardless of what the user configured.
+        args.extend(["-o", f"extractor.retries={retries}", "-o", f"downloader.retries={retries}"])
     if extra_args:
         try:
             args.extend(shlex.split(extra_args))
@@ -230,6 +236,7 @@ if __name__ == "__main__":
             callback=_emit, filename_format=_s(_rest[3]), extra_args=_s(_rest[4]),
             archive_path=_s(_rest[5]), limit_rate=_s(_rest[6]), item_filter=_s(_rest[7]),
             should_cancel=None, exclude_video=(_rest[8] == "1"),
+            retries=_s(_rest[9]) if len(_rest) > 9 else None,
         )
         print(f"[__status__] {_status}", file=_real_stdout, flush=True)
     elif _cmd == "list_items":
