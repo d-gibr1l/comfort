@@ -1,7 +1,13 @@
 package com.example.gallerydl.ui.main
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -13,6 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -20,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -33,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import com.example.gallerydl.R
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.gallerydl.data.DownloadStatus
 import com.example.gallerydl.data.GalleryDlPreferences
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.PillShape
@@ -131,7 +141,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         // `when` block's own Home case (that one only fires when selectedTab == 0), so this isn't
         // a duplicate/live second copy of Home.
         if (selectedTab != 0) {
-            HomeScreen(onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") })
+            HomeScreen(
+                onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") },
+                viewModel = viewModel,
+                onOpenLibrary = { selectedTab = 1 },
+                onOpenQueue = { showQueueScreen = true },
+            )
         }
 
         // Back from a non-Home tab returns to Home first, matching standard bottom-nav behavior,
@@ -142,7 +157,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         }
         Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(tabBackProgress)) {
             when (selectedTab) {
-                0 -> HomeScreen(onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") })
+                0 -> HomeScreen(
+                    onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") },
+                    viewModel = viewModel,
+                    onOpenLibrary = { selectedTab = 1 },
+                    onOpenQueue = { showQueueScreen = true },
+                )
                 1 -> DownloadsHistoryScreen(
                     viewModel = viewModel,
                     onOpenQueue = { showQueueScreen = true },
@@ -290,10 +310,21 @@ private object ClipboardSuggestionState {
 }
 
 @Composable
-fun HomeScreen(onDownload: (String) -> Unit) {
+fun HomeScreen(
+    onDownload: (String) -> Unit,
+    viewModel: DownloadsViewModel,
+    onOpenLibrary: () -> Unit = {},
+    onOpenQueue: () -> Unit = {},
+) {
     var url by remember { mutableStateOf("") }
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     var clipboardSuggestion by remember { mutableStateOf<String?>(null) }
+    val queueItems by viewModel.queueFlow.collectAsState()
+    val historyItems by viewModel.historyFlow.collectAsState()
+    // Most-recent RUNNING item — a summary screen only ever needs to surface one at a time; the
+    // full Queue is one tap away (onOpenQueue) for anything more than that.
+    val activeDownload = remember(queueItems) { queueItems.firstOrNull { it.status == DownloadStatus.RUNNING } }
+    val recentDownloads = remember(historyItems) { historyItems.filter { !it.thumbnailPath.isNullOrBlank() }.take(10) }
 
     LaunchedEffect(Unit) {
         val clipText = clipboardManager.getText()?.text?.trim()
@@ -489,6 +520,45 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                 }
             }
 
+            if (activeDownload != null) {
+                Spacer(Modifier.height(24.dp))
+                ActiveDownloadCard(item = activeDownload, onClick = onOpenQueue)
+            }
+
+            if (recentDownloads.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Recently downloaded",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    // Escapes the screen's own 24dp margin entirely (unlike the Video downloads
+                    // quality-chip row this bleed technique is borrowed from, which re-adds that
+                    // margin as its own content padding so chips only reach the edge while
+                    // scrolling) — thumbnails sit flush against both true screen edges even at
+                    // rest, since there's no re-added padding here at all.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .layout { measurable, constraints ->
+                            val bleed = 24.dp.roundToPx()
+                            val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
+                            layout(placeable.width - bleed * 2, placeable.height) {
+                                placeable.placeRelative(-bleed, 0)
+                            }
+                        },
+                ) {
+                    items(recentDownloads, key = { it.id }) { item ->
+                        RecentDownloadThumbnail(item = item, onClick = onOpenLibrary)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HomeTipsCarousel()
+
             // Matches NAV_BAR_RESERVED_HEIGHT below — content needs to be able to scroll clear
             // of the floating pill now that it overlays on top instead of reserving its own
             // Scaffold-managed space (see MainScreen's own comment on that change).
@@ -509,6 +579,161 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                     .align(Alignment.BottomEnd)
                     .padding(bottom = NAV_BAR_RESERVED_HEIGHT, end = 24.dp),
             )
+        }
+    }
+}
+
+/** Compact summary of the single most-recent RUNNING download, filling what used to be dead
+ * space below "Supported sources" — tapping it opens the full Queue (onClick) for anything more
+ * than the one item this shows. Deliberately much simpler than QueueScreen's own QueueItemCard
+ * (no per-item action buttons, no network-stall messaging) — this is a glance/shortcut, not
+ * another place to manage the download from. */
+@Composable
+private fun ActiveDownloadCard(item: com.example.gallerydl.data.DownloadEntity, onClick: () -> Unit) {
+    val progress = when {
+        item.totalItems > 1 -> (item.downloadedItems.toFloat() / item.totalItems).coerceIn(0f, 1f)
+        item.expectedBytes > 0 -> ((item.totalBytes + item.liveBytes).toFloat() / item.expectedBytes).coerceIn(0f, 1f)
+        else -> null
+    }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!item.thumbnailPath.isNullOrBlank()) {
+                    HomeCardThumbnail(item.thumbnailPath, item.url, item.title, Modifier.fillMaxSize())
+                } else {
+                    Icon(FeatherIcons.DownloadCloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    item.title.ifBlank { item.url },
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                } else {
+                    Text(
+                        "Downloading…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun RecentDownloadThumbnail(item: com.example.gallerydl.data.DownloadEntity, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(76.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onClick),
+    ) {
+        HomeCardThumbnail(item.thumbnailPath, item.url, item.title, Modifier.fillMaxSize())
+    }
+}
+
+// Shared by ActiveDownloadCard/RecentDownloadThumbnail — same spoofed-header pattern QueueScreen's
+// own QueueThumbnail uses (many sites reject hotlinked image requests without a browser-like UA
+// and a same-site Referer), kept local here rather than exported since it's a small, self-contained
+// image request and Home has no other reason to depend on QueueScreen's internals.
+@Composable
+private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, modifier: Modifier = Modifier) {
+    coil.compose.AsyncImage(
+        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+            .data(path)
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+            .addHeader("Referer", refererUrl)
+            .build(),
+        contentDescription = title,
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+    )
+}
+
+// Short, rotating tips highlighting features that are easy to miss otherwise — long-press
+// multi-select and auto-updating engines especially, both added the same session this carousel
+// was, with no other obvious discovery path on Home.
+private val HOME_TIPS = listOf(
+    "Long-press a card in Queue to select multiple downloads at once." to FeatherIcons.CheckSquare,
+    "gallery-dl and yt-dlp engines auto-update in the background — check Settings > About." to FeatherIcons.RefreshCw,
+    "Add cookies from Settings to unlock private or age-restricted content." to FeatherIcons.Lock,
+    "Tap a queued download's \"Start now\" to skip the schedule window or its place in line." to FeatherIcons.Zap,
+    "Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads." to FeatherIcons.Settings,
+)
+
+@Composable
+private fun HomeTipsCarousel() {
+    var index by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(6000)
+            index = (index + 1) % HOME_TIPS.size
+        }
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        AnimatedContent(
+            targetState = index,
+            transitionSpec = {
+                (slideInVertically { it / 3 } + androidx.compose.animation.fadeIn(tween(300))) togetherWith
+                    (slideOutVertically { -it / 3 } + androidx.compose.animation.fadeOut(tween(300)))
+            },
+            label = "homeTip",
+        ) { i ->
+            val (tip, icon) = HOME_TIPS[i]
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    tip,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
