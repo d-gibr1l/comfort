@@ -94,7 +94,23 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         EngineUpdateSignal.hasUpdate = GalleryDlPreferences.isEngineUpdateAvailable(context)
         val lastCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
         if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
-        val statuses = EngineUpdater.checkAll(context)
+        var statuses = EngineUpdater.checkAll(context)
+        // On by default (Settings > About > Engines): install whatever this check found instead
+        // of only flagging it for the user to apply by hand later. Best-effort per engine — a
+        // failed download/verify (network hiccup, PyPI momentarily unreachable) just leaves that
+        // one engine's own outdated status in place, still surfaced normally via the dot/quick
+        // Settings section/About page, rather than silently swallowing the failure.
+        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
+            statuses = statuses.map { status ->
+                val wheelUrl = status.wheelUrl
+                if (status.updateAvailable && wheelUrl != null) {
+                    val result = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                    result.getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
+                } else {
+                    status
+                }
+            }
+        }
         val available = statuses.any { it.updateAvailable }
         EngineUpdateSignal.hasUpdate = available
         GalleryDlPreferences.setEngineUpdateAvailable(context, available)

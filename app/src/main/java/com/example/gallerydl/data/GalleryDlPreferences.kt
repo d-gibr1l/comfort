@@ -58,6 +58,7 @@ object GalleryDlPreferences {
     const val KEY_ENGINE_UPDATE_AVAILABLE = "engine_update_available"
     const val KEY_OUTPUT_FORMAT = "output_format"
     const val KEY_NETWORK_RETRIES = "network_retries"
+    const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
     // yt-dlp's own built-in default (used whenever this preference hasn't been touched) — chosen
     // to match rather than invent a different "app default", so leaving the setting alone behaves
     // exactly like it always did before this preference existed.
@@ -286,5 +287,15 @@ object GalleryDlPreferences {
 
     fun setNetworkRetries(context: Context, retries: Int) {
         prefs(context).edit().putInt(KEY_NETWORK_RETRIES, retries.coerceIn(1, MAX_NETWORK_RETRIES)).apply()
+    }
+
+    /** When enabled (the default), MainScreen's own rate-limited engine check installs any update
+     * it finds automatically instead of only flagging it for the user to apply by hand. */
+    fun isAutoUpdateEnginesEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_AUTO_UPDATE_ENGINES, true)
+    }
+
+    fun setAutoUpdateEnginesEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_AUTO_UPDATE_ENGINES, enabled).apply()
     }
 }
