@@ -7,17 +7,21 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +74,17 @@ fun QueueScreen(
     var selectedFilter by remember { mutableStateOf("Running") }
     val filters = listOf("Running", "In Queue", "Paused", "Errored", "Cancelled")
 
+    // Multi-select: entered via a long-press on any card's thumbnail (see QueueItemCard/StoppedRow),
+    // not a dedicated mode toggle — matches how the request was framed ("make cards selectable by
+    // long pressing"). selectedIds is cleared (which also drops back out of selection mode, see
+    // toggleSelected below) whenever the filter tab changes, since a selection tied to one status
+    // list stops making sense once a different list is showing.
+    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val selectionMode = selectedIds.isNotEmpty()
+    fun toggleSelected(id: String) {
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+    }
+
     // The "Add cookies" error-card action opens this for the failing item's own site, then
     // retries that same download once cookies are extracted.
     var cookieLoginTarget by remember { mutableStateOf<Pair<String, String>?>(null) } // (loginUrl, downloadId)
@@ -112,6 +127,9 @@ fun QueueScreen(
         else -> null
     }
 
+    // A selection tied to one status list stops making sense once a different list is showing.
+    LaunchedEffect(selectedFilter) { selectedIds = emptySet() }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         // No floating bottom nav bar overlaying this screen (it's a full-screen overlay on top of
@@ -139,23 +157,60 @@ fun QueueScreen(
             }
         },
         topBar = {
-            TopAppBar(
-                title = { Text("Download Queue", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO: Clear All */ }) {
-                        Icon(FeatherIcons.Trash2, contentDescription = "Clear Queue")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+            if (selectionMode) {
+                TopAppBar(
+                    title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = { selectedIds = emptySet() }) {
+                            Icon(FeatherIcons.X, contentDescription = "Cancel selection")
+                        }
+                    },
+                    actions = {
+                        val allSelected = filteredItems.isNotEmpty() && filteredItems.all { it.id in selectedIds }
+                        // A real labeled control instead of a bare icon whose meaning (select vs.
+                        // deselect *all*, as opposed to "select all" always adding to a partial
+                        // selection) isn't obvious from a glyph alone.
+                        TextButton(onClick = {
+                            selectedIds = if (allSelected) emptySet() else filteredItems.map { it.id }.toSet()
+                        }) {
+                            Icon(
+                                if (allSelected) FeatherIcons.XSquare else FeatherIcons.CheckSquare,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (allSelected) "Deselect all" else "Select all")
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        // Only ever appears once something's actually selected — the placeholder
+                        // "Clear Queue" trash icon this replaces used to sit here unconditionally
+                        // and did nothing (a dead TODO), so this is a real, scoped action instead.
+                        IconButton(onClick = {
+                            viewModel.deleteDownloads(selectedIds)
+                            selectedIds = emptySet()
+                        }) {
+                            Icon(FeatherIcons.Trash2, contentDescription = "Delete selected")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
-            )
+            } else {
+                TopAppBar(
+                    title = { Text("Download Queue", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            }
         }
     ) { paddingValues ->
         Column(
@@ -230,12 +285,16 @@ fun QueueScreen(
                         // animateItem()'s own built-in fade-out + placement animation below, not
                         // this AnimatedVisibility's exit (deliberately ExitTransition.None).
                         val visibleState = remember(item.id) { MutableTransitionState(false).apply { targetState = true } }
+                        val isSelected = item.id in selectedIds
                         val row = @Composable {
                             if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED) {
                                 StoppedRow(
                                     item = item,
                                     onResume = { viewModel.retryDownload(item.id) },
                                     onDelete = { viewModel.deleteDownload(item.id) },
+                                    selectionMode = selectionMode,
+                                    selected = isSelected,
+                                    onToggleSelect = { toggleSelected(item.id) },
                                 )
                             } else {
                                 QueueItemCard(
@@ -250,6 +309,9 @@ fun QueueScreen(
                                         val host = runCatching { URI(item.url).host }.getOrNull()
                                         if (host != null) cookieLoginTarget = "https://$host" to item.id
                                     },
+                                    selectionMode = selectionMode,
+                                    selected = isSelected,
+                                    onToggleSelect = { toggleSelected(item.id) },
                                 )
                             }
                         }
@@ -263,8 +325,10 @@ fun QueueScreen(
                         // Swipe-to-delete is only offered for downloads that are already stopped
                         // for good (errored or cancelled) — everything still active or resumable
                         // (running, queued, scheduled, paused) should require a deliberate tap
-                        // instead of a stray swipe wiping it out.
-                        if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.ERRORED) {
+                        // instead of a stray swipe wiping it out. Also suppressed for the whole
+                        // list while multi-select is active — a swipe gesture competing with
+                        // tap-to-toggle-selection on the same cards would be janky either way.
+                        if (!selectionMode && (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.ERRORED)) {
                             val dismissState = rememberSwipeToDismissBoxState(
                                 confirmValueChange = { value ->
                                     if (value != SwipeToDismissBoxValue.Settled) {
@@ -340,45 +404,104 @@ private fun QueueThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) 
     )
 }
 
+/** Renders a card's thumbnail with the selection-mode dimming/checkmark badge. Purely visual —
+ * the actual long-press/tap-to-toggle gesture lives on the *whole* card (see StoppedRow's/
+ * QueueItemCard's own outer combinedClickable), not just this thumbnail, so long-pressing
+ * anywhere on a card works, not only its corner. */
+@Composable
+private fun SelectableThumbnail(
+    selectionMode: Boolean,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(modifier = modifier) {
+        content()
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(Color.Black.copy(alpha = if (selected) 0.15f else 0.35f)),
+            )
+        }
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp)
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) {
+                    Icon(
+                        FeatherIcons.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun StoppedRow(
     item: DownloadEntity,
     onResume: () -> Unit,
     onDelete: () -> Unit,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
 ) {
     val isPaused = item.status == DownloadStatus.PAUSED
     var menuExpanded by remember { mutableStateOf(false) }
     val hasThumbnail = !item.thumbnailPath.isNullOrBlank()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
+    Box {
+        Row(
             modifier = Modifier
-                .size(76.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                // Always present, not just once selectionMode is already true — this is what
+                // actually *enters* selection mode via a long-press anywhere on the row (not just
+                // the thumbnail; reported live that only the thumbnail worked before this). Short
+                // taps stay a no-op outside selection mode, so the Resume/More buttons further
+                // right keep working normally: Compose routes a tap to the deepest element under
+                // it first, so a direct tap on one of those buttons is consumed there and never
+                // reaches this outer handler at all — only taps that land on otherwise-inert areas
+                // of the row (thumbnail, title, blank space) ever hit this onClick/onLongClick.
+                .combinedClickable(
+                    onClick = { if (selectionMode) onToggleSelect() },
+                    onLongClick = onToggleSelect,
+                )
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (hasThumbnail) {
-                QueueThumbnail(item = item, modifier = Modifier.fillMaxSize())
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        FeatherIcons.Image,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(26.dp),
-                    )
+            SelectableThumbnail(
+                selectionMode = selectionMode,
+                selected = selected,
+                modifier = Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                if (hasThumbnail) {
+                    QueueThumbnail(item = item, modifier = Modifier.fillMaxSize())
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            FeatherIcons.Image,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -415,25 +538,28 @@ private fun StoppedRow(
             }
         }
 
-        IconButton(onClick = onResume) {
-            Icon(FeatherIcons.Play, contentDescription = "Resume")
-        }
-        Box {
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(FeatherIcons.MoreVertical, contentDescription = "More options")
-            }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text("Remove") },
-                    leadingIcon = { Icon(FeatherIcons.Trash2, contentDescription = null) },
-                    onClick = { menuExpanded = false; onDelete() },
-                )
+            if (!selectionMode) {
+                IconButton(onClick = onResume) {
+                    Icon(FeatherIcons.Play, contentDescription = "Resume")
+                }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(FeatherIcons.MoreVertical, contentDescription = "More options")
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Remove") },
+                            leadingIcon = { Icon(FeatherIcons.Trash2, contentDescription = null) },
+                            onClick = { menuExpanded = false; onDelete() },
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun QueueItemCard(
     item: DownloadEntity,
@@ -444,6 +570,9 @@ fun QueueItemCard(
     onRetry: () -> Unit,
     onStartNow: () -> Unit = {},
     onAddCookies: () -> Unit = {},
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -456,18 +585,24 @@ fun QueueItemCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Same reasoning as StoppedRow's own combinedClickable — always present so a
+                // long-press anywhere on the card (not just the thumbnail) enters/extends
+                // selection, while a direct tap on one of the buttons further down is still
+                // consumed there first and never reaches this outer handler.
+                .combinedClickable(
+                    onClick = { if (selectionMode) onToggleSelect() },
+                    onLongClick = onToggleSelect,
+                )
                 .padding(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
+                SelectableThumbnail(
+                    selectionMode = selectionMode,
+                    selected = selected,
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer),
                 ) {
                     // A RUNNING download gets a thumbnail as soon as yt-dlp's extractor picks one
                     // (a remote preview URL, well before any bytes land — see DownloadWorker's
@@ -477,14 +612,16 @@ fun QueueItemCard(
                     if (!item.thumbnailPath.isNullOrBlank()) {
                         QueueThumbnail(item = item, modifier = Modifier.fillMaxSize())
                     } else {
-                        val icon = when (item.status) {
-                            DownloadStatus.ERRORED -> FeatherIcons.AlertTriangle
-                            DownloadStatus.QUEUED -> FeatherIcons.Clock
-                            DownloadStatus.SCHEDULED -> FeatherIcons.Calendar
-                            else -> FeatherIcons.DownloadCloud
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            val icon = when (item.status) {
+                                DownloadStatus.ERRORED -> FeatherIcons.AlertTriangle
+                                DownloadStatus.QUEUED -> FeatherIcons.Clock
+                                DownloadStatus.SCHEDULED -> FeatherIcons.Calendar
+                                else -> FeatherIcons.DownloadCloud
+                            }
+                            val tint = if (item.status == DownloadStatus.ERRORED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            Icon(icon, contentDescription = null, tint = tint)
                         }
-                        val tint = if (item.status == DownloadStatus.ERRORED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                        Icon(icon, contentDescription = null, tint = tint)
                     }
                 }
 
@@ -691,48 +828,50 @@ fun QueueItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (!selectionMode) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                when (item.status) {
-                    DownloadStatus.RUNNING -> {
-                        IconButton(onClick = onPauseResume) {
-                            Icon(FeatherIcons.Pause, contentDescription = "Pause")
-                        }
-                        IconButton(onClick = onCancel) {
-                            Icon(FeatherIcons.X, contentDescription = "Cancel")
-                        }
-                    }
-                    DownloadStatus.ERRORED -> {
-                        if (isCookieRelatedError(item.errorMessage)) {
-                            TextButton(onClick = onAddCookies) {
-                                Icon(FeatherIcons.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Add cookies")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    when (item.status) {
+                        DownloadStatus.RUNNING -> {
+                            IconButton(onClick = onPauseResume) {
+                                Icon(FeatherIcons.Pause, contentDescription = "Pause")
+                            }
+                            IconButton(onClick = onCancel) {
+                                Icon(FeatherIcons.X, contentDescription = "Cancel")
                             }
                         }
-                        TextButton(onClick = onRetry) {
-                            Text("Retry")
+                        DownloadStatus.ERRORED -> {
+                            if (isCookieRelatedError(item.errorMessage)) {
+                                TextButton(onClick = onAddCookies) {
+                                    Icon(FeatherIcons.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Add cookies")
+                                }
+                            }
+                            TextButton(onClick = onRetry) {
+                                Text("Retry")
+                            }
+                            IconButton(onClick = onDelete) {
+                                Icon(FeatherIcons.Trash2, contentDescription = "Remove")
+                            }
                         }
-                        IconButton(onClick = onDelete) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "Remove")
+                        DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
+                            TextButton(onClick = onStartNow) {
+                                Icon(FeatherIcons.Zap, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Start now")
+                            }
+                            IconButton(onClick = onCancel) {
+                                Icon(FeatherIcons.X, contentDescription = "Cancel")
+                            }
                         }
+                        else -> {}
                     }
-                    DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
-                        TextButton(onClick = onStartNow) {
-                            Icon(FeatherIcons.Zap, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Start now")
-                        }
-                        IconButton(onClick = onCancel) {
-                            Icon(FeatherIcons.X, contentDescription = "Cancel")
-                        }
-                    }
-                    else -> {}
                 }
             }
         }

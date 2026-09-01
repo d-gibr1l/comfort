@@ -121,6 +121,16 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** Bulk delete for the Queue screen's multi-select mode — one coroutine handling every id
+     * sequentially rather than a separate launch per item, so a large selection doesn't fire a
+     * burst of concurrent deletes racing each other. */
+    fun deleteDownloads(ids: Set<String>) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            ids.forEach { id -> DownloadDispatcher.deleteDownload(context, id) }
+        }
+    }
+
     fun setFavorite(id: String, isFavorite: Boolean) {
         viewModelScope.launch {
             dao.setFavorite(id, isFavorite)
