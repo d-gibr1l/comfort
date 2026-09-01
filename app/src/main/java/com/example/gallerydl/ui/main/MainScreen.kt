@@ -323,7 +323,7 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                     )
                 )
                 .statusBarsPadding()
-                .padding(top = 32.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
+                .padding(top = 12.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
         ) {
             // A big, chunky wordmark instead of a name + tagline pair — no separate app-name
             // caption above it (there's nothing to disambiguate it from anymore) and no subtitle
