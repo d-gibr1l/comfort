@@ -50,7 +50,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "8"
+    private const val PROVISION_VERSION = "10"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -101,6 +101,12 @@ object PythonRuntime {
         // extractor's own impersonate=True request degrades the same way. TikTok itself will likely
         // regress without this — that trade was made deliberately, revisit if TikTok support is
         // needed again before Reddit's side of this is otherwise resolved.
+        //
+        // Re-tested live with curl_cffi restored (2026-09-01, in response to "why does YTDLnis work
+        // fine on this same device"): got the exact same "Your IP address is unable to access the
+        // Reddit API" failure either way — conclusively ruling out curl_cffi/impersonation as the
+        // differentiator for *this* specific error. Keeping curl_cffi removed (no upside left to
+        // restoring it, only TikTok's known regression risk).
         listOf("curl_cffi", "curl_cffi.libs").forEach { name ->
             File(sitePackages, name).deleteRecursively()
         }
