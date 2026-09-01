@@ -272,9 +272,24 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # player rejects with "Empty VP Codec Configuration box". MKV has no such requirement for
         # any codec combination, which is why it stayed the hardcoded default — now that
         # output_format is a real user choice (Settings > Downloads), MP4 additionally gets the
-        # vcodec:h264 format_sort bias above so it actually picks a source that mixes cleanly
-        # instead of hitting the same box error; MKV needs no such steering.
-        ydl_opts["merge_output_format"] = output_format or "mkv"
+        # vcodec:h264/acodec:aac format_sort bias above so it picks a source that mixes cleanly
+        # when one's actually available; MKV needs no such steering.
+        #
+        # That bias can only ever reorder *existing* candidates, not conjure a compatible one —
+        # reproduced live against a real Instagram Reel offering VP9 video with no H264 variant at
+        # all (common for Reels specifically): the bias had nothing to pick, yt-dlp still forced a
+        # stream-copy remux into .mp4 (this bundled ffmpeg has every encoder disabled — see
+        # FfmpegRuntime's own build config — so *transcoding* VP9 into real H264 to rescue this
+        # isn't an option at all), and produced the exact "Empty VP Codec Configuration box"
+        # failure this whole feature exists to avoid — just now reachable via an explicit user
+        # choice instead of yt-dlp's own old default. "mp4/mkv" (a preference *list*, not a single
+        # value) is yt-dlp's own documented mechanism for exactly this: get_compatible_ext() (see
+        # YoutubeDL.py) walks the list in order and returns the first extension the actual codecs
+        # can losslessly satisfy, with "mkv" always accepted as a universal container regardless of
+        # codec — so this still produces a real .mp4 whenever the source genuinely supports one,
+        # and only quietly drops to .mkv for the specific sources that can't, rather than a file
+        # that "downloaded successfully" while being unplayable either way.
+        ydl_opts["merge_output_format"] = f"{output_format}/mkv" if output_format == "mp4" else (output_format or "mkv")
         # Built in the same order as custom_pp_keys above — get_postprocessor() resolves each
         # "key" to a "<key>PP" class (e.g. "FFmpegExtractAudio" -> FFmpegExtractAudioPP), while
         # the runtime hook event names strip the "Ffmpeg" prefix (-> "ExtractAudio"), which is
