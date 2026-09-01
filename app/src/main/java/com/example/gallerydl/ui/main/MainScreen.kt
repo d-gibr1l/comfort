@@ -347,6 +347,12 @@ fun HomeScreen(onDownload: (String) -> Unit) {
                 overflow = TextOverflow.Clip,
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Extra inset beyond the screen's own 24dp margin (see this Column's parent
+                    // padding above) so the auto-fit-to-width logic below settles on a slightly
+                    // smaller size instead of stretching edge-to-edge — a size request, not a
+                    // literal fontSize, so it still scales consistently across screen widths the
+                    // same way the un-inset version did.
+                    .padding(horizontal = 20.dp)
                     .graphicsLayer(alpha = if (wordmarkMeasured) 1f else 0f),
                 onTextLayout = { result ->
                     if (result.didOverflowWidth && wordmarkFontSize > 12.sp) {
