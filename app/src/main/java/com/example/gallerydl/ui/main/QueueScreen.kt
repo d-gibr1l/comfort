@@ -1,5 +1,6 @@
 package com.example.gallerydl.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
@@ -84,6 +85,11 @@ fun QueueScreen(
     fun toggleSelected(id: String) {
         selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
     }
+    // Takes priority over MainScreen's own predictive-back handling for this whole screen (a
+    // system back press/gesture while selecting should clear the selection, not leave Queue
+    // entirely) — same pattern already proven in DownloadsHistoryScreen's own multi-select.
+    // Reproduced live before this: back while selecting jumped straight out to Library instead.
+    BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
 
     // The "Add cookies" error-card action opens this for the failing item's own site, then
     // retries that same download once cookies are extracted.
