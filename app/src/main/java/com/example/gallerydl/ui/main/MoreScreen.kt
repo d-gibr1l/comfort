@@ -150,6 +150,8 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                 )
             }
 
+            QuickEngineUpdateSection()
+
             GroupedRows {
                 SettingsListRow(
                     icon = FeatherIcons.Info,
@@ -1390,6 +1392,68 @@ private fun AboutScreen(onBack: () -> Unit) {
     }
 }
 
+/** Compact teaser on the Settings root list, so an available engine update is both visible and
+ * actionable without drilling into About > Engines first — mirrors that section's own check/update
+ * logic (see EnginesSection() below) but renders nothing at all when everything's already current,
+ * rather than always showing a "Checking…"/"Up to date" panel the way the About page's version
+ * does (appropriate there as a persistent utility panel; here it should only ever appear as news,
+ * not a permanent fixture). */
+@Composable
+private fun QuickEngineUpdateSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var statuses by remember { mutableStateOf<List<EngineUpdater.VersionStatus>?>(null) }
+    var updatingEngine by remember { mutableStateOf<String?>(null) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val result = EngineUpdater.checkAll(context)
+        statuses = result
+        val available = result.any { it.updateAvailable }
+        GalleryDlPreferences.setEngineUpdateAvailable(context, available)
+        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+        EngineUpdateSignal.hasUpdate = available
+    }
+
+    val outdated = statuses?.filter { it.updateAvailable } ?: return
+    if (outdated.isEmpty()) return
+
+    SettingsSection(title = "Updates available", icon = FeatherIcons.RefreshCw) {
+        outdated.forEachIndexed { index, status ->
+            EngineUpdateRow(
+                status = status,
+                updating = updatingEngine == status.engine.packageDirName,
+                onUpdate = {
+                    val wheelUrl = status.wheelUrl ?: return@EngineUpdateRow
+                    updatingEngine = status.engine.packageDirName
+                    errorText = null
+                    scope.launch {
+                        val result = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                        updatingEngine = null
+                        result.onSuccess { newVersion ->
+                            val updated = statuses.orEmpty().map {
+                                if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
+                            }
+                            statuses = updated
+                            val available = updated.any { it.updateAvailable }
+                            GalleryDlPreferences.setEngineUpdateAvailable(context, available)
+                            EngineUpdateSignal.hasUpdate = available
+                        }
+                        result.onFailure { e ->
+                            errorText = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
+                        }
+                    }
+                },
+            )
+            if (index != outdated.lastIndex) Spacer(Modifier.height(12.dp))
+        }
+        if (errorText != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
 /** yt-dlp and gallery-dl are bundled as static wheels (see PythonRuntime's own doc comment) that
  * only get refreshed when this app itself ships a new APK — but site extractors break against the
  * live site far more often than that. This lets either engine be updated independently, straight
@@ -1410,11 +1474,14 @@ private fun EnginesSection() {
             val result = EngineUpdater.checkAll(context)
             statuses = result
             checking = false
-            // Refreshes the same cached flag MainScreen's own rate-limited auto-check reads for
-            // the nav-bar badge — opening this screen and checking here is itself a fresh signal,
-            // no reason to wait for the next auto-check interval to clear/set it.
-            GalleryDlPreferences.setEngineUpdateAvailable(context, result.any { it.updateAvailable })
+            // Refreshes both the persisted flag (survives process restart) and the live in-session
+            // signal MainScreen's nav-bar badge reads directly — opening this screen and checking
+            // here is itself a fresh signal, no reason to wait for the next auto-check interval, or
+            // a tab switch, to clear/set it.
+            val available = result.any { it.updateAvailable }
+            GalleryDlPreferences.setEngineUpdateAvailable(context, available)
             GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+            EngineUpdateSignal.hasUpdate = available
         }
     }
 
@@ -1445,7 +1512,9 @@ private fun EnginesSection() {
                                     if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
                                 }
                                 statuses = updated
-                                GalleryDlPreferences.setEngineUpdateAvailable(context, updated.any { it.updateAvailable })
+                                val available = updated.any { it.updateAvailable }
+                                GalleryDlPreferences.setEngineUpdateAvailable(context, available)
+                                EngineUpdateSignal.hasUpdate = available
                             }
                             result.onFailure { e ->
                                 errorText = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
@@ -1486,7 +1555,10 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
         }
         when {
             updating -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            status.updateAvailable -> TextButton(onClick = onUpdate) { Text("Update to ${status.latestVersion}") }
+            status.updateAvailable -> Button(
+                onClick = onUpdate,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            ) { Text("Update to ${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
             status.latestVersion != null -> Text(
                 "Up to date",
                 style = MaterialTheme.typography.labelMedium,
