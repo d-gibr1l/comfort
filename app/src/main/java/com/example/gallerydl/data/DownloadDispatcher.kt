@@ -53,6 +53,17 @@ object DownloadDispatcher {
         }
     }
 
+    /** DownloadWorker's own staging area for [id] (`cacheDir/gallery-dl-staging/<id>/`) — where a
+     * download's files sit while in progress before each one gets copied out to the real gallery/
+     * custom folder (see MediaStoreHelper.saveMediaToGallery(), called per-item as it completes).
+     * Deliberately left alone by a plain pause: it's what lets a later Resume continue an
+     * in-progress file instead of restarting it, and gallery-dl/yt-dlp's own download-archive
+     * tracking depends on it too. Only [cancelDownload]/[deleteDownload] — genuinely final actions,
+     * not "pick this back up later" — actually clear it. */
+    private fun deleteStagingDir(context: Context, id: String) {
+        File(context.cacheDir, "gallery-dl-staging/$id").deleteRecursively()
+    }
+
     suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, videoQuality: VideoQuality? = null): String {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val id = UUID.randomUUID().toString()
@@ -156,6 +167,14 @@ object DownloadDispatcher {
             dao.updateStatus(id, DownloadStatus.CANCELLED)
             dao.resetSpeed(id)
             DownloadNotifications.cancel(context, id)
+            // cancelWorkManagerJob() just requests the stop — it doesn't wait for the worker's own
+            // subprocess to actually die, so this can briefly race an item still writing into its
+            // staging dir. deleteRecursively() is best-effort (doesn't throw, just skips whatever's
+            // locked at that instant) rather than a hard delete, and the subprocess dies moments
+            // later anyway once PythonRuntime's own cancellation-triggered kill lands — so a rare
+            // near-miss here just leaves the same harmless private-cache leftover this was already
+            // living with, never a real failure.
+            deleteStagingDir(context, id)
         }
         // Same WorkManager chain-cascade repair as pauseDownload() above — cancelling a running
         // download's job can just as easily orphan whatever was queued behind it in its lane.
@@ -202,6 +221,7 @@ object DownloadDispatcher {
         DownloadNotifications.cancel(context, id)
         File(context.filesDir, "archives/$id.sqlite3").delete()
         File(context.filesDir, "archives/$id.ytdlp.txt").delete()
+        deleteStagingDir(context, id)
         dao.clearDownloadedFileRecords(id)
         dao.delete(id)
     }
