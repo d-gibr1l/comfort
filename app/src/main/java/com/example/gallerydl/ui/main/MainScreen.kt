@@ -539,20 +539,12 @@ fun HomeScreen(
                 Spacer(Modifier.height(12.dp))
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    // Escapes the screen's own 24dp margin entirely (unlike the Video downloads
-                    // quality-chip row this bleed technique is borrowed from, which re-adds that
-                    // margin as its own content padding so chips only reach the edge while
-                    // scrolling) — thumbnails sit flush against both true screen edges even at
-                    // rest, since there's no re-added padding here at all.
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .layout { measurable, constraints ->
-                            val bleed = 24.dp.roundToPx()
-                            val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
-                            layout(placeable.width - bleed * 2, placeable.height) {
-                                placeable.placeRelative(-bleed, 0)
-                            }
-                        },
+                    // Plain fillMaxWidth — no bleed/escape trick. The strip should start at the
+                    // same left edge as everything else on this screen (Supported sources cards,
+                    // the tips carousel, the paste box), not flush against the true screen edge;
+                    // an earlier version made it bleed all the way to x=0, which looked flush with
+                    // the screen but inconsistent with the rest of the page's own margin.
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     items(recentDownloads, key = { it.id }) { item ->
                         RecentDownloadThumbnail(item = item, onClick = onOpenLibrary)
