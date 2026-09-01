@@ -241,7 +241,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # instead of picking VP9 (yt-dlp's usual preference) and then failing to mux it. Still
         # falls back to whatever's actually available (av1/vp9/...) when a source has no h264
         # variant at all — this only reorders the preference, it doesn't exclude anything.
+        #
+        # Audio needs the same treatment, reproduced live after the video-only fix above: yt-dlp's
+        # own default best-audio for a YouTube source is Opus in a WebM container (itag 251), and
+        # ffmpeg muxes that into an .mp4 without ever raising an error — but plenty of real
+        # players (this device's own included) can't actually *play* Opus-in-MP4, so the file
+        # "downloaded successfully" while being unplayable. AAC is MP4's own native, universally-
+        # supported audio codec, so bias toward it the same way — falls back to whatever's actually
+        # available when a source has no AAC variant.
         format_sort_terms.append("vcodec:h264")
+        format_sort_terms.append("acodec:aac")
     if format_sort_terms:
         ydl_opts["format_sort"] = format_sort_terms
     if no_playlist:
