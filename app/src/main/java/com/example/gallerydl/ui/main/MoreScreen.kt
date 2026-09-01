@@ -31,6 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.gallerydl.data.GalleryDlPreferences
+import com.example.gallerydl.data.OutputFormat
 import com.example.gallerydl.data.VideoQuality
 import com.example.gallerydl.data.VideoSiteRouter
 import com.example.gallerydl.theme.LocalThemeState
@@ -288,6 +289,8 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
     var embedThumbnail by remember { mutableStateOf(GalleryDlPreferences.isEmbedThumbnail(context)) }
     var embedMetadata by remember { mutableStateOf(GalleryDlPreferences.isEmbedMetadata(context)) }
+    var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
+    var networkRetries by remember { mutableStateOf(GalleryDlPreferences.getNetworkRetries(context)) }
     var downloadLocationUri by remember { mutableStateOf(GalleryDlPreferences.getDownloadLocationUri(context)) }
     val downloadLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -439,6 +442,45 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                         Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Text(
                                 quality.label,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(Modifier.height(16.dp))
+
+            Text("Output format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Only applies when video and audio need merging (most yt-dlp sources). A single already-muxed file, or anything gallery-dl fetches directly, keeps its own format regardless.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutputFormat.entries.forEach { format ->
+                    val selected = outputFormat == format
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        onClick = {
+                            outputFormat = format
+                            GalleryDlPreferences.setOutputFormat(context, format)
+                        },
+                    ) {
+                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(
+                                format.label,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -614,6 +656,47 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
             )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(Modifier.height(16.dp))
+
+            Text("Retries", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "How many times a failed request is retried before the download actually fails.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // 10 is yt-dlp's own built-in default (see GalleryDlPreferences.DEFAULT_NETWORK_RETRIES) —
+                // included as a preset rather than only reachable by not touching this setting at all.
+                listOf(3, 5, 10, 20).forEach { count ->
+                    val selected = networkRetries == count
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        onClick = {
+                            networkRetries = count
+                            GalleryDlPreferences.setNetworkRetries(context, count)
+                        },
+                    ) {
+                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(
+                                "$count",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         SettingsSection(title = "Schedule", icon = FeatherIcons.Clock) {
