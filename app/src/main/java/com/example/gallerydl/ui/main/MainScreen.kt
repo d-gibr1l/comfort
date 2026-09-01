@@ -85,6 +85,10 @@ val NAV_BAR_RESERVED_HEIGHT = 100.dp
 fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
+    // Hoisted here (not owned inside MoreScreen) specifically so it survives switching away from
+    // and back to the Settings tab — see MoreScreen's own doc comment for why a local remember
+    // there wasn't enough.
+    var settingsRoute by remember { mutableStateOf(SettingsRoute.ROOT) }
     // Same RUNNING+QUEUED count already shown inside the Library screen's own queue-icon badge
     // (DownloadsHistoryScreen) — kept consistent with that existing definition of "active" rather
     // than introducing a second, differently-scoped count just for this badge.
@@ -168,7 +172,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
                     onOpenQueue = { showQueueScreen = true },
                     isQueueOpen = showQueueScreen,
                 )
-                2 -> MoreScreen()
+                2 -> MoreScreen(route = settingsRoute, onNavigate = { settingsRoute = it })
             }
         }
 
