@@ -63,7 +63,10 @@ val NAV_BAR_RESERVED_HEIGHT = 100.dp
 fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
-    val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsState()
+    // Same RUNNING+QUEUED count already shown inside the Library screen's own queue-icon badge
+    // (DownloadsHistoryScreen) — kept consistent with that existing definition of "active" rather
+    // than introducing a second, differently-scoped count just for this badge.
+    val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsState()
 
     // Rate-limited auto-check for a newer yt-dlp/gallery-dl release — seeded from the cached
     // result of the last check (so the badge shows immediately without waiting on a fresh network
@@ -127,7 +130,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
 
         FloatingNavBar(
             selectedTab = selectedTab,
-            hasActiveDownloads = hasActiveDownloads,
+            activeDownloadsCount = activeDownloadsCount,
             hasEngineUpdate = hasEngineUpdate,
             onSelect = { index ->
                 // Tapping the already-selected Library tab again jumps to the Queue, matching
@@ -161,7 +164,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
 @Composable
 private fun FloatingNavBar(
     selectedTab: Int,
-    hasActiveDownloads: Boolean,
+    activeDownloadsCount: Int,
     hasEngineUpdate: Boolean,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -228,7 +231,15 @@ private fun FloatingNavBar(
                                     Modifier
                                 }
                             )
-                        if ((index == 1 && hasActiveDownloads) || (index == 2 && hasEngineUpdate)) {
+                        if (index == 1 && activeDownloadsCount > 0) {
+                            BadgedBox(badge = {
+                                Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                    Text(activeDownloadsCount.toString())
+                                }
+                            }) {
+                                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
+                            }
+                        } else if (index == 2 && hasEngineUpdate) {
                             BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) }) {
                                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                             }
