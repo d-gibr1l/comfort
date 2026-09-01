@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -1362,16 +1364,29 @@ private fun AboutScreen(onBack: () -> Unit) {
     SettingsSubScaffold(title = "About", onBack = onBack) {
         SettingsSection(title = "App", icon = FeatherIcons.Info) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.foundation.Image(
-                    // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml (an
-                    // AdaptiveIconDrawable, not a plain vector/raster) — this dedicated drawable
-                    // copy is what actually renders here instead of crashing.
-                    painter = androidx.compose.ui.res.painterResource(com.example.gallerydl.R.drawable.ic_app_logo),
-                    contentDescription = null,
+                // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
+                // AdaptiveIconDrawable, not a plain vector/raster) — composed by hand here from
+                // the same two layers instead: ic_launcher_background.xml (a plain white rect,
+                // approximated directly rather than parsed) behind ic_launcher_foreground.xml,
+                // the actual wordmark. This used to be a separate static ic_app_logo.png export
+                // that silently drifted out of sync with the real launcher icon once it changed
+                // (reported live: "still using the old app icon") — rendering the *same* vector
+                // the launcher itself uses guarantees they can't drift again. Fixed black/white
+                // rather than theme-reactive, matching ic_launcher_foreground.xml's own reasoning:
+                // this is a copy of the real launcher icon, which never follows the in-app theme.
+                Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(MaterialTheme.shapes.medium),
-                )
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        imageVector = ImageVector.vectorResource(id = com.example.gallerydl.R.drawable.ic_launcher_foreground),
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Comfort", style = MaterialTheme.typography.titleSmall)
