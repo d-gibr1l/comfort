@@ -6,10 +6,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gallerydl"
+    namespace = "com.comfort.app"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.gallerydl"
+        applicationId = "com.comfort.app"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
