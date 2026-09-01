@@ -125,25 +125,73 @@ object DownloadDispatcher {
      * [cancelDownload] so a global pauseAll()/resumeAll() cycle only ever touches downloads it
      * itself held back, never ones the user explicitly cancelled. Callable from anywhere — the
      * ViewModel, or a notification action's BroadcastReceiver with no Activity. */
-    suspend fun pauseDownload(context: Context, id: String) = withDownloadLock(id) {
-        val dao = AppDatabase.getDatabase(context).downloadDao()
-        val entity = dao.getById(id) ?: return@withDownloadLock
-        cancelWorkManagerJob(context, entity.workRequestId)
-        dao.updateStatus(id, DownloadStatus.PAUSED)
-        dao.resetSpeed(id)
-        DownloadNotifications.cancel(context, id)
+    suspend fun pauseDownload(context: Context, id: String) {
+        withDownloadLock(id) {
+            val dao = AppDatabase.getDatabase(context).downloadDao()
+            val entity = dao.getById(id) ?: return@withDownloadLock
+            cancelWorkManagerJob(context, entity.workRequestId)
+            dao.updateStatus(id, DownloadStatus.PAUSED)
+            dao.resetSpeed(id)
+            DownloadNotifications.cancel(context, id)
+        }
+        // Reproduced live: pausing a *running* download silently orphaned everything else queued
+        // behind it in the same round-robin lane. Each lane is a real WorkManager dependency chain
+        // (enqueueUniqueWork(..., APPEND_OR_REPLACE, ...) — the same shape as .then()), and
+        // cancelWorkById() on one link cascade-cancels every dependent chained after it, by
+        // WorkManager's own documented design. That cascade only touches WorkManager's internal
+        // state, not this app's DB — the DB rows behind the paused head stayed QUEUED/SCHEDULED, so
+        // the UI kept showing them as "waiting" even though their WorkRequest was already dead and
+        // would never start on its own.
+        repairOrphanedQueue(context)
     }
 
     /** Cancels the in-flight WorkManager job (if any) and marks the entry cancelled. Unlike
      * [pauseDownload], a cancelled entry is never swept back up by resumeAll() — the user has to
      * explicitly resume it from the Cancelled section. */
-    suspend fun cancelDownload(context: Context, id: String) = withDownloadLock(id) {
+    suspend fun cancelDownload(context: Context, id: String) {
+        withDownloadLock(id) {
+            val dao = AppDatabase.getDatabase(context).downloadDao()
+            val entity = dao.getById(id) ?: return@withDownloadLock
+            cancelWorkManagerJob(context, entity.workRequestId)
+            dao.updateStatus(id, DownloadStatus.CANCELLED)
+            dao.resetSpeed(id)
+            DownloadNotifications.cancel(context, id)
+        }
+        // Same WorkManager chain-cascade repair as pauseDownload() above — cancelling a running
+        // download's job can just as easily orphan whatever was queued behind it in its lane.
+        repairOrphanedQueue(context)
+    }
+
+    /** Re-submits only the QUEUED/SCHEDULED entries whose WorkManager job is actually dead —
+     * unlike [rescheduleQueuedDownloads] (which unconditionally resubmits *everything* waiting,
+     * fine for a genuine one-off setting change), this must be safe to call from [pauseDownload]/
+     * [cancelDownload] on every single pause or cancel, including a burst of several in a row.
+     * Blindly resubmitting the whole queue every time was reproduced live to be a real regression:
+     * with several genuinely-healthy queued/running downloads sharing round-robin lanes, each
+     * resubmission churned all of them — cancel, restart from scratch, cancel again a few seconds
+     * later — 15+ times in under two minutes, so nothing ever actually finished (this is what
+     * surfaced as "concurrency is 2 but only 1 is ever really downloading"). Checking each entry's
+     * live WorkInfo first means a healthy job is never touched, only ones WorkManager's chain-cancel
+     * cascade actually killed out from under the DB's back. */
+    private suspend fun repairOrphanedQueue(context: Context) {
+        // A null workRequestId is also how a global pauseAll() deliberately parks a download added
+        // while paused (see DownloadsViewModel.resumeAll()'s own matching filter) — not every null
+        // means "orphaned by the chain cascade." Leave those alone here; resumeAll() is what's
+        // supposed to pick them back up.
+        if (GalleryDlPreferences.isGloballyPaused(context)) return
         val dao = AppDatabase.getDatabase(context).downloadDao()
-        val entity = dao.getById(id) ?: return@withDownloadLock
-        cancelWorkManagerJob(context, entity.workRequestId)
-        dao.updateStatus(id, DownloadStatus.CANCELLED)
-        dao.resetSpeed(id)
-        DownloadNotifications.cancel(context, id)
+        val workManager = WorkManager.getInstance(context)
+        dao.getQueuedOnce().forEach { entity ->
+            val uuid = entity.workRequestId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            // No job ever recorded, or WorkManager reports it in a terminal state (CANCELLED from
+            // the chain cascade, or FAILED/SUCCEEDED with the DB row never updated to match) — any
+            // of those mean this entry's own job is dead and it'll never start on its own. Still
+            // ENQUEUED/RUNNING/BLOCKED means it's healthy and must not be touched.
+            val info = uuid?.let { runCatching { workManager.getWorkInfoById(it).get() }.getOrNull() }
+            if (info == null || info.state.isFinished) {
+                enqueueWork(context, entity.id, entity.url)
+            }
+        }
     }
 
     /** Cancels any in-flight job, drops the row, and cleans up its download-archive file. */
