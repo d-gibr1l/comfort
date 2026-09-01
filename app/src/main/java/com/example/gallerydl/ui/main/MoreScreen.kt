@@ -462,7 +462,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
             Text("Output format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Only applies when video and audio need merging (most yt-dlp sources). A single already-muxed file, or anything gallery-dl fetches directly, keeps its own format regardless.",
+                "Only applies when video and audio need merging (most yt-dlp sources). A single already-muxed file, or anything gallery-dl fetches directly, keeps its own format regardless. If MP4 is picked but a source's video can't actually go in an MP4 (Instagram Reels are usually like this), that one download saves as MKV instead rather than an unplayable MP4.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
