@@ -53,6 +53,18 @@ private val tabs = listOf(
     NavTab("Settings", FeatherIcons.Settings),
 )
 
+/** Live, in-session mirror of GalleryDlPreferences.isEngineUpdateAvailable() — the persisted flag
+ * stays the source of truth across process restarts, but reading it back only on a tab switch
+ * (the previous approach) meant updating an engine from Settings' own quick-update section or the
+ * About page, *without* ever leaving the Settings tab, left the nav-bar dot showing stale
+ * (reproduced live: updated an engine, dot stayed lit until switching tabs and back). Every writer
+ * — MainScreen's own rate-limited auto-check, and every place in MoreScreen.kt that finishes an
+ * update — sets this directly, so the badge (which just reads it, no LaunchedEffect polling needed)
+ * updates the instant any of them do, same-session, regardless of which screen did it. */
+object EngineUpdateSignal {
+    var hasUpdate by mutableStateOf(false)
+}
+
 // FloatingNavBar's own footprint: 16dp padding + 68dp pill + 16dp padding. Screens that now
 // overlay it (instead of Scaffold reserving space for it) use this so their own scrollable
 // content and floating buttons can still clear the pill instead of sitting behind it.
@@ -74,23 +86,19 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     // elapsed since the last one, so relaunching the app repeatedly doesn't spam it. The Engines
     // section in Settings > About always does its own fresh check regardless of this cache.
     val context = androidx.compose.ui.platform.LocalContext.current
-    var hasEngineUpdate by remember { mutableStateOf(GalleryDlPreferences.isEngineUpdateAvailable(context)) }
     LaunchedEffect(Unit) {
+        // Seeded from the persisted flag immediately (so the badge shows right away without
+        // waiting on a fresh network round trip), then only actually re-checks PyPI if
+        // ENGINE_UPDATE_CHECK_INTERVAL_MS has elapsed since the last check, so relaunching the app
+        // repeatedly doesn't spam it.
+        EngineUpdateSignal.hasUpdate = GalleryDlPreferences.isEngineUpdateAvailable(context)
         val lastCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
         if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
         val statuses = EngineUpdater.checkAll(context)
         val available = statuses.any { it.updateAvailable }
-        hasEngineUpdate = available
+        EngineUpdateSignal.hasUpdate = available
         GalleryDlPreferences.setEngineUpdateAvailable(context, available)
         GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
-    }
-    // Re-syncs from the same cached flag whenever the Settings tab is left — the Engines section
-    // (Settings > About) writes to it directly the moment its own check/update finishes, but that's
-    // a different composable with no other link back to this one, so without this the nav-bar badge
-    // would otherwise only catch up on the next full app launch instead of right away. selectedTab
-    // is read as a key here, not for its own value, purely to fire on every tab change.
-    LaunchedEffect(selectedTab) {
-        hasEngineUpdate = GalleryDlPreferences.isEngineUpdateAvailable(context)
     }
 
     // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
@@ -131,7 +139,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         FloatingNavBar(
             selectedTab = selectedTab,
             activeDownloadsCount = activeDownloadsCount,
-            hasEngineUpdate = hasEngineUpdate,
+            hasEngineUpdate = EngineUpdateSignal.hasUpdate,
             onSelect = { index ->
                 // Tapping the already-selected Library tab again jumps to the Queue, matching
                 // the "tap again for more" pattern used elsewhere in the app.
