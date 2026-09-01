@@ -1407,7 +1407,21 @@ private fun QuickEngineUpdateSection() {
     var errorText by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        val result = EngineUpdater.checkAll(context)
+        var result = EngineUpdater.checkAll(context)
+        // Same auto-update behavior as MainScreen's own periodic check (Settings > About > Engines
+        // > Auto-update, on by default) — opening Settings shouldn't need a manual tap either when
+        // it's enabled.
+        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
+            result = result.map { status ->
+                val wheelUrl = status.wheelUrl
+                if (status.updateAvailable && wheelUrl != null) {
+                    val update = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                    update.getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
+                } else {
+                    status
+                }
+            }
+        }
         statuses = result
         val available = result.any { it.updateAvailable }
         GalleryDlPreferences.setEngineUpdateAvailable(context, available)
@@ -1466,6 +1480,7 @@ private fun EnginesSection() {
     var checking by remember { mutableStateOf(false) }
     var updatingEngine by remember { mutableStateOf<String?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var autoUpdate by remember { mutableStateOf(GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) }
 
     fun runCheck() {
         checking = true
@@ -1488,6 +1503,20 @@ private fun EnginesSection() {
     LaunchedEffect(Unit) { runCheck() }
 
     SettingsSection(title = "Engines", icon = FeatherIcons.RefreshCw) {
+        IconToggleRow(
+            icon = FeatherIcons.Zap,
+            title = "Auto-update",
+            subtitle = "Install a newer yt-dlp/gallery-dl release automatically when one's found, instead of just flagging it.",
+            checked = autoUpdate,
+            onCheckedChange = {
+                autoUpdate = it
+                GalleryDlPreferences.setAutoUpdateEnginesEnabled(context, it)
+            },
+        )
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        Spacer(Modifier.height(16.dp))
+
         val currentStatuses = statuses
         if (currentStatuses == null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
