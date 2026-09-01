@@ -50,7 +50,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "13"
+    private const val PROVISION_VERSION = "14"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -88,30 +88,14 @@ object PythonRuntime {
         context.assets.open("python_packages/gallery_dl.whl").use { unzipStreamTo(it, sitePackages) }
         context.assets.open("python_packages/yt_dlp.whl").use { unzipStreamTo(it, sitePackages) }
 
-        // curl_cffi (bundled as part of the native runtime zip above, for TikTok's own bot-
-        // detection bypass — see this class's own doc comment) removed for now: reproduced live
-        // that yt-dlp's Reddit extractor unconditionally requests impersonation for one of its
-        // requests, and having a *working* impersonation backend available made Reddit's own
-        // anti-bot system block it outright (403) — while gracefully falling back to a plain,
-        // non-impersonated request (yt-dlp's own documented behavior when no impersonate target is
-        // available at all) is exactly what a bare terminal yt-dlp install without curl_cffi does,
-        // and that succeeds against the same links. Deleting the package here (rather than not
-        // unzipping libpython.zip.so's own copy of it at all) means yt-dlp's own
-        // _get_available_impersonate_targets() correctly reports none available and every
-        // extractor's own impersonate=True request degrades the same way. TikTok itself will likely
-        // regress without this — that trade was made deliberately, revisit if TikTok support is
-        // needed again before Reddit's side of this is otherwise resolved.
-        //
-        // Re-tested live with curl_cffi restored (2026-09-01, in response to "why does YTDLnis work
-        // fine on this same device"): got the exact same "Your IP address is unable to access the
-        // Reddit API" failure either way — conclusively ruling out curl_cffi/impersonation as the
-        // differentiator for *this* specific error. Keeping curl_cffi removed (no upside left to
-        // restoring it, only TikTok's known regression risk).
-        listOf("curl_cffi", "curl_cffi.libs").forEach { name ->
-            File(sitePackages, name).deleteRecursively()
-        }
-        sitePackages.listFiles { f -> f.isDirectory && f.name.startsWith("curl_cffi-") && f.name.endsWith(".dist-info") }
-            ?.forEach { it.deleteRecursively() }
+        // curl_cffi (bundled as part of the native runtime zip above) was previously deleted here —
+        // it was suspected of causing Reddit's "Your IP address is unable to access the Reddit API"
+        // block, since having a working impersonation backend available makes yt-dlp's Reddit
+        // extractor request impersonation for one of its calls. Re-tested live with curl_cffi
+        // restored (2026-09-01): got the exact same Reddit failure either way, conclusively ruling
+        // out curl_cffi/impersonation as the differentiator for that error. So it's kept (not
+        // deleted) again — Reddit's block is a separate, still-unresolved issue unrelated to this,
+        // and TikTok genuinely needs curl_cffi's impersonation to get past its bot detection.
 
         for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py")) {
             context.assets.open("python_packages/$name").use { input ->
