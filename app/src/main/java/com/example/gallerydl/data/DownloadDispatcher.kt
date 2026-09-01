@@ -198,9 +198,38 @@ object DownloadDispatcher {
         // means "orphaned by the chain cascade." Leave those alone here; resumeAll() is what's
         // supposed to pick them back up.
         if (GalleryDlPreferences.isGloballyPaused(context)) return
-        val dao = AppDatabase.getDatabase(context).downloadDao()
+        repairIfJobDead(context, AppDatabase.getDatabase(context).downloadDao().getQueuedOnce())
+    }
+
+    /** Startup-only counterpart to [repairOrphanedQueue] — catches a download stuck showing
+     * "Downloading..." forever because the process that owned it died (force-stopped, OS-killed
+     * while backgrounded, crashed) before its worker ever got to write a terminal status.
+     * Reproduced live: WorkManager's own persisted work record for a killed process's job can end
+     * up CANCELLED or simply gone by the next cold start, but nothing was re-checking the DB row
+     * that pointed at it, so it just sat at RUNNING indefinitely — with no live WorkManager job
+     * behind it — until someone noticed and cancelled it by hand.
+     *
+     * Safe to re-submit rather than just mark ERRORED: gallery-dl's/yt-dlp's own download-archive
+     * (keyed by this same download id, see DownloadWorker's galleryArchivePath/ytDlpArchivePath)
+     * means a re-run only fetches whatever's still missing — if the original run had actually
+     * finished before dying, this resubmission finds nothing new, saves nothing, and immediately
+     * reaches DownloadWorker's own `savedCount > 0` check to write FINISHED, exactly as if the
+     * original run's own final status write had simply landed a little late.
+     *
+     * Call once per cold start (MainActivity), not reactively — unlike a QUEUED/SCHEDULED row
+     * going stale, a RUNNING row's job dying isn't a predictable side effect of some other action
+     * in this file, so there's no "this just happened, check now" trigger to hang it off of. */
+    suspend fun repairOrphanedRunning(context: Context) {
+        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        repairIfJobDead(context, AppDatabase.getDatabase(context).downloadDao().getRunningOnce())
+    }
+
+    /** Shared by [repairOrphanedQueue] and [repairOrphanedRunning]: re-submits any of [entities]
+     * whose recorded WorkManager job is no longer actually alive, leaving everything else (a job
+     * still genuinely ENQUEUED/RUNNING/BLOCKED) untouched. */
+    private suspend fun repairIfJobDead(context: Context, entities: List<DownloadEntity>) {
         val workManager = WorkManager.getInstance(context)
-        dao.getQueuedOnce().forEach { entity ->
+        entities.forEach { entity ->
             val uuid = entity.workRequestId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
             // No job ever recorded, or WorkManager reports it in a terminal state (CANCELLED from
             // the chain cascade, or FAILED/SUCCEEDED with the DB row never updated to match) — any

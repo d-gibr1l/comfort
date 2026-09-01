@@ -105,6 +105,16 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE status IN ('QUEUED', 'SCHEDULED')")
     suspend fun getQueuedOnce(): List<DownloadEntity>
 
+    /** One-shot snapshot of everything still marked RUNNING — used at app startup to catch a
+     * download whose WorkManager job died out from under it (process killed/frozen mid-download,
+     * an OS out-of-memory kill, ...) without ever getting the chance to write a terminal status.
+     * Unlike [getQueuedOnce] this is never called reactively from pause/cancel — a RUNNING row's
+     * job dying isn't a normal WorkManager chain-cascade side effect the way an unstarted one's is,
+     * so there's no equivalent "just happened, check right now" trigger; a fresh app process is the
+     * only reliable point to notice a stale RUNNING row from a process that no longer exists. */
+    @Query("SELECT * FROM downloads WHERE status = 'RUNNING'")
+    suspend fun getRunningOnce(): List<DownloadEntity>
+
     @Query("DELETE FROM downloads WHERE id = :id")
     suspend fun delete(id: String)
 

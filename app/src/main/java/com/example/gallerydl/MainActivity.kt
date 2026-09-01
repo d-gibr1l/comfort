@@ -26,6 +26,7 @@ import com.example.gallerydl.theme.GalleryDLTheme
 import com.example.gallerydl.theme.LocalThemeState
 import com.example.gallerydl.theme.ThemePreferences
 import com.example.gallerydl.theme.ThemeState
+import com.example.gallerydl.data.DownloadDispatcher
 import com.example.gallerydl.util.AppImageLoader
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -87,6 +88,13 @@ class MainActivity : ComponentActivity() {
         ) {
           notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+      }
+
+      // One-shot per cold start — catches a download stuck showing "Downloading..." forever
+      // because the process that owned it died before its worker could write a terminal status.
+      // See DownloadDispatcher.repairOrphanedRunning()'s own doc comment for the full story.
+      LaunchedEffect(Unit) {
+        DownloadDispatcher.repairOrphanedRunning(context)
       }
 
       var lightTheme by remember { mutableStateOf(ThemePreferences.getLightTheme(context)) }
