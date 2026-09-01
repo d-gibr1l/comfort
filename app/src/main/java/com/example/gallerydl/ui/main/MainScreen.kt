@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -537,14 +538,47 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
+                val recentListState = rememberLazyListState()
+                // Auto-advances one item at a time once the user's left it alone for a while,
+                // rather than a continuous scroll — an idle showcase, not something fighting a
+                // real swipe attempt. Waits out isScrollInProgress (covers both an active drag and
+                // this same effect's own animateScrollToItem, so it never overlaps itself) before
+                // each step, and re-checks it is still idle right before actually scrolling — a
+                // user grabbing the list mid-delay just gets skipped that cycle instead of yanked
+                // out from under their thumb.
+                LaunchedEffect(recentDownloads.size) {
+                    if (recentDownloads.size <= 1) return@LaunchedEffect
+                    while (true) {
+                        kotlinx.coroutines.delay(3500)
+                        if (recentListState.isScrollInProgress) continue
+                        val next = recentListState.firstVisibleItemIndex + 1
+                        val target = if (next >= recentDownloads.size) 0 else next
+                        recentListState.animateScrollToItem(target)
+                    }
+                }
                 LazyRow(
+                    state = recentListState,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    // Plain fillMaxWidth — no bleed/escape trick. The strip should start at the
-                    // same left edge as everything else on this screen (Supported sources cards,
-                    // the tips carousel, the paste box), not flush against the true screen edge;
-                    // an earlier version made it bleed all the way to x=0, which looked flush with
-                    // the screen but inconsistent with the rest of the page's own margin.
-                    modifier = Modifier.fillMaxWidth(),
+                    // The earlier Modifier.padding() here was the actual bug: applied after the
+                    // bleed widening, it shrinks the LazyRow's own *viewport*, which just moves
+                    // where the clipped edge sits — it can never let scrolling actually reach past
+                    // it, no matter how much extra width the bleed measures into. contentPadding
+                    // is the real mechanism for "inset at rest, reachable by scrolling": it pads
+                    // the *scrollable content* within a full-width viewport, not the viewport
+                    // itself, so the leading/trailing item can still scroll into that space. The
+                    // bleed layout below still does need to stay, though — it's the only thing
+                    // giving this row a full-width viewport to begin with, escaping the parent
+                    // Column's own 24dp margin that would otherwise cap it regardless.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .layout { measurable, constraints ->
+                            val bleed = 24.dp.roundToPx()
+                            val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
+                            layout(placeable.width - bleed * 2, placeable.height) {
+                                placeable.placeRelative(-bleed, 0)
+                            }
+                        },
+                    contentPadding = PaddingValues(horizontal = 24.dp),
                 ) {
                     items(recentDownloads, key = { it.id }) { item ->
                         RecentDownloadThumbnail(item = item, onClick = onOpenLibrary)
