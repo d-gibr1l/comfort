@@ -870,8 +870,17 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                     val touchedDomains = pastedParsed.map { it.domain.removePrefix(".") }.toSet()
                     val keptExisting = parseCookiesFile(savedCookiesContent)
                         .filterNot { it.domain.removePrefix(".") in touchedDomains }
-                    val merged = (keptExisting + pastedParsed).joinToString("\n") { it.rawLine }
-                    persist(merged)
+                    // parseCookiesFile() deliberately drops comment/header lines when parsing (so
+                    // they don't get double-counted as fake cookies) — rebuilding purely from
+                    // rawLine values without adding this back means the result can never carry the
+                    // "# Netscape HTTP Cookie File" header gallery-dl/yt-dlp's own cookie-jar parser
+                    // requires as the file's literal first line. Reproduced live: a save through
+                    // this exact path produced a header-less file that both engines flatly rejected
+                    // as "does not look like a Netscape format cookies file", failing every
+                    // download outright regardless of whether that site even needed cookies.
+                    val mergedText = (listOf("# Netscape HTTP Cookie File") + (keptExisting + pastedParsed).map { it.rawLine })
+                        .joinToString("\n")
+                    persist(mergedText)
                     pastedCookies = ""
                     savedConfirmation = true
                 },
@@ -939,9 +948,14 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                         }
                         IconButton(onClick = {
                             val toRemove = site.cookies.toSet()
-                            val updated = parsedCookies
-                                .filter { it !in toRemove }
-                                .joinToString("\n") { it.rawLine }
+                            // Same header requirement as the Save button's own merge logic above —
+                            // parseCookiesFile() strips comment/header lines when parsing, so
+                            // rebuilding purely from the surviving cookies' rawLine values needs the
+                            // "# Netscape HTTP Cookie File" header added back explicitly, or the
+                            // result fails gallery-dl/yt-dlp's strict format check the same way.
+                            val remaining = parsedCookies.filter { it !in toRemove }
+                            val updated = (listOf("# Netscape HTTP Cookie File") + remaining.map { it.rawLine })
+                                .joinToString("\n")
                             persist(updated)
                         }) {
                             Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
