@@ -9,6 +9,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -539,21 +541,32 @@ fun HomeScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 val recentListState = rememberLazyListState()
-                // Auto-advances one item at a time once the user's left it alone for a while,
-                // rather than a continuous scroll — an idle showcase, not something fighting a
-                // real swipe attempt. Waits out isScrollInProgress (covers both an active drag and
-                // this same effect's own animateScrollToItem, so it never overlaps itself) before
-                // each step, and re-checks it is still idle right before actually scrolling — a
-                // user grabbing the list mid-delay just gets skipped that cycle instead of yanked
-                // out from under their thumb.
+                // A genuinely continuous, slow drift (not the earlier per-item jump-and-pause)
+                // once the user's left it alone for a while — an idle showcase, not something
+                // fighting a real swipe. scrollBy() runs at MutatePriority.Default, the same
+                // priority auto-scroll conventionally uses; a real drag gesture is handled by the
+                // LazyRow's own built-in touch machinery at UserInput priority, which Compose's
+                // scroll mutex always lets preempt a lower-priority caller, so a user grabbing the
+                // list mid-drift interrupts this loop's current scrollBy call automatically — the
+                // isDragged check below just avoids wastefully *starting* a new one while they're
+                // still holding it, on top of that.
+                val isRecentListDragged by recentListState.interactionSource.collectIsDraggedAsState()
                 LaunchedEffect(recentDownloads.size) {
                     if (recentDownloads.size <= 1) return@LaunchedEffect
+                    kotlinx.coroutines.delay(3500)
                     while (true) {
-                        kotlinx.coroutines.delay(3500)
-                        if (recentListState.isScrollInProgress) continue
-                        val next = recentListState.firstVisibleItemIndex + 1
-                        val target = if (next >= recentDownloads.size) 0 else next
-                        recentListState.animateScrollToItem(target)
+                        if (isRecentListDragged) {
+                            kotlinx.coroutines.delay(200)
+                            continue
+                        }
+                        if (recentListState.canScrollForward) {
+                            recentListState.scrollBy(1.1f)
+                        } else {
+                            kotlinx.coroutines.delay(1800)
+                            recentListState.animateScrollToItem(0)
+                            kotlinx.coroutines.delay(1800)
+                        }
+                        kotlinx.coroutines.delay(16)
                     }
                 }
                 LazyRow(
