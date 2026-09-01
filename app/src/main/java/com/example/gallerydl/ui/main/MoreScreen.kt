@@ -47,31 +47,36 @@ import kotlinx.datetime.LocalTime
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 
-private enum class SettingsRoute { ROOT, APPEARANCE, DOWNLOADS, ADVANCED, COOKIES, ABOUT }
+enum class SettingsRoute { ROOT, APPEARANCE, DOWNLOADS, ADVANCED, COOKIES, ABOUT }
 
+/** [route]/[onNavigate] are hoisted up to MainScreen rather than owned here — this composable
+ * itself gets torn down and rebuilt every time the Settings tab is switched away from and back
+ * (MainScreen's `when(selectedTab)` only composes the selected tab's screen at all), so a plain
+ * local `remember` here used to reset to ROOT on every tab switch instead of staying wherever the
+ * user actually was (reported live: drill into Downloads, tap Library, tap Settings again — lands
+ * back on the root list instead of Downloads). Hoisting to MainScreen (which stays composed for
+ * the app's whole lifetime) is what actually survives a tab switch. */
 @Composable
-fun MoreScreen() {
-    var route by remember { mutableStateOf(SettingsRoute.ROOT) }
-
+fun MoreScreen(route: SettingsRoute, onNavigate: (SettingsRoute) -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         // The root settings list is what a sub-screen's back gesture reveals — kept composed
         // underneath whenever we're not already on it, same reasoning as MainScreen's Home-behind-
         // a-tab treatment, purely so there's something real to peek at mid-swipe.
         if (route != SettingsRoute.ROOT) {
-            SettingsRootScreen(onNavigate = { route = it })
+            SettingsRootScreen(onNavigate = onNavigate)
         }
 
         val backProgress = rememberPredictiveBackProgress(enabled = route != SettingsRoute.ROOT) {
-            route = SettingsRoute.ROOT
+            onNavigate(SettingsRoute.ROOT)
         }
         Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(backProgress)) {
             when (route) {
-                SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = { route = it })
-                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { route = SettingsRoute.ROOT })
-                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { route = SettingsRoute.ROOT })
-                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { route = SettingsRoute.ROOT })
-                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { route = SettingsRoute.ROOT })
-                SettingsRoute.ABOUT -> AboutScreen(onBack = { route = SettingsRoute.ROOT })
+                SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = onNavigate)
+                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.ABOUT -> AboutScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
             }
         }
     }
