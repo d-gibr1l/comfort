@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -14,11 +15,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarVisuals
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,34 +56,49 @@ data class DownloadEventVisuals(
     override val duration: SnackbarDuration = if (isSuccess) SnackbarDuration.Short else SnackbarDuration.Long
 }
 
-/** Shared "download finished/failed" toast styling for both Library and the Download Queue —
- * a colored, icon-led card instead of Material's plain flat default, so success/failure reads at a
- * glance instead of requiring reading the text first. */
+/** Shared "download finished/failed" toast styling for both Library and the Download Queue — a
+ * free-floating rounded card with a solid-color circular icon badge, matching the icon-badge
+ * language used throughout the rest of the app (Home's tip rows, About's engine rows, ...) instead
+ * of Material's plain flat Snackbar default, which reads as the same flat grey block for both a
+ * success and a failure until you actually read the text. A custom Surface (not Snackbar's own
+ * shape/color slots) is what makes the solid icon badge and the pill dismiss button possible —
+ * Snackbar's own API only exposes a single flat containerColor for the whole bar. */
 @Composable
 fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
     SnackbarHost(hostState = hostState, modifier = modifier) { data ->
         val visuals = data.visuals
         val isSuccess = (visuals as? DownloadEventVisuals)?.isSuccess ?: true
-        Snackbar(
-            containerColor = if (isSuccess) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-            contentColor = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
-            dismissAction = {
-                IconButton(onClick = { data.dismiss() }) {
+        // Success reads as "finished" more clearly in the app's own teal (already reserved for
+        // progress/success states — see Color.kt) than the brand indigo Snackbar used to borrow
+        // from primaryContainer, which reads as "just another accent," not specifically "done."
+        val accent = if (isSuccess) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
+        val onAccent = if (isSuccess) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onError
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 6.dp,
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(accent),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
-                        FeatherIcons.X,
-                        contentDescription = "Dismiss",
-                        modifier = Modifier.size(16.dp),
-                        tint = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                        if (isSuccess) FeatherIcons.CheckCircle else FeatherIcons.AlertTriangle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = onAccent,
                     )
                 }
-            },
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (isSuccess) FeatherIcons.CheckCircle else FeatherIcons.AlertTriangle,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
                 Spacer(Modifier.width(12.dp))
                 // Capped regardless of how long visuals.message turns out to be — error text is
                 // sanitized at the source now (see GalleryDlListing.sanitizeErrorMessage), but this
@@ -89,10 +106,21 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                 // one reproduced live before that existed, not something to rely on that alone for.
                 Text(
                     visuals.message,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
+                IconButton(onClick = { data.dismiss() }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        FeatherIcons.X,
+                        contentDescription = "Dismiss",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
