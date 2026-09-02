@@ -1140,20 +1140,42 @@ private data class ParsedCookie(
  * rest of the line past that exact prefix is a genuine tab-separated cookie row, just one flagged
  * httpOnly. Reproduced live in this app's own "paste raw cookies" flow: without stripping that
  * prefix first, every httpOnly cookie in a real exported file silently vanished from the parsed
- * list, showing as if the file were mostly empty. */
+ * list, showing as if the file were mostly empty.
+ *
+ * Falls back to splitting on any run of whitespace (not just a literal tab) when a line doesn't
+ * split into 7 real tab-separated fields — reproduced live with a genuine Cookie-Editor export
+ * whose tabs had been silently collapsed to plain spaces somewhere in the copy/paste chain (a
+ * viewer or app re-rendering the text, not something gallery-dl's own export ever did). Visually
+ * indistinguishable from a real tab-separated file, and previously failed this parser entirely —
+ * `limit = 7` keeps the 7th field (the cookie's value) intact as everything remaining, in case it
+ * legitimately contains its own internal whitespace, rather than truncating it. The corresponding
+ * ParsedCookie.rawLine is rebuilt with real tabs in this fallback branch — a big difference from
+ * gallery-dl/yt-dlp's own `--cookies` parser (Python's http.cookiejar), which is strict and only
+ * ever splits on literal tabs: persisting the original, space-only line as-is would have let this
+ * *display* correctly in the app's own cookie list while still silently failing to actually
+ * authenticate a single real download — worse than never fixing it, since it would look fixed. */
 private fun parseCookiesFile(content: String): List<ParsedCookie> {
     return content.lineSequence().mapNotNull { rawLine ->
         val trimmed = rawLine.trimEnd('\r')
         if (trimmed.isBlank()) return@mapNotNull null
+        val hadHttpOnlyPrefix = trimmed.startsWith("#HttpOnly_")
         val dataLine = trimmed.removePrefix("#HttpOnly_")
         if (dataLine.startsWith("#")) return@mapNotNull null
-        val fields = dataLine.split("\t")
+        var fields = dataLine.split("\t")
+        var normalizedLine = rawLine
+        if (fields.size < 7) {
+            val whitespaceFields = dataLine.trim().split(Regex("\\s+"), limit = 7)
+            if (whitespaceFields.size == 7) {
+                fields = whitespaceFields
+                normalizedLine = (if (hadHttpOnlyPrefix) "#HttpOnly_" else "") + whitespaceFields.joinToString("\t")
+            }
+        }
         if (fields.size < 7) return@mapNotNull null
         ParsedCookie(
             domain = fields[0],
             expiryEpochSeconds = fields[4].toLongOrNull() ?: 0L,
             name = fields[5],
-            rawLine = rawLine,
+            rawLine = normalizedLine,
         )
     }.toList()
 }
