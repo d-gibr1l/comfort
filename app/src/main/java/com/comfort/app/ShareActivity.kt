@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -62,6 +63,17 @@ private const val SHEET_ANIM_MS = 280
  * when it's genuinely working — verify visually on-device, not from an adb screenshot.) */
 class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Without this the window still defaults to decorFitsSystemWindows=true, meaning the
+        // system reserves its own space for the nav bar regardless of this Activity's transparent
+        // theme — the sheet's dim scrim only happened to reach the real nav bar by that automatic
+        // reservation, not by this window actually drawing there. SharePickerScreen's own Scaffold
+        // (inside the sheet below) already computes its bottom content padding from real
+        // WindowInsets via its own default contentWindowInsets — it just had nothing to measure
+        // while this window wasn't edge-to-edge, so its Download button sat right instead of
+        // properly inset purely by luck. Nothing else needs to change for that button to stay
+        // reachable once this is on; Scaffold's default already reserves the right space now that
+        // there's a real inset for it to see.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         com.comfort.app.util.AppImageLoader.install(applicationContext)
