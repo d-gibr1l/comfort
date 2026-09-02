@@ -19,7 +19,6 @@ object VideoSiteRouter {
         "tiktok.com",
         "vimeo.com",
         "twitch.tv",
-        "twitter.com", "x.com",
         "crunchyroll.com",
         "bbc.co.uk", "bbc.com",
         "bloomberg.com",
