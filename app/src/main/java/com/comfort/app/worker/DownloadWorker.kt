@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.comfort.app.data.AppDatabase
+import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.DownloadedFileRecord
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -283,12 +285,46 @@ class DownloadWorker(
                 // [thumbnail] branch below) rather than being blocked by an already-filled slot.
                 val singleItemDownload = (entity?.totalItems ?: 1) <= 1
 
+                // The schedule window only ever gated a download from *starting* (see
+                // DownloadDispatcher.enqueueWork's own setInitialDelay) — nothing here noticed the
+                // window closing on a download already RUNNING, so a long-running one (a big video,
+                // a large gallery) could freely bleed straight through into the restricted hours a
+                // "night-time only" schedule is meant to keep data usage out of. Re-checked at most
+                // once every 60s of wall-clock (not on every single output line, which for a fast
+                // multi-item gallery-dl gallery can be many times a second) to keep this cheap;
+                // scheduleClosedPauseRequested guards against firing pauseDownload() more than once
+                // if several lines arrive in the same window right as it closes — WorkManager's own
+                // cancellation of this same job takes a moment to actually propagate back in.
+                val lastScheduleCheckMs = AtomicLong(0L)
+                val scheduleClosedPauseRequested = AtomicBoolean(false)
+
                 // suspend, not a plain lambda — PythonRuntime's onLine has no JNI-reentrancy
                 // constraint (unlike Chaquopy's old synchronous callback), so every DB write below
                 // is a direct, awaited suspend call instead of a fire-and-launch job collected into
                 // a separate list and joined afterward.
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     android.util.Log.d("DownloadEngine", "Python output: $line")
+
+                    if (!scheduleClosedPauseRequested.get()) {
+                        val now = System.currentTimeMillis()
+                        val last = lastScheduleCheckMs.get()
+                        if (now - last >= 60_000L && lastScheduleCheckMs.compareAndSet(last, now)) {
+                            if (GalleryDlPreferences.isScheduleEnabled(applicationContext) &&
+                                !DownloadDispatcher.isWithinScheduleWindow(applicationContext) &&
+                                scheduleClosedPauseRequested.compareAndSet(false, true)
+                            ) {
+                                // Same mechanism a manual Pause tap already uses while this download
+                                // is running: this cancels the WorkManager job *this worker is
+                                // itself running under*, which this coroutine hierarchy notices at
+                                // its own next suspension point (PythonRuntime.run()'s own killer
+                                // sibling coroutine force-kills the subprocess, unblocking the
+                                // blocking readLine() loop) — the outer catch(CancellationException)
+                                // below already knows to leave whatever status this just set alone.
+                                DownloadDispatcher.pauseDownload(applicationContext, downloadId)
+                            }
+                        }
+                    }
+
                     when {
                         // yt-dlp-only signals (see yt_dlp_wrapper.py's progress_hook) — gallery-dl
                         // never emits these, so gallery-dl-routed downloads just never hit this
