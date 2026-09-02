@@ -880,6 +880,10 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
     // text, duplicating what the table already shows more usefully.
     var pastedCookies by remember { mutableStateOf("") }
     var savedConfirmation by remember { mutableStateOf(false) }
+    // Distinct from savedConfirmation, not just its negation — persist()/clearing pastedCookies
+    // only happens on an actual successful parse now (see the Save cookies button below), so this
+    // and savedConfirmation are never both true from the same click.
+    var pasteError by remember { mutableStateOf<String?>(null) }
     // The real, on-disk cookies.txt is the one source of truth gallery-dl/yt-dlp actually read
     // (see GalleryDlListing.kt/DownloadWorker.kt) — SharedPreferences' own KEY_COOKIES is only ever
     // a same-content mirror written alongside it, kept for the raw-paste textbox's own persistence.
@@ -939,7 +943,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 
             OutlinedTextField(
                 value = pastedCookies,
-                onValueChange = { pastedCookies = it },
+                onValueChange = { pastedCookies = it; pasteError = null },
                 modifier = Modifier.fillMaxWidth().height(160.dp),
                 label = { Text("cookies.txt contents") },
                 maxLines = 10,
@@ -959,22 +963,40 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                     // expiry/secure/subdomain flags) — only the touched registrable domains get
                     // replaced, everything else already saved is left exactly as it was.
                     val pastedParsed = parseCookiesFile(pastedCookies)
-                    val touchedDomains = pastedParsed.map { it.domain.removePrefix(".") }.toSet()
-                    val keptExisting = parseCookiesFile(savedCookiesContent)
-                        .filterNot { it.domain.removePrefix(".") in touchedDomains }
-                    // parseCookiesFile() deliberately drops comment/header lines when parsing (so
-                    // they don't get double-counted as fake cookies) — rebuilding purely from
-                    // rawLine values without adding this back means the result can never carry the
-                    // "# Netscape HTTP Cookie File" header gallery-dl/yt-dlp's own cookie-jar parser
-                    // requires as the file's literal first line. Reproduced live: a save through
-                    // this exact path produced a header-less file that both engines flatly rejected
-                    // as "does not look like a Netscape format cookies file", failing every
-                    // download outright regardless of whether that site even needed cookies.
-                    val mergedText = (listOf("# Netscape HTTP Cookie File") + (keptExisting + pastedParsed).map { it.rawLine })
-                        .joinToString("\n")
-                    persist(mergedText)
-                    pastedCookies = ""
-                    savedConfirmation = true
+                    // parseCookiesFile() silently drops any line that isn't real tab-separated
+                    // Netscape format (fewer than 7 fields) rather than throwing — the right call
+                    // for skipping a comment/header line, but it means a paste in the wrong format
+                    // entirely (an HTTP-header-style "name=value; name2=value2" string, a browser
+                    // cookie-editor's own space-aligned export, ...) used to parse to an empty list
+                    // and this button would still merge that into (no-op) the existing file and
+                    // claim "Cookies saved and applied" regardless — reproduced live: pasted
+                    // Instagram cookies that weren't real tab-separated Netscape rows disappeared
+                    // with no error, and the very next thing the user saw was a false success
+                    // message. Refusing to persist or clear the textbox (so the original paste is
+                    // still there to fix/copy elsewhere) when nothing actually parsed turns that
+                    // silent no-op into a real, actionable error instead.
+                    if (pastedCookies.isNotBlank() && pastedParsed.isEmpty()) {
+                        pasteError = "Couldn't find any valid cookies in that text — it needs to be real tab-separated Netscape format (domain, includeSubdomains, path, secure, expiry, name, value per line), not just \"name=value\" pairs."
+                        savedConfirmation = false
+                    } else {
+                        val touchedDomains = pastedParsed.map { it.domain.removePrefix(".") }.toSet()
+                        val keptExisting = parseCookiesFile(savedCookiesContent)
+                            .filterNot { it.domain.removePrefix(".") in touchedDomains }
+                        // parseCookiesFile() deliberately drops comment/header lines when parsing (so
+                        // they don't get double-counted as fake cookies) — rebuilding purely from
+                        // rawLine values without adding this back means the result can never carry the
+                        // "# Netscape HTTP Cookie File" header gallery-dl/yt-dlp's own cookie-jar parser
+                        // requires as the file's literal first line. Reproduced live: a save through
+                        // this exact path produced a header-less file that both engines flatly rejected
+                        // as "does not look like a Netscape format cookies file", failing every
+                        // download outright regardless of whether that site even needed cookies.
+                        val mergedText = (listOf("# Netscape HTTP Cookie File") + (keptExisting + pastedParsed).map { it.rawLine })
+                            .joinToString("\n")
+                        persist(mergedText)
+                        pastedCookies = ""
+                        pasteError = null
+                        savedConfirmation = true
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
@@ -987,6 +1009,19 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
             if (savedConfirmation) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies saved and applied", tint = MaterialTheme.colorScheme.secondary)
+            }
+            pasteError?.let { message ->
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        FeatherIcons.AlertTriangle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp).padding(top = 2.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
 
