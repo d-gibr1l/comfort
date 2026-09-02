@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -108,7 +109,29 @@ fun AppearanceScreen(onBack: () -> Unit) {
 
             Text("Light theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                // Bleed past the page's own 20dp side padding (from the parent Column, above) so
+                // this row can actually scroll edge-to-edge instead of stopping short at the same
+                // margin every other row on the page rests at — same technique as Home's own
+                // Recently-downloaded strip (see MainScreen.kt): widen the measured constraint by
+                // bleed*2 and place at x=-bleed to escape the parent's padding-constrained slot,
+                // then use contentPadding (a LazyRow constructor PARAMETER, not a trailing
+                // Modifier.padding()) to bring the *content* back to resting at that same margin.
+                // A trailing .padding() here would look identical at rest but silently cap the
+                // LazyRow's own scrollable viewport at the pre-bleed width regardless of how much
+                // extra the bleed measures into, making the bleed pointless.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .layout { measurable, constraints ->
+                        val bleed = 20.dp.roundToPx()
+                        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
+                        layout(placeable.width - bleed * 2, placeable.height) {
+                            placeable.placeRelative(-bleed, 0)
+                        }
+                    },
+                contentPadding = PaddingValues(horizontal = 20.dp),
+            ) {
                 items(availableThemes, key = { "${it.name}_light" }) { theme ->
                     ThemePreviewCard(
                         theme = theme,
@@ -127,7 +150,20 @@ fun AppearanceScreen(onBack: () -> Unit) {
 
             Text("Dark theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(10.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                // Same bleed + contentPadding technique as the Light theme row above.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .layout { measurable, constraints ->
+                        val bleed = 20.dp.roundToPx()
+                        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
+                        layout(placeable.width - bleed * 2, placeable.height) {
+                            placeable.placeRelative(-bleed, 0)
+                        }
+                    },
+                contentPadding = PaddingValues(horizontal = 20.dp),
+            ) {
                 items(availableThemes, key = { "${it.name}_dark" }) { theme ->
                     ThemePreviewCard(
                         theme = theme,
