@@ -16,6 +16,7 @@ object MediaStoreHelper {
     private const val IMAGE_RELATIVE_DIR = "Pictures/Comfort"
     private const val VIDEO_RELATIVE_DIR = "Movies/Comfort"
     private const val AUDIO_RELATIVE_DIR = "Music/Comfort"
+    private const val OTHER_RELATIVE_DIR = "Download/Comfort"
 
     /** Whether the Uri a download saved still resolves to a real file — false once the user has
      * deleted it from their gallery (or the SAF folder) outside the app. Errors fail open (return
@@ -46,7 +47,18 @@ object MediaStoreHelper {
                 "webm" -> "video/webm"
                 "mp3" -> "audio/mpeg"
                 "m4a" -> "audio/mp4"
-                else -> "image/jpeg"
+                // yt-dlp's own subtitle sidecar files ("Download Subtitles" in Settings) —
+                // MimeTypeMap doesn't reliably recognize either on every Android version, and
+                // falling all the way through this chain used to default to "image/jpeg" for
+                // *anything* unmatched, which defeated collectionFor()'s own image/video/audio/
+                // other split below: a subtitle "recognized" as an image still got routed into the
+                // Images collection incorrectly, the exact failure this whole chain exists to fix.
+                "vtt" -> "text/vtt"
+                "srt" -> "application/x-subrip"
+                // Honest "unknown binary" instead of the previous blanket "image/jpeg" guess — lets
+                // collectionFor()'s own else branch (Files collection, accepts any type) correctly
+                // catch whatever this still doesn't recognize, rather than silently mislabeling it.
+                else -> "application/octet-stream"
             }
         // Kept honest here (a real .mkv file reported as "video/x-matroska", not lied about) —
         // saveToMediaStore() itself falls back to "video/mp4" only if MediaStore actually rejects
@@ -142,11 +154,21 @@ object MediaStoreHelper {
 
     // gallery-dl posts (Instagram reels/carousels especially) can include video or audio-only
     // files alongside images — MediaStore rejects any of these MIME types inserted into a
-    // mismatched collection, so route each into its matching one.
+    // mismatched collection, so route each into its matching one. The `else` branch used to fall
+    // through straight to Images regardless of what the file actually was — fine while every
+    // download really was a picture, video, or audio file, but this app also saves yt-dlp
+    // subtitles (.vtt/.srt, "Download Subtitles" in Settings) and those aren't remotely an image.
+    // On API 29+, MediaStore.Images.Media flatly rejects a "text/vtt" (or any non-image/*) insert
+    // with an IllegalArgumentException — insertIntoMediaStore() below already treats a thrown
+    // insert() the same as a null return, so this failed *silently*: the file was left orphaned in
+    // cacheDir/gallery-dl-staging/ forever (never cleaned up, never counted as saved) with no
+    // visible error anywhere. Anything that isn't image/video/audio now goes to the generic Files
+    // collection instead, which accepts any MIME type.
     private fun collectionFor(mimeType: String): Pair<Uri, String> = when {
+        mimeType.startsWith("image/") -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI to IMAGE_RELATIVE_DIR
         mimeType.startsWith("video/") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI to VIDEO_RELATIVE_DIR
         mimeType.startsWith("audio/") -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI to AUDIO_RELATIVE_DIR
-        else -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI to IMAGE_RELATIVE_DIR
+        else -> MediaStore.Files.getContentUri("external") to OTHER_RELATIVE_DIR
     }
 
     private fun insertIntoMediaStore(context: Context, sourceFile: File, mimeType: String): Uri? {
