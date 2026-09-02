@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
@@ -122,7 +123,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(top = paddingValues.calculateTopPadding())
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -265,7 +266,7 @@ private fun SettingsSubScaffold(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(top = paddingValues.calculateTopPadding())
                 .verticalScroll(rememberScrollState())
                 // Extra bottom inset beyond the normal 20dp: the floating nav bar overlays the
                 // bottom of the screen without reserving space, so without this the last section
@@ -617,6 +618,14 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                         onClick = {
                             concurrentDownloads = count
                             sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_CONCURRENT_DOWNLOADS, count).apply()
+                            // Without this, everything already queued stays chained in whatever
+                            // round-robin lane(s) it was originally assigned to (e.g. all in
+                            // gallery_dl_queue_0 from when the setting was 1) and keeps running
+                            // exactly that concurrently regardless of the new setting — it only
+                            // ever applied to downloads added *after* this tap. Redistributes the
+                            // existing backlog across the new lane count immediately instead of
+                            // leaving the user's current queue stuck on the old concurrency.
+                            scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
                         },
                     ) {
                         Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -1810,3 +1819,4 @@ private fun StatusRow(icon: ImageVector, text: String, tint: androidx.compose.ui
         Text(text, color = tint, style = MaterialTheme.typography.bodySmall)
     }
 }
+
