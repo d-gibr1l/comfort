@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import android.content.ClipData
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
@@ -24,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +43,7 @@ import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 // Matches the phrasing yt-dlp/gallery-dl actually use when a download failed because the site
 // wants an authenticated session — e.g. "The web client only works when logged-in. Use --cookies,
@@ -466,6 +470,9 @@ private fun StoppedRow(
     val isPaused = item.status == DownloadStatus.PAUSED
     var menuExpanded by remember { mutableStateOf(false) }
     val hasThumbnail = !item.thumbnailPath.isNullOrBlank()
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     Box {
         Row(
@@ -554,6 +561,17 @@ private fun StoppedRow(
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
+                            text = { Text("Copy link") },
+                            leadingIcon = { Icon(FeatherIcons.Copy, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                scope.launch {
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Download link", item.url)))
+                                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
                             text = { Text("Remove") },
                             leadingIcon = { Icon(FeatherIcons.Trash2, contentDescription = null) },
                             onClick = { menuExpanded = false; onDelete() },
@@ -580,6 +598,9 @@ fun QueueItemCard(
     selected: Boolean = false,
     onToggleSelect: () -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -861,6 +882,14 @@ fun QueueItemCard(
                             }
                             TextButton(onClick = onRetry) {
                                 Text("Retry")
+                            }
+                            IconButton(onClick = {
+                                scope.launch {
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Download link", item.url)))
+                                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                }
+                            }) {
+                                Icon(FeatherIcons.Copy, contentDescription = "Copy link")
                             }
                             IconButton(onClick = onDelete) {
                                 Icon(FeatherIcons.Trash2, contentDescription = "Remove")
