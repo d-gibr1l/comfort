@@ -316,6 +316,21 @@ object DownloadDispatcher {
         }
     }
 
+    /** Kills and immediately re-submits every currently RUNNING download's WorkManager job —
+     * used to apply a setting (the speed limit) that's only ever read fresh when a new Python
+     * subprocess is spawned, baked into its own CLI/dict args at that exact moment, with no IPC
+     * channel to reach an already-running one. gallery-dl's own --download-archive and yt-dlp's
+     * partial .part-file resume mean the freshly spawned replacement picks up exactly where the
+     * killed one left off, not from scratch — enqueueWork() itself already does the cancel-then-
+     * resubmit in one atomic step (see its own doc comment), so this is just that, once per
+     * running item. */
+    suspend fun restartRunningDownloads(context: Context) {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        dao.getRunningOnce().forEach { entity ->
+            enqueueWork(context, entity.id, entity.url)
+        }
+    }
+
     /** Plain resume for a single PAUSED download — the "Resume" action on its own static paused
      * notification (see DownloadNotifications.notifyPaused), so tapping it doesn't require opening
      * the app and finding the item in Queue first. Just re-submits the existing job; unlike

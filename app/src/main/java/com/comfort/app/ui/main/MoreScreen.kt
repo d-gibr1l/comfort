@@ -43,6 +43,7 @@ import com.comfort.app.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import compose.icons.FeatherIcons
@@ -677,6 +678,21 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
             )
+            // A speed limit is only ever read fresh when a new subprocess is spawned — no IPC
+            // channel reaches an already-running one, so changing it here used to do nothing for
+            // whatever's downloading right now, only the next thing queued. Debounced (not fired
+            // straight from onValueChange above, which would otherwise restart every currently
+            // running download on every single keystroke while typing a new value) — restarts
+            // once typing actually settles. speedLimitSettled starts equal to the initial value
+            // specifically so opening this screen doesn't itself trigger a restart nobody asked for.
+            var speedLimitSettled by remember { mutableStateOf(speedLimit) }
+            LaunchedEffect(speedLimit) {
+                delay(800)
+                if (speedLimit != speedLimitSettled) {
+                    speedLimitSettled = speedLimit
+                    DownloadDispatcher.restartRunningDownloads(context)
+                }
+            }
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
