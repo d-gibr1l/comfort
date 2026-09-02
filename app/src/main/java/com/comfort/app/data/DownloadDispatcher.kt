@@ -67,13 +67,22 @@ object DownloadDispatcher {
     suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, videoQuality: VideoQuality? = null): String {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val id = UUID.randomUUID().toString()
+        val globallyPaused = GalleryDlPreferences.isGloballyPaused(context)
         dao.insert(
             DownloadEntity(
                 id = id,
                 url = url,
                 title = title,
                 thumbnailPath = null,
-                status = DownloadStatus.QUEUED,
+                // A new download added while globally paused used to always insert as QUEUED
+                // regardless — it never actually dispatched to WorkManager (see the check below,
+                // unchanged), but the UI told the user otherwise: it sat in the "In Queue" filter
+                // tab saying "Waiting to start…" right alongside genuinely-paused items sitting in
+                // the "Paused" tab saying "Paused," for what was really the identical frozen state.
+                // Reported live as confusing split UI. PAUSED here from the start means it's
+                // grouped correctly and resumeAll()'s own `status == PAUSED` filter already picks
+                // it straight up — no other change needed for it to resume normally.
+                status = if (globallyPaused) DownloadStatus.PAUSED else DownloadStatus.QUEUED,
                 progress = 0f,
                 downloadedItems = 0,
                 // Known for free when this came from the share-sheet item picker (it already
@@ -88,9 +97,9 @@ object DownloadDispatcher {
                 videoQuality = videoQuality?.name,
             )
         )
-        // While globally paused, new downloads sit in the queue undispatched — resumeAll()
-        // picks up anything with no workRequestId yet, alongside whatever it un-pauses.
-        if (!GalleryDlPreferences.isGloballyPaused(context)) {
+        // While globally paused, new downloads sit undispatched — resumeAll() picks up anything
+        // still PAUSED (see above) alongside whatever it un-pauses.
+        if (!globallyPaused) {
             enqueueWork(context, id, url)
         }
         return id
@@ -262,6 +271,13 @@ object DownloadDispatcher {
      * WorkManager never re-evaluates a fixed delay on its own (only true Constraints, like
      * network type, are continuously re-checked). */
     suspend fun rescheduleQueuedDownloads(context: Context) {
+        // enqueueWork() doesn't check this itself, so without this guard a schedule-window change
+        // made while globally paused silently broke the pause: every QUEUED/SCHEDULED row got
+        // resubmitted straight to WorkManager regardless, dispatching downloads the user explicitly
+        // froze. Normally pauseAll() already converts every QUEUED/SCHEDULED row to PAUSED (so
+        // getQueuedOnce() below wouldn't find any while paused), but this stays a real, defensive
+        // guard rather than relying on that invariant always holding everywhere.
+        if (GalleryDlPreferences.isGloballyPaused(context)) return
         val dao = AppDatabase.getDatabase(context).downloadDao()
         // enqueueWork() cancels whatever job is already associated with each id itself, atomically
         // with resubmitting it — no need to duplicate that cancellation here.
