@@ -5,6 +5,7 @@ import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.comfort.app.worker.DownloadNotifications
@@ -123,7 +124,21 @@ object DownloadDispatcher {
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(workDataOf("downloadId" to id, "url" to url))
             .setConstraints(constraints)
-            .apply { if (delayMillis > 0) setInitialDelay(delayMillis, TimeUnit.MILLISECONDS) }
+            .apply {
+                if (delayMillis > 0) {
+                    setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+                } else {
+                    // Only when there's no delay — WorkManager throws if setExpedited() and
+                    // setInitialDelay() are both set on the same request. Gives the OS a stronger
+                    // signal to actually start this promptly (and be more reluctant to kill the
+                    // process) during the real gap between WorkManager picking this up and
+                    // DownloadWorker's own setForegroundSafely() call actually promoting it to a
+                    // genuine foreground service — RUN_AS_NON_EXPEDITED_WORK_REQUEST means this
+                    // just quietly falls back to a normal request if the app's expedited-job quota
+                    // is already spent, never fails outright over it.
+                    setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                }
+            }
             .build()
 
         dao.setWorkRequestId(id, workRequest.id.toString())
