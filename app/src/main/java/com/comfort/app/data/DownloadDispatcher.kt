@@ -152,7 +152,10 @@ object DownloadDispatcher {
             cancelWorkManagerJob(context, entity.workRequestId)
             dao.updateStatus(id, DownloadStatus.PAUSED)
             dao.resetSpeed(id)
-            DownloadNotifications.cancel(context, id)
+            // A static "Paused" notification with its own Resume action, not cancel() — tapping
+            // Pause right from the notification used to make it vanish outright, with no way back
+            // to the download short of opening the app and finding it in Queue by hand.
+            DownloadNotifications.notifyPaused(context, id, entity.title)
         }
         // Reproduced live: pausing a *running* download silently orphaned everything else queued
         // behind it in the same round-robin lane. Each lane is a real WorkManager dependency chain
@@ -284,6 +287,16 @@ object DownloadDispatcher {
         dao.getQueuedOnce().forEach { entity ->
             enqueueWork(context, entity.id, entity.url)
         }
+    }
+
+    /** Plain resume for a single PAUSED download — the "Resume" action on its own static paused
+     * notification (see DownloadNotifications.notifyPaused), so tapping it doesn't require opening
+     * the app and finding the item in Queue first. Just re-submits the existing job; unlike
+     * [startNow] this doesn't jump the queue order or skip the schedule window. */
+    suspend fun resumeDownload(context: Context, id: String) {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        val entity = dao.getById(id) ?: return
+        enqueueWork(context, id, entity.url)
     }
 
     /** Jumps a still-waiting download (QUEUED or SCHEDULED) to the front of the queue and past

@@ -205,7 +205,9 @@ object DownloadNotifications {
     }
 
     fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?) {
-        val text = if (downloadedItems > 0) "$downloadedItems picture${if (downloadedItems == 1) "" else "s"} saved" else "Nothing new to download"
+        // "picture(s)" used to be hardcoded here regardless of what actually got saved — a
+        // downloaded video or audio file still read "1 picture saved," which looked like a bug.
+        val text = if (downloadedItems > 0) "$downloadedItems item${if (downloadedItems == 1) "" else "s"} saved" else "Nothing new to download"
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
             // still uses — so "this one finished" is visible at a glance in the shade/status bar
@@ -250,6 +252,29 @@ object DownloadNotifications {
         // this plain notify() call just replaces it in place, cleanly and immediately, no
         // separate cancel needed.
         notifySafe(context, downloadId, builder.build())
+    }
+
+    /** Replaces the ongoing progress notification with a static "Paused" one carrying a Resume
+     * action, instead of pauseDownload() just cancelling it outright — reproduced live: tapping
+     * Pause directly from the notification (its own Pause action button, not the in-app one) made
+     * the notification vanish entirely, leaving no way to resume without opening the app and
+     * finding the item in Queue by hand. Not ongoing/auto-cancel, same id as the progress
+     * notification it replaces, so it just sits in the shade until Resume is tapped or the user
+     * dismisses it — dismissing it doesn't itself resume or otherwise change the download. */
+    fun notifyPaused(context: Context, downloadId: String, title: String) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notif_logo)
+            .setContentTitle(title)
+            .setContentText("Paused")
+            .setOngoing(false)
+            .setAutoCancel(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(
+                0, "Resume",
+                actionPendingIntent(context, DownloadActionReceiver.ACTION_RESUME, downloadId),
+            )
+            .build()
+        notifySafe(context, downloadId, notification)
     }
 
     fun notifyFailed(context: Context, downloadId: String, title: String, errorMessage: String? = null) {
