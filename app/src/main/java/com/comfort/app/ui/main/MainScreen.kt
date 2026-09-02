@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.comfort.app.R
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.comfort.app.data.DownloadStatus
@@ -81,7 +82,27 @@ object EngineUpdateSignal {
 // FloatingNavBar's own footprint: 16dp padding + 68dp pill + 16dp padding. Screens that now
 // overlay it (instead of Scaffold reserving space for it) use this so their own scrollable
 // content and floating buttons can still clear the pill instead of sitting behind it.
+//
+// This is only the pill's own visual size, deliberately not the real system navigation bar's
+// height on top of it — enableEdgeToEdge() (MainActivity.onCreate) makes the system bars
+// transparent and lets this app's content draw underneath them, which is only *half* of a real
+// edge-to-edge setup. The other half is making sure nothing interactive (this pill itself, or the
+// last item in a list using this constant) ends up sitting *behind* the real system nav bar
+// instead of just behind its own transparent space — reproduced live: hardcoding a flat 100dp
+// everywhere happened to clear this device's own nav bar by luck, but nothing here was actually
+// reading its real height (WindowInsets.navigationBars), so a taller one (3-button nav, or a
+// gesture nav with a taller inset on a different OEM skin) had no guarantee of being cleared at
+// all. [navBarClearance] is the fix — this raw constant is kept only for the one place that isn't
+// a screen-content clearance value (FloatingNavBar's own internal pill height math, further down).
 val NAV_BAR_RESERVED_HEIGHT = 100.dp
+
+/** [NAV_BAR_RESERVED_HEIGHT] plus the real system navigation bar inset — use this (not the bare
+ * constant) for any scrollable content's bottom clearance or a floating button's own bottom
+ * padding, so the reserved space actually adapts to the device's real nav bar height (3-button vs
+ * gesture, and however tall a given OEM skin makes either) instead of assuming a fixed guess
+ * happens to already cover it. See [NAV_BAR_RESERVED_HEIGHT]'s own doc comment for the full story. */
+@Composable
+fun navBarClearance(): Dp = NAV_BAR_RESERVED_HEIGHT + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
 
 @Composable
@@ -236,6 +257,11 @@ private fun FloatingNavBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            // Real system nav bar inset first (so the pill sits clear of it on every device, not
+            // just this one, where the fixed 16dp below happened to already be enough), then this
+            // bar's own fixed visual margin on top of that — see NAV_BAR_RESERVED_HEIGHT's doc
+            // comment for the full story.
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         Surface(
@@ -602,10 +628,10 @@ fun HomeScreen(
             Spacer(Modifier.height(24.dp))
             HomeTipsCarousel()
 
-            // Matches NAV_BAR_RESERVED_HEIGHT below — content needs to be able to scroll clear
+            // Matches navBarClearance() below — content needs to be able to scroll clear
             // of the floating pill now that it overlays on top instead of reserving its own
             // Scaffold-managed space (see MainScreen's own comment on that change).
-            Spacer(Modifier.height(NAV_BAR_RESERVED_HEIGHT))
+            Spacer(Modifier.height(navBarClearance()))
         }
     }
 
@@ -620,7 +646,7 @@ fun HomeScreen(
                 text = { Text("Paste copied link") },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = NAV_BAR_RESERVED_HEIGHT, end = 24.dp),
+                    .padding(bottom = navBarClearance(), end = 24.dp),
             )
         }
     }
