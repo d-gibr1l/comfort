@@ -352,6 +352,24 @@ class DownloadWorker(
                                 if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) candidate else current
                             }
                         }
+                        // gallery-dl's own "no results" outcome — not an [error] line at all (just
+                        // its logger's [info] level), so it silently fell through to the file-path
+                        // branch below and never got captured as a reason. Reproduced live: a tweet
+                        // gallery-dl's guest-token API simply can't see (no [error], just an empty
+                        // result) fell all the way through to savedCount==0's yt-dlp fallback, whose
+                        // own unrelated failure ("No video could be found in this tweet" for a post
+                        // that was actually a picture carousel) was the only thing left to show —
+                        // actively misleading about what really went wrong. Capturing gallery-dl's
+                        // real, empty-handed outcome here first means the "first wins" rule above
+                        // correctly keeps this over yt-dlp's less relevant fallback error, the same
+                        // way a genuine gallery-dl [error] line already would.
+                        GALLERY_DL_NO_RESULTS_LINE.containsMatchIn(line) -> {
+                            lastErrorLine.getAndUpdate { current ->
+                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) {
+                                    "No content found at this link — it may need cookies for a logged-in session, or be unavailable"
+                                } else current
+                            }
+                        }
                         // yt-dlp's own non-fatal warnings — never file paths, nothing to act on,
                         // just kept out of the file-path branch below.
                         line.startsWith("[warning] ") -> Unit
@@ -626,6 +644,13 @@ private val REDDIT_SHARE_LINK = Regex("^https?://(www\\.)?reddit\\.com/r/[^/]+/s
 // Instagram failure whose actual root cause (a login redirect) was silently missed by the plain
 // "[error] " prefix check, letting a vaguer fallback error overwrite it instead.
 private val GALLERY_DL_ERROR_LINE = Regex("^\\[[\\w.]+\\]\\[error\\] ")
+
+// Same "[<extractor>][<level>] " shape as GALLERY_DL_ERROR_LINE above, but at gallery-dl's own
+// [info] level — its logger genuinely doesn't treat "found nothing" as an error, so this never
+// reaches GALLERY_DL_ERROR_LINE at all. See the actualCallback branch that uses this for the full
+// story (a real access failure reported this way, then masked by a less useful yt-dlp fallback
+// error).
+private val GALLERY_DL_NO_RESULTS_LINE = Regex("^\\[[\\w.]+\\]\\[info\\] No results for ")
 
 /** Reddit's mobile Share button produces a `reddit.com/r/<sub>/s/<code>` short link that 302s to
  * the real `/comments/...` post URL — the bundled yt-dlp's Reddit extractor only recognizes
