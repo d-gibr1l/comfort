@@ -19,8 +19,12 @@ import com.comfort.app.util.PythonRuntime
 import com.comfort.app.util.QuickJsRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -60,8 +64,21 @@ private suspend fun CoroutineWorker.setForegroundSafely(info: ForegroundInfo) {
  * so it keeps respecting a concurrency-limit change made mid-session without needing to recreate or
  * resize anything — each wait iteration re-reads the current preference value fresh. */
 private object DownloadConcurrencyGate {
-    private const val POLL_INTERVAL_MS = 500L
+    // Fallback only now, not the steady-state wait — a waiter normally wakes the instant
+    // slotFreed fires below, so this only actually matters for the one case that can't signal
+    // itself: the user *raising* the concurrency limit in Settings while every existing slot is
+    // still legitimately busy (nothing released, so there's nothing for release() to emit).
+    // Reproduced-anti-pattern this replaces: the previous version polled on this same 500ms
+    // interval *unconditionally*, waking every waiting worker twice a second for the entire time
+    // it sat at the concurrency limit regardless of whether anything had actually changed.
+    private const val POLL_FALLBACK_MS = 5_000L
     private val active = AtomicInteger(0)
+
+    // release() emits here; a suspended acquire() wakes on the very next line instead of waiting
+    // out whatever's left of a fixed poll interval. DROP_OLDEST + capacity 1 because this is a
+    // pure "something changed, go recheck the real state" signal, not a value in itself — a
+    // waiter that's about to recheck anyway doesn't need every past release queued up for it.
+    private val slotFreed = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     suspend fun acquire(context: Context) {
         while (true) {
@@ -69,19 +86,20 @@ private object DownloadConcurrencyGate {
             // Not perfectly atomic against another waiter passing this same check at the same
             // moment — worst case briefly overshoots the limit by however many racing waiters all
             // read a stale "still under limit" value together, and self-corrects on the very next
-            // poll once their increments are visible. An acceptable trade for not needing a real
-            // lock around a value that has to be re-read fresh from preferences every iteration
-            // anyway (a plain Semaphore can't be resized once constructed).
+            // recheck once their increments are visible. An acceptable trade for not needing a
+            // real lock around a value that has to be re-read fresh from preferences every
+            // iteration anyway (a plain Semaphore can't be resized once constructed).
             if (active.get() < limit) {
                 active.incrementAndGet()
                 return
             }
-            delay(POLL_INTERVAL_MS)
+            withTimeoutOrNull(POLL_FALLBACK_MS) { slotFreed.first() }
         }
     }
 
     fun release() {
         active.updateAndGet { (it - 1).coerceAtLeast(0) }
+        slotFreed.tryEmit(Unit)
     }
 }
 
