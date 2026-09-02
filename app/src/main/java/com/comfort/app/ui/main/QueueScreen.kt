@@ -226,7 +226,15 @@ fun QueueScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                // Only the top inset from Scaffold — same reasoning as Library's own Scaffold
+                // (DownloadsHistoryScreen.kt), which this used to differ from. Applying the whole
+                // paddingValues here (including its own bottom inset, auto-reserved to clear the
+                // floatingActionButton) and then ALSO adding navBarClearance() as the LazyColumn's
+                // own bottom contentPadding below double-reserved bottom space — reproduced live:
+                // the last card ended up sitting much further from the Retry All FAB than Library's
+                // own last row sits from its floating nav bar, for no visual reason. The
+                // LazyColumn's own bottom contentPadding is the sole source of bottom clearance now.
+                .padding(top = paddingValues.calculateTopPadding())
         ) {
             LazyRow(
                 // contentPadding (not an outer Modifier.padding) so the scrollable viewport spans
