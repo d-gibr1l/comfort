@@ -21,10 +21,21 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE status = 'DELETED' ORDER BY dateAdded DESC")
     fun getDeletedFlow(): Flow<List<DownloadEntity>>
 
+    // ERRORED first (rank 0, everything else rank 1) so a failed download always surfaces at the
+    // top instead of wherever plain chronological order happened to leave it — reproduced live: a
+    // download that fails immediately keeps the queueOrder/dateAdded of when it was *added*, which
+    // in a long queue buries it off-screen at the bottom, easy to miss entirely. Within each rank,
     // queueOrder first so "Start now" (which jumps a waiting download to a very negative order)
-    // moves it to the top regardless of when it was added; dateAdded as the tiebreaker keeps
-    // everything else in plain oldest-added-first/newest-added-last order.
-    @Query("SELECT * FROM downloads WHERE status NOT IN ('FINISHED', 'SAVED', 'DELETED') ORDER BY queueOrder ASC, dateAdded ASC")
+    // still moves it to the top of the non-errored group regardless of when it was added;
+    // dateAdded as the tiebreaker keeps everything else in plain oldest-added-first order.
+    @Query("""
+        SELECT * FROM downloads
+        WHERE status NOT IN ('FINISHED', 'SAVED', 'DELETED')
+        ORDER BY
+            CASE WHEN status = 'ERRORED' THEN 0 ELSE 1 END ASC,
+            queueOrder ASC,
+            dateAdded ASC
+    """)
     fun getQueueFlow(): Flow<List<DownloadEntity>>
 
     /** Bumps a still-waiting download to the front of the queue — see [DownloadDispatcher.startNow]. */
