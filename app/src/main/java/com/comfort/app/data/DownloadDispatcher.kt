@@ -144,18 +144,30 @@ object DownloadDispatcher {
     /** Cancels the in-flight WorkManager job (if any) and marks the entry paused — distinct from
      * [cancelDownload] so a global pauseAll()/resumeAll() cycle only ever touches downloads it
      * itself held back, never ones the user explicitly cancelled. Callable from anywhere — the
-     * ViewModel, or a notification action's BroadcastReceiver with no Activity. */
-    suspend fun pauseDownload(context: Context, id: String) {
+     * ViewModel, or a notification action's BroadcastReceiver with no Activity.
+     *
+     * [notify] false skips replacing the notification with a static "Paused" one — pauseAll()
+     * passes this for every item in its own loop, since leaving one behind *per download* would
+     * turn a single "Pause All" tap on a large queue into a stack of individual notifications, one
+     * per paused item. The single-item paths (the in-app Pause button, the notification's own
+     * Pause action) still want it, so this defaults to true rather than pauseAll() needing its own
+     * separate cleanup pass. */
+    suspend fun pauseDownload(context: Context, id: String, notify: Boolean = true) {
         withDownloadLock(id) {
             val dao = AppDatabase.getDatabase(context).downloadDao()
             val entity = dao.getById(id) ?: return@withDownloadLock
             cancelWorkManagerJob(context, entity.workRequestId)
             dao.updateStatus(id, DownloadStatus.PAUSED)
             dao.resetSpeed(id)
-            // A static "Paused" notification with its own Resume action, not cancel() — tapping
-            // Pause right from the notification used to make it vanish outright, with no way back
-            // to the download short of opening the app and finding it in Queue by hand.
-            DownloadNotifications.notifyPaused(context, id, entity.title)
+            if (notify) {
+                // A static "Paused" notification with its own Resume action, not cancel() —
+                // tapping Pause right from the notification used to make it vanish outright, with
+                // no way back to the download short of opening the app and finding it in Queue by
+                // hand.
+                DownloadNotifications.notifyPaused(context, id, entity.title)
+            } else {
+                DownloadNotifications.cancel(context, id)
+            }
         }
         // Reproduced live: pausing a *running* download silently orphaned everything else queued
         // behind it in the same round-robin lane. Each lane is a real WorkManager dependency chain

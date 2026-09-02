@@ -76,7 +76,9 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             GalleryDlPreferences.setGloballyPaused(context, true)
             queueFlow.value
                 .filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED }
-                .forEach { entity -> DownloadDispatcher.pauseDownload(context, entity.id) }
+                // notify = false — a per-item "Paused" notification for every download in a large
+                // queue would turn one "Pause All" tap into a stack of individual notifications.
+                .forEach { entity -> DownloadDispatcher.pauseDownload(context, entity.id, notify = false) }
         }
     }
 
