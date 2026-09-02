@@ -150,7 +150,16 @@ object GalleryDlPreferences {
     }
 
     fun setSpeedLimit(context: Context, limit: String) {
-        prefs(context).edit().putString(KEY_SPEED_LIMIT, limit.trim()).apply()
+        // Both engines' parsers are strict about the unit suffix being a single letter (k/M/G) —
+        // gallery-dl's own --limit-rate parser raises outright on "500kb"/"2MB", and yt_dlp_
+        // wrapper.py's own _parse_rate() regex (^\s*([\d.]+)\s*([kKmMgG]?)\s*$) just as strictly
+        // fails to match, silently dropping the limit instead. The UI hint says "500k"/"2M", but
+        // typing the trailing "B" out of habit (a very natural thing to type for a byte unit) used
+        // to fatally break gallery-dl's own downloads and silently no-op yt-dlp's. Stripping one
+        // trailing b/B here (not deeper validation — this is the one specific, reported failure
+        // shape) shields both engines from it before it's ever persisted or handed to either.
+        val sanitized = limit.trim().replace(Regex("(?i)b$"), "")
+        prefs(context).edit().putString(KEY_SPEED_LIMIT, sanitized).apply()
     }
 
     /** A user-chosen SAF folder to save downloads into, or null to use the default
