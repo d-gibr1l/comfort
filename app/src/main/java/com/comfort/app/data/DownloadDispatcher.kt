@@ -322,6 +322,12 @@ object DownloadDispatcher {
         enqueueWork(context, id, entity.url, forceImmediate = true)
     }
 
+    /** Whether the configured schedule window (if any) currently allows downloading — the
+     * complement of [scheduleDelayMillis] returning 0, pulled out under its own name for
+     * DownloadWorker's own mid-download bleed-over check (see its actualCallback), which reads
+     * much more clearly as "are we still inside the window" than "is the delay zero." */
+    fun isWithinScheduleWindow(context: Context): Boolean = scheduleDelayMillis(context) == 0L
+
     /** Millis until the configured download window next opens, or 0 if downloads are allowed right now. */
     fun scheduleDelayMillis(context: Context): Long {
         if (!GalleryDlPreferences.isScheduleEnabled(context)) return 0L
