@@ -1459,11 +1459,37 @@ private fun AboutScreen(onBack: () -> Unit) {
 
         EnginesSection()
 
-        SettingsSection(title = "Links", icon = FeatherIcons.Link) {
+        // gallery-dl was the only credit here before — a real gap for an app that's really built on
+        // five separately-licensed open-source projects, not one: yt-dlp does just as much of the
+        // actual downloading (see VideoSiteRouter), and PythonRuntime's own doc comment describes
+        // running YTDLnis's published interpreter/curl_cffi build as a subprocess, FFmpeg
+        // (FfmpegRuntime) merging video/audio, and QuickJS (QuickJsRuntime) solving yt-dlp's JS
+        // challenges — none of them previously credited or linked anywhere in the app.
+        SettingsSection(title = "Credits", icon = FeatherIcons.Link) {
             LinkRow(
                 icon = FeatherIcons.Code,
-                title = "gallery-dl source code",
+                title = "gallery-dl",
                 url = "https://github.com/mikf/gallery-dl",
+            )
+            LinkRow(
+                icon = FeatherIcons.Terminal,
+                title = "yt-dlp",
+                url = "https://github.com/yt-dlp/yt-dlp",
+            )
+            LinkRow(
+                icon = FeatherIcons.Film,
+                title = "FFmpeg",
+                url = "https://ffmpeg.org",
+            )
+            LinkRow(
+                icon = FeatherIcons.Cpu,
+                title = "QuickJS",
+                url = "https://bellard.org/quickjs/",
+            )
+            LinkRow(
+                icon = FeatherIcons.Package,
+                title = "YTDLnis Python runtime (curl_cffi build)",
+                url = "https://github.com/deniscerri/ytdlnis-packages",
             )
         }
     }
