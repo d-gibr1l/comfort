@@ -171,7 +171,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
             // Clears the floating nav pill overlaying this screen (see MainScreen's own comment
             // on why it overlays instead of reserving Scaffold space) so this list can scroll
             // fully clear of it instead of ending up hidden behind.
-            Spacer(Modifier.height(NAV_BAR_RESERVED_HEIGHT))
+            Spacer(Modifier.height(navBarClearance()))
         }
     }
 }
@@ -270,8 +270,11 @@ private fun SettingsSubScaffold(
                 // Extra bottom inset beyond the normal 20dp: the floating nav bar overlays the
                 // bottom of the screen without reserving space, so without this the last section
                 // (e.g. Schedule's Start/End time buttons) scrolls to right underneath it and is
-                // unreachable/unreadable.
-                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 120.dp),
+                // unreachable/unreadable. navBarClearance() (not a flat guess) so this also clears
+                // the real system nav bar inset on devices where it's taller than this app's own
+                // pill assumed — see its own doc comment (MainScreen.kt) for the full story. Used
+                // by every settings sub-page through this one shared scaffold.
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + navBarClearance()),
             verticalArrangement = Arrangement.spacedBy(24.dp),
             content = content,
         )

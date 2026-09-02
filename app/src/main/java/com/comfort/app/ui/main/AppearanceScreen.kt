@@ -205,7 +205,7 @@ fun AppearanceScreen(onBack: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.height(NAV_BAR_RESERVED_HEIGHT))
+            Spacer(Modifier.height(navBarClearance()))
         }
     }
 }

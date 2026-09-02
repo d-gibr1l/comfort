@@ -279,8 +279,11 @@ fun QueueScreen(
                     // Extra bottom inset beyond the normal 16dp: the Pause/Resume/Retry All FAB
                     // floats over the content rather than reserving space for itself, so without
                     // this the last card(s) end up scrolled underneath it, partly unreadable and
-                    // with their own action buttons unreachable.
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp),
+                    // with their own action buttons unreachable. navBarClearance() (not a flat
+                    // 100dp guess) so this also clears the real system nav bar inset on devices
+                    // where it's taller than this app's own FAB assumed — see its doc comment
+                    // (MainScreen.kt) for the full story.
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = navBarClearance()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {

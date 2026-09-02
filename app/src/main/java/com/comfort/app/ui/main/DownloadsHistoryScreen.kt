@@ -324,7 +324,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,
-                contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), start = 8.dp, end = 8.dp, bottom = NAV_BAR_RESERVED_HEIGHT),
+                contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), start = 8.dp, end = 8.dp, bottom = navBarClearance()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -359,7 +359,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         } else {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = NAV_BAR_RESERVED_HEIGHT),
+                contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(visibleItems, key = { it.id }) { item ->
