@@ -14,6 +14,11 @@ class DownloadActionReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_PAUSE = "com.comfort.app.action.PAUSE_DOWNLOAD"
         const val ACTION_CANCEL = "com.comfort.app.action.CANCEL_DOWNLOAD"
+        // The "Resume" action on the static paused notification (see DownloadNotifications.
+        // notifyPaused) — the pause/cancel actions above only ever act on something already
+        // running, so this is the first action here that has to re-submit a WorkManager job
+        // rather than just stop one.
+        const val ACTION_RESUME = "com.comfort.app.action.RESUME_DOWNLOAD"
         const val EXTRA_DOWNLOAD_ID = "downloadId"
     }
 
@@ -26,6 +31,7 @@ class DownloadActionReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     ACTION_PAUSE -> DownloadDispatcher.pauseDownload(appContext, id)
                     ACTION_CANCEL -> DownloadDispatcher.cancelDownload(appContext, id)
+                    ACTION_RESUME -> DownloadDispatcher.resumeDownload(appContext, id)
                 }
             } finally {
                 pendingResult.finish()
