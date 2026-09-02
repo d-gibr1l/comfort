@@ -12,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -65,19 +67,26 @@ object PythonRuntime {
         return File(dir).takeIf { it.exists() }
     }
 
+    // Guards the unpack-everything critical section below. Without this, two downloads starting
+    // at once right after an app update (PROVISION_VERSION bumped, marker stale) both see the
+    // stale marker, both proceed into root.deleteRecursively() + unzip concurrently, and clobber
+    // each other's writes — a real corruption risk, not just a wasted duplicate unzip, since one
+    // coroutine's deleteRecursively() can run while the other is mid-write into the same tree.
+    private val provisionMutex = Mutex()
+
     /** True once the interpreter tree + our own packages are unpacked and ready to run. Cheap to
      * call repeatedly — only actually does work the first time (or after [PROVISION_VERSION]
      * changes). */
-    fun ensureProvisioned(context: Context): Boolean {
-        val nativeLibDir = helperNativeLibDir(context) ?: return false
+    suspend fun ensureProvisioned(context: Context): Boolean = provisionMutex.withLock {
+        val nativeLibDir = helperNativeLibDir(context) ?: return@withLock false
         val root = runtimeRoot(context)
         val marker = File(root, PROVISION_MARKER)
         if (marker.exists() && runCatching { marker.readText() }.getOrNull() == PROVISION_VERSION) {
-            return true
+            return@withLock true
         }
 
         val zipSo = File(nativeLibDir, "libpython.zip.so")
-        if (!zipSo.exists()) return false
+        if (!zipSo.exists()) return@withLock false
 
         root.deleteRecursively()
         root.mkdirs()
@@ -104,7 +113,7 @@ object PythonRuntime {
         }
 
         marker.writeText(PROVISION_VERSION)
-        return true
+        true
     }
 
     // internal, not private — EngineUpdater.kt reuses this to unpack a freshly downloaded engine
