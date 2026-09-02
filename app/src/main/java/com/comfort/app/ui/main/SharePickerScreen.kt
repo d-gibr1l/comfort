@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
@@ -341,17 +342,36 @@ fun SharePickerScreen(
                 ListingState.LOADED -> {
                     Column(modifier = Modifier.fillMaxSize()) {
                         if (hasVideoItems) {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Column(modifier = Modifier.padding(vertical = 8.dp)) {
                                 Text(
                                     "Video quality",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 Row(
+                                    // Bleed past this section's own 16dp side margin (pulled out of
+                                    // the parent Column above, which used to apply it around both
+                                    // this row and the label) so the scrollable viewport spans the
+                                    // full screen width instead of stopping short at that margin on
+                                    // either side — same bug/fix as the Downloads settings page's
+                                    // own Video quality row (MoreScreen.kt) and Home's
+                                    // Recently-downloaded strip (MainScreen.kt): a trailing
+                                    // Modifier.padding() looks identical at rest but caps the row's
+                                    // own scrollable width, a bleed measured via a custom layout{}
+                                    // plus content padding *after* horizontalScroll() doesn't.
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
+                                        .layout { measurable, constraints ->
+                                            val bleed = 16.dp.roundToPx()
+                                            val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
+                                            layout(placeable.width - bleed * 2, placeable.height) {
+                                                placeable.placeRelative(-bleed, 0)
+                                            }
+                                        }
+                                        .horizontalScroll(rememberScrollState())
+                                        .padding(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     VideoQuality.entries.forEach { quality ->
