@@ -631,6 +631,7 @@ class DownloadWorker(
                         ?: "No downloadable content found at this link"
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
+                    DownloadDispatcher.forgetLock(downloadId)
                     // Result.success(), not failure() — see the isStopped branch above for why:
                     // this download's own ERRORED status is already recorded in our DB; returning
                     // failure() here would additionally auto-kill every other download still
@@ -641,6 +642,7 @@ class DownloadWorker(
                 dao.updateStatus(downloadId, DownloadStatus.FINISHED)
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
                 DownloadNotifications.notifyFinished(applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail)
+                DownloadDispatcher.forgetLock(downloadId)
                 Result.success()
             } catch (e: CancellationException) {
                 // A paused/cancelled download: leave whatever status pauseDownload()/cancelDownload()
@@ -660,6 +662,7 @@ class DownloadWorker(
                     val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it) }
                     dao.updateError(downloadId, DownloadStatus.ERRORED, sanitized)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, sanitized)
+                    DownloadDispatcher.forgetLock(downloadId)
                     Result.success()
                 }
             }
