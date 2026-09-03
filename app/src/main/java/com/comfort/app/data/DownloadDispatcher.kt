@@ -48,6 +48,18 @@ object DownloadDispatcher {
         // computeIfAbsent() is the JDK's real atomic check-and-set.
         locks.computeIfAbsent(id) { Mutex() }.withLock { block() }
 
+    /** Drops a download's entry from [locks] once it can no longer be enqueued/paused/cancelled
+     * again — a row that's been deleted, or that reached a terminal FINISHED/ERRORED state.
+     * Every download id otherwise lives in that map forever (it's only ever added to, never
+     * removed), permanently retaining a String + Mutex per download the app has ever run. Called
+     * outside of [withDownloadLock] itself, so there's a theoretically possible sliver of a race
+     * with a call that's just about to computeIfAbsent() the same id (it would get a fresh, already
+     * unlocked Mutex slightly early) — harmless here since this only ever runs once an id is truly
+     * done, and the fresh Mutex still serializes whatever comes next correctly either way. */
+    fun forgetLock(id: String) {
+        locks.remove(id)
+    }
+
     private fun cancelWorkManagerJob(context: Context, workRequestId: String?) {
         workRequestId?.let { runCatching { UUID.fromString(it) } }?.getOrNull()?.let { uuid ->
             WorkManager.getInstance(context).cancelWorkById(uuid)
@@ -292,6 +304,7 @@ object DownloadDispatcher {
         deleteStagingDir(context, id)
         dao.clearDownloadedFileRecords(id)
         dao.delete(id)
+        forgetLock(id)
     }
 
     /** Re-submits every not-yet-started download's WorkManager job so it recomputes its delay
