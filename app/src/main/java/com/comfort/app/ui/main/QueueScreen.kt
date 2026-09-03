@@ -77,7 +77,7 @@ fun QueueScreen(
     // connected but never validated by the OS (some hotspot/captive-portal setups never do).
     val isNetworkAvailable = rememberIsNetworkAvailable()
     var selectedFilter by remember { mutableStateOf("Running") }
-    val filters = listOf("Running", "In Queue", "Paused", "Errored", "Cancelled")
+    val filters = listOf("Running", "In Queue", "Scheduled", "Paused", "Errored", "Cancelled")
 
     // Multi-select: entered via a long-press on any card's thumbnail (see QueueItemCard/StoppedRow),
     // not a dedicated mode toggle — matches how the request was framed ("make cards selectable by
@@ -124,7 +124,8 @@ fun QueueScreen(
     val filteredItems = queueItems.filter { item ->
         when (selectedFilter) {
             "Running" -> item.status == DownloadStatus.RUNNING
-            "In Queue" -> item.status == DownloadStatus.QUEUED || item.status == DownloadStatus.SCHEDULED
+            "In Queue" -> item.status == DownloadStatus.QUEUED
+            "Scheduled" -> item.status == DownloadStatus.SCHEDULED
             "Paused" -> item.status == DownloadStatus.PAUSED
             "Errored" -> item.status == DownloadStatus.ERRORED
             "Cancelled" -> item.status == DownloadStatus.CANCELLED
@@ -261,7 +262,8 @@ fun QueueScreen(
                 items(filters) { filter ->
                     val count = when (filter) {
                         "Running" -> queueItems.count { it.status == DownloadStatus.RUNNING }
-                        "In Queue" -> queueItems.count { it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED }
+                        "In Queue" -> queueItems.count { it.status == DownloadStatus.QUEUED }
+                        "Scheduled" -> queueItems.count { it.status == DownloadStatus.SCHEDULED }
                         "Paused" -> queueItems.count { it.status == DownloadStatus.PAUSED }
                         "Errored" -> queueItems.count { it.status == DownloadStatus.ERRORED }
                         "Cancelled" -> queueItems.count { it.status == DownloadStatus.CANCELLED }
