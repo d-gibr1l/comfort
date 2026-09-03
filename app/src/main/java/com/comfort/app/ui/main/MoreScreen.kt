@@ -2,6 +2,8 @@ package com.comfort.app.ui.main
 
 import android.content.Intent
 import android.net.Uri
+import android.os.PowerManager
+import android.provider.Settings
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -318,6 +320,25 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
             GalleryDlPreferences.setDownloadLocationUri(context, uri)
         }
     }
+
+    // A download forced past the schedule window (Start Now) requests setExpedited(), but Android
+    // grants each app only a limited expedited-job quota — once a burst of Start Now taps burns
+    // through it, the next one silently falls back to a plain background job instead of erroring.
+    // A plain background job is exactly the kind of work Battery Saver + the app being backgrounded
+    // is allowed to hold indefinitely (reproduced live: one sat QUEUED with its own real
+    // workRequestId assigned, but DownloadWorker.doWork() was never actually invoked for it).
+    // Whitelisting the app from battery optimization exempts it from that background-network block
+    // entirely, the same fix standard Android download managers point users to for this exact class
+    // of stall. Re-read (not just set once) via the launcher's callback below, since the user grants
+    // or denies this from a system dialog this screen has no other way to observe returning from.
+    fun isIgnoringBatteryOptimizations(): Boolean {
+        val powerManager = context.getSystemService(PowerManager::class.java) ?: return true
+        return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    }
+    var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations()) }
+    val batteryOptimizationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }
 
     SettingsSubScaffold(title = "Downloads", onBack = onBack) {
         SettingsSection(title = "Filename format", icon = FeatherIcons.Type) {
@@ -732,6 +753,45 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                             )
                         }
                     }
+                }
+            }
+        }
+
+        SettingsSection(title = "Reliability", icon = FeatherIcons.Zap) {
+            if (batteryUnrestricted) {
+                StatusRow(FeatherIcons.CheckCircle, "Unrestricted — downloads can keep running in the background.", MaterialTheme.colorScheme.primary)
+            } else {
+                Text(
+                    "Unrestricted background activity",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Without this, Android's Battery Saver can silently freeze a download that's " +
+                        "waiting to start once the app is backgrounded — especially after \"Start now\" " +
+                        "is tapped several times in a row. Recommended if downloads seem to get stuck.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:${context.packageName}"),
+                        )
+                        // Some OEM skins ship no activity for this action at all despite declaring
+                        // the permission — falls back to the general battery-settings screen rather
+                        // than crashing on startActivity() with no handler.
+                        runCatching { batteryOptimizationLauncher.launch(intent) }
+                            .onFailure { runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(FeatherIcons.Zap, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Allow unrestricted background activity")
                 }
             }
         }
