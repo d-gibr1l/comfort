@@ -116,6 +116,28 @@ object MediaStoreHelper {
         return candidate
     }
 
+    /** Same dedup as [uniqueName] above, against a plain public directory instead of a
+     * DocumentFile — for the legacy API 24-28 path in [saveToMediaStore], which (unlike API 29+'s
+     * MediaStore insert() and this same uniqueName() on the SAF custom-folder path) used to write
+     * straight to `File(publicDir, sourceFile.name)` with no existence check at all: a filename
+     * collision silently overwrote the older file's bytes in place, then inserted a *second*
+     * MediaStore row pointing at that same now-shared path — a duplicate gallery entry sitting on
+     * top of clobbered content instead of its own. */
+    private fun uniqueFile(dir: File, name: String): File {
+        val candidate0 = File(dir, name)
+        if (!candidate0.exists()) return candidate0
+        val dot = name.lastIndexOf('.')
+        val base = if (dot > 0) name.substring(0, dot) else name
+        val ext = if (dot > 0) name.substring(dot) else ""
+        var index = 1
+        var candidate: File
+        do {
+            candidate = File(dir, "$base ($index)$ext")
+            index++
+        } while (candidate.exists())
+        return candidate
+    }
+
     private fun saveToMediaStore(context: Context, sourceFile: File, mimeType: String): Uri? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Real .mkv used to get flat-out rejected by MediaStore's own insert() with its honest
@@ -138,7 +160,7 @@ object MediaStoreHelper {
             )
             val publicDir = File(publicRoot, "Comfort")
             if (!publicDir.exists()) publicDir.mkdirs()
-            val destFile = File(publicDir, sourceFile.name)
+            val destFile = uniqueFile(publicDir, sourceFile.name)
             sourceFile.inputStream().use { input ->
                 destFile.outputStream().use { output -> input.copyTo(output) }
             }
