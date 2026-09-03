@@ -85,13 +85,38 @@ class ShareActivity : ComponentActivity() {
             intent.action == Intent.ACTION_VIEW -> intent.dataString
             else -> null
         }
-        val matcher = sharedText?.let { Patterns.WEB_URL.matcher(it) }
-        val url = if (matcher != null && matcher.find()) sharedText.substring(matcher.start(), matcher.end()) else null
+        // while(find()), not a single if — used to stop at the first match, so sharing a block of
+        // text with two separate links (e.g. a text message with two TikTok URLs) silently
+        // discarded the second one. Every match is collected the same way, in the order they
+        // appear in the text.
+        val urls = mutableListOf<String>()
+        if (sharedText != null) {
+            val matcher = Patterns.WEB_URL.matcher(sharedText)
+            while (matcher.find()) urls.add(sharedText.substring(matcher.start(), matcher.end()))
+        }
 
-        if (url == null) {
+        if (urls.isEmpty()) {
             finish()
             return
         }
+
+        if (urls.size > 1) {
+            // Multiple links: the picker sheet below is built around reviewing/filtering exactly
+            // one link's own gallery, and stacking one sheet per link would be terrible UX — so
+            // this bypasses it (and the "Instant download" preference, which only ever gated
+            // whether *one* link's sheet appears) and just enqueues every link found, the same
+            // direct way Instant Download already handles a single link.
+            lifecycleScope.launch {
+                urls.forEach { sharedUrl ->
+                    DownloadDispatcher.enqueueDownload(applicationContext, sharedUrl, "Downloading from ${VideoSiteRouter.siteName(sharedUrl)}")
+                }
+                Toast.makeText(applicationContext, "${urls.size} downloads started", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+            return
+        }
+
+        val url = urls[0]
 
         if (GalleryDlPreferences.isInstantShareEnabled(this)) {
             // No sheet, no frame ever drawn — just enqueue in the background and close.
