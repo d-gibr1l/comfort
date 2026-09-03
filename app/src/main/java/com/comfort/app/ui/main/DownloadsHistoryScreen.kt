@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
@@ -65,10 +66,10 @@ private enum class LibrarySort(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Unit, isQueueOpen: Boolean = false) {
-    val historyItems by viewModel.historyFlow.collectAsState()
-    val deletedItems by viewModel.deletedFlow.collectAsState()
-    val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsState()
-    val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsState()
+    val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
+    val deletedItems by viewModel.deletedFlow.collectAsStateWithLifecycle()
+    val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsStateWithLifecycle()
+    val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
