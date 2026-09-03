@@ -297,6 +297,14 @@ class DownloadWorker(
                 // cancellation of this same job takes a moment to actually propagate back in.
                 val lastScheduleCheckMs = AtomicLong(0L)
                 val scheduleClosedPauseRequested = AtomicBoolean(false)
+                // A negative queueOrder is startNow()'s own marker for "the user explicitly jumped
+                // this past the schedule window" (see DownloadDispatcher.startNow/repairIfJobDead).
+                // Without this, the periodic check below would pause a Start-Now'd download within
+                // its first minute anyway the instant the window happens to already be closed —
+                // silently undoing the very override the user just tapped. Snapshotted once from the
+                // entity fetched at the top of doWork(), not re-read live, so this exemption covers
+                // this entire run exactly like the initial forceImmediate skip already did.
+                val startedViaStartNow = (entity?.queueOrder ?: 0) < 0
 
                 // suspend, not a plain lambda — PythonRuntime's onLine has no JNI-reentrancy
                 // constraint (unlike Chaquopy's old synchronous callback), so every DB write below
@@ -305,7 +313,7 @@ class DownloadWorker(
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     android.util.Log.d("DownloadEngine", "Python output: $line")
 
-                    if (!scheduleClosedPauseRequested.get()) {
+                    if (!scheduleClosedPauseRequested.get() && !startedViaStartNow) {
                         val now = System.currentTimeMillis()
                         val last = lastScheduleCheckMs.get()
                         if (now - last >= 60_000L && lastScheduleCheckMs.compareAndSet(last, now)) {
