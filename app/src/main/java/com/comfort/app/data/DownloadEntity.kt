@@ -1,14 +1,30 @@
 package com.comfort.app.data
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
 
 enum class DownloadStatus {
     RUNNING, QUEUED, SCHEDULED, PAUSED, CANCELLED, ERRORED, FINISHED, SAVED, DELETED
 }
 
-@Entity(tableName = "downloads")
+// DownloadWorker calls updateLiveBytes multiple times a second while anything is RUNNING, and
+// every one of those writes invalidates every Flow query below (getQueueFlow/getHistoryFlow/
+// getDeletedFlow) regardless of which rows actually changed — Room re-runs each one to check.
+// Without an index matching a query's own status/order columns, that re-run is a full table scan
+// *and* a full sort (SQLite's own "Filesort") over the whole downloads table, up to ~10 times a
+// second, entirely on a background thread but still real, silent CPU churn that compounds as
+// history grows. These two match getHistoryFlow/getDeletedFlow's own WHERE status = ...
+// ORDER BY dateAdded shape, and getQueueFlow's WHERE status NOT IN (...) ORDER BY queueOrder,
+// dateAdded shape, respectively — see MIGRATION_9_10 in AppDatabase.kt for the matching migration.
+@Entity(
+    tableName = "downloads",
+    indices = [
+        Index(value = ["status", "dateAdded"]),
+        Index(value = ["status", "queueOrder", "dateAdded"]),
+    ],
+)
 data class DownloadEntity(
     @PrimaryKey val id: String,
     val url: String,

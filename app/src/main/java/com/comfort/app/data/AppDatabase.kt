@@ -38,7 +38,18 @@ private val MIGRATION_8_9 = object : Migration(8, 9) {
     }
 }
 
-@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 9, exportSchema = false)
+// Adds the two indices DownloadEntity now declares (see its own doc comment on why) — CREATE
+// INDEX, not ALTER TABLE, and named to match Room's own default index-naming convention
+// (index_<table>_<col1>_<col2>...) exactly, so Room's schema validation at startup sees the
+// resulting table matching what the annotated entity expects instead of flagging a mismatch.
+private val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_status_dateAdded` ON `downloads` (`status`, `dateAdded`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_status_queueOrder_dateAdded` ON `downloads` (`status`, `queueOrder`, `dateAdded`)")
+    }
+}
+
+@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 10, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
@@ -49,7 +60,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration
                     // above instead, so this never actually triggers and wipes the user's
