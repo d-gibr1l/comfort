@@ -74,6 +74,12 @@ object PythonRuntime {
     // coroutine's deleteRecursively() can run while the other is mid-write into the same tree.
     private val provisionMutex = Mutex()
 
+    /** Lets EngineUpdater share this same critical section when it replaces an engine's
+     * site-packages contents in place — same corruption risk as two ensureProvisioned() calls
+     * racing each other, just between an update's delete+unzip and a concurrent first-ever
+     * provision instead of two provisions. */
+    suspend fun <T> withProvisionLock(block: suspend () -> T): T = provisionMutex.withLock { block() }
+
     /** True once the interpreter tree + our own packages are unpacked and ready to run. Cheap to
      * call repeatedly — only actually does work the first time (or after [PROVISION_VERSION]
      * changes). */

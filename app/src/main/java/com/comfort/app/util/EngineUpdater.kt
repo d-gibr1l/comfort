@@ -1,6 +1,7 @@
 package com.comfort.app.util
 
 import android.content.Context
+import com.comfort.app.data.AppDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -105,6 +106,16 @@ object EngineUpdater {
     suspend fun update(context: Context, engine: EngineInfo, wheelUrl: String, sha256: String?): Result<String> =
         withContext(Dispatchers.IO) {
             runCatching {
+                // Refuse outright rather than let it race an active download: Python lazy-loads
+                // modules (yt-dlp's extractors especially), so deleting and replacing an engine's
+                // package directory out from under a running download crashes it with a
+                // ModuleNotFoundError the instant it next tries to import anything from here.
+                // Checked fresh right before acting (not cached), since "no downloads running" can
+                // stop being true between when the user opened this screen and when they tapped
+                // Update.
+                if (AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()) {
+                    error("Can't update while a download is running — wait for it to finish first")
+                }
                 if (!PythonRuntime.ensureProvisioned(context)) error("Python runtime isn't provisioned yet")
 
                 val tempFile = File(context.cacheDir, "${engine.packageDirName}_update.whl")
@@ -132,15 +143,22 @@ object EngineUpdater {
                     }
                 }
 
-                val sitePackages = PythonRuntime.sitePackagesDir(context)
-                // The old install first — the new wheel's own contents fully replace the package
-                // and dist-info directories, but a file the *previous* version shipped that the
-                // new one no longer does (a removed submodule, say) would otherwise linger forever.
-                sitePackages.listFiles { f ->
-                    f.name == engine.packageDirName || (f.name.startsWith("${engine.packageDirName}-") && f.name.endsWith(".dist-info"))
-                }?.forEach { it.deleteRecursively() }
+                // Shares PythonRuntime's own provisioning Mutex — without it, this delete+unzip
+                // could race a concurrent first-ever ensureProvisioned() (e.g. a download that
+                // started at the same moment on a fresh install) the same way two provisions could
+                // race each other, clobbering whichever writer loses.
+                PythonRuntime.withProvisionLock {
+                    val sitePackages = PythonRuntime.sitePackagesDir(context)
+                    // The old install first — the new wheel's own contents fully replace the
+                    // package and dist-info directories, but a file the *previous* version shipped
+                    // that the new one no longer does (a removed submodule, say) would otherwise
+                    // linger forever.
+                    sitePackages.listFiles { f ->
+                        f.name == engine.packageDirName || (f.name.startsWith("${engine.packageDirName}-") && f.name.endsWith(".dist-info"))
+                    }?.forEach { it.deleteRecursively() }
 
-                tempFile.inputStream().use { PythonRuntime.unzipStreamTo(it, sitePackages) }
+                    tempFile.inputStream().use { PythonRuntime.unzipStreamTo(it, sitePackages) }
+                }
                 tempFile.delete()
 
                 installedVersion(context, engine) ?: error("Update installed but its version couldn't be read back")
