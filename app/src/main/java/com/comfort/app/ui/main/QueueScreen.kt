@@ -77,6 +77,15 @@ fun QueueScreen(
     // sitting on an unsatisfied CONNECTIVITY constraint because the current Wi-Fi network was
     // connected but never validated by the OS (some hotspot/captive-portal setups never do).
     val isNetworkAvailable = rememberIsNetworkAvailable()
+    // Hoisted here, not inside each card's own `remember(item.id)` below — a LazyColumn destroys
+    // and recreates an item's composable as it scrolls off-screen and back on, which reset a
+    // purely-local remember back to its initial "not yet animated" state every time. Reproduced
+    // live: the whole visible list kept re-playing its slide-up entrance animation on every scroll
+    // up/down, not just once when a card was genuinely new. This map, owned by the screen instead
+    // of the item, remembers which ids have already played their entrance once and never resets —
+    // Modifier.animateItem() below already handles the smooth reflow/removal animation on its own,
+    // so this only ever needs to gate the one-time entrance.
+    val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
     var selectedFilter by remember { mutableStateOf("Running") }
     val filters = listOf("Running", "In Queue", "Scheduled", "Paused", "Errored", "Cancelled")
 
@@ -320,7 +329,10 @@ fun QueueScreen(
                         // out and slide the rest up to fill the gap" half of this is entirely
                         // animateItem()'s own built-in fade-out + placement animation below, not
                         // this AnimatedVisibility's exit (deliberately ExitTransition.None).
-                        val visibleState = remember(item.id) { MutableTransitionState(false).apply { targetState = true } }
+                        val visibleState = remember(item.id) {
+                            MutableTransitionState(alreadyAnimatedIds.containsKey(item.id)).apply { targetState = true }
+                        }
+                        SideEffect { alreadyAnimatedIds[item.id] = true }
                         val isSelected = item.id in selectedIds
                         val row = @Composable {
                             if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED) {
