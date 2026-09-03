@@ -220,12 +220,23 @@ object DownloadNotifications {
 
         if (thumbnailUri != null) {
             val uri = Uri.parse(thumbnailUri)
+            // Used to hardcode "image/*" here regardless of what actually got saved — harmless for
+            // a gallery-dl picture, but a yt-dlp video (a single-item download, so this is always
+            // the real saved MediaStore URI by the time a download finishes — see
+            // DownloadWorker's own setThumbnail/setThumbnailIfAbsent split) forced Gallery apps to
+            // open it as a static image (no playback controls) and made share targets like
+            // WhatsApp reject it outright as a fake image. contentResolver.getType() reads the
+            // real MIME type back from MediaStore for the content:// URI this normally is; falls
+            // back to the old "image/*" only for a multi-item gallery download's remote preview
+            // URL (not a content:// URI ContentResolver can resolve at all), which is still
+            // usually a picture anyway.
+            val mimeType = context.contentResolver.getType(uri) ?: "image/*"
             val openIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "image/*")
+                setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/*"
+                type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
@@ -242,7 +253,7 @@ object DownloadNotifications {
                     0, "Share",
                     PendingIntent.getActivity(
                         context, requestBase + 2,
-                        Intent.createChooser(shareIntent, "Share image").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        Intent.createChooser(shareIntent, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                     ),
                 )
