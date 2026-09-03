@@ -74,6 +74,19 @@
             android:name=".worker.DownloadActionReceiver"
             android:exported="false" />
 
+        <!-- Re-evaluates any pending Schedule-window delay against the clock/timezone that's now
+             current — see ClockChangeReceiver's own doc comment. TIME_CHANGED/TIMEZONE_CHANGED are
+             both still exempt from Android 8's implicit-broadcast restrictions, so a manifest
+             registration (unlike most other system broadcasts) still gets delivered here. -->
+        <receiver
+            android:name=".worker.ClockChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <!-- WorkManager's own service, declared here only to add the foregroundServiceType that
              DownloadWorker's ForegroundInfo requires on API 34+; without a matching declaration
              here, setForeground() throws "foregroundServiceType is not a subset of ... manifest". -->
