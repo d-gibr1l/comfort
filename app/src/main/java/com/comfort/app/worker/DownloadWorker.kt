@@ -121,15 +121,6 @@ class DownloadWorker(
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
 
-        // Blocks here (not a hard failure) until a concurrency slot is actually free — see
-        // DownloadConcurrencyGate's own doc comment for why this exists alongside the round-robin
-        // unique-work-chain system rather than trusting that alone. release() is in this function's
-        // own outer finally below — the try starts right here, not any later, specifically so that
-        // finally still runs (and releases the slot) even if something between here and the
-        // existing try block below throws (setForegroundSafely, updateProgress, ...).
-        DownloadConcurrencyGate.acquire(applicationContext)
-        try {
-
         // A resumed/retried download already has real progress sitting in the DB from its last
         // run — starting the notification back at a bare indeterminate spinner (only for the first
         // real progress line or file to arrive to correct it) would visibly regress what the user
@@ -147,6 +138,13 @@ class DownloadWorker(
         // per-download id here used to leave that exact notification permanently stuck (flags
         // ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE, uncancellable) once this worker finished,
         // reproduced live even long after the underlying service was confirmed destroyed.
+        //
+        // Called *before* DownloadConcurrencyGate.acquire() below, not after — a worker that has to
+        // wait its turn at the gate used to sit as an unprotected plain background task for however
+        // long that wait takes (potentially indefinite — see the gate's own doc comment), which
+        // Android's background execution limits can kill outright before the worker ever gets to
+        // become a real foreground service. Promoting first means the wait itself happens under
+        // foreground-service protection.
         setForegroundSafely(
             ForegroundInfo(
                 DownloadNotifications.FOREGROUND_SERVICE_NOTIFICATION_ID,
@@ -168,6 +166,14 @@ class DownloadWorker(
         // hits zero — not tied to (or trusting) WorkManager's own foreground-service bookkeeping.
         DownloadNotifications.markForegroundStarted()
         try {
+            // Blocks here (not a hard failure) until a concurrency slot is actually free — see
+            // DownloadConcurrencyGate's own doc comment for why this exists alongside the
+            // round-robin unique-work-chain system rather than trusting that alone. release() is in
+            // its own try/finally right below, not this outer one — so that if acquire() itself
+            // throws/gets cancelled before ever incrementing the counter, release() correctly never
+            // runs for a slot this worker never actually took.
+            DownloadConcurrencyGate.acquire(applicationContext)
+            try {
             return withContext(Dispatchers.IO) {
                 try {
                 dao.updateStatus(downloadId, DownloadStatus.RUNNING)
@@ -676,14 +682,14 @@ class DownloadWorker(
             }
         }
         } finally {
+            DownloadConcurrencyGate.release()
+        }
+        } finally {
             DownloadNotifications.markForegroundStopped(applicationContext)
             // Matches the temp file created above for the cookies-normalization fix — cleaned up
             // unconditionally here (success, failure, or cancellation) rather than only on the
             // success path, same reasoning as markForegroundStopped needing its own finally.
             File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").delete()
-        }
-        } finally {
-            DownloadConcurrencyGate.release()
         }
     }
 }
