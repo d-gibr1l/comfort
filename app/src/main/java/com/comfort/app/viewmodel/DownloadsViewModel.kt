@@ -91,9 +91,16 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             queueFlow.value
                 .filter { it.status == DownloadStatus.PAUSED || (it.status == DownloadStatus.QUEUED && it.workRequestId == null) }
                 .forEach { entity ->
-                    // enqueueWork() itself sets the correct QUEUED/SCHEDULED status once it knows
-                    // the actual delay — no need to guess QUEUED here first.
-                    DownloadDispatcher.enqueueWork(context, entity.id, entity.url)
+                    // launch, not a plain suspend call — enqueueWork() is a suspend function that
+                    // hits the database and acquires a per-id Mutex (see DownloadDispatcher.
+                    // withDownloadLock), so awaiting each one in turn here forced a large "Resume
+                    // All" to re-enqueue its downloads one at a time for no reason: different ids
+                    // never contend on the same lock, so there's nothing to serialize between them.
+                    launch {
+                        // enqueueWork() itself sets the correct QUEUED/SCHEDULED status once it
+                        // knows the actual delay — no need to guess QUEUED here first.
+                        DownloadDispatcher.enqueueWork(context, entity.id, entity.url)
+                    }
                 }
         }
     }
