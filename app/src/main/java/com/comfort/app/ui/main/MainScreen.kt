@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import com.comfort.app.R
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
@@ -116,7 +117,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     // Same RUNNING+QUEUED count already shown inside the Library screen's own queue-icon badge
     // (DownloadsHistoryScreen) — kept consistent with that existing definition of "active" rather
     // than introducing a second, differently-scoped count just for this badge.
-    val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsState()
+    val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsStateWithLifecycle()
 
     // Rate-limited auto-check for a newer yt-dlp/gallery-dl release — seeded from the cached
     // result of the last check (so the badge shows immediately without waiting on a fresh network
@@ -352,8 +353,8 @@ fun HomeScreen(
     var url by remember { mutableStateOf("") }
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     var clipboardSuggestion by remember { mutableStateOf<String?>(null) }
-    val queueItems by viewModel.queueFlow.collectAsState()
-    val historyItems by viewModel.historyFlow.collectAsState()
+    val queueItems by viewModel.queueFlow.collectAsStateWithLifecycle()
+    val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
     // Most-recent RUNNING item — a summary screen only ever needs to surface one at a time; the
     // full Queue is one tap away (onOpenQueue) for anything more than that.
     val activeDownload = remember(queueItems) { queueItems.firstOrNull { it.status == DownloadStatus.RUNNING } }

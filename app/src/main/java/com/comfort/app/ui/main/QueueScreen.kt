@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,12 +64,12 @@ fun QueueScreen(
     viewModel: DownloadsViewModel,
     onBack: () -> Unit
 ) {
-    val queueItems by viewModel.queueFlow.collectAsState()
-    val isGloballyPaused by viewModel.isGloballyPaused.collectAsState()
+    val queueItems by viewModel.queueFlow.collectAsStateWithLifecycle()
+    val isGloballyPaused by viewModel.isGloballyPaused.collectAsStateWithLifecycle()
     // Only watched here for the finished-download toast below — the Queue's own list is
     // everything NOT finished/saved/deleted (see DownloadDao.getQueueFlow), so a finished item is
     // only ever visible via historyFlow, never queueItems itself.
-    val historyItems by viewModel.historyFlow.collectAsState()
+    val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems, snackbarHostState = snackbarHostState)
     // Lets a QUEUED item's card explain *why* it's stuck (no usable network right now) instead of
