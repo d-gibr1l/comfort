@@ -288,7 +288,13 @@ object DownloadDispatcher {
             // ENQUEUED/RUNNING/BLOCKED means it's healthy and must not be touched.
             val info = uuid?.let { runCatching { workManager.getWorkInfoById(it).get() }.getOrNull() }
             if (info == null || info.state.isFinished) {
-                enqueueWork(context, entity.id, entity.url)
+                // A negative queueOrder is startNow()'s own marker for "the user explicitly jumped
+                // this past the schedule window" (see its doc comment) — re-submitting through the
+                // normal delayed path here would silently drop that override the moment a forced
+                // download's process dies mid-transfer and gets picked back up by this repair on
+                // the next cold start, sending it back to waiting on a window that's since closed
+                // instead of resuming immediately like the user asked.
+                enqueueWork(context, entity.id, entity.url, forceImmediate = entity.queueOrder < 0)
             }
         }
     }
