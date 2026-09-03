@@ -557,6 +557,15 @@ class DownloadWorker(
                 val embedMetadata = GalleryDlPreferences.isEmbedMetadata(applicationContext)
                 val noPlaylist = GalleryDlPreferences.isNoPlaylist(applicationContext)
                 val outputFormat = GalleryDlPreferences.getOutputFormat(applicationContext)
+                // The share-sheet picker's own gallery-dl-syntax --filter ("num in {1,3,4}", see
+                // SharePickerScreen) translated into yt-dlp's own native playlist_items syntax
+                // ("1,3,4") — the item numbers themselves are already the right 1-indexed positions
+                // either way (see GalleryDlListing.listViaYtDlp's entryToGalleryItem), only the
+                // surrounding syntax differs between the two engines' filter mechanisms. Previously
+                // dropped entirely for a yt-dlp-routed download: the picker let the user uncheck
+                // specific playlist videos, but yt-dlp itself never heard about that selection and
+                // downloaded based only on the global "Download Playlists" setting instead.
+                val ytDlpPlaylistItems = ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -571,7 +580,7 @@ class DownloadWorker(
                             if (audioOnly) "1" else "0", if (downloadSubtitles) "1" else "0", subtitleLangs,
                             if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
                             videoQuality.resolutionCap()?.toString().orEmpty(),
-                            outputFormat.extension, networkRetries,
+                            outputFormat.extension, networkRetries, ytDlpPlaylistItems,
                         ),
                         actualCallback,
                     )
@@ -722,6 +731,13 @@ private val GALLERY_DL_ERROR_LINE = Regex("^\\[[\\w.]+\\]\\[error\\] ")
 // story (a real access failure reported this way, then masked by a less useful yt-dlp fallback
 // error).
 private val GALLERY_DL_NO_RESULTS_LINE = Regex("^\\[[\\w.]+\\]\\[info\\] No results for ")
+
+// Pulls the comma-separated item numbers out of SharePickerScreen's gallery-dl-syntax
+// --filter string ("num in {1,3,4}") — the same numbers double as yt-dlp's own native
+// playlist_items syntax once stripped of the surrounding "num in {...}" (see runYtDlp's own
+// ytDlpPlaylistItems). No match (itemFilter null, or a "download everything" case where the
+// picker never set one at all) just yields an empty string, same as any other unset arg here.
+private val ITEM_FILTER_NUMS_RE = Regex("""\{([\d,]+)\}""")
 
 /** Reddit's mobile Share button produces a `reddit.com/r/<sub>/s/<code>` short link that 302s to
  * the real `/comments/...` post URL — the bundled yt-dlp's Reddit extractor only recognizes

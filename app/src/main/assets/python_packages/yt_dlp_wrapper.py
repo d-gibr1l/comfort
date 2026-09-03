@@ -57,7 +57,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
-             resolution_cap=None, output_format=None, retries=None):
+             resolution_cap=None, output_format=None, retries=None, playlist_items=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -253,7 +253,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         format_sort_terms.append("acodec:aac")
     if format_sort_terms:
         ydl_opts["format_sort"] = format_sort_terms
-    if no_playlist:
+    if playlist_items:
+        # The share-sheet picker's own explicit "download exactly these items" selection —
+        # matches gallery-dl's --filter counterpart (see gallery_dl_wrapper.py) but as yt-dlp's own
+        # native "1,3,4"/"1-3" playlist_items syntax, mapped from the same 1-indexed item numbers
+        # the picker showed (see GalleryDlListing.listViaYtDlp's entryToGalleryItem — the same
+        # top-to-bottom order yt-dlp itself enumerates the playlist in). Deliberately overrides
+        # no_playlist below: a user who explicitly picked specific items from a multi-item listing
+        # wants those items downloaded, not yt-dlp's single-video "noplaylist" shortcut silently
+        # discarding everything but item 1.
+        ydl_opts["playlist_items"] = playlist_items
+    elif no_playlist:
         # Only set when actually requested, not unconditionally — verified live (same URL, single
         # variable changed) that passing this at all turns a ~6s extraction into 60-250+s in this
         # yt-dlp version, seemingly by forcing a much more expensive resolution path that compounds
@@ -445,7 +455,7 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: yt_dlp_wrapper.py download <20 positional args> | list <4 positional args>", file=_sys.stderr)
+        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <4 positional args>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "list":
@@ -464,5 +474,6 @@ if __name__ == "__main__":
         resolution_cap=(int(a[16]) if a[16] else None),
         output_format=_s(a[17]) if len(a) > 17 else None,
         retries=_s(a[18]) if len(a) > 18 else None,
+        playlist_items=_s(a[19]) if len(a) > 19 else None,
     )
     print(f"[__status__] {status}", flush=True)
