@@ -140,6 +140,18 @@ fun QueueScreen(
     // A selection tied to one status list stops making sense once a different list is showing.
     LaunchedEffect(selectedFilter) { selectedIds = emptySet() }
 
+    // queueItems updates live from a background StateFlow, so a selected item can finish, error
+    // out into a different tab's status, or get deleted while it's still selected — e.g. it
+    // auto-retries and moves out of the Errored tab, or a bulk action elsewhere removes it. Drop
+    // any selected id the instant it's no longer in filteredItems, so the selection count/actions
+    // never operate on a phantom id that isn't even on screen any more.
+    LaunchedEffect(filteredItems) {
+        val visibleIds = filteredItems.mapTo(HashSet()) { it.id }
+        if (selectedIds.any { it !in visibleIds }) {
+            selectedIds = selectedIds intersect visibleIds
+        }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         // No floating bottom nav bar overlaying this screen (it's a full-screen overlay on top of
