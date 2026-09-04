@@ -72,6 +72,30 @@ fun QueueScreen(
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems, snackbarHostState = snackbarHostState)
+    val deleteScope = rememberCoroutineScope()
+    // Every delete on this screen (bulk, a single card's "Remove", swipe-to-dismiss) routes through
+    // here instead of calling DownloadDispatcher.deleteDownload directly — code review flagged the
+    // old direct-delete-on-tap behavior as a HIGH finding (a destructive, irreversible action with
+    // no confirmation or undo anywhere). hideForDeletion() only ever hides the ids (reversible);
+    // the real, irreversible delete is confirmDelete(), which only runs once this Snackbar's own
+    // Undo window has passed without the user tapping it.
+    fun requestDelete(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        viewModel.hideForDeletion(ids)
+        deleteScope.launch {
+            val message = if (ids.size == 1) "Download removed" else "${ids.size} downloads removed"
+            val result = snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.cancelDeletion(ids)
+            } else {
+                viewModel.confirmDelete(ids)
+            }
+        }
+    }
     // Lets a QUEUED item's card explain *why* it's stuck (no usable network right now) instead of
     // just "Waiting to start…" forever with no visible reason — reproduced live: a WorkManager job
     // sitting on an unsatisfied CONNECTIVITY constraint because the current Wi-Fi network was
@@ -219,7 +243,7 @@ fun QueueScreen(
                         // "Clear Queue" trash icon this replaces used to sit here unconditionally
                         // and did nothing (a dead TODO), so this is a real, scoped action instead.
                         IconButton(onClick = {
-                            viewModel.deleteDownloads(selectedIds)
+                            requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
                             Icon(FeatherIcons.Trash2, contentDescription = "Delete selected")
@@ -339,7 +363,7 @@ fun QueueScreen(
                                 StoppedRow(
                                     item = item,
                                     onResume = { viewModel.retryDownload(item.id) },
-                                    onDelete = { viewModel.deleteDownload(item.id) },
+                                    onDelete = { requestDelete(setOf(item.id)) },
                                     selectionMode = selectionMode,
                                     selected = isSelected,
                                     onToggleSelect = { toggleSelected(item.id) },
@@ -349,7 +373,7 @@ fun QueueScreen(
                                     item = item,
                                     isNetworkAvailable = isNetworkAvailable,
                                     onCancel = { viewModel.cancelDownload(item.id) },
-                                    onDelete = { viewModel.deleteDownload(item.id) },
+                                    onDelete = { requestDelete(setOf(item.id)) },
                                     onPauseResume = { viewModel.pauseDownload(item.id) },
                                     onRetry = { viewModel.retryDownload(item.id) },
                                     onStartNow = { viewModel.startNow(item.id) },
@@ -380,7 +404,7 @@ fun QueueScreen(
                             val dismissState = rememberSwipeToDismissBoxState(
                                 confirmValueChange = { value ->
                                     if (value != SwipeToDismissBoxValue.Settled) {
-                                        viewModel.deleteDownload(item.id)
+                                        requestDelete(setOf(item.id))
                                     }
                                     true
                                 },

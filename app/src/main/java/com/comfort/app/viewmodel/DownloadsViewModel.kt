@@ -149,6 +149,36 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** First half of an undoable delete for the Queue screen (code review: a destructive delete
+     * with no confirmation or undo anywhere was a HIGH finding). Hides the given ids from
+     * [queueFlow] immediately via the same [_deletingIds] mechanism [deleteDownloads] already
+     * uses, but — unlike [deleteDownload]/[deleteDownloads] — touches nothing in the database. The
+     * caller (a Snackbar's own "Undo" window) decides afterward whether to actually go through
+     * with [confirmDelete] or reverse this with [cancelDeletion]; nothing here is irreversible on
+     * its own. */
+    fun hideForDeletion(ids: Set<String>) {
+        _deletingIds.update { it + ids }
+    }
+
+    /** Second half of an undoable delete: performs the real, irreversible
+     * [DownloadDispatcher.deleteDownload] for every id, concurrently since they're independent
+     * per-id work — same reasoning as [deleteDownloads]. Call only once the Undo window has
+     * genuinely passed; [hideForDeletion] must have already hidden these ids or they never
+     * visually leave the queue in the first place. */
+    fun confirmDelete(ids: Set<String>) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
+            _deletingIds.update { it - ids }
+        }
+    }
+
+    /** Reverses [hideForDeletion] — the user tapped Undo before [confirmDelete] ever ran, so
+     * nothing was actually deleted and this just un-hides the ids. */
+    fun cancelDeletion(ids: Set<String>) {
+        _deletingIds.update { it - ids }
+    }
+
     /** Bulk delete for the Queue screen's multi-select mode. Every selected id is hidden from
      * [queueFlow] immediately (see [_deletingIds]) so Compose animates the whole selection
      * disappearing as one batch, instead of a slow "waterfall" — each real DB delete is disk I/O,
