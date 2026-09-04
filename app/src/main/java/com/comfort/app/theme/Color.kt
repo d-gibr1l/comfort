@@ -16,11 +16,18 @@ val Teal40 = Color(0xFF0D9488)
 val Teal80 = Color(0xFF5EEAD4)
 val Teal90 = Color(0xFFCCFBF1)
 
-// Brand accent — the floating nav bar's palette, reused anywhere else in the app that wants to
-// visually match it (e.g. the Library toolbar's active filter chips).
-val AccentSalmon = Color(0xFFEA7B7B)
-val AccentRed = Color(0xFFD25353)
-val AccentRedDark = Color(0xFF9E3B3B)
+// SUNSET theme's own accent ramp (see AppTheme.kt) — hue 22° (burnt orange/terracotta), not used
+// anywhere else in the app currently (better-colors review: an older comment here claimed these
+// were "the floating nav bar's palette, reused... e.g. the Library toolbar's active filter chips",
+// but that was stale — the nav bar and filter chips actually read MaterialTheme.colorScheme.primary
+// /.secondary directly, confirmed live). Previously hue 0° (pure red), identical to the error ramp
+// below — same hue as `error` meant SUNSET's brand/interactive color and its destructive/error color
+// were indistinguishable by hue, only differing in lightness. Rotated 22° off red so a themed delete
+// affordance and a plain primary button read apart at a glance, same lightness/saturation profile as
+// before (recomputed against their actual on-colors, not just eyeballed) so contrast held or improved.
+val AccentSalmon = Color(0xFFEBAA84)
+val AccentRed = Color(0xFFB55B26)
+val AccentRedDark = Color(0xFF96532C)
 val AccentCream = Color(0xFFFFEAD3)
 
 // Error
