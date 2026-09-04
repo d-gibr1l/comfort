@@ -301,10 +301,22 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 }
                             }
                         }
+                        // better-interface review: this row silently overflowed past the last
+                        // couple of chips ("Deleted", Grid/List) on typical phone widths with no
+                        // visible cue that anything more was scrollable. A first attempt (edge
+                        // fades sized with fillMaxHeight()) broke the whole screen's layout —
+                        // fillMaxHeight() resolved against the topBar slot's own unbounded height
+                        // instead of the row's, ballooning it and pushing every list/grid item
+                        // off-screen. This is a separate, fixed-height indicator strip below the
+                        // row instead — a small scrollbar-style track/thumb, chosen with the user
+                        // over the fade — so there's no shared-height ambiguity with anything else
+                        // on screen to repeat that bug. Only shown while there's actually more to
+                        // scroll (hidden entirely on a wide-enough screen where every chip fits).
+                        val toolbarScrollState = rememberScrollState()
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
+                                .horizontalScroll(toolbarScrollState)
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -351,6 +363,30 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     GalleryDlPreferences.setLibraryGridView(context, gridView)
                                 },
                             )
+                        }
+                        if (toolbarScrollState.maxValue > 0) {
+                            val thumbFraction = (toolbarScrollState.viewportSize.toFloat() /
+                                (toolbarScrollState.viewportSize + toolbarScrollState.maxValue)).coerceIn(0.15f, 1f)
+                            val scrollFraction = if (toolbarScrollState.maxValue > 0) {
+                                toolbarScrollState.value.toFloat() / toolbarScrollState.maxValue
+                            } else 0f
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                                    .width(64.dp)
+                                    .height(3.dp)
+                                    .clip(RoundedCornerShape(1.5.dp))
+                                    .background(MaterialTheme.colorScheme.outlineVariant),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(thumbFraction)
+                                        .fillMaxHeight()
+                                        .offset(x = (64.dp - 64.dp * thumbFraction) * scrollFraction)
+                                        .clip(RoundedCornerShape(1.5.dp))
+                                        .background(MaterialTheme.colorScheme.onSurfaceVariant),
+                                )
+                            }
                         }
                     }
                 }
