@@ -433,6 +433,8 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         # extracts the same Reel cleanly. Playlists/multi-item sources still expand into "entries"
         # normally either way — this only affects *which* code path a single item takes.
     }
+    if _REDDIT_SHARE_LINK_RE.match(url):
+        ydl_opts['impersonate'] = ImpersonateTarget()
     if cookies_path:
         ydl_opts["cookiefile"] = cookies_path
     if js_runtime_path:
