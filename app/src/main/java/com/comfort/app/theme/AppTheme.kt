@@ -4,6 +4,54 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import kotlin.math.max
+import kotlin.math.min
+
+// better-colors review: secondaryContainer/onSecondaryContainer used to be hardcoded to a fixed
+// teal (Teal90/#00201C light, #0B4A42/Teal90 dark) in every non-DEFAULT theme, regardless of that
+// theme's own secondary hue — e.g. BLOSSOM's secondary is pink but its container stayed teal.
+// Currently unused anywhere in the app (grepped), so nothing rendered wrong yet, but any future
+// chip/badge that reads these roles would have silently gone off-theme. These two derive a
+// same-hue container pair from `secondary` instead, at roughly Material3's own tonal-container
+// steps (~90/~20 light, ~28/~90 dark), so a new theme can't reintroduce the mismatch by omission.
+private fun containerToneOf(base: Color, containerLightness: Float, containerSaturationScale: Float): Color {
+    val (h, s, _) = base.toHsl()
+    return hslToColor(h, s * containerSaturationScale, containerLightness)
+}
+
+private fun Color.toHsl(): Triple<Float, Float, Float> {
+    val r = red; val g = green; val b = blue
+    val maxC = max(r, max(g, b)); val minC = min(r, min(g, b))
+    val l = (maxC + minC) / 2f
+    if (maxC == minC) return Triple(0f, 0f, l * 100f)
+    val d = maxC - minC
+    val s = if (l > 0.5f) d / (2f - maxC - minC) else d / (maxC + minC)
+    val h = when (maxC) {
+        r -> ((g - b) / d + (if (g < b) 6f else 0f))
+        g -> (b - r) / d + 2f
+        else -> (r - g) / d + 4f
+    } * 60f
+    return Triple(h, s * 100f, l * 100f)
+}
+
+private fun hslToColor(h: Float, s: Float, l: Float): Color {
+    val hh = h / 360f; val ss = s / 100f; val ll = l / 100f
+    if (ss == 0f) return Color(ll, ll, ll)
+    fun hue2rgb(p: Float, q: Float, tIn: Float): Float {
+        var t = tIn
+        if (t < 0f) t += 1f
+        if (t > 1f) t -= 1f
+        return when {
+            t < 1f / 6f -> p + (q - p) * 6f * t
+            t < 1f / 2f -> q
+            t < 2f / 3f -> p + (q - p) * (2f / 3f - t) * 6f
+            else -> p
+        }
+    }
+    val q = if (ll < 0.5f) ll * (1f + ss) else ll + ss - ll * ss
+    val p = 2f * ll - q
+    return Color(hue2rgb(p, q, hh + 1f / 3f), hue2rgb(p, q, hh), hue2rgb(p, q, hh - 1f / 3f))
+}
 
 // Builds a full light/dark ColorScheme from just the handful of roles that actually differ
 // between named themes (primary/secondary/background/surface); everything else (neutrals,
@@ -15,8 +63,8 @@ private fun buildLight(primary: Color, onPrimary: Color, primaryContainer: Color
     onPrimaryContainer = onPrimaryContainer,
     secondary = secondary,
     onSecondary = Color.White,
-    secondaryContainer = Teal90,
-    onSecondaryContainer = Color(0xFF00201C),
+    secondaryContainer = containerToneOf(secondary, containerLightness = 90f, containerSaturationScale = 0.45f),
+    onSecondaryContainer = containerToneOf(secondary, containerLightness = 20f, containerSaturationScale = 0.9f),
     tertiary = secondary,
     onTertiary = Color.White,
     background = background,
@@ -45,8 +93,8 @@ private fun buildDark(primary: Color, onPrimary: Color, primaryContainer: Color,
     onPrimaryContainer = onPrimaryContainer,
     secondary = secondary,
     onSecondary = Color(0xFF00201C),
-    secondaryContainer = Color(0xFF0B4A42),
-    onSecondaryContainer = Teal90,
+    secondaryContainer = containerToneOf(secondary, containerLightness = 28f, containerSaturationScale = 0.6f),
+    onSecondaryContainer = containerToneOf(secondary, containerLightness = 90f, containerSaturationScale = 0.5f),
     tertiary = secondary,
     onTertiary = Color(0xFF00201C),
     background = background,
