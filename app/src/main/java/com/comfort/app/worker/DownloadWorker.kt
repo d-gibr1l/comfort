@@ -180,8 +180,6 @@ class DownloadWorker(
                 val startTime = System.currentTimeMillis()
                 dao.setStartTime(downloadId, startTime)
 
-                val url = resolveRedditShareLink(url)
-
                 // Sites gallery-dl either can't parse at all or (TikTok specifically) handles
                 // more weakly than yt-dlp skip the gallery-dl attempt entirely; everything else
                 // goes through gallery-dl first since that's the engine with real gallery/image
@@ -716,8 +714,6 @@ private fun derivePosterCaptionTitle(filename: String): String? {
     return stripped.ifBlank { null }
 }
 
-private val REDDIT_SHARE_LINK = Regex("^https?://(www\\.)?reddit\\.com/r/[^/]+/s/[A-Za-z0-9]+/?")
-
 // gallery-dl/yt-dlp's own extractor-level log lines are shaped "[extractor_name][error]
 // <message>" (both bracketed, e.g. "[instagram][error] HTTP redirect to login page") — a
 // different shape from yt-dlp's top-level "[error] <message>", confirmed live via a real
@@ -739,40 +735,3 @@ private val GALLERY_DL_NO_RESULTS_LINE = Regex("^\\[[\\w.]+\\]\\[info\\] No resu
 // picker never set one at all) just yields an empty string, same as any other unset arg here.
 private val ITEM_FILTER_NUMS_RE = Regex("""\{([\d,]+)\}""")
 
-/** Reddit's mobile Share button produces a `reddit.com/r/<sub>/s/<code>` short link that 302s to
- * the real `/comments/...` post URL — the bundled yt-dlp's Reddit extractor only recognizes
- * `/comments/...` URLs (confirmed by reading its `_VALID_URL` regex), so a raw share link falls
- * through to yt-dlp's generic extractor, which gets an HTTP 403 from Reddit trying to resolve the
- * redirect itself (reproduced live: "[generic] ...: Unable to download webpage: HTTP Error 403").
- * Following the redirect here first, with a real browser User-Agent, avoids that. A no-op for any
- * other URL, or if resolution fails for any reason — the original URL is always a safe fallback,
- * so a network hiccup here degrades back to today's (broken-for-this-one-case) behavior rather
- * than failing the whole download. */
-private fun resolveRedditShareLink(url: String): String {
-    if (!REDDIT_SHARE_LINK.containsMatchIn(url)) return url
-    var current = url
-    repeat(5) {
-        val connection = runCatching {
-            (java.net.URL(current).openConnection() as java.net.HttpURLConnection).apply {
-                instanceFollowRedirects = false
-                connectTimeout = 8000
-                readTimeout = 8000
-                requestMethod = "GET"
-                setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-                )
-            }
-        }.getOrNull() ?: return url
-        val code = runCatching { connection.responseCode }.getOrNull()
-        val location = connection.getHeaderField("Location")
-        connection.disconnect()
-        if (code != null && code in 300..399 && location != null) {
-            current = runCatching { java.net.URL(java.net.URL(current), location).toString() }.getOrDefault(current)
-            if ("/comments/" in current) return current
-        } else {
-            return current
-        }
-    }
-    return current
-}

@@ -3,6 +3,7 @@ import os
 import re
 import time
 import yt_dlp
+from yt_dlp.networking.impersonate import ImpersonateTarget
 
 class _Cancelled(Exception):
     pass
@@ -15,6 +16,22 @@ class _Cancelled(Exception):
 # so this matches on shape (starts right after the dot with an alphanumeric, no embedded dots)
 # rather than requiring digits only.
 _FRAGMENT_SUFFIX_RE = re.compile(r"\.f[A-Za-z0-9][A-Za-z0-9_-]*\.[^./\\]+$")
+
+# Reddit's mobile Share button produces a reddit.com/r/<sub>/s/<code> short link that 302s to the
+# real /comments/... post URL. yt-dlp's own Reddit extractor only recognizes /comments/... URLs
+# (its _VALID_URL doesn't match /s/ links), so a raw share link falls through to yt-dlp's generic
+# extractor to resolve the redirect itself — and that plain request gets an HTTP 403 from Reddit's
+# WAF (reproduced live: "[generic] ...: Unable to download webpage: HTTP Error 403: Blocked").
+# A prior fix resolved the redirect in Kotlin first with a naked HttpURLConnection and a spoofed
+# User-Agent header — but a spoofed *header* with the wrong TLS fingerprint behind it is exactly
+# what a WAF like this one is designed to catch, so that "fix" was tripping the same block it was
+# meant to avoid. curl_cffi (bundled specifically for this — see PythonRuntime.kt's own comments on
+# why Chaquopy's interpreter was replaced) genuinely spoofs a real browser's TLS handshake, not just
+# its headers, but yt-dlp only routes a request through it when something asks for impersonation —
+# the generic extractor doesn't do that on its own. Asking for it only for this one shortlink shape
+# (rather than every download) keeps the change scoped to the actual failure instead of impersonating
+# a browser for sites that were already working fine without it.
+_REDDIT_SHARE_LINK_RE = re.compile(r"^https?://(www\.)?reddit\.com/r/[^/]+/s/[A-Za-z0-9]+/?")
 
 def _parse_rate(limit_rate):
     """Converts gallery-dl-style rate strings ("500k", "2M") into yt-dlp's expected
@@ -218,6 +235,18 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # post, etc.) raise normally — it only tolerates individual items failing mid-playlist.
         "ignoreerrors": "only_download",
     }
+    if _REDDIT_SHARE_LINK_RE.match(url):
+        # An empty ImpersonateTarget() (rather than a specific browser/version string) asks yt-dlp
+        # for its own default target — the first one whose backend is actually available in this
+        # bundled environment (see _REDDIT_SHARE_LINK_RE's own comment for why this is needed at
+        # all). YoutubeDL.__init__'s own availability check (self.params.get('impersonate') passed
+        # straight to _impersonate_target_available) skips the True/''-to-ImpersonateTarget()
+        # normalization that _parse_impersonate_targets does elsewhere in this yt-dlp version —
+        # passing the bare `True` the CLI's --impersonate accepts hits an `assert
+        # isinstance(target, ImpersonateTarget)` in is_supported_target() instead (reproduced live:
+        # AssertionError with an empty message, right out of YoutubeDL(ydl_opts) construction).
+        # Constructing the real object ourselves sidesteps that.
+        ydl_opts["impersonate"] = ImpersonateTarget()
     if retries:
         # Same count for both — "retries" alone only covers whole-request failures (extraction,
         # a plain single-file fetch); a merge download's separate video/audio fragments each get
