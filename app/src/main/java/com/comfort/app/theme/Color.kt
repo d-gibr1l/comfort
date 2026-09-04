@@ -34,6 +34,17 @@ val AccentRed = Color(0xFFB55B26)
 val AccentRedDark = Color(0xFF96532C)
 val AccentCream = Color(0xFFFFEAD3)
 
+// Success — deliberately fixed across every theme, the same way `error` is (MaterialTheme.colorScheme
+// .error stays Red40/Red80 in every buildLight()/buildDark() call, never re-tinted per theme). Named
+// here instead of an inline literal at its one call site (StatusBadge in DownloadsHistoryScreen.kt)
+// so it reads as an intentional, documented choice rather than a stray hex value (better-colors review).
+val SuccessGreen40 = Color(0xFF22C55E)
+
+// Favorite-star gold — also deliberately theme-invariant (a near-universal "gold star" convention,
+// same reasoning as SuccessGreen40 above), named here instead of the bare literal duplicated at its
+// two call sites (DownloadsHistoryScreen.kt's grid and list rows) (better-colors review).
+val FavoriteGold = Color(0xFFFACC15)
+
 // Error
 val Red40 = Color(0xFFDC2626)
 val Red80 = Color(0xFFF87171)

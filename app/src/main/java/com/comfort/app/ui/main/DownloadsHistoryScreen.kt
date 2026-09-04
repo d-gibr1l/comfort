@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.comfort.app.theme.FavoriteGold
+import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboard
@@ -559,7 +561,7 @@ private fun HistoryGridItem(
                     .background(Color.Black.copy(alpha = 0.55f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = Color(0xFFFACC15), modifier = Modifier.size(11.dp))
+                Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
             }
         }
 
@@ -591,7 +593,7 @@ private fun HistoryGridItem(
 @Composable
 private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
     val (icon, tint, description) = when (status) {
-        DownloadStatus.FINISHED -> Triple(FeatherIcons.CheckCircle, Color(0xFF22C55E), "Succeeded")
+        DownloadStatus.FINISHED -> Triple(FeatherIcons.CheckCircle, SuccessGreen40, "Succeeded")
         DownloadStatus.ERRORED -> Triple(FeatherIcons.AlertCircle, MaterialTheme.colorScheme.error, "Failed")
         else -> return
     }
@@ -709,7 +711,7 @@ private fun HistoryRow(
                             .background(Color.Black.copy(alpha = 0.55f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = Color(0xFFFACC15), modifier = Modifier.size(11.dp))
+                        Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
                     }
                 }
 
