@@ -113,7 +113,10 @@ enum class AppTheme(
         light = buildLight(
             primary = Color(0xFFC43C97), onPrimary = Color.White,
             primaryContainer = Color(0xFFFCDCF0), onPrimaryContainer = Color(0xFF5C1147),
-            secondary = Color(0xFFF02475),
+            // Darkened from 0xFFF02475 (same hue) — better-colors review: paired with fixed-white
+            // text/icons (see buildLight's own onSecondary), that measured 4.03:1, under WCAG AA's
+            // 4.5:1. Now 4.54:1.
+            secondary = Color(0xFFE61065),
             background = Color(0xFFFAF3F8), surface = Color.White,
         ),
         dark = buildDark(
@@ -161,7 +164,10 @@ enum class AppTheme(
         light = buildLight(
             primary = Color(0xFF0072B2), onPrimary = Color.White,
             primaryContainer = Color(0xFFD6E9F8), onPrimaryContainer = Color(0xFF00304D),
-            secondary = Color(0xFF3B82F6),
+            // Darkened from 0xFF3B82F6 (same hue) — better-colors review: paired with fixed-white
+            // text/icons (see buildLight's own onSecondary), that measured 3.68:1, under WCAG AA's
+            // 4.5:1. Now 4.52:1.
+            secondary = Color(0xFF1E6FF5),
             background = Color(0xFFF1F5FA), surface = Color.White,
         ),
         dark = buildDark(
@@ -177,7 +183,10 @@ enum class AppTheme(
         light = buildLight(
             primary = Color(0xFF12803B), onPrimary = Color.White,
             primaryContainer = Color(0xFFD9F2DF), onPrimaryContainer = Color(0xFF0A3D1D),
-            secondary = Color(0xFF65A30D),
+            // Darkened from 0xFF65A30D (same hue) — better-colors review: paired with fixed-white
+            // text/icons (see buildLight's own onSecondary), that measured 3.09:1, the worst
+            // offender of the set, well under WCAG AA's 4.5:1. Now 4.50:1.
+            secondary = Color(0xFF52840B),
             background = Color(0xFFF1F8F0), surface = Color.White,
         ),
         dark = buildDark(

@@ -11,8 +11,12 @@ val Indigo40 = Color(0xFF4F46E5)
 val Indigo80 = Color(0xFFA5AEFF)
 val Indigo90 = Color(0xFFE0E1FF)
 
-// Accent (used for progress / success states)
-val Teal40 = Color(0xFF0D9488)
+// Accent (used for progress / success states). Teal40 is deliberately a touch darker than a
+// plain "brand teal" would be — better-colors review: it's paired with fixed-white text/icons in
+// two places (DEFAULT's secondary/tertiary, OCEAN's primary) and at the original 0x0D9488 that
+// pairing measured 3.74:1, under WCAG AA's 4.5:1 for normal text. Darkened (same hue) until it
+// cleared 4.5:1 (4.57 measured) — the smallest shift that fixes both consumers at once.
+val Teal40 = Color(0xFF0C8479)
 val Teal80 = Color(0xFF5EEAD4)
 val Teal90 = Color(0xFFCCFBF1)
 
