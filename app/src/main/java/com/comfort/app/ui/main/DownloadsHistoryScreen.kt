@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.comfort.app.theme.FavoriteGold
 import com.comfort.app.theme.SuccessGreen40
+import com.comfort.app.util.rememberIsReducedMotionEnabled
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboard
@@ -83,6 +84,9 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     // already handles the smooth reflow/removal animation on its own, so this only ever needs to
     // gate the one-time entrance.
     val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
+    // better-interface review: the entrance slide below animated unconditionally, with nothing
+    // checking the OS-level reduce-motion setting — same finding already fixed on QueueScreen.kt.
+    val reducedMotion = rememberIsReducedMotionEnabled()
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var showDeletedOnly by remember { mutableStateOf(false) }
@@ -382,7 +386,10 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     SideEffect { alreadyAnimatedIds[item.id] = true }
                     AnimatedVisibility(
                         visibleState = visibleState,
-                        enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                        // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
+                        // but keeps the fade — brief functional feedback that a new item just
+                        // appeared, same as QueueScreen.kt's own reduced-motion fix.
+                        enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
                         exit = ExitTransition.None,
                         modifier = Modifier.animateItem(),
                     ) {
@@ -431,7 +438,10 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     SideEffect { alreadyAnimatedIds[item.id] = true }
                     AnimatedVisibility(
                         visibleState = visibleState,
-                        enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                        // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
+                        // but keeps the fade — brief functional feedback that a new item just
+                        // appeared, same as QueueScreen.kt's own reduced-motion fix.
+                        enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
                         exit = ExitTransition.None,
                         modifier = Modifier.animateItem(),
                     ) {
@@ -499,7 +509,10 @@ private fun LibraryToolbarChip(
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(18.dp))
+        // better-interface review: this icon's contentDescription duplicated the visible Text
+        // right next to it inside one clickable (merged-semantics) row — decorative next to real
+        // text, so null here, not a repeat of the same name TalkBack already gets from the Text.
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Medium)
     }
