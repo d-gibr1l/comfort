@@ -21,6 +21,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -113,6 +114,22 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // This custom Surface replaces Snackbar's own layout entirely (see the doc comment
+                // above), which means Compose's default action-button rendering never runs either —
+                // an actionLabel passed to showSnackbar() silently had no on-screen button at all
+                // until this was added, discovered live: the Queue screen's delete-undo Snackbar
+                // (see QueueScreen.requestDelete) always fell through to the real delete because its
+                // "Undo" was never actually clickable, only the dismiss X below was, and dismissing
+                // early resolves showSnackbar() as Dismissed same as letting it time out.
+                visuals.actionLabel?.let { actionLabel ->
+                    TextButton(onClick = { data.performAction() }) {
+                        Text(
+                            actionLabel,
+                            color = accent,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
                 IconButton(onClick = { data.dismiss() }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         FeatherIcons.X,
