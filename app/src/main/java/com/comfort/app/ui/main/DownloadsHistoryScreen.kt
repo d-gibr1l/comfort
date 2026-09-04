@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,7 +54,9 @@ import com.comfort.app.viewmodel.DownloadsViewModel
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -307,84 +310,110 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         // fades sized with fillMaxHeight()) broke the whole screen's layout —
                         // fillMaxHeight() resolved against the topBar slot's own unbounded height
                         // instead of the row's, ballooning it and pushing every list/grid item
-                        // off-screen. This is a separate, fixed-height indicator strip below the
-                        // row instead — a small scrollbar-style track/thumb, chosen with the user
-                        // over the fade — so there's no shared-height ambiguity with anything else
-                        // on screen to repeat that bug. Only shown while there's actually more to
-                        // scroll (hidden entirely on a wide-enough screen where every chip fits).
+                        // off-screen. A second attempt (a scrollbar-style track/thumb strip below
+                        // the row) worked but was replaced at the user's request with two treatments
+                        // instead: a "fog" edge fade — same idea as the first attempt, but this time
+                        // the wrapping Box gets height(IntrinsicSize.Min) so its height is derived
+                        // from the Row's own real content instead of the topBar slot's ambient
+                        // unbounded one, which is what made fillMaxHeight() balloon it before — and
+                        // a one-time "nudge": a brief auto-scroll-and-back on first appearance, the
+                        // physical equivalent of someone tapping the row and pointing right.
                         val toolbarScrollState = rememberScrollState()
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(toolbarScrollState)
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            LibraryToolbarChip(
-                                icon = FeatherIcons.Search,
-                                label = "Search",
-                                onClick = { showSearch = true },
-                            )
-                            Box {
-                                LibraryToolbarChip(
-                                    icon = FeatherIcons.Sliders,
-                                    label = "Sort",
-                                    onClick = { sortMenuExpanded = true },
+                        val toolbarNudgePx = with(LocalDensity.current) { 28.dp.toPx() }
+                        LaunchedEffect(Unit) {
+                            // Give the static state a beat to register before moving anything —
+                            // also lets the real maxValue (only known post-layout) settle so a
+                            // screen where every chip already fits doesn't nudge toward nothing.
+                            delay(500)
+                            // An automatic scroll the user didn't ask for — same reduce-motion
+                            // gate as the entrance animations above, not just decorative here.
+                            if (!reducedMotion && toolbarScrollState.maxValue > 0) {
+                                toolbarScrollState.animateScrollTo(
+                                    toolbarNudgePx.roundToInt().coerceAtMost(toolbarScrollState.maxValue),
+                                    animationSpec = tween(350),
                                 )
-                                DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
-                                    LibrarySort.entries.forEach { option ->
-                                        DropdownMenuItem(
-                                            text = { Text(option.label) },
-                                            leadingIcon = if (option == sortOption) {
-                                                { Icon(FeatherIcons.Check, contentDescription = null) }
-                                            } else null,
-                                            onClick = { sortOption = option; sortMenuExpanded = false },
-                                        )
+                                delay(150)
+                                toolbarScrollState.animateScrollTo(0, animationSpec = tween(350))
+                            }
+                        }
+                        Box(modifier = Modifier.height(IntrinsicSize.Min)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(toolbarScrollState)
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                LibraryToolbarChip(
+                                    icon = FeatherIcons.Search,
+                                    label = "Search",
+                                    onClick = { showSearch = true },
+                                )
+                                Box {
+                                    LibraryToolbarChip(
+                                        icon = FeatherIcons.Sliders,
+                                        label = "Sort",
+                                        onClick = { sortMenuExpanded = true },
+                                    )
+                                    DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                                        LibrarySort.entries.forEach { option ->
+                                            DropdownMenuItem(
+                                                text = { Text(option.label) },
+                                                leadingIcon = if (option == sortOption) {
+                                                    { Icon(FeatherIcons.Check, contentDescription = null) }
+                                                } else null,
+                                                onClick = { sortOption = option; sortMenuExpanded = false },
+                                            )
+                                        }
                                     }
                                 }
+                                LibraryToolbarChip(
+                                    icon = FeatherIcons.Star,
+                                    label = "Favorites",
+                                    active = favoritesOnly,
+                                    onClick = { favoritesOnly = !favoritesOnly; if (favoritesOnly) showDeletedOnly = false },
+                                )
+                                LibraryToolbarChip(
+                                    icon = FeatherIcons.Trash2,
+                                    label = "Deleted",
+                                    active = showDeletedOnly,
+                                    onClick = { showDeletedOnly = !showDeletedOnly; if (showDeletedOnly) favoritesOnly = false },
+                                )
+                                LibraryToolbarChip(
+                                    icon = if (gridView) FeatherIcons.List else FeatherIcons.Grid,
+                                    label = if (gridView) "List" else "Grid",
+                                    onClick = {
+                                        gridView = !gridView
+                                        GalleryDlPreferences.setLibraryGridView(context, gridView)
+                                    },
+                                )
                             }
-                            LibraryToolbarChip(
-                                icon = FeatherIcons.Star,
-                                label = "Favorites",
-                                active = favoritesOnly,
-                                onClick = { favoritesOnly = !favoritesOnly; if (favoritesOnly) showDeletedOnly = false },
-                            )
-                            LibraryToolbarChip(
-                                icon = FeatherIcons.Trash2,
-                                label = "Deleted",
-                                active = showDeletedOnly,
-                                onClick = { showDeletedOnly = !showDeletedOnly; if (showDeletedOnly) favoritesOnly = false },
-                            )
-                            LibraryToolbarChip(
-                                icon = if (gridView) FeatherIcons.List else FeatherIcons.Grid,
-                                label = if (gridView) "List" else "Grid",
-                                onClick = {
-                                    gridView = !gridView
-                                    GalleryDlPreferences.setLibraryGridView(context, gridView)
-                                },
-                            )
-                        }
-                        if (toolbarScrollState.maxValue > 0) {
-                            val thumbFraction = (toolbarScrollState.viewportSize.toFloat() /
-                                (toolbarScrollState.viewportSize + toolbarScrollState.maxValue)).coerceIn(0.15f, 1f)
-                            val scrollFraction = if (toolbarScrollState.maxValue > 0) {
-                                toolbarScrollState.value.toFloat() / toolbarScrollState.maxValue
-                            } else 0f
-                            Box(
-                                modifier = Modifier
-                                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
-                                    .width(64.dp)
-                                    .height(3.dp)
-                                    .clip(RoundedCornerShape(1.5.dp))
-                                    .background(MaterialTheme.colorScheme.outlineVariant),
-                            ) {
+                            // Only visible while there's actually unscrolled content in that
+                            // direction — a row that fits entirely on a wide screen shows neither.
+                            if (toolbarScrollState.value > 0) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(thumbFraction)
+                                        .align(Alignment.CenterStart)
                                         .fillMaxHeight()
-                                        .offset(x = (64.dp - 64.dp * thumbFraction) * scrollFraction)
-                                        .clip(RoundedCornerShape(1.5.dp))
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant),
+                                        .width(24.dp)
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(MaterialTheme.colorScheme.background, Color.Transparent)
+                                            )
+                                        ),
+                                )
+                            }
+                            if (toolbarScrollState.value < toolbarScrollState.maxValue) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .fillMaxHeight()
+                                        .width(24.dp)
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(Color.Transparent, MaterialTheme.colorScheme.background)
+                                            )
+                                        ),
                                 )
                             }
                         }
