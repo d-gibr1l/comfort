@@ -26,20 +26,31 @@ import kotlinx.coroutines.withContext
 class DownloadsViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).downloadDao()
 
-    val historyFlow: StateFlow<List<DownloadEntity>> = dao.getHistoryFlow()
+    private val rawHistoryFlow: StateFlow<List<DownloadEntity>> = dao.getHistoryFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val deletedFlow: StateFlow<List<DownloadEntity>> = dao.getDeletedFlow()
+    private val rawDeletedFlow: StateFlow<List<DownloadEntity>> = dao.getDeletedFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val rawQueueFlow: StateFlow<List<DownloadEntity>> = dao.getQueueFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Bulk-delete's own optimistic-hide set (see deleteDownloads()) — an id sits here for the
-    // brief window between the user tapping delete and its real DB row actually being gone, so
-    // queueFlow below can hide it immediately instead of waiting for each sequential disk I/O to
-    // finish and Room to re-emit one row at a time.
+    // Optimistic-hide set shared by every screen's undoable delete (see hideForDeletion() below)
+    // — an id sits here for the window between the user tapping delete and either the Undo
+    // Snackbar timing out (confirmDelete() actually removes it) or the user tapping Undo
+    // (cancelDeletion() un-hides it), *and* for the brief window bulk deletes need between
+    // tapping and each sequential disk I/O finishing. Every list below filters through it, not
+    // just the queue — the Library screen's better-interface review found the exact same
+    // no-confirmation/no-undo HIGH finding already fixed here for the Queue screen.
     private val _deletingIds = MutableStateFlow<Set<String>>(emptySet())
+
+    val historyFlow: StateFlow<List<DownloadEntity>> = combine(rawHistoryFlow, _deletingIds) { history, deleting ->
+        if (deleting.isEmpty()) history else history.filterNot { it.id in deleting }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val deletedFlow: StateFlow<List<DownloadEntity>> = combine(rawDeletedFlow, _deletingIds) { deleted, deleting ->
+        if (deleting.isEmpty()) deleted else deleted.filterNot { it.id in deleting }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds) { queue, deleting ->
         if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
@@ -143,28 +154,24 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun deleteDownload(id: String) {
-        viewModelScope.launch {
-            DownloadDispatcher.deleteDownload(getApplication(), id)
-        }
-    }
-
-    /** First half of an undoable delete for the Queue screen (code review: a destructive delete
-     * with no confirmation or undo anywhere was a HIGH finding). Hides the given ids from
-     * [queueFlow] immediately via the same [_deletingIds] mechanism [deleteDownloads] already
-     * uses, but — unlike [deleteDownload]/[deleteDownloads] — touches nothing in the database. The
-     * caller (a Snackbar's own "Undo" window) decides afterward whether to actually go through
-     * with [confirmDelete] or reverse this with [cancelDeletion]; nothing here is irreversible on
-     * its own. */
+    /** First half of an undoable delete, shared by every screen with a delete action (Queue,
+     * Library) (code review: a destructive delete with no confirmation or undo anywhere was a
+     * HIGH finding on both). Hides the given ids from [queueFlow]/[historyFlow]/[deletedFlow]
+     * immediately via [_deletingIds], but — unlike [confirmDelete]/[deleteDownloads] — touches
+     * nothing in the database. The caller (a Snackbar's own "Undo" window) decides afterward
+     * whether to actually go through with [confirmDelete] or reverse this with [cancelDeletion];
+     * nothing here is irreversible on its own. */
     fun hideForDeletion(ids: Set<String>) {
         _deletingIds.update { it + ids }
     }
 
     /** Second half of an undoable delete: performs the real, irreversible
      * [DownloadDispatcher.deleteDownload] for every id, concurrently since they're independent
-     * per-id work — same reasoning as [deleteDownloads]. Call only once the Undo window has
+     * per-id work (separate rows, separate files) — also what keeps a bulk selection's real
+     * deletes from running one at a time and stuttering/reflowing the list over a second or two,
+     * the way a naive sequential loop did before this existed. Call only once the Undo window has
      * genuinely passed; [hideForDeletion] must have already hidden these ids or they never
-     * visually leave the queue in the first place. */
+     * visually leave their list in the first place. */
     fun confirmDelete(ids: Set<String>) {
         viewModelScope.launch {
             val context = getApplication<Application>()
@@ -177,23 +184,6 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * nothing was actually deleted and this just un-hides the ids. */
     fun cancelDeletion(ids: Set<String>) {
         _deletingIds.update { it - ids }
-    }
-
-    /** Bulk delete for the Queue screen's multi-select mode. Every selected id is hidden from
-     * [queueFlow] immediately (see [_deletingIds]) so Compose animates the whole selection
-     * disappearing as one batch, instead of a slow "waterfall" — each real DB delete is disk I/O,
-     * so without this the list only lost one row at a time as Room re-emitted between each
-     * sequential suspend, visibly stuttering/reflowing over a second or two for a large selection.
-     * The real deletes themselves now run concurrently (they're independent per-id work — separate
-     * rows, separate files) rather than one-at-a-time, so the optimistic hide above doesn't sit
-     * ahead of reality for any longer than it has to. */
-    fun deleteDownloads(ids: Set<String>) {
-        _deletingIds.update { it + ids }
-        viewModelScope.launch {
-            val context = getApplication<Application>()
-            ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
-            _deletingIds.update { it - ids }
-        }
     }
 
     fun setFavorite(id: String, isFavorite: Boolean) {

@@ -93,6 +93,33 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     var gridView by remember { mutableStateOf(GalleryDlPreferences.isLibraryGridView(context)) }
     val selectionMode = selectedIds.isNotEmpty()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val deleteScope = rememberCoroutineScope()
+    // Every delete on this screen (bulk, a single row's "Remove", swipe-to-dismiss) routes through
+    // here instead of calling viewModel.deleteDownload directly — better-interface review flagged
+    // the old direct-delete-on-tap behavior as a HIGH finding (a destructive, irreversible action
+    // with no confirmation or undo anywhere), the same issue already fixed on the Queue screen.
+    // Mirrors QueueScreen.kt's own requestDelete(): hideForDeletion() only ever hides the ids
+    // (reversible); the real, irreversible delete is confirmDelete(), which only runs once this
+    // Snackbar's own Undo window has passed without the user tapping it.
+    fun requestDelete(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        viewModel.hideForDeletion(ids)
+        deleteScope.launch {
+            val message = if (ids.size == 1) "Download removed" else "${ids.size} downloads removed"
+            val result = snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.cancelDeletion(ids)
+            } else {
+                viewModel.confirmDelete(ids)
+            }
+        }
+    }
+
     // MainScreen keeps this screen composed underneath the Download Queue overlay now (needed for
     // the predictive-back reveal animation), where it used to fully unmount and remount — which
     // reset scroll position back to the top as a side effect. A freshly-finished download lands at
@@ -134,6 +161,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             if (selectionMode) {
                 TopAppBar(
@@ -165,7 +193,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             Icon(FeatherIcons.Star, contentDescription = "Add selected to favorites")
                         }
                         IconButton(onClick = {
-                            selectedIds.forEach { viewModel.deleteDownload(it) }
+                            requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
                             Icon(FeatherIcons.Trash2, contentDescription = "Remove selected")
@@ -390,7 +418,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 }
                             },
                             onLongPress = { selectedIds = selectedIds + item.id },
-                            onDelete = { viewModel.deleteDownload(item.id) },
+                            onDelete = { requestDelete(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                         )
@@ -413,7 +441,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             val dismissState = rememberSwipeToDismissBoxState(
                                 confirmValueChange = { value ->
                                     if (value != SwipeToDismissBoxValue.Settled) {
-                                        viewModel.deleteDownload(item.id)
+                                        requestDelete(setOf(item.id))
                                     }
                                     true
                                 },
