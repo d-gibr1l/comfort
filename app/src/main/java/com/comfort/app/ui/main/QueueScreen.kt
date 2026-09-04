@@ -40,6 +40,7 @@ import com.comfort.app.viewmodel.DownloadsViewModel
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.util.rememberIsNetworkAvailable
+import com.comfort.app.util.rememberIsReducedMotionEnabled
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -110,6 +111,10 @@ fun QueueScreen(
     // Modifier.animateItem() below already handles the smooth reflow/removal animation on its own,
     // so this only ever needs to gate the one-time entrance.
     val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
+    // better-interface review: the entrance slide below (and the wavy progress indicator's wave
+    // motion in QueueItemCard) animated unconditionally, with nothing checking the OS-level
+    // reduce-motion setting.
+    val reducedMotion = rememberIsReducedMotionEnabled()
     var selectedFilter by remember { mutableStateOf("Running") }
     val filters = listOf("Running", "In Queue", "Scheduled", "Paused", "Errored", "Cancelled")
 
@@ -390,7 +395,10 @@ fun QueueScreen(
 
                         AnimatedVisibility(
                             visibleState = visibleState,
-                            enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                            // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
+                            // but keeps the fade — brief functional feedback that a new item just
+                            // appeared, same as better-accessibility's own guidance distinguishes.
+                            enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
                             exit = ExitTransition.None,
                             modifier = Modifier.animateItem(),
                         ) {
@@ -663,6 +671,10 @@ fun QueueItemCard(
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    // better-interface review: the wavy progress indicator below animated its wave motion
+    // unconditionally. Flattening amplitude to 0 under reduced motion keeps the progress *level*
+    // itself moving (functional feedback, not decorative) while dropping the continuous undulation.
+    val reducedMotion = rememberIsReducedMotionEnabled()
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -810,7 +822,7 @@ fun QueueItemCard(
                             .height(12.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        amplitude = { progress -> if (progress > 0.9f) 0f else 0.4f },
+                        amplitude = { progress -> if (reducedMotion || progress > 0.9f) 0f else 0.4f },
                         wavelength = 40.dp,
                         waveSpeed = 8.dp,
                     )
@@ -828,7 +840,7 @@ fun QueueItemCard(
                             .height(12.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        amplitude = 0.4f,
+                        amplitude = if (reducedMotion) 0f else 0.4f,
                         wavelength = 40.dp,
                         waveSpeed = if (isExtracting) 4.dp else 8.dp,
                     )
@@ -922,7 +934,12 @@ fun QueueItemCard(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    // Explicit gap rather than relying on each TextButton/IconButton's own default
+                    // touch-target padding for spacing — better-interface review: on the 4-action
+                    // ERRORED row (Add cookies / Retry / Copy / Remove) that default padding was the
+                    // only thing separating adjacent actions, tighter and less deliberate than a
+                    // real gap.
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     when (item.status) {
