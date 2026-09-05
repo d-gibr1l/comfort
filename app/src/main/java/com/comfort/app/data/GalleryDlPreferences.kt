@@ -47,6 +47,7 @@ object GalleryDlPreferences {
     const val KEY_MAX_FILESIZE_ENABLED = "max_filesize_enabled"
     const val KEY_MAX_FILESIZE = "max_filesize"
     const val KEY_PROXY_URL = "proxy_url"
+    const val KEY_EXTRACTOR_ARGS = "extractor_args"
     const val KEY_DOWNLOAD_LOCATION_URI = "download_location_uri"
     const val KEY_GLOBAL_PAUSE = "global_pause"
     const val KEY_INSTANT_SHARE = "instant_share"
@@ -102,6 +103,20 @@ object GalleryDlPreferences {
 
     fun getExtraArgs(context: Context): String {
         return prefs(context).getString(KEY_EXTRA_ARGS, "") ?: ""
+    }
+
+    /** yt-dlp CLI-syntax --extractor-args string(s), e.g. "youtube:player_client=android,web".
+     * Multiple IE_KEY:ARGS blocks can be whitespace-separated, mirroring how --extractor-args can
+     * be repeated on the real CLI for different extractors. gallery-dl isn't wired to this — its
+     * own "Extra arguments" field already accepts arbitrary CLI flags including per-extractor
+     * config, so there's no separate mechanism needed there the way there is for yt-dlp's more
+     * restrictive extra_args field (only flat "key=value" pairs, not this nested syntax). */
+    fun getExtractorArgs(context: Context): String {
+        return prefs(context).getString(KEY_EXTRACTOR_ARGS, "") ?: ""
+    }
+
+    fun setExtractorArgs(context: Context, args: String) {
+        prefs(context).edit().putString(KEY_EXTRACTOR_ARGS, args).apply()
     }
 
     fun getCookies(context: Context): String {
