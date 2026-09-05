@@ -67,7 +67,7 @@ class CallbackWriter:
             self._emit(self.buffer)
             self.buffer = ""
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None):
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -101,6 +101,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # each individual file's download — setting only one leaves the other at gallery-dl's
         # own default (4) regardless of what the user configured.
         args.extend(["-o", f"extractor.retries={retries}", "-o", f"downloader.retries={retries}"])
+    if max_filesize:
+        args.extend(["-o", f"downloader.filesize-max={max_filesize}"])
     if extra_args:
         try:
             args.extend(shlex.split(extra_args))
@@ -237,6 +239,7 @@ if __name__ == "__main__":
             archive_path=_s(_rest[5]), limit_rate=_s(_rest[6]), item_filter=_s(_rest[7]),
             should_cancel=None, exclude_video=(_rest[8] == "1"),
             retries=_s(_rest[9]) if len(_rest) > 9 else None,
+            max_filesize=_s(_rest[10]) if len(_rest) > 10 else None,
         )
         print(f"[__status__] {_status}", file=_real_stdout, flush=True)
     elif _cmd == "list_items":

@@ -16,6 +16,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,10 +28,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -43,10 +48,8 @@ import com.comfort.app.theme.LocalThemeState
 import com.comfort.app.theme.ThemeMode
 import com.comfort.app.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
-import dev.darkokoa.datetimewheelpicker.core.WheelTextPicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import compose.icons.FeatherIcons
@@ -102,6 +105,22 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
     val filenameFormat = remember { GalleryDlPreferences.getFilenameFormat(context) }
     val hasCookies = remember { GalleryDlPreferences.getCookies(context).isNotBlank() }
 
+    var searchQuery by remember { mutableStateOf("") }
+    val mainItems = remember(themeSummary, filenameFormat, hasCookies) {
+        listOf(
+            SettingsItemSpec(FeatherIcons.Sun, "Appearance", themeSummary, SettingsItemColor.TERTIARY) { onNavigate(SettingsRoute.APPEARANCE) },
+            SettingsItemSpec(FeatherIcons.Download, "Downloads", filenameFormat, SettingsItemColor.PRIMARY) { onNavigate(SettingsRoute.DOWNLOADS) },
+            SettingsItemSpec(FeatherIcons.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED) },
+            SettingsItemSpec(FeatherIcons.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.PRIMARY) { onNavigate(SettingsRoute.COOKIES) },
+        )
+    }
+    val aboutItems = remember {
+        listOf(SettingsItemSpec(FeatherIcons.Info, "About", "Version, credits & source", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT) })
+    }
+    val filteredMainItems = mainItems.filter { it.matches(searchQuery) }
+    val filteredAboutItems = aboutItems.filter { it.matches(searchQuery) }
+    val isSearching = searchQuery.isNotBlank()
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -132,45 +151,16 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            GroupedRows {
-                SettingsListRow(
-                    icon = FeatherIcons.Sun,
-                    title = "Appearance",
-                    summary = themeSummary,
-                    onClick = { onNavigate(SettingsRoute.APPEARANCE) },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                SettingsListRow(
-                    icon = FeatherIcons.Download,
-                    title = "Downloads",
-                    summary = filenameFormat,
-                    onClick = { onNavigate(SettingsRoute.DOWNLOADS) },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                SettingsListRow(
-                    icon = FeatherIcons.Terminal,
-                    title = "Advanced",
-                    summary = "Extra gallery-dl arguments",
-                    onClick = { onNavigate(SettingsRoute.ADVANCED) },
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                SettingsListRow(
-                    icon = FeatherIcons.Lock,
-                    title = "Cookies & Login",
-                    summary = if (hasCookies) "Configured" else "Not set",
-                    onClick = { onNavigate(SettingsRoute.COOKIES) },
-                )
+            SettingsSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
+
+            ExpressiveSettingsList(items = filteredMainItems, emptyMessage = "No settings match \"$searchQuery\"".takeIf { isSearching && filteredMainItems.isEmpty() && filteredAboutItems.isEmpty() })
+
+            if (!isSearching) {
+                QuickEngineUpdateSection()
             }
 
-            QuickEngineUpdateSection()
-
-            GroupedRows {
-                SettingsListRow(
-                    icon = FeatherIcons.Info,
-                    title = "About",
-                    summary = "Version, credits & source",
-                    onClick = { onNavigate(SettingsRoute.ABOUT) },
-                )
+            if (filteredAboutItems.isNotEmpty()) {
+                ExpressiveSettingsList(items = filteredAboutItems)
             }
 
             // Clears the floating nav pill overlaying this screen (see MainScreen's own comment
@@ -181,14 +171,85 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
     }
 }
 
+// A pill-shaped 56dp search bar filtering the settings rows below it in real time.
 @Composable
-private fun GroupedRows(content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsSearchBar(query: String, onQueryChange: (String) -> Unit) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Column(content = content)
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(FeatherIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(12.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                if (query.isEmpty()) {
+                    Text("Search", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+    }
+}
+
+private enum class SettingsItemColor { PRIMARY, TERTIARY, SURFACE_HIGH }
+
+private class SettingsItemSpec(
+    val icon: ImageVector,
+    val title: String,
+    val summary: String,
+    val color: SettingsItemColor,
+    val onClick: () -> Unit,
+) {
+    fun matches(query: String): Boolean =
+        query.isBlank() || title.contains(query, ignoreCase = true) || summary.contains(query, ignoreCase = true)
+}
+
+// The M3 Expressive "list group" shape treatment: 3dp gaps between items, 28dp on the group's
+// outer top/bottom corners, 8dp on the corners items share with their neighbor.
+private fun expressiveListItemShape(index: Int, count: Int): RoundedCornerShape {
+    val outer = 28.dp
+    val inner = 8.dp
+    val top = if (index == 0) outer else inner
+    val bottom = if (index == count - 1) outer else inner
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
+}
+
+@Composable
+private fun ExpressiveSettingsList(items: List<SettingsItemSpec>, emptyMessage: String? = null) {
+    if (items.isEmpty()) {
+        if (emptyMessage != null) {
+            Text(emptyMessage, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        items.forEachIndexed { index, item ->
+            val (containerColor, onContainerColor) = when (item.color) {
+                SettingsItemColor.PRIMARY -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                SettingsItemColor.TERTIARY -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+                SettingsItemColor.SURFACE_HIGH -> MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurface
+            }
+            SettingsListRow(
+                icon = item.icon,
+                title = item.title,
+                summary = item.summary,
+                containerColor = containerColor,
+                onContainerColor = onContainerColor,
+                shape = expressiveListItemShape(index, items.size),
+                onClick = item.onClick,
+            )
+        }
     }
 }
 
@@ -197,39 +258,46 @@ private fun SettingsListRow(
     icon: ImageVector,
     title: String,
     summary: String? = null,
+    containerColor: Color,
+    onContainerColor: Color,
+    shape: RoundedCornerShape,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
+        shape = shape,
+        color = containerColor,
+        onClick = onClick,
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            if (summary != null) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
             }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = onContainerColor, fontWeight = FontWeight.SemiBold)
+                if (summary != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onContainerColor.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(18.dp))
         }
-        Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -299,6 +367,8 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var scheduleStartMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleStartMinutes(context)) }
     var scheduleEndMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleEndMinutes(context)) }
     var speedLimit by remember { mutableStateOf(GalleryDlPreferences.getSpeedLimit(context)) }
+    var maxFilesizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isMaxFilesizeEnabled(context)) }
+    var maxFilesize by remember { mutableStateOf(GalleryDlPreferences.getMaxFilesize(context)) }
     var instantShare by remember { mutableStateOf(GalleryDlPreferences.isInstantShareEnabled(context)) }
     var videoQuality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
     var noPlaylist by remember { mutableStateOf(GalleryDlPreferences.isNoPlaylist(context)) }
@@ -688,17 +758,19 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            SpeedLimitPickerButton(
-                currentLimit = speedLimit,
-                onPicked = { limit ->
-                    speedLimit = limit
-                    GalleryDlPreferences.setSpeedLimit(context, limit)
-                    scope.launch {
-                        DownloadDispatcher.restartRunningDownloads(context)
-                    }
-                }
+            SizeSheetField(
+                currentValue = speedLimit,
+                label = "Speed limit",
+                units = SPEED_UNITS,
+                onValueChange = {
+                    speedLimit = it
+                    GalleryDlPreferences.setSpeedLimit(context, it)
+                    // A speed limit is only ever read fresh when a new subprocess is spawned — no
+                    // IPC channel reaches an already-running one, so changing it here used to do
+                    // nothing for whatever's downloading right now, only the next thing queued.
+                    scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                },
             )
-            // (Speed limit is now applied instantly upon dialog OK via the onPicked callback)
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -823,6 +895,34 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                         },
                     )
                 }
+            }
+        }
+
+        SettingsSection(title = "Max file size", icon = FeatherIcons.HardDrive) {
+            IconToggleRow(
+                icon = FeatherIcons.HardDrive,
+                title = "Limit max file size",
+                subtitle = "Files larger than this are skipped instead of downloaded.",
+                checked = maxFilesizeEnabled,
+                onCheckedChange = {
+                    maxFilesizeEnabled = it
+                    GalleryDlPreferences.setMaxFilesizeEnabled(context, it)
+                    scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                },
+            )
+
+            if (maxFilesizeEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SizeSheetField(
+                    currentValue = maxFilesize,
+                    label = "Max file size",
+                    units = FILESIZE_UNITS,
+                    onValueChange = {
+                        maxFilesize = it
+                        GalleryDlPreferences.setMaxFilesize(context, it)
+                        scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                    },
+                )
             }
         }
     }
@@ -1882,115 +1982,106 @@ private fun StatusRow(icon: ImageVector, text: String, tint: androidx.compose.ui
 }
 
 
-@Composable
-private fun SpeedLimitPickerButton(
-    modifier: Modifier = Modifier,
-    currentLimit: String,
-    onPicked: (String) -> Unit,
-) {
-    var showPicker by remember { mutableStateOf(false) }
+// (label, suffix) pairs, e.g. "KB/s" -> "k". Order determines the trailing toggle's cycle order.
+private val SPEED_UNITS = listOf("KB/s" to "k", "MB/s" to "m")
+private val FILESIZE_UNITS = listOf("KB" to "k", "MB" to "m", "GB" to "g")
 
-    val isUnlimited = currentLimit.isBlank() || currentLimit == "0"
-    val displayValue = if (isUnlimited) "Unlimited" else {
-        val num = currentLimit.filter { it.isDigit() }
-        val suffix = currentLimit.filter { it.isLetter() }.uppercase()
-        val unit = if (suffix == "K") "KB/s" else if (suffix == "M") "MB/s" else "KB/s"
-        "$num $unit"
+/** A field that opens a bottom sheet to edit a "number + suffix letter" value (e.g. "500k",
+ * "2M") — the string format both Speed limit and Max file size share, and that both engines'
+ * own config parsers accept directly. Blank/zero numeric input means unlimited, matching both
+ * preferences' own convention. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SizeSheetField(
+    modifier: Modifier = Modifier,
+    label: String,
+    currentValue: String,
+    units: List<Pair<String, String>>,
+    onValueChange: (String) -> Unit,
+) {
+    var showSheet by remember { mutableStateOf(false) }
+
+    val displayValue = if (currentValue.isBlank()) "Unlimited" else {
+        val num = currentValue.filter { it.isDigit() || it == '.' }
+        val suffix = currentValue.filter { it.isLetter() }.lowercase()
+        val unitLabel = units.firstOrNull { it.second == suffix }?.first ?: units[0].first
+        "$num $unitLabel"
     }
 
     OutlinedButton(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        onClick = { showPicker = true },
+        onClick = { showSheet = true },
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-            Text("Speed limit", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(displayValue, style = MaterialTheme.typography.titleMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(displayValue, style = MaterialTheme.typography.titleMedium)
+            }
+            Icon(FeatherIcons.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
-    if (showPicker) {
-        val numbers = listOf("Unlimited") + (1..999).map { it.toString() }
-        val units = listOf("KB/s", "MB/s")
-        
-        var selectedNumIndex by remember { 
+    if (showSheet) {
+        // Seeded once from the committed value when the sheet opens, then only ever written by
+        // the fields below — re-deriving from currentValue on every recomposition would fight
+        // whatever the user is mid-typing.
+        var numberText by remember { mutableStateOf(currentValue.filter { it.isDigit() || it == '.' }) }
+        var unitIndex by remember {
             mutableStateOf(
-                if (isUnlimited) 0 else {
-                    val n = currentLimit.filter { it.isDigit() }.toIntOrNull() ?: 1
-                    n.coerceIn(1, 999)
-                }
-            ) 
-        }
-        var selectedUnitIndex by remember { 
-            mutableStateOf(
-                if (currentLimit.uppercase().contains("M")) 1 else 0
+                units.indexOfFirst { (_, suffix) -> currentValue.trim().endsWith(suffix, ignoreCase = true) }
+                    .takeIf { it >= 0 } ?: 0
             )
         }
-
-        Dialog(onDismissRequest = { showPicker = false }) {
-            Card(shape = MaterialTheme.shapes.large) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+                Text(label, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = numberText,
+                    onValueChange = { numberText = it.filter { c -> c.isDigit() || c == '.' } },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Unlimited") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                Spacer(Modifier.height(12.dp))
+                // A plain chip row instead of a DropdownMenu — a popup nested inside a
+                // ModalBottomSheet's own popup dismisses BOTH on tap (reproduced live: tapping
+                // the unit dropdown closed the whole sheet instead of opening the menu), so this
+                // sidesteps that Compose nested-popup bug entirely rather than working around it.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("Speed limit", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(16.dp))
-                    
-                    Row(
-                        modifier = Modifier.size(280.dp, 160.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        WheelTextPicker(
+                    units.forEachIndexed { index, (unitLabel, _) ->
+                        val selected = unitIndex == index
+                        Surface(
                             modifier = Modifier.weight(1f),
-                            startIndex = selectedNumIndex,
-                            texts = numbers,
-                            rowCount = 5,
-                            textStyle = MaterialTheme.typography.titleMedium,
-                            selectedTextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            onScrollFinished = { snapped -> 
-                                selectedNumIndex = snapped
-                                null
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            onClick = { unitIndex = index },
+                        ) {
+                            Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(unitLabel)
                             }
-                        )
-                        if (selectedNumIndex != 0) {
-                            WheelTextPicker(
-                                modifier = Modifier.weight(1f),
-                                startIndex = selectedUnitIndex,
-                                texts = units,
-                                rowCount = 5,
-                                textStyle = MaterialTheme.typography.titleMedium,
-                                selectedTextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                onScrollFinished = { snapped -> 
-                                    selectedUnitIndex = snapped
-                                    null
-                                }
-                            )
                         }
                     }
-                    
-                    Spacer(Modifier.height(24.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showPicker = false }) {
-                            Text("Cancel")
-                        }
-                        TextButton(onClick = { 
-                            val result = if (selectedNumIndex == 0) "" else {
-                                val n = selectedNumIndex
-                                val u = if (selectedUnitIndex == 0) "k" else "M"
-                                "$n$u"
-                            }
-                            onPicked(result)
-                            showPicker = false 
-                        }) {
-                            Text("OK")
-                        }
-                    }
+                }
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onValueChange(if (numberText.isBlank()) "" else "$numberText${units[unitIndex].second}")
+                        showSheet = false
+                    },
+                ) {
+                    Text("Done")
                 }
             }
         }

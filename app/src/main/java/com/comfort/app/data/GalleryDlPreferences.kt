@@ -44,6 +44,8 @@ object GalleryDlPreferences {
     const val KEY_SCHEDULE_START_MIN = "schedule_start_min"
     const val KEY_SCHEDULE_END_MIN = "schedule_end_min"
     const val KEY_SPEED_LIMIT = "speed_limit"
+    const val KEY_MAX_FILESIZE_ENABLED = "max_filesize_enabled"
+    const val KEY_MAX_FILESIZE = "max_filesize"
     const val KEY_DOWNLOAD_LOCATION_URI = "download_location_uri"
     const val KEY_GLOBAL_PAUSE = "global_pause"
     const val KEY_INSTANT_SHARE = "instant_share"
@@ -160,6 +162,33 @@ object GalleryDlPreferences {
         // shape) shields both engines from it before it's ever persisted or handed to either.
         val sanitized = limit.trim().replace(Regex("(?i)b$"), "")
         prefs(context).edit().putString(KEY_SPEED_LIMIT, sanitized).apply()
+    }
+
+    fun isMaxFilesizeEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_MAX_FILESIZE_ENABLED, false)
+    }
+
+    fun setMaxFilesizeEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_MAX_FILESIZE_ENABLED, enabled).apply()
+    }
+
+    /** gallery-dl/yt-dlp size syntax, e.g. "500k" or "2M" or "1G". Blank means unlimited. Only
+     * applied to downloads when [isMaxFilesizeEnabled] is also true. */
+    fun getMaxFilesize(context: Context): String {
+        return prefs(context).getString(KEY_MAX_FILESIZE, "") ?: ""
+    }
+
+    fun setMaxFilesize(context: Context, value: String) {
+        // Same trailing b/B footgun as setSpeedLimit() above — see its comment.
+        val sanitized = value.trim().replace(Regex("(?i)b$"), "")
+        prefs(context).edit().putString(KEY_MAX_FILESIZE, sanitized).apply()
+    }
+
+    /** The value to actually hand to a download's engine call — null when the limit is off or
+     * unset, so call sites don't need to re-check [isMaxFilesizeEnabled] themselves. */
+    fun getEffectiveMaxFilesize(context: Context): String? {
+        if (!isMaxFilesizeEnabled(context)) return null
+        return getMaxFilesize(context).takeIf { it.isNotBlank() }
     }
 
     /** A user-chosen SAF folder to save downloads into, or null to use the default
