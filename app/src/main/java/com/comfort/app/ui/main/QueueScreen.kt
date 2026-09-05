@@ -13,10 +13,12 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,6 +48,7 @@ import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // Matches the phrasing yt-dlp/gallery-dl actually use when a download failed because the site
@@ -288,7 +292,23 @@ fun QueueScreen(
                 // LazyColumn's own bottom contentPadding is the sole source of bottom clearance now.
                 .padding(top = paddingValues.calculateTopPadding())
         ) {
+            // better-interface review: this filter row (6 chips: Running/In Queue/Scheduled/
+            // Paused/Errored/Cancelled) has the same undiscoverable-overflow problem the Library
+            // toolbar row had — nothing on screen hints that "Cancelled" sits off past the visible
+            // edge on a typical phone width. Same fix applied here: a one-time nudge (auto-scroll
+            // right, then back) on first appearance, gated behind reduced motion.
+            val filterListState = rememberLazyListState()
+            val filterNudgePx = with(LocalDensity.current) { 28.dp.toPx() }
+            LaunchedEffect(Unit) {
+                delay(500)
+                if (!reducedMotion && filterListState.canScrollForward) {
+                    filterListState.animateScrollBy(filterNudgePx, animationSpec = tween(350))
+                    delay(150)
+                    filterListState.animateScrollBy(-filterNudgePx, animationSpec = tween(350))
+                }
+            }
             LazyRow(
+                state = filterListState,
                 // contentPadding (not an outer Modifier.padding) so the scrollable viewport spans
                 // the full screen width — chips scroll flush to the true edge instead of getting
                 // clipped mid-chip right at an inset boundary, which read as "cut off."

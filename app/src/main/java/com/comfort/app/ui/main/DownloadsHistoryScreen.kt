@@ -306,18 +306,11 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         }
                         // better-interface review: this row silently overflowed past the last
                         // couple of chips ("Deleted", Grid/List) on typical phone widths with no
-                        // visible cue that anything more was scrollable. A first attempt (edge
-                        // fades sized with fillMaxHeight()) broke the whole screen's layout —
-                        // fillMaxHeight() resolved against the topBar slot's own unbounded height
-                        // instead of the row's, ballooning it and pushing every list/grid item
-                        // off-screen. A second attempt (a scrollbar-style track/thumb strip below
-                        // the row) worked but was replaced at the user's request with two treatments
-                        // instead: a "fog" edge fade — same idea as the first attempt, but this time
-                        // the wrapping Box gets height(IntrinsicSize.Min) so its height is derived
-                        // from the Row's own real content instead of the topBar slot's ambient
-                        // unbounded one, which is what made fillMaxHeight() balloon it before — and
-                        // a one-time "nudge": a brief auto-scroll-and-back on first appearance, the
-                        // physical equivalent of someone tapping the row and pointing right.
+                        // visible cue that anything more was scrollable. Two earlier attempts (an
+                        // edge fade, then a scrollbar-style track/thumb strip) both worked but the
+                        // user didn't want either look — this is a one-time "nudge" instead: a
+                        // brief auto-scroll-and-back on first appearance, the physical equivalent
+                        // of someone tapping the row and pointing right.
                         val toolbarScrollState = rememberScrollState()
                         val toolbarNudgePx = with(LocalDensity.current) { 28.dp.toPx() }
                         LaunchedEffect(Unit) {
@@ -336,86 +329,56 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 toolbarScrollState.animateScrollTo(0, animationSpec = tween(350))
                             }
                         }
-                        Box(modifier = Modifier.height(IntrinsicSize.Min)) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(toolbarScrollState)
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(toolbarScrollState)
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            LibraryToolbarChip(
+                                icon = FeatherIcons.Search,
+                                label = "Search",
+                                onClick = { showSearch = true },
+                            )
+                            Box {
                                 LibraryToolbarChip(
-                                    icon = FeatherIcons.Search,
-                                    label = "Search",
-                                    onClick = { showSearch = true },
+                                    icon = FeatherIcons.Sliders,
+                                    label = "Sort",
+                                    onClick = { sortMenuExpanded = true },
                                 )
-                                Box {
-                                    LibraryToolbarChip(
-                                        icon = FeatherIcons.Sliders,
-                                        label = "Sort",
-                                        onClick = { sortMenuExpanded = true },
-                                    )
-                                    DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
-                                        LibrarySort.entries.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option.label) },
-                                                leadingIcon = if (option == sortOption) {
-                                                    { Icon(FeatherIcons.Check, contentDescription = null) }
-                                                } else null,
-                                                onClick = { sortOption = option; sortMenuExpanded = false },
-                                            )
-                                        }
+                                DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                                    LibrarySort.entries.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option.label) },
+                                            leadingIcon = if (option == sortOption) {
+                                                { Icon(FeatherIcons.Check, contentDescription = null) }
+                                            } else null,
+                                            onClick = { sortOption = option; sortMenuExpanded = false },
+                                        )
                                     }
                                 }
-                                LibraryToolbarChip(
-                                    icon = FeatherIcons.Star,
-                                    label = "Favorites",
-                                    active = favoritesOnly,
-                                    onClick = { favoritesOnly = !favoritesOnly; if (favoritesOnly) showDeletedOnly = false },
-                                )
-                                LibraryToolbarChip(
-                                    icon = FeatherIcons.Trash2,
-                                    label = "Deleted",
-                                    active = showDeletedOnly,
-                                    onClick = { showDeletedOnly = !showDeletedOnly; if (showDeletedOnly) favoritesOnly = false },
-                                )
-                                LibraryToolbarChip(
-                                    icon = if (gridView) FeatherIcons.List else FeatherIcons.Grid,
-                                    label = if (gridView) "List" else "Grid",
-                                    onClick = {
-                                        gridView = !gridView
-                                        GalleryDlPreferences.setLibraryGridView(context, gridView)
-                                    },
-                                )
                             }
-                            // Only visible while there's actually unscrolled content in that
-                            // direction — a row that fits entirely on a wide screen shows neither.
-                            if (toolbarScrollState.value > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.CenterStart)
-                                        .fillMaxHeight()
-                                        .width(24.dp)
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(MaterialTheme.colorScheme.background, Color.Transparent)
-                                            )
-                                        ),
-                                )
-                            }
-                            if (toolbarScrollState.value < toolbarScrollState.maxValue) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .fillMaxHeight()
-                                        .width(24.dp)
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(Color.Transparent, MaterialTheme.colorScheme.background)
-                                            )
-                                        ),
-                                )
-                            }
+                            LibraryToolbarChip(
+                                icon = FeatherIcons.Star,
+                                label = "Favorites",
+                                active = favoritesOnly,
+                                onClick = { favoritesOnly = !favoritesOnly; if (favoritesOnly) showDeletedOnly = false },
+                            )
+                            LibraryToolbarChip(
+                                icon = FeatherIcons.Trash2,
+                                label = "Deleted",
+                                active = showDeletedOnly,
+                                onClick = { showDeletedOnly = !showDeletedOnly; if (showDeletedOnly) favoritesOnly = false },
+                            )
+                            LibraryToolbarChip(
+                                icon = if (gridView) FeatherIcons.List else FeatherIcons.Grid,
+                                label = if (gridView) "List" else "Grid",
+                                onClick = {
+                                    gridView = !gridView
+                                    GalleryDlPreferences.setLibraryGridView(context, gridView)
+                                },
+                            )
                         }
                     }
                 }
