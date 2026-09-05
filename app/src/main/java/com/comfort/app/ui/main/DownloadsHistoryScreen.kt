@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,7 +55,6 @@ import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -310,9 +308,11 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         // edge fade, then a scrollbar-style track/thumb strip) both worked but the
                         // user didn't want either look — this is a one-time "nudge" instead: a
                         // brief auto-scroll-and-back on first appearance, the physical equivalent
-                        // of someone tapping the row and pointing right.
+                        // of someone tapping the row and pointing right. Scrolls all the way to
+                        // maxValue (the real end), not a small hinting bump — a fixed small nudge
+                        // (reported live, and true of the analogous Queue-screen fix too) stopped
+                        // short of actually revealing the last chip.
                         val toolbarScrollState = rememberScrollState()
-                        val toolbarNudgePx = with(LocalDensity.current) { 28.dp.toPx() }
                         LaunchedEffect(Unit) {
                             // Give the static state a beat to register before moving anything —
                             // also lets the real maxValue (only known post-layout) settle so a
@@ -321,12 +321,9 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             // An automatic scroll the user didn't ask for — same reduce-motion
                             // gate as the entrance animations above, not just decorative here.
                             if (!reducedMotion && toolbarScrollState.maxValue > 0) {
-                                toolbarScrollState.animateScrollTo(
-                                    toolbarNudgePx.roundToInt().coerceAtMost(toolbarScrollState.maxValue),
-                                    animationSpec = tween(350),
-                                )
-                                delay(150)
-                                toolbarScrollState.animateScrollTo(0, animationSpec = tween(350))
+                                toolbarScrollState.animateScrollTo(toolbarScrollState.maxValue, animationSpec = tween(450))
+                                delay(250)
+                                toolbarScrollState.animateScrollTo(0, animationSpec = tween(450))
                             }
                         }
                         Row(
