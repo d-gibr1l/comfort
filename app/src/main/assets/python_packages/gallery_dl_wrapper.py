@@ -67,7 +67,7 @@ class CallbackWriter:
             self._emit(self.buffer)
             self.buffer = ""
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None):
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -103,6 +103,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         args.extend(["-o", f"extractor.retries={retries}", "-o", f"downloader.retries={retries}"])
     if max_filesize:
         args.extend(["-o", f"downloader.filesize-max={max_filesize}"])
+    if write_info_files:
+        # gallery-dl's closest analog to yt-dlp's --write-info-json: one JSON sidecar per
+        # downloaded file, containing the same metadata used for --filename/-filter expressions.
+        args.append("--write-metadata")
     if extra_args:
         try:
             args.extend(shlex.split(extra_args))
@@ -240,6 +244,7 @@ if __name__ == "__main__":
             should_cancel=None, exclude_video=(_rest[8] == "1"),
             retries=_s(_rest[9]) if len(_rest) > 9 else None,
             max_filesize=_s(_rest[10]) if len(_rest) > 10 else None,
+            write_info_files=(_rest[11] == "1") if len(_rest) > 11 else False,
         )
         print(f"[__status__] {_status}", file=_real_stdout, flush=True)
     elif _cmd == "list_items":
