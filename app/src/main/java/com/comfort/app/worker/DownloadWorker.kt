@@ -519,6 +519,7 @@ class DownloadWorker(
                 val limitRate = GalleryDlPreferences.getSpeedLimit(applicationContext)
                 val networkRetries = GalleryDlPreferences.getNetworkRetries(applicationContext).toString()
                 val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(applicationContext).orEmpty()
+                val writeInfoFiles = GalleryDlPreferences.isWriteInfoFiles(applicationContext)
 
                 // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
                 // call into one shared interpreter — the race PythonEngineLock existed to prevent
@@ -532,7 +533,7 @@ class DownloadWorker(
                             "download", url, stagingDir.absolutePath, cookiesArg,
                             filenameFormat, extraArgs, galleryArchivePath, limitRate,
                             entity?.itemFilter.orEmpty(), if (excludeVideo) "1" else "0",
-                            networkRetries, maxFilesize,
+                            networkRetries, maxFilesize, if (writeInfoFiles) "1" else "0",
                         ),
                         actualCallback,
                     )
@@ -580,6 +581,7 @@ class DownloadWorker(
                             if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
                             videoQuality.resolutionCap()?.toString().orEmpty(),
                             outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
+                            if (writeInfoFiles) "1" else "0",
                         ),
                         actualCallback,
                     )
@@ -623,6 +625,20 @@ class DownloadWorker(
                             }
                         }
                     }
+                }
+
+                if (writeInfoFiles) {
+                    // gallery-dl's --write-metadata and yt-dlp's --write-description/
+                    // --write-info-json write these silently to disk — neither engine ever prints
+                    // their path the way it prints the actual media file's, so the normal
+                    // line-by-line callback above never sees them, never moves them out of
+                    // stagingDir, and they'd otherwise just be wiped out by the
+                    // deleteRecursively() below along with the rest of the now-empty staging dir.
+                    stagingDir.walkTopDown()
+                        .filter { it.isFile && (it.extension == "json" || it.name.endsWith(".description")) }
+                        .forEach { sidecarFile ->
+                            runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, sidecarFile) }
+                        }
                 }
 
                 stagingDir.deleteRecursively()

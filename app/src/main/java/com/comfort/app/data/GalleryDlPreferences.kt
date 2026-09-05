@@ -55,6 +55,7 @@ object GalleryDlPreferences {
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
     const val KEY_EMBED_THUMBNAIL = "embed_thumbnail"
     const val KEY_EMBED_METADATA = "embed_metadata"
+    const val KEY_WRITE_INFO_FILES = "write_info_files"
     const val KEY_NO_PLAYLIST = "no_playlist"
     const val KEY_ENGINE_UPDATE_LAST_CHECK_MS = "engine_update_last_check_ms"
     const val KEY_ENGINE_UPDATE_AVAILABLE = "engine_update_available"
@@ -269,6 +270,16 @@ object GalleryDlPreferences {
 
     fun setEmbedMetadata(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_EMBED_METADATA, enabled).apply()
+    }
+
+    /** Saves a per-item JSON metadata sidecar alongside each download — gallery-dl's
+     * --write-metadata, yt-dlp's --write-info-json plus --write-description. */
+    fun isWriteInfoFiles(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_WRITE_INFO_FILES, false)
+    }
+
+    fun setWriteInfoFiles(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WRITE_INFO_FILES, enabled).apply()
     }
 
     /** Whether a link that's technically part of a playlist/channel downloads just that one

@@ -376,6 +376,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
     var embedThumbnail by remember { mutableStateOf(GalleryDlPreferences.isEmbedThumbnail(context)) }
     var embedMetadata by remember { mutableStateOf(GalleryDlPreferences.isEmbedMetadata(context)) }
+    var writeInfoFiles by remember { mutableStateOf(GalleryDlPreferences.isWriteInfoFiles(context)) }
     var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
     var networkRetries by remember { mutableStateOf(GalleryDlPreferences.getNetworkRetries(context)) }
     var downloadLocationUri by remember { mutableStateOf(GalleryDlPreferences.getDownloadLocationUri(context)) }
@@ -638,6 +639,21 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 onCheckedChange = {
                     embedMetadata = it
                     GalleryDlPreferences.setEmbedMetadata(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.FileText,
+                title = "Write description / info.json files",
+                subtitle = "Save a separate JSON metadata file alongside each download.",
+                checked = writeInfoFiles,
+                onCheckedChange = {
+                    writeInfoFiles = it
+                    GalleryDlPreferences.setWriteInfoFiles(context, it)
                 },
             )
 

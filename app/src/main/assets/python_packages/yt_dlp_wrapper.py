@@ -77,7 +77,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
-             resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None):
+             resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
+             write_info_files=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -378,6 +379,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     filesize_bytes = _parse_size(max_filesize)
     if filesize_bytes:
         ydl_opts["max_filesize"] = filesize_bytes
+    if write_info_files:
+        ydl_opts["writedescription"] = True
+        ydl_opts["writeinfojson"] = True
     if extra_args:
         # yt-dlp has no CLI-args-string constructor, so only a small, safe subset of raw options
         # is supported this way: "key=value" pairs matching real yt_dlp option names, one per line
@@ -513,5 +517,6 @@ if __name__ == "__main__":
         retries=_s(a[18]) if len(a) > 18 else None,
         playlist_items=_s(a[19]) if len(a) > 19 else None,
         max_filesize=_s(a[20]) if len(a) > 20 else None,
+        write_info_files=_b(a[21]) if len(a) > 21 else False,
     )
     print(f"[__status__] {status}", flush=True)
