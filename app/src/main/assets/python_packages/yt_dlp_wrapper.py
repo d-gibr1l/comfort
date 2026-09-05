@@ -111,7 +111,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
              resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
-             write_info_files=False, clip_range=None, proxy_url=None):
+             write_info_files=False, clip_range=None, proxy_url=None, live_from_start=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -419,6 +419,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         ydl_opts["ratelimit"] = rate
     if proxy_url:
         ydl_opts["proxy"] = proxy_url
+    if live_from_start:
+        # A no-op for anything that isn't currently live (info_dict.get('is_live') gates every
+        # actual use of this internally), so safe to set unconditionally from a global preference.
+        ydl_opts["live_from_start"] = True
     filesize_bytes = _parse_size(max_filesize)
     if filesize_bytes:
         ydl_opts["max_filesize"] = filesize_bytes
@@ -570,5 +574,6 @@ if __name__ == "__main__":
         write_info_files=_b(a[21]) if len(a) > 21 else False,
         clip_range=_s(a[22]) if len(a) > 22 else None,
         proxy_url=_s(a[23]) if len(a) > 23 else None,
+        live_from_start=_b(a[24]) if len(a) > 24 else False,
     )
     print(f"[__status__] {status}", flush=True)
