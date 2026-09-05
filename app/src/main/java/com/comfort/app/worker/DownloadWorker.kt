@@ -521,6 +521,7 @@ class DownloadWorker(
                 val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(applicationContext).orEmpty()
                 val writeInfoFiles = GalleryDlPreferences.isWriteInfoFiles(applicationContext)
                 val proxyUrl = GalleryDlPreferences.getProxyUrl(applicationContext)
+                val extractorArgs = GalleryDlPreferences.getExtractorArgs(applicationContext)
 
                 // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
                 // call into one shared interpreter — the race PythonEngineLock existed to prevent
@@ -585,7 +586,7 @@ class DownloadWorker(
                             videoQuality.resolutionCap()?.toString().orEmpty(),
                             outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
                             if (writeInfoFiles) "1" else "0", clipRange, proxyUrl,
-                            if (liveFromStart) "1" else "0",
+                            if (liveFromStart) "1" else "0", extractorArgs,
                         ),
                         actualCallback,
                     )

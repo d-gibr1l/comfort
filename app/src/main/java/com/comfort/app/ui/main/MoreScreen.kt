@@ -1067,6 +1067,8 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     var extraArgs by remember { mutableStateOf(GalleryDlPreferences.getExtraArgs(context)) }
     var saved by remember { mutableStateOf(false) }
+    var extractorArgs by remember { mutableStateOf(GalleryDlPreferences.getExtractorArgs(context)) }
+    var extractorArgsSaved by remember { mutableStateOf(false) }
 
     SettingsSubScaffold(title = "Advanced", onBack = onBack) {
         SettingsSection(title = "Extra arguments", icon = FeatherIcons.Terminal) {
@@ -1102,6 +1104,44 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
             if (saved) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = FeatherIcons.CheckCircle, text = "Extra arguments saved", tint = MaterialTheme.colorScheme.secondary)
+            }
+        }
+
+        SettingsSection(title = "yt-dlp extractor arguments", icon = FeatherIcons.Terminal) {
+            Text(
+                "Site-specific yt-dlp tuning (throttling workarounds, player client selection, etc). " +
+                    "CLI syntax, e.g. \"youtube:player_client=android,web\". Separate multiple " +
+                    "extractors with whitespace.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = extractorArgs,
+                onValueChange = { extractorArgs = it; extractorArgsSaved = false },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                label = { Text("e.g. youtube:player_client=android") },
+                shape = MaterialTheme.shapes.medium,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    GalleryDlPreferences.setExtractorArgs(context, extractorArgs)
+                    extractorArgsSaved = true
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Save extractor arguments")
+            }
+
+            if (extractorArgsSaved) {
+                Spacer(Modifier.height(8.dp))
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extractor arguments saved", tint = MaterialTheme.colorScheme.secondary)
             }
         }
     }

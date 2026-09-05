@@ -82,6 +82,35 @@ def _parse_clip_range(clip_range):
         return None
     return download_range_func(None, [(start or 0, end if end is not None else float("inf"))])
 
+def _parse_extractor_args(raw):
+    """Converts yt-dlp CLI-syntax --extractor-args strings ("youtube:player_client=android,web")
+    into the nested dict yt-dlp's own extractor_args opt expects
+    ({"youtube": {"player_client": ["android", "web"]}}) — mirrors the real CLI's own parser
+    (options.py's _extractor_arg_parser) closely enough to accept the same syntax users would
+    find documented for yt-dlp itself. Multiple "IE_KEY:ARGS" blocks can be whitespace-separated,
+    standing in for --extractor-args being repeatable on the real CLI for different extractors."""
+    if not raw:
+        return None
+    result = {}
+    for block in raw.split():
+        if ":" not in block:
+            continue
+        ie_key, _, args_str = block.partition(":")
+        ie_key = ie_key.strip().lower()
+        if not ie_key:
+            continue
+        args = {}
+        for arg in args_str.split(";"):
+            if "=" not in arg:
+                continue
+            key, _, vals = arg.partition("=")
+            key = key.strip().lower().replace("-", "_")
+            values = [v.replace("\\,", ",").strip() for v in re.split(r"(?<!\\),", vals)]
+            args[key] = values
+        if args:
+            result[ie_key] = args
+    return result or None
+
 class _Logger:
     """Routes yt-dlp's own log messages through the same per-line callback DownloadWorker
     already uses for gallery-dl, instead of yt-dlp's default of printing to stdout — this module
@@ -111,7 +140,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
              resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
-             write_info_files=False, clip_range=None, proxy_url=None, live_from_start=False):
+             write_info_files=False, clip_range=None, proxy_url=None, live_from_start=False,
+             extractor_args=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -423,6 +453,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # A no-op for anything that isn't currently live (info_dict.get('is_live') gates every
         # actual use of this internally), so safe to set unconditionally from a global preference.
         ydl_opts["live_from_start"] = True
+    parsed_extractor_args = _parse_extractor_args(extractor_args)
+    if parsed_extractor_args:
+        ydl_opts["extractor_args"] = parsed_extractor_args
     filesize_bytes = _parse_size(max_filesize)
     if filesize_bytes:
         ydl_opts["max_filesize"] = filesize_bytes
@@ -575,5 +608,6 @@ if __name__ == "__main__":
         clip_range=_s(a[22]) if len(a) > 22 else None,
         proxy_url=_s(a[23]) if len(a) > 23 else None,
         live_from_start=_b(a[24]) if len(a) > 24 else False,
+        extractor_args=_s(a[25]) if len(a) > 25 else None,
     )
     print(f"[__status__] {status}", flush=True)
