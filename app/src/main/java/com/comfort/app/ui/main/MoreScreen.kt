@@ -50,6 +50,7 @@ import com.comfort.app.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import compose.icons.FeatherIcons
@@ -367,6 +368,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var scheduleStartMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleStartMinutes(context)) }
     var scheduleEndMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleEndMinutes(context)) }
     var speedLimit by remember { mutableStateOf(GalleryDlPreferences.getSpeedLimit(context)) }
+    var proxyUrl by remember { mutableStateOf(GalleryDlPreferences.getProxyUrl(context)) }
     var maxFilesizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isMaxFilesizeEnabled(context)) }
     var maxFilesize by remember { mutableStateOf(GalleryDlPreferences.getMaxFilesize(context)) }
     var instantShare by remember { mutableStateOf(GalleryDlPreferences.isInstantShareEnabled(context)) }
@@ -826,6 +828,43 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                             )
                         }
                     }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(Modifier.height(16.dp))
+
+            Text("Proxy", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = proxyUrl,
+                onValueChange = {
+                    proxyUrl = it
+                    GalleryDlPreferences.setProxyUrl(context, it)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Proxy") },
+                placeholder = { Text("None") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+            )
+            // Same reasoning as speedLimitSettled elsewhere in this file — a proxy is only ever
+            // read fresh when a new subprocess is spawned, so changing it here otherwise does
+            // nothing for whatever's downloading right now. Debounced so typing a new URL doesn't
+            // restart every currently running download on every keystroke.
+            var proxyUrlSettled by remember { mutableStateOf(proxyUrl) }
+            LaunchedEffect(proxyUrl) {
+                delay(800)
+                if (proxyUrl != proxyUrlSettled) {
+                    proxyUrlSettled = proxyUrl
+                    DownloadDispatcher.restartRunningDownloads(context)
                 }
             }
         }

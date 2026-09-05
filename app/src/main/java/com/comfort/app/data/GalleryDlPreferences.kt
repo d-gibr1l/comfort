@@ -46,6 +46,7 @@ object GalleryDlPreferences {
     const val KEY_SPEED_LIMIT = "speed_limit"
     const val KEY_MAX_FILESIZE_ENABLED = "max_filesize_enabled"
     const val KEY_MAX_FILESIZE = "max_filesize"
+    const val KEY_PROXY_URL = "proxy_url"
     const val KEY_DOWNLOAD_LOCATION_URI = "download_location_uri"
     const val KEY_GLOBAL_PAUSE = "global_pause"
     const val KEY_INSTANT_SHARE = "instant_share"
@@ -190,6 +191,17 @@ object GalleryDlPreferences {
     fun getEffectiveMaxFilesize(context: Context): String? {
         if (!isMaxFilesizeEnabled(context)) return null
         return getMaxFilesize(context).takeIf { it.isNotBlank() }
+    }
+
+    /** http(s):// or socks5:// proxy URL, e.g. "socks5://user:pass@127.0.0.1:1080". Blank means
+     * no proxy — both engines' own default (env vars aside, which this app doesn't otherwise
+     * touch). */
+    fun getProxyUrl(context: Context): String {
+        return prefs(context).getString(KEY_PROXY_URL, "") ?: ""
+    }
+
+    fun setProxyUrl(context: Context, url: String) {
+        prefs(context).edit().putString(KEY_PROXY_URL, url.trim()).apply()
     }
 
     /** A user-chosen SAF folder to save downloads into, or null to use the default
