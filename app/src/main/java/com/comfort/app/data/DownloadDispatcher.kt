@@ -77,7 +77,7 @@ object DownloadDispatcher {
         File(context.cacheDir, "gallery-dl-staging/$id").deleteRecursively()
     }
 
-    suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, videoQuality: VideoQuality? = null): String {
+    suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, videoQuality: VideoQuality? = null, clipRange: String? = null): String {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val id = UUID.randomUUID().toString()
         val globallyPaused = GalleryDlPreferences.isGloballyPaused(context)
@@ -108,6 +108,7 @@ object DownloadDispatcher {
                 dateAdded = System.currentTimeMillis(),
                 itemFilter = itemFilter,
                 videoQuality = videoQuality?.name,
+                clipRange = clipRange,
             )
         )
         // While globally paused, new downloads sit undispatched — resumeAll() picks up anything

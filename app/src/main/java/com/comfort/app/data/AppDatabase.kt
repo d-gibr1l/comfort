@@ -49,7 +49,15 @@ private val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
-@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 10, exportSchema = false)
+// Added clipRange ("start-end" timestamps, e.g. "00:10-01:30") — an optional per-download trim
+// range set on the Home screen's paste-a-link field before starting a yt-dlp-routed download.
+private val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN clipRange TEXT")
+    }
+}
+
+@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 11, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
@@ -60,7 +68,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration
                     // above instead, so this never actually triggers and wipes the user's

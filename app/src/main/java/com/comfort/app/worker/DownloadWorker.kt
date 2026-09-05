@@ -551,6 +551,7 @@ class DownloadWorker(
                 val videoQuality = entity?.videoQuality?.let { stored -> runCatching { VideoQuality.valueOf(stored) }.getOrNull() }
                     ?: GalleryDlPreferences.getVideoQuality(applicationContext)
                 val audioOnly = videoQuality == VideoQuality.AUDIO_ONLY
+                val clipRange = entity?.clipRange.orEmpty()
                 val downloadSubtitles = GalleryDlPreferences.isDownloadSubtitles(applicationContext)
                 val subtitleLangs = GalleryDlPreferences.getSubtitleLanguages(applicationContext)
                 val embedThumbnail = GalleryDlPreferences.isEmbedThumbnail(applicationContext)
@@ -581,7 +582,7 @@ class DownloadWorker(
                             if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
                             videoQuality.resolutionCap()?.toString().orEmpty(),
                             outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
-                            if (writeInfoFiles) "1" else "0",
+                            if (writeInfoFiles) "1" else "0", clipRange,
                         ),
                         actualCallback,
                     )

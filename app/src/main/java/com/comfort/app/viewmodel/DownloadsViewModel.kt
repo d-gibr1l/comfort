@@ -68,9 +68,9 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         .map { list -> list.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    fun enqueueDownload(url: String, title: String, itemFilter: String? = null, totalItems: Int = 0) {
+    fun enqueueDownload(url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, clipRange: String? = null) {
         viewModelScope.launch {
-            DownloadDispatcher.enqueueDownload(getApplication(), url, title, itemFilter, totalItems)
+            DownloadDispatcher.enqueueDownload(getApplication(), url, title, itemFilter, totalItems, clipRange = clipRange)
         }
     }
 

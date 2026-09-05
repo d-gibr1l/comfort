@@ -73,6 +73,11 @@ data class DownloadEntity(
     // field existed — so a retry/resume still re-applies the quality the user actually picked
     // rather than silently falling back to the global default if it's since changed.
     val videoQuality: String? = null,
+    // "start-end" timestamps (e.g. "00:10-01:30"), set on the Home screen's paste-a-link field
+    // before starting the download. Only meaningful for yt-dlp-routed downloads — gallery-dl has
+    // no concept of trimming a gallery of images to a time range, so this is simply never read on
+    // that path. Null means download the whole thing, same as before this field existed.
+    val clipRange: String? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for
