@@ -558,6 +558,7 @@ class DownloadWorker(
                 val embedThumbnail = GalleryDlPreferences.isEmbedThumbnail(applicationContext)
                 val embedMetadata = GalleryDlPreferences.isEmbedMetadata(applicationContext)
                 val noPlaylist = GalleryDlPreferences.isNoPlaylist(applicationContext)
+                val liveFromStart = GalleryDlPreferences.isLiveFromStart(applicationContext)
                 val outputFormat = GalleryDlPreferences.getOutputFormat(applicationContext)
                 // The share-sheet picker's own gallery-dl-syntax --filter ("num in {1,3,4}", see
                 // SharePickerScreen) translated into yt-dlp's own native playlist_items syntax
@@ -584,6 +585,7 @@ class DownloadWorker(
                             videoQuality.resolutionCap()?.toString().orEmpty(),
                             outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
                             if (writeInfoFiles) "1" else "0", clipRange, proxyUrl,
+                            if (liveFromStart) "1" else "0",
                         ),
                         actualCallback,
                     )

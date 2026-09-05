@@ -58,6 +58,7 @@ object GalleryDlPreferences {
     const val KEY_EMBED_METADATA = "embed_metadata"
     const val KEY_WRITE_INFO_FILES = "write_info_files"
     const val KEY_NO_PLAYLIST = "no_playlist"
+    const val KEY_LIVE_FROM_START = "live_from_start"
     const val KEY_ENGINE_UPDATE_LAST_CHECK_MS = "engine_update_last_check_ms"
     const val KEY_ENGINE_UPDATE_AVAILABLE = "engine_update_available"
     const val KEY_OUTPUT_FORMAT = "output_format"
@@ -306,6 +307,17 @@ object GalleryDlPreferences {
 
     fun setNoPlaylist(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_NO_PLAYLIST, enabled).apply()
+    }
+
+    /** Whether an in-progress live stream downloads from its actual start instead of from the
+     * current moment (yt-dlp's own --live-from-start). A no-op for any URL that isn't currently
+     * live, so safe to leave on as a global default unlike most other per-download choices. */
+    fun isLiveFromStart(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_LIVE_FROM_START, false)
+    }
+
+    fun setLiveFromStart(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_LIVE_FROM_START, enabled).apply()
     }
 
     // Drives the small red badge on the Settings tab / About row — set by MainScreen's rate-limited

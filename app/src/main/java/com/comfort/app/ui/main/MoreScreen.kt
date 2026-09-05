@@ -374,6 +374,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var instantShare by remember { mutableStateOf(GalleryDlPreferences.isInstantShareEnabled(context)) }
     var videoQuality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
     var noPlaylist by remember { mutableStateOf(GalleryDlPreferences.isNoPlaylist(context)) }
+    var liveFromStart by remember { mutableStateOf(GalleryDlPreferences.isLiveFromStart(context)) }
     var downloadSubtitles by remember { mutableStateOf(GalleryDlPreferences.isDownloadSubtitles(context)) }
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
     var embedThumbnail by remember { mutableStateOf(GalleryDlPreferences.isEmbedThumbnail(context)) }
@@ -611,6 +612,21 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 onCheckedChange = {
                     noPlaylist = it
                     GalleryDlPreferences.setNoPlaylist(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Rewind,
+                title = "Live streams from the start",
+                subtitle = "Download an in-progress live stream from its beginning instead of starting at the current moment. Has no effect on a video that isn't currently live.",
+                checked = liveFromStart,
+                onCheckedChange = {
+                    liveFromStart = it
+                    GalleryDlPreferences.setLiveFromStart(context, it)
                 },
             )
 
