@@ -4,6 +4,8 @@ import re
 import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
+from yt_dlp.utils import download_range_func
+from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 
 class _Cancelled(Exception):
     pass
@@ -49,6 +51,37 @@ def _parse_size(size_str):
     multiplier = {"": 1, "k": 1024, "m": 1024 * 1024, "g": 1024 * 1024 * 1024}[unit]
     return int(value * multiplier)
 
+def _parse_timestamp(value):
+    """Converts a "H:MM:SS"/"MM:SS"/"SS" clip-trim timestamp (from the Home screen's Start/End
+    fields) into seconds. Returns None for a blank/unparseable value."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        # A leading/trailing empty segment (e.g. ":10" or "10:") means an omitted hour/minute,
+        # not a literal 0 duration to add — treated as 0 rather than fed to float(""), which
+        # would otherwise raise and reject an otherwise-valid, very typeable timestamp.
+        parts = [float(p) if p else 0.0 for p in value.split(":")]
+    except ValueError:
+        return None
+    seconds = 0.0
+    for part in parts:
+        seconds = seconds * 60 + part
+    return seconds
+
+def _parse_clip_range(clip_range):
+    """Converts a "start-end" string (either side optionally blank, meaning "from the
+    beginning"/"to the end") into a yt-dlp download_ranges callable, or None if neither side
+    parses to anything."""
+    if not clip_range or "-" not in clip_range:
+        return None
+    start_str, _, end_str = clip_range.partition("-")
+    start = _parse_timestamp(start_str)
+    end = _parse_timestamp(end_str)
+    if start is None and end is None:
+        return None
+    return download_range_func(None, [(start or 0, end if end is not None else float("inf"))])
+
 class _Logger:
     """Routes yt-dlp's own log messages through the same per-line callback DownloadWorker
     already uses for gallery-dl, instead of yt-dlp's default of printing to stdout — this module
@@ -78,7 +111,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
              resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
-             write_info_files=False):
+             write_info_files=False, clip_range=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -308,6 +341,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         ydl_opts["noplaylist"] = True
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
+        # FFmpegFD.available() (checked specifically for a partial/trimmed download — see
+        # clip_range below) instantiates FFmpegPostProcessor() with no downloader at all, so it
+        # never sees ydl_opts["ffmpeg_location"] and reports ffmpeg missing even though it's
+        # right there — a known yt-dlp gap ("Fixme: This may be wrong when --ffmpeg-location is
+        # used" in its own source). Its real CLI works around exactly this by also setting this
+        # module-level ContextVar directly; reproduced live (clip trim aborted with "ffmpeg is
+        # not installed" despite ffmpeg_location being set) and fixed the same way.
+        FFmpegPostProcessor._ffmpeg_location.set(ffmpeg_path)
         # Letting yt-dlp pick MP4 for a merge (its own default when the video track allows it)
         # used to produce unplayable output on real devices — some sites (Instagram among them)
         # serve VP9 video, and muxing VP9 into an MP4 container needs a "vpcC" codec-configuration
@@ -382,6 +423,13 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     if write_info_files:
         ydl_opts["writedescription"] = True
         ydl_opts["writeinfojson"] = True
+    range_func = _parse_clip_range(clip_range)
+    if range_func:
+        ydl_opts["download_ranges"] = range_func
+        # Without this, a cut can only land on the nearest existing keyframe (often a second or
+        # more off the requested timestamp) since ffmpeg -ss/-to on a copy-codec trim can't
+        # re-encode to an exact frame — this forces a keyframe to actually exist at the cut point.
+        ydl_opts["force_keyframes_at_cuts"] = True
     if extra_args:
         # yt-dlp has no CLI-args-string constructor, so only a small, safe subset of raw options
         # is supported this way: "key=value" pairs matching real yt_dlp option names, one per line
@@ -518,5 +566,6 @@ if __name__ == "__main__":
         playlist_items=_s(a[19]) if len(a) > 19 else None,
         max_filesize=_s(a[20]) if len(a) > 20 else None,
         write_info_files=_b(a[21]) if len(a) > 21 else False,
+        clip_range=_s(a[22]) if len(a) > 22 else None,
     )
     print(f"[__status__] {status}", flush=True)
