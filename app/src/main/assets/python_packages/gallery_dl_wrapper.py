@@ -67,7 +67,7 @@ class CallbackWriter:
             self._emit(self.buffer)
             self.buffer = ""
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False):
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -78,6 +78,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         args.extend(["--filename", filename_format])
     if limit_rate:
         args.extend(["--limit-rate", limit_rate])
+    if proxy_url:
+        args.extend(["--proxy", proxy_url])
     # Only one --filter is honored by gallery-dl (the last one wins, they don't combine), so an
     # item_filter from the share-picker and the video-exclusion filter have to be merged into one
     # expression rather than passed as two separate flags.
@@ -245,6 +247,7 @@ if __name__ == "__main__":
             retries=_s(_rest[9]) if len(_rest) > 9 else None,
             max_filesize=_s(_rest[10]) if len(_rest) > 10 else None,
             write_info_files=(_rest[11] == "1") if len(_rest) > 11 else False,
+            proxy_url=_s(_rest[12]) if len(_rest) > 12 else None,
         )
         print(f"[__status__] {_status}", file=_real_stdout, flush=True)
     elif _cmd == "list_items":

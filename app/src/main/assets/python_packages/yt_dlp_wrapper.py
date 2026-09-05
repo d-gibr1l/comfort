@@ -111,7 +111,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
              resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
-             write_info_files=False, clip_range=None):
+             write_info_files=False, clip_range=None, proxy_url=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -417,6 +417,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     rate = _parse_size(limit_rate)
     if rate:
         ydl_opts["ratelimit"] = rate
+    if proxy_url:
+        ydl_opts["proxy"] = proxy_url
     filesize_bytes = _parse_size(max_filesize)
     if filesize_bytes:
         ydl_opts["max_filesize"] = filesize_bytes
@@ -567,5 +569,6 @@ if __name__ == "__main__":
         max_filesize=_s(a[20]) if len(a) > 20 else None,
         write_info_files=_b(a[21]) if len(a) > 21 else False,
         clip_range=_s(a[22]) if len(a) > 22 else None,
+        proxy_url=_s(a[23]) if len(a) > 23 else None,
     )
     print(f"[__status__] {status}", flush=True)
