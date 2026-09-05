@@ -43,6 +43,7 @@ import com.comfort.app.theme.LocalThemeState
 import com.comfort.app.theme.ThemeMode
 import com.comfort.app.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
+import dev.darkokoa.datetimewheelpicker.core.WheelTextPicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
 import kotlinx.coroutines.delay
@@ -682,38 +683,22 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
             Text("Speed limit", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Caps download bandwidth, e.g. \"500k\" or \"2M\". Leave blank for unlimited.",
+                "Caps download bandwidth for all future downloads.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = speedLimit,
-                onValueChange = {
-                    speedLimit = it
-                    GalleryDlPreferences.setSpeedLimit(context, it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Speed limit") },
-                placeholder = { Text("Unlimited") },
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-            )
-            // A speed limit is only ever read fresh when a new subprocess is spawned — no IPC
-            // channel reaches an already-running one, so changing it here used to do nothing for
-            // whatever's downloading right now, only the next thing queued. Debounced (not fired
-            // straight from onValueChange above, which would otherwise restart every currently
-            // running download on every single keystroke while typing a new value) — restarts
-            // once typing actually settles. speedLimitSettled starts equal to the initial value
-            // specifically so opening this screen doesn't itself trigger a restart nobody asked for.
-            var speedLimitSettled by remember { mutableStateOf(speedLimit) }
-            LaunchedEffect(speedLimit) {
-                delay(800)
-                if (speedLimit != speedLimitSettled) {
-                    speedLimitSettled = speedLimit
-                    DownloadDispatcher.restartRunningDownloads(context)
+            SpeedLimitPickerButton(
+                currentLimit = speedLimit,
+                onPicked = { limit ->
+                    speedLimit = limit
+                    GalleryDlPreferences.setSpeedLimit(context, limit)
+                    scope.launch {
+                        DownloadDispatcher.restartRunningDownloads(context)
+                    }
                 }
-            }
+            )
+            // (Speed limit is now applied instantly upon dialog OK via the onPicked callback)
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -1896,3 +1881,118 @@ private fun StatusRow(icon: ImageVector, text: String, tint: androidx.compose.ui
     }
 }
 
+
+@Composable
+private fun SpeedLimitPickerButton(
+    modifier: Modifier = Modifier,
+    currentLimit: String,
+    onPicked: (String) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+
+    val isUnlimited = currentLimit.isBlank() || currentLimit == "0"
+    val displayValue = if (isUnlimited) "Unlimited" else {
+        val num = currentLimit.filter { it.isDigit() }
+        val suffix = currentLimit.filter { it.isLetter() }.uppercase()
+        val unit = if (suffix == "K") "KB/s" else if (suffix == "M") "MB/s" else "KB/s"
+        "$num $unit"
+    }
+
+    OutlinedButton(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        onClick = { showPicker = true },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Text("Speed limit", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(displayValue, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+
+    if (showPicker) {
+        val numbers = listOf("Unlimited") + (1..999).map { it.toString() }
+        val units = listOf("KB/s", "MB/s")
+        
+        var selectedNumIndex by remember { 
+            mutableStateOf(
+                if (isUnlimited) 0 else {
+                    val n = currentLimit.filter { it.isDigit() }.toIntOrNull() ?: 1
+                    n.coerceIn(1, 999)
+                }
+            ) 
+        }
+        var selectedUnitIndex by remember { 
+            mutableStateOf(
+                if (currentLimit.uppercase().contains("M")) 1 else 0
+            )
+        }
+
+        Dialog(onDismissRequest = { showPicker = false }) {
+            Card(shape = MaterialTheme.shapes.large) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("Speed limit", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Row(
+                        modifier = Modifier.size(280.dp, 160.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        WheelTextPicker(
+                            modifier = Modifier.weight(1f),
+                            startIndex = selectedNumIndex,
+                            texts = numbers,
+                            rowCount = 5,
+                            textStyle = MaterialTheme.typography.titleMedium,
+                            selectedTextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            onScrollFinished = { snapped -> 
+                                selectedNumIndex = snapped
+                                null
+                            }
+                        )
+                        if (selectedNumIndex != 0) {
+                            WheelTextPicker(
+                                modifier = Modifier.weight(1f),
+                                startIndex = selectedUnitIndex,
+                                texts = units,
+                                rowCount = 5,
+                                textStyle = MaterialTheme.typography.titleMedium,
+                                selectedTextStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                onScrollFinished = { snapped -> 
+                                    selectedUnitIndex = snapped
+                                    null
+                                }
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showPicker = false }) {
+                            Text("Cancel")
+                        }
+                        TextButton(onClick = { 
+                            val result = if (selectedNumIndex == 0) "" else {
+                                val n = selectedNumIndex
+                                val u = if (selectedUnitIndex == 0) "k" else "M"
+                                "$n$u"
+                            }
+                            onPicked(result)
+                            showPicker = false 
+                        }) {
+                            Text("OK")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
