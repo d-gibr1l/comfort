@@ -33,12 +33,15 @@ _FRAGMENT_SUFFIX_RE = re.compile(r"\.f[A-Za-z0-9][A-Za-z0-9_-]*\.[^./\\]+$")
 # a browser for sites that were already working fine without it.
 _REDDIT_SHARE_LINK_RE = re.compile(r"^https?://(www\.)?reddit\.com/r/[^/]+/s/[A-Za-z0-9]+/?")
 
-def _parse_rate(limit_rate):
-    """Converts gallery-dl-style rate strings ("500k", "2M") into yt-dlp's expected
-    bytes-per-second integer, so both engines can share the same Settings > Speed limit field."""
-    if not limit_rate:
+def _parse_size(size_str):
+    """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
+    integer. Shared by the Speed limit field (bytes-per-second, for yt-dlp's "ratelimit" opt) and
+    the Max file size field (bytes, for its "max_filesize" opt) — both engines' own config/CLI
+    layers accept these suffixed strings directly, but yt-dlp's Python API (unlike its CLI) wants
+    the value pre-parsed into an int before it ever reaches YoutubeDL's constructor dict."""
+    if not size_str:
         return None
-    match = re.match(r"^\s*([\d.]+)\s*([kKmMgG]?)\s*$", limit_rate)
+    match = re.match(r"^\s*([\d.]+)\s*([kKmMgG]?)\s*$", size_str)
     if not match:
         return None
     value = float(match.group(1))
@@ -74,7 +77,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
              audio_only=False, download_subtitles=False, subtitle_langs=None,
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
-             resolution_cap=None, output_format=None, retries=None, playlist_items=None):
+             resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -369,9 +372,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # table is still the real source of truth for dedup (see its comment for why), this is
         # just yt-dlp's own bookkeeping so a resume doesn't re-fetch already-finished files either.
         ydl_opts["download_archive"] = archive_path
-    rate = _parse_rate(limit_rate)
+    rate = _parse_size(limit_rate)
     if rate:
         ydl_opts["ratelimit"] = rate
+    filesize_bytes = _parse_size(max_filesize)
+    if filesize_bytes:
+        ydl_opts["max_filesize"] = filesize_bytes
     if extra_args:
         # yt-dlp has no CLI-args-string constructor, so only a small, safe subset of raw options
         # is supported this way: "key=value" pairs matching real yt_dlp option names, one per line
@@ -506,5 +512,6 @@ if __name__ == "__main__":
         output_format=_s(a[17]) if len(a) > 17 else None,
         retries=_s(a[18]) if len(a) > 18 else None,
         playlist_items=_s(a[19]) if len(a) > 19 else None,
+        max_filesize=_s(a[20]) if len(a) > 20 else None,
     )
     print(f"[__status__] {status}", flush=True)
