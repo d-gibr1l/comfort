@@ -296,15 +296,19 @@ fun QueueScreen(
             // Paused/Errored/Cancelled) has the same undiscoverable-overflow problem the Library
             // toolbar row had — nothing on screen hints that "Cancelled" sits off past the visible
             // edge on a typical phone width. Same fix applied here: a one-time nudge (auto-scroll
-            // right, then back) on first appearance, gated behind reduced motion.
+            // right, then back) on first appearance, gated behind reduced motion. Scrolls by a
+            // deliberately oversized distance rather than a small hinting bump — animateScrollBy
+            // clamps at the real end on its own, so this reliably reveals "Cancelled" regardless
+            // of how many chips are hidden, instead of a small nudge that (reported live) stopped
+            // short of it.
             val filterListState = rememberLazyListState()
-            val filterNudgePx = with(LocalDensity.current) { 28.dp.toPx() }
+            val filterNudgePx = with(LocalDensity.current) { 1000.dp.toPx() }
             LaunchedEffect(Unit) {
                 delay(500)
                 if (!reducedMotion && filterListState.canScrollForward) {
-                    filterListState.animateScrollBy(filterNudgePx, animationSpec = tween(350))
-                    delay(150)
-                    filterListState.animateScrollBy(-filterNudgePx, animationSpec = tween(350))
+                    filterListState.animateScrollBy(filterNudgePx, animationSpec = tween(450))
+                    delay(250)
+                    filterListState.animateScrollBy(-filterNudgePx, animationSpec = tween(450))
                 }
             }
             LazyRow(
@@ -897,8 +901,14 @@ fun QueueItemCard(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
+                    val speedStr = when {
+                        !isNetworkAvailable -> "0.00 MB/s"
+                        item.speedMbs == 0f -> "0.00 MB/s"
+                        item.speedMbs < 1f -> String.format(Locale.getDefault(), "%.2f KB/s", item.speedMbs * 1024)
+                        else -> String.format(Locale.getDefault(), "%.2f MB/s", item.speedMbs)
+                    }
                     Text(
-                        text = "Speed: ${String.format("%.2f", item.speedMbs)} MB/s",
+                        text = "Speed: " + speedStr,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
