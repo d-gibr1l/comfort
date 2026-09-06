@@ -70,17 +70,26 @@ def _parse_timestamp(value):
     return seconds
 
 def _parse_clip_range(clip_range):
-    """Converts a "start-end" string (either side optionally blank, meaning "from the
-    beginning"/"to the end") into a yt-dlp download_ranges callable, or None if neither side
-    parses to anything."""
-    if not clip_range or "-" not in clip_range:
+    """Converts "start-end" range string(s) — either side of a range optionally blank, meaning
+    "from the beginning"/"to the end" — into a yt-dlp download_ranges callable, or None if none of
+    them parse to anything. Several comma-separated ranges ("00:10-00:20,01:00-01:30") are
+    accepted, matching the preview sheet's multi-segment trim: download_range_func takes a list, so
+    yt-dlp cuts and concatenates every segment into the one output file."""
+    if not clip_range:
         return None
-    start_str, _, end_str = clip_range.partition("-")
-    start = _parse_timestamp(start_str)
-    end = _parse_timestamp(end_str)
-    if start is None and end is None:
+    ranges = []
+    for part in clip_range.split(","):
+        if "-" not in part:
+            continue
+        start_str, _, end_str = part.partition("-")
+        start = _parse_timestamp(start_str)
+        end = _parse_timestamp(end_str)
+        if start is None and end is None:
+            continue
+        ranges.append((start or 0, end if end is not None else float("inf")))
+    if not ranges:
         return None
-    return download_range_func(None, [(start or 0, end if end is not None else float("inf"))])
+    return download_range_func(None, ranges)
 
 def _parse_extractor_args(raw):
     """Converts yt-dlp CLI-syntax --extractor-args strings ("youtube:player_client=android,web")
@@ -141,7 +150,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
              resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
              write_info_files=False, clip_range=None, proxy_url=None, live_from_start=False,
-             extractor_args=None):
+             extractor_args=None, save_thumbnail=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -456,6 +465,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     parsed_extractor_args = _parse_extractor_args(extractor_args)
     if parsed_extractor_args:
         ydl_opts["extractor_args"] = parsed_extractor_args
+    if save_thumbnail:
+        # Writes the thumbnail out as its own file next to the media, unlike embed_thumbnail
+        # above which muxes it into the file itself — the preview sheet offers these as two
+        # separate choices because they produce genuinely different results.
+        ydl_opts["writethumbnail"] = True
     filesize_bytes = _parse_size(max_filesize)
     if filesize_bytes:
         ydl_opts["max_filesize"] = filesize_bytes
@@ -549,7 +563,19 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
     def _pick(entry):
         if not entry:
             return None
-        return {"title": entry.get("title"), "thumbnail": entry.get("thumbnail")}
+        # uploader is for the download preview sheet's card subtitle. Several extractors only
+        # populate one of these (Instagram gives "uploader", YouTube "channel", some give only
+        # "uploader_id"), so fall through them rather than showing nothing when the first is absent.
+        uploader = entry.get("uploader") or entry.get("channel") or entry.get("uploader_id")
+        # filesize is only populated once a specific format is picked; filesize_approx is what a
+        # plain extraction usually carries, so fall through to it rather than showing nothing.
+        filesize = entry.get("filesize") or entry.get("filesize_approx")
+        return {
+            "title": entry.get("title"),
+            "thumbnail": entry.get("thumbnail"),
+            "uploader": uploader,
+            "filesize": filesize,
+        }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -609,5 +635,6 @@ if __name__ == "__main__":
         proxy_url=_s(a[23]) if len(a) > 23 else None,
         live_from_start=_b(a[24]) if len(a) > 24 else False,
         extractor_args=_s(a[25]) if len(a) > 25 else None,
+        save_thumbnail=_b(a[26]) if len(a) > 26 else False,
     )
     print(f"[__status__] {status}", flush=True)

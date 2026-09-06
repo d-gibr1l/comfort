@@ -11,6 +11,7 @@ import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.DownloadedFileRecord
 import com.comfort.app.data.GalleryDlPreferences
+import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.FfmpegRuntime
@@ -504,8 +505,19 @@ class DownloadWorker(
                 }
 
                 val cookiesArg = normalizedCookiesPath?.absolutePath ?: ""
-                val filenameFormat = GalleryDlPreferences.getFilenameFormat(applicationContext)
-                val extraArgs = GalleryDlPreferences.getExtraArgs(applicationContext)
+                // Each of these prefers what the download preview sheet recorded for this one
+                // download over the global Settings default — see DownloadEntity's own comment on
+                // why they're nullable rather than defaulted. A retry/resume therefore re-applies
+                // exactly what the user picked in the sheet, not a since-changed global.
+                val filenameFormat = entity?.filenameTemplate?.takeIf { it.isNotBlank() }
+                    ?: GalleryDlPreferences.getFilenameFormat(applicationContext)
+                // The sheet's extra commands are appended to (not a replacement for) the global
+                // Advanced > Extra arguments field, so a per-download tweak doesn't silently drop
+                // whatever the user configured globally for every download.
+                val extraArgs = listOfNotNull(
+                    GalleryDlPreferences.getExtraArgs(applicationContext).takeIf { it.isNotBlank() },
+                    entity?.extraCommands?.takeIf { it.isNotBlank() },
+                ).joinToString(" ")
                 // Tracks already-fetched item IDs across retries, so pausing/retrying a download
                 // resumes where it left off instead of starting the whole gallery over. Separate
                 // files per engine — gallery-dl's archive is a sqlite db, yt-dlp's is a plain text
@@ -557,10 +569,15 @@ class DownloadWorker(
                 val downloadSubtitles = GalleryDlPreferences.isDownloadSubtitles(applicationContext)
                 val subtitleLangs = GalleryDlPreferences.getSubtitleLanguages(applicationContext)
                 val embedThumbnail = GalleryDlPreferences.isEmbedThumbnail(applicationContext)
+                // The sheet's "Save thumbnail" chip writes the thumbnail out as its own file
+                // (yt-dlp's writethumbnail) rather than embedding it in the media — a separate
+                // choice from the global "Embed thumbnail" setting above, which muxes it in.
+                val saveThumbnail = entity?.saveThumbnail == true
                 val embedMetadata = GalleryDlPreferences.isEmbedMetadata(applicationContext)
                 val noPlaylist = GalleryDlPreferences.isNoPlaylist(applicationContext)
                 val liveFromStart = GalleryDlPreferences.isLiveFromStart(applicationContext)
-                val outputFormat = GalleryDlPreferences.getOutputFormat(applicationContext)
+                val outputFormat = entity?.outputFormat?.let { stored -> runCatching { OutputFormat.valueOf(stored) }.getOrNull() }
+                    ?: GalleryDlPreferences.getOutputFormat(applicationContext)
                 // The share-sheet picker's own gallery-dl-syntax --filter ("num in {1,3,4}", see
                 // SharePickerScreen) translated into yt-dlp's own native playlist_items syntax
                 // ("1,3,4") — the item numbers themselves are already the right 1-indexed positions
@@ -587,6 +604,7 @@ class DownloadWorker(
                             outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
                             if (writeInfoFiles) "1" else "0", clipRange, proxyUrl,
                             if (liveFromStart) "1" else "0", extractorArgs,
+                            if (saveThumbnail) "1" else "0",
                         ),
                         actualCallback,
                     )

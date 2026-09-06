@@ -48,6 +48,7 @@ object GalleryDlPreferences {
     const val KEY_MAX_FILESIZE = "max_filesize"
     const val KEY_PROXY_URL = "proxy_url"
     const val KEY_EXTRACTOR_ARGS = "extractor_args"
+    const val KEY_FILENAME_TEMPLATES = "filename_templates"
     const val KEY_DOWNLOAD_LOCATION_URI = "download_location_uri"
     const val KEY_GLOBAL_PAUSE = "global_pause"
     const val KEY_INSTANT_SHARE = "instant_share"
@@ -117,6 +118,37 @@ object GalleryDlPreferences {
 
     fun setExtractorArgs(context: Context, args: String) {
         prefs(context).edit().putString(KEY_EXTRACTOR_ARGS, args).apply()
+    }
+
+    /** The user's saved filename templates, as offered by the download preview sheet's
+     * "Filename Templates" screen. Stored newline-separated rather than as JSON: a template is a
+     * single-line format string (see DEFAULT_FILENAME_FORMAT) and can't itself contain a newline,
+     * so there's nothing to escape and nothing to parse wrongly. Empty until the user saves one —
+     * the sheet shows its own empty state rather than shipping sample templates. */
+    fun getFilenameTemplates(context: Context): List<String> {
+        return (prefs(context).getString(KEY_FILENAME_TEMPLATES, "") ?: "")
+            .split("\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    private fun setFilenameTemplates(context: Context, templates: List<String>) {
+        prefs(context).edit().putString(KEY_FILENAME_TEMPLATES, templates.joinToString("\n")).apply()
+    }
+
+    /** Returns false when [template] is blank or already saved, so the caller can report that
+     * rather than silently appearing to succeed while the list is unchanged. */
+    fun addFilenameTemplate(context: Context, template: String): Boolean {
+        val trimmed = template.trim().replace("\n", " ")
+        if (trimmed.isEmpty()) return false
+        val existing = getFilenameTemplates(context)
+        if (trimmed in existing) return false
+        setFilenameTemplates(context, existing + trimmed)
+        return true
+    }
+
+    fun removeFilenameTemplate(context: Context, template: String) {
+        setFilenameTemplates(context, getFilenameTemplates(context).filterNot { it == template })
     }
 
     fun getCookies(context: Context): String {

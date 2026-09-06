@@ -21,6 +21,18 @@ import org.json.JSONObject
  * separate field precisely so nothing downstream is tempted to reuse [num] for identity again. */
 data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?, val listIndex: Int)
 
+/** What the download preview sheet shows about a link before committing to downloading it. Every
+ * field is independently optional — extractors vary a lot in what they populate, and a missing
+ * title or thumbnail is a cosmetic gap in the card, not a reason to refuse the download. */
+data class PreviewInfo(
+    val title: String?,
+    val uploader: String?,
+    val thumbnail: String?,
+    /** Bytes, from yt-dlp's own filesize/filesize_approx. Null when the extractor doesn't report
+     * either — common enough that the preview card just omits the size rather than guessing. */
+    val filesizeBytes: Long?,
+)
+
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
  * different situations for the picker: the former falls back to a normal whole-gallery download
@@ -296,6 +308,28 @@ object GalleryDlListing {
             videoIndex++
             if (thumbnail != null) item.copy(url = thumbnail) else item
         }
+    }
+
+    /** Title/uploader/thumbnail for the download preview sheet's card, from the same yt-dlp
+     * listing pass the share picker already runs — so showing the sheet costs no extra extraction
+     * beyond what a preview already did. Null for anything that fails to list (an unsupported
+     * link, a login-gated post, no network): the sheet just shows its placeholder card and the
+     * download itself still goes ahead, since a preview failing is not a reason to block it. */
+    suspend fun fetchPreviewInfo(context: Context, url: String): PreviewInfo? = withContext(Dispatchers.IO) {
+        val json = runYtDlpListInfo(context, url) ?: return@withContext null
+        // A multi-item source comes back as {"entries": [...]} — the sheet previews one download,
+        // so the first entry that actually resolved stands in for it.
+        val entry = json.optJSONArray("entries")?.let { entries ->
+            (0 until entries.length())
+                .mapNotNull { entries.optJSONObject(it) }
+                .firstOrNull { !it.optString("title").isNullOrBlank() || !it.optString("thumbnail").isNullOrBlank() }
+        } ?: json
+        PreviewInfo(
+            title = entry.optString("title").takeIf { it.isNotBlank() && it != "null" },
+            uploader = entry.optString("uploader").takeIf { it.isNotBlank() && it != "null" },
+            thumbnail = entry.optString("thumbnail").takeIf { it.isNotBlank() && it != "null" },
+            filesizeBytes = entry.optLong("filesize", 0L).takeIf { it > 0L },
+        )
     }
 
     private suspend fun runYtDlpListInfo(context: Context, url: String): JSONObject? {

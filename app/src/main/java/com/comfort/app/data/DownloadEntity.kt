@@ -73,11 +73,22 @@ data class DownloadEntity(
     // field existed — so a retry/resume still re-applies the quality the user actually picked
     // rather than silently falling back to the global default if it's since changed.
     val videoQuality: String? = null,
-    // "start-end" timestamps (e.g. "00:10-01:30"), set on the Home screen's paste-a-link field
-    // before starting the download. Only meaningful for yt-dlp-routed downloads — gallery-dl has
-    // no concept of trimming a gallery of images to a time range, so this is simply never read on
-    // that path. Null means download the whole thing, same as before this field existed.
+    // "start-end" timestamps (e.g. "00:10-01:30"), set in the download preview sheet's Trim
+    // screen before starting the download. Multiple comma-separated ranges are allowed
+    // ("00:10-00:20,01:00-01:30") — yt-dlp's own download_ranges takes a list, so several cuts of
+    // one video come out as one file. Only meaningful for yt-dlp-routed downloads — gallery-dl
+    // has no concept of trimming a gallery of images to a time range, so this is simply never
+    // read on that path. Null means download the whole thing.
     val clipRange: String? = null,
+    // The rest of the per-download overrides the preview sheet collects. Each is null when the
+    // user didn't override it there, in which case DownloadWorker falls back to the global
+    // Settings value at download time — same behavior as before the sheet existed, and the reason
+    // these are nullable rather than defaulted: a retry/resume re-applies what the user actually
+    // picked for *this* download instead of silently drifting to a since-changed global default.
+    val extraCommands: String? = null,
+    val outputFormat: String? = null,
+    val filenameTemplate: String? = null,
+    val saveThumbnail: Boolean? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

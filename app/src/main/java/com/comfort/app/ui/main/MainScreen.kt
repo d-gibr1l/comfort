@@ -110,6 +110,10 @@ fun navBarClearance(): Dp = NAV_BAR_RESERVED_HEIGHT + WindowInsets.navigationBar
 fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
+    // Non-null while the download preview sheet is up for that URL — the Home screen's Download
+    // button opens the sheet instead of enqueueing straight away, so per-download quality/format/
+    // trim/commands/filename can be set before anything starts.
+    var previewUrl by remember { mutableStateOf<String?>(null) }
     // Hoisted here (not owned inside MoreScreen) specifically so it survives switching away from
     // and back to the Settings tab — see MoreScreen's own doc comment for why a local remember
     // there wasn't enough.
@@ -171,7 +175,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         // a duplicate/live second copy of Home.
         if (selectedTab != 0) {
             HomeScreen(
-                onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") },
+                onDownload = { url -> previewUrl = url },
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = { showQueueScreen = true },
@@ -187,7 +191,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(tabBackProgress)) {
             when (selectedTab) {
                 0 -> HomeScreen(
-                    onDownload = { url -> viewModel.enqueueDownload(url, "Downloading from ${VideoSiteRouter.siteName(url)}") },
+                    onDownload = { url -> previewUrl = url },
                     viewModel = viewModel,
                     onOpenLibrary = { selectedTab = 1 },
                     onOpenQueue = { showQueueScreen = true },
@@ -230,6 +234,26 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
                     onBack = { showQueueScreen = false }
                 )
             }
+        }
+
+        previewUrl?.let { pendingUrl ->
+            DownloadPreviewSheet(
+                url = pendingUrl,
+                onDismiss = { previewUrl = null },
+                onDownload = { options ->
+                    viewModel.enqueueDownload(
+                        url = pendingUrl,
+                        title = "Downloading from ${VideoSiteRouter.siteName(pendingUrl)}",
+                        videoQuality = options.quality,
+                        clipRange = options.clipRange,
+                        extraCommands = options.extraCommands,
+                        outputFormat = options.outputFormat,
+                        filenameTemplate = options.filenameTemplate,
+                        saveThumbnail = options.saveThumbnail,
+                    )
+                    previewUrl = null
+                },
+            )
         }
     }
 }

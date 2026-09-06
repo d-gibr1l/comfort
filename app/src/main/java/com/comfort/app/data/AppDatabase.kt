@@ -57,7 +57,20 @@ private val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
-@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 11, exportSchema = false)
+// Added the rest of the download preview sheet's per-download overrides alongside the clipRange
+// column above — extra yt-dlp commands, output container, filename template and the save-thumbnail
+// flag. All nullable: null means "use the global Settings value at download time", which is what
+// every download did before the sheet existed.
+private val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN extraCommands TEXT")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN outputFormat TEXT")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN filenameTemplate TEXT")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN saveThumbnail INTEGER")
+    }
+}
+
+@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 12, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
@@ -68,7 +81,10 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return Instance ?: synchronized(this) {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
-                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                    .addMigrations(
+                        MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+                        MIGRATION_10_11, MIGRATION_11_12,
+                    )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration
                     // above instead, so this never actually triggers and wipes the user's
