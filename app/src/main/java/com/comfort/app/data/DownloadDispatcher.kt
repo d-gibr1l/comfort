@@ -77,7 +77,19 @@ object DownloadDispatcher {
         File(context.cacheDir, "gallery-dl-staging/$id").deleteRecursively()
     }
 
-    suspend fun enqueueDownload(context: Context, url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, videoQuality: VideoQuality? = null, clipRange: String? = null): String {
+    suspend fun enqueueDownload(
+        context: Context,
+        url: String,
+        title: String,
+        itemFilter: String? = null,
+        totalItems: Int = 0,
+        videoQuality: VideoQuality? = null,
+        clipRange: String? = null,
+        extraCommands: String? = null,
+        outputFormat: OutputFormat? = null,
+        filenameTemplate: String? = null,
+        saveThumbnail: Boolean? = null,
+    ): String {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val id = UUID.randomUUID().toString()
         val globallyPaused = GalleryDlPreferences.isGloballyPaused(context)
@@ -109,6 +121,10 @@ object DownloadDispatcher {
                 itemFilter = itemFilter,
                 videoQuality = videoQuality?.name,
                 clipRange = clipRange,
+                extraCommands = extraCommands,
+                outputFormat = outputFormat?.name,
+                filenameTemplate = filenameTemplate,
+                saveThumbnail = saveThumbnail,
             )
         )
         // While globally paused, new downloads sit undispatched — resumeAll() picks up anything
@@ -162,9 +178,13 @@ object DownloadDispatcher {
 
         val concurrentDownloads = GalleryDlPreferences.getConcurrentDownloads(context)
         val slot = nextQueueSlot.getAndUpdate { (it + 1) % concurrentDownloads }
+        
+        val uniqueName = if (forceImmediate) "gallery_dl_now_$id" else "gallery_dl_queue_$slot"
+        val policy = if (forceImmediate) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE
+        
         WorkManager.getInstance(context).enqueueUniqueWork(
-            "gallery_dl_queue_$slot",
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            uniqueName,
+            policy,
             workRequest,
         )
     }
@@ -370,6 +390,7 @@ object DownloadDispatcher {
         val entity = dao.getById(id) ?: return
         dao.setQueueOrder(id, -(System.currentTimeMillis() / 1000L).toInt())
         enqueueWork(context, id, entity.url, forceImmediate = true)
+        repairOrphanedQueue(context)
     }
 
     /** Whether the configured schedule window (if any) currently allows downloading — the

@@ -8,6 +8,8 @@ import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
+import com.comfort.app.data.OutputFormat
+import com.comfort.app.data.VideoQuality
 import com.comfort.app.util.MediaStoreHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -68,9 +70,28 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         .map { list -> list.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    fun enqueueDownload(url: String, title: String, itemFilter: String? = null, totalItems: Int = 0, clipRange: String? = null) {
+    fun enqueueDownload(
+        url: String,
+        title: String,
+        itemFilter: String? = null,
+        totalItems: Int = 0,
+        videoQuality: VideoQuality? = null,
+        clipRange: String? = null,
+        extraCommands: String? = null,
+        outputFormat: OutputFormat? = null,
+        filenameTemplate: String? = null,
+        saveThumbnail: Boolean? = null,
+    ) {
         viewModelScope.launch {
-            DownloadDispatcher.enqueueDownload(getApplication(), url, title, itemFilter, totalItems, clipRange = clipRange)
+            DownloadDispatcher.enqueueDownload(
+                getApplication(), url, title, itemFilter, totalItems,
+                videoQuality = videoQuality,
+                clipRange = clipRange,
+                extraCommands = extraCommands,
+                outputFormat = outputFormat,
+                filenameTemplate = filenameTemplate,
+                saveThumbnail = saveThumbnail,
+            )
         }
     }
 
