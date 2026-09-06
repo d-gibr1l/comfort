@@ -2,15 +2,16 @@
 package com.comfort.app.ui.main
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.comfort.app.data.GalleryDlPreferences
@@ -58,11 +62,12 @@ data class TrimSegment(
 private const val NOMINAL_DURATION_MS = 10 * 60 * 1000L
 private const val DEFAULT_SEGMENT_LENGTH_MS = 30 * 1000L
 
-/** Which of the sheet's screens is showing. They share one ModalBottomSheet and swap content with
- * a slide, rather than each being its own nested sheet: a popup inside a popup gets dismissed
- * *along with* its parent on tap in this Compose version (reproduced live earlier with a
- * DropdownMenu inside a ModalBottomSheet, which closed both), so nesting real sheets here would
- * reintroduce exactly that bug. */
+/** Which of the sheet's screens is showing. MAIN is always composed; every other value renders as
+ * a panel that slides up from the bottom and overlays MAIN in place, rather than a second real
+ * ModalBottomSheet: a popup inside a popup gets dismissed *along with* its parent on tap in this
+ * Compose version (reproduced live earlier with a DropdownMenu inside a ModalBottomSheet, which
+ * closed both), so nesting real sheets here would reintroduce exactly that bug. The overlay panel
+ * is a plain Surface animated with slideInVertically/slideOutVertically instead. */
 private enum class PreviewScreen { MAIN, COMMANDS, TRIM, TEMPLATES, VIEW_TEMPLATES }
 
 /** Everything the sheet collects, handed back to the caller by [onDownload] when the user commits.
@@ -120,10 +125,25 @@ fun DownloadPreviewSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val clipboard = LocalClipboardManager.current
 
     var screen by remember { mutableStateOf(PreviewScreen.MAIN) }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        // A swipe-to-hide drag normally commits straight to Hidden. With an overlay panel open,
+        // reject that commit and back out to MAIN instead — the sheet snaps back to expanded the
+        // same way it would if the user hadn't dragged far enough, rather than visibly collapsing
+        // and then being forced back open.
+        confirmValueChange = { target ->
+            if (target == SheetValue.Hidden && screen != PreviewScreen.MAIN) {
+                screen = PreviewScreen.MAIN
+                false
+            } else {
+                true
+            }
+        },
+    )
 
     // Seeded from the global defaults, then only ever changed by this sheet's own controls — a
     // per-download override, never a write back to the global Settings value.
@@ -157,110 +177,279 @@ fun DownloadPreviewSheet(
     BackHandler(enabled = screen != PreviewScreen.MAIN) { screen = PreviewScreen.MAIN }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        // Tapping the scrim outside the sheet's own bounds fires this directly (it doesn't go
+        // through sheetState/confirmValueChange above, which only guards drag-to-hide). With an
+        // overlay panel open this should back out to MAIN first, same as Back and the overlay's
+        // own scrim — only a tap with nothing open should actually dismiss the sheet.
+        onDismissRequest = { if (screen != PreviewScreen.MAIN) screen = PreviewScreen.MAIN else onDismiss() },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        // The default (BottomSheetDefaults.windowInsets) pads our whole content lambda above the
+        // navigation bar *before* it ever reaches us — which is exactly how MAIN gets to bleed
+        // behind the bar for free (the sheet's own Surface still extends the rest of the way, we
+        // just never draw there). Our overlay panel is a second, differently-colored Surface drawn
+        // *inside* that already-inset content, though, so it can't reach that reserved strip at
+        // all — it would stop short with a visible seam above the bar instead of bleeding through
+        // it in its own color. Disabling the default here and applying navigationBarsPadding()
+        // ourselves (below, in both MAIN and the overlay) lets each one grow into that space with
+        // its own background instead of only the sheet's base color showing through it.
+        contentWindowInsets = { WindowInsets(0) },
     ) {
-        AnimatedContent(
-            targetState = screen,
-            transitionSpec = {
-                val forward = targetState != PreviewScreen.MAIN
-                if (forward) {
-                    (slideInHorizontally(tween(300)) { it } + fadeIn(tween(300))) togetherWith
-                        (slideOutHorizontally(tween(300)) { -it / 4 } + fadeOut(tween(300)))
-                } else {
-                    (slideInHorizontally(tween(300)) { -it / 4 } + fadeIn(tween(300))) togetherWith
-                        (slideOutHorizontally(tween(300)) { it } + fadeOut(tween(300)))
-                }.using(SizeTransform(clip = false))
+        // Broken out into its own (non-extension) composable so the AnimatedVisibility calls below
+        // aren't lexically inside ModalBottomSheet's ColumnScope receiver — with that receiver in
+        // scope, Kotlin resolves the plain top-level AnimatedVisibility to Compose's ColumnScope-
+        // extension overload instead and refuses to call it without an explicit receiver.
+        PreviewSheetOverlayHost(
+            screen = screen,
+            onScreenChange = { screen = it },
+            url = url,
+            context = context,
+            scope = scope,
+            clipboard = clipboard,
+            previewTitle = previewTitle,
+            previewUploader = previewUploader,
+            previewThumbnail = previewThumbnail,
+            previewFilesize = previewFilesize,
+            previewLoading = previewLoading,
+            quality = quality,
+            onQualityChange = { quality = it },
+            outputFormat = outputFormat,
+            onToggleFormat = {
+                outputFormat = if (outputFormat == OutputFormat.MP4) OutputFormat.MKV else OutputFormat.MP4
             },
-            label = "previewScreen",
-        ) { current ->
-            when (current) {
-                PreviewScreen.MAIN -> MainPreviewScreen(
-                    url = url,
-                    title = previewTitle,
-                    uploader = previewUploader,
-                    thumbnail = previewThumbnail,
-                    filesizeBytes = previewFilesize,
-                    loading = previewLoading,
-                    quality = quality,
-                    onQualityChange = { quality = it },
-                    outputFormat = outputFormat,
-                    onToggleFormat = {
-                        outputFormat = if (outputFormat == OutputFormat.MP4) OutputFormat.MKV else OutputFormat.MP4
-                    },
-                    saveThumbnail = saveThumbnail,
-                    onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
-                    trimmed = segments.isNotEmpty(),
-                    commandCount = commands.size,
-                    filenameTemplate = filenameTemplate,
-                    onCopyLink = { clipboard.setText(AnnotatedString(url)) },
-                    onCancel = onDismiss,
-                    onOpenCommands = { screen = PreviewScreen.COMMANDS },
-                    onOpenTrim = {
-                        if (segments.isEmpty()) {
-                            segments = listOf(TrimSegment(startMs = 0L, endMs = DEFAULT_SEGMENT_LENGTH_MS))
-                        }
-                        screen = PreviewScreen.TRIM
-                    },
-                    onOpenTemplates = { screen = PreviewScreen.TEMPLATES },
-                    onDownload = {
-                        scope.launch {
-                            onDownload(
-                                DownloadOptions(
+            saveThumbnail = saveThumbnail,
+            onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
+            segments = segments,
+            onSegmentsChange = { segments = it },
+            commands = commands,
+            onCommandsChange = { commands = it },
+            filenameTemplate = filenameTemplate,
+            onFilenameTemplateChange = { filenameTemplate = it },
+            onDismiss = onDismiss,
+            onDownload = onDownload,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PreviewSheetOverlayHost(
+    screen: PreviewScreen,
+    onScreenChange: (PreviewScreen) -> Unit,
+    url: String,
+    context: android.content.Context,
+    scope: kotlinx.coroutines.CoroutineScope,
+    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    previewTitle: String?,
+    previewUploader: String?,
+    previewThumbnail: String?,
+    previewFilesize: Long?,
+    previewLoading: Boolean,
+    quality: VideoQuality,
+    onQualityChange: (VideoQuality) -> Unit,
+    outputFormat: OutputFormat,
+    onToggleFormat: () -> Unit,
+    saveThumbnail: Boolean,
+    onToggleSaveThumbnail: () -> Unit,
+    segments: List<TrimSegment>,
+    onSegmentsChange: (List<TrimSegment>) -> Unit,
+    commands: List<String>,
+    onCommandsChange: (List<String>) -> Unit,
+    filenameTemplate: String?,
+    onFilenameTemplateChange: (String?) -> Unit,
+    onDismiss: () -> Unit,
+    onDownload: (DownloadOptions) -> Unit,
+) {
+    val overlayOpen = screen != PreviewScreen.MAIN
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        MainPreviewScreen(
+            url = url,
+            title = previewTitle,
+            uploader = previewUploader,
+            thumbnail = previewThumbnail,
+            filesizeBytes = previewFilesize,
+            loading = previewLoading,
+            quality = quality,
+            onQualityChange = onQualityChange,
+            outputFormat = outputFormat,
+            onToggleFormat = onToggleFormat,
+            saveThumbnail = saveThumbnail,
+            onToggleSaveThumbnail = onToggleSaveThumbnail,
+            trimmed = segments.isNotEmpty(),
+            commandCount = commands.size,
+            filenameTemplate = filenameTemplate,
+            onCopyLink = { clipboard.setText(AnnotatedString(url)) },
+            onCancel = onDismiss,
+            onOpenCommands = { onScreenChange(PreviewScreen.COMMANDS) },
+            onOpenTrim = {
+                if (segments.isEmpty()) {
+                    onSegmentsChange(listOf(TrimSegment(startMs = 0L, endMs = DEFAULT_SEGMENT_LENGTH_MS)))
+                }
+                onScreenChange(PreviewScreen.TRIM)
+            },
+            onOpenTemplates = { onScreenChange(PreviewScreen.TEMPLATES) },
+            onDownload = {
+                scope.launch {
+                    onDownload(
+                        DownloadOptions(
+                            quality = quality,
+                            outputFormat = outputFormat,
+                            saveThumbnail = saveThumbnail,
+                            extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
+                            clipRange = segments.toClipRange(),
+                            filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
+            },
+        )
+
+        // Scrim: dims MAIN behind the overlay panel and, tapped, backs out of the overlay the
+        // same way Cancel on each sub-screen does (discarding whatever that sub-screen hadn't
+        // committed yet) rather than closing the whole sheet.
+        AnimatedVisibility(
+            visible = overlayOpen,
+            enter = fadeIn(tween(300)),
+            exit = fadeOut(tween(300)),
+            modifier = Modifier.matchParentSize(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.32f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onScreenChange(PreviewScreen.MAIN) },
+            )
+        }
+
+        // The overlay panel itself: pops up from the bottom and sits on top of MAIN, rather
+        // than replacing it — Commands/Trim/Templates/View Templates all render inside this
+        // one panel, swapping via a plain Crossfade so switching between them (e.g. Templates
+        // -> View Templates) doesn't re-trigger the slide-up entrance.
+        AnimatedVisibility(
+            visible = overlayOpen,
+            enter = slideInVertically(tween(300)) { it } + fadeIn(tween(300)),
+            exit = slideOutVertically(tween(300)) { it } + fadeOut(tween(300)),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 6.dp,
+            ) {
+                // navigationBarsPadding() grows this Column (and so the Surface wrapping it,
+                // which sizes to its content) by the nav-bar's own height — without it the panel
+                // stops flush with its last row of content, well short of the true screen edge,
+                // instead of bleeding its own surfaceContainerHigh color behind the bar the way
+                // MAIN's sheet background does.
+                Column(modifier = Modifier.navigationBarsPadding()) {
+                    // A drag-handle-style bar, matching the outer sheet's own, so the panel
+                    // reads as "another sheet" rather than an inline section of the first. Without
+                    // its own gesture handling, a drag here fell straight through to the outer
+                    // ModalBottomSheet's swipe-to-dismiss underneath — reproduced live: dragging
+                    // this handle dragged the whole sheet down instead of just this overlay. This
+                    // consumes vertical drags itself, closing just the overlay past a threshold,
+                    // which is what the handle looks like it should do anyway; it's scoped to the
+                    // handle alone so scrolling/sliders in the panel's own content below are
+                    // untouched.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp, bottom = 4.dp)
+                            .pointerInput(Unit) {
+                                var totalDrag = 0f
+                                detectVerticalDragGestures(
+                                    onDragStart = { totalDrag = 0f },
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        totalDrag += dragAmount
+                                    },
+                                    onDragEnd = {
+                                        if (totalDrag > 48.dp.toPx()) onScreenChange(PreviewScreen.MAIN)
+                                    },
+                                )
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 32.dp, height = 4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                        )
+                    }
+
+                    Box(modifier = Modifier.heightIn(max = 520.dp)) {
+                        Crossfade(targetState = screen, label = "overlayScreen") { current ->
+                            when (current) {
+                                PreviewScreen.COMMANDS -> ExtraCommandsScreen(
+                                    url = url,
                                     quality = quality,
                                     outputFormat = outputFormat,
                                     saveThumbnail = saveThumbnail,
-                                    extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
-                                    clipRange = segments.toClipRange(),
-                                    filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
-                                ),
-                            )
+                                    segments = segments,
+                                    filenameTemplate = filenameTemplate,
+                                    commands = commands,
+                                    onCommandsChange = onCommandsChange,
+                                    onCopy = {
+                                        clipboard.setText(AnnotatedString(buildPreviewCommand(
+                                            context = context,
+                                            url = url,
+                                            quality = quality,
+                                            outputFormat = outputFormat,
+                                            saveThumbnail = saveThumbnail,
+                                            segments = segments,
+                                            filenameTemplate = filenameTemplate,
+                                            extraCommands = commands,
+                                        )))
+                                    },
+                                    onCancel = {
+                                        onCommandsChange(emptyList())
+                                        onScreenChange(PreviewScreen.MAIN)
+                                    },
+                                    onDone = { onScreenChange(PreviewScreen.MAIN) },
+                                )
+
+                                PreviewScreen.TRIM -> TrimVideoScreen(
+                                    segments = segments,
+                                    onSegmentsChange = onSegmentsChange,
+                                    thumbnail = previewThumbnail,
+                                    pageUrl = url,
+                                    onCancel = {
+                                        onSegmentsChange(emptyList())
+                                        onScreenChange(PreviewScreen.MAIN)
+                                    },
+                                    onDone = { onScreenChange(PreviewScreen.MAIN) },
+                                )
+
+                                PreviewScreen.TEMPLATES -> FilenameTemplatesScreen(
+                                    current = filenameTemplate ?: GalleryDlPreferences.getFilenameFormat(context),
+                                    onApply = onFilenameTemplateChange,
+                                    onViewTemplates = { onScreenChange(PreviewScreen.VIEW_TEMPLATES) },
+                                    onCancel = {
+                                        onFilenameTemplateChange(null)
+                                        onScreenChange(PreviewScreen.MAIN)
+                                    },
+                                    onDone = { onScreenChange(PreviewScreen.MAIN) },
+                                )
+
+                                PreviewScreen.VIEW_TEMPLATES -> ViewTemplatesScreen(
+                                    onPick = {
+                                        onFilenameTemplateChange(it)
+                                        onScreenChange(PreviewScreen.TEMPLATES)
+                                    },
+                                    onBack = { onScreenChange(PreviewScreen.TEMPLATES) },
+                                )
+
+                                PreviewScreen.MAIN -> {}
+                            }
                         }
-                    },
-                )
-
-                PreviewScreen.COMMANDS -> ExtraCommandsScreen(
-                    commands = commands,
-                    onCommandsChange = { commands = it },
-                    onCopy = { clipboard.setText(AnnotatedString(commands.joinToString(" "))) },
-                    onCancel = {
-                        commands = emptyList()
-                        screen = PreviewScreen.MAIN
-                    },
-                    onDone = { screen = PreviewScreen.MAIN },
-                )
-
-                PreviewScreen.TRIM -> TrimVideoScreen(
-                    segments = segments,
-                    onSegmentsChange = { segments = it },
-                    thumbnail = previewThumbnail,
-                    pageUrl = url,
-                    onCancel = {
-                        segments = emptyList()
-                        screen = PreviewScreen.MAIN
-                    },
-                    onDone = { screen = PreviewScreen.MAIN },
-                )
-
-                PreviewScreen.TEMPLATES -> FilenameTemplatesScreen(
-                    current = filenameTemplate ?: GalleryDlPreferences.getFilenameFormat(context),
-                    onApply = { filenameTemplate = it },
-                    onViewTemplates = { screen = PreviewScreen.VIEW_TEMPLATES },
-                    onCancel = {
-                        filenameTemplate = null
-                        screen = PreviewScreen.MAIN
-                    },
-                    onDone = { screen = PreviewScreen.MAIN },
-                )
-
-                PreviewScreen.VIEW_TEMPLATES -> ViewTemplatesScreen(
-                    onPick = {
-                        filenameTemplate = it
-                        screen = PreviewScreen.TEMPLATES
-                    },
-                    onBack = { screen = PreviewScreen.TEMPLATES },
-                )
+                    }
+                }
             }
         }
     }
@@ -297,19 +486,19 @@ private fun PreviewChip(
     FilterChip(
         selected = selected,
         onClick = onClick,
-        label = { Text(label, maxLines = 1, fontWeight = FontWeight.ExtraBold, color = androidx.compose.ui.graphics.Color.Black) },
+        modifier = Modifier.height(31.dp),
+        label = { Text(label, maxLines = 1, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp) },
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            borderColor = androidx.compose.ui.graphics.Color.Black,
-            borderWidth = 1.5.dp,
+                        borderWidth = 1.5.dp,
             selectedBorderWidth = 1.5.dp
         ),
         // 8dp rather than the pill the theme's shape scale would otherwise give a chip — the
         // sheet's own spec calls for squarer chips than the fully-rounded buttons around them.
         shape = shape,
         leadingIcon = leading?.let {
-            { Icon(it, contentDescription = null, modifier = Modifier.size(16.dp), tint = androidx.compose.ui.graphics.Color.Black) }
+            { Icon(it, contentDescription = null, modifier = Modifier.size(15.dp)) }
         },
     )
 }
@@ -364,7 +553,11 @@ private fun MainPreviewScreen(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
-            .padding(bottom = 24.dp),
+            .padding(bottom = 24.dp)
+            // contentWindowInsets = 0 on the sheet means nothing pads this above the nav bar for
+            // us anymore — this keeps the Download button clear of it while the sheet's own
+            // background (now free to size past this Column) still bleeds behind the bar.
+            .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
@@ -417,7 +610,7 @@ private fun MainPreviewScreen(
         // listing pass is still resolving it.
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             shape = RoundedCornerShape(20.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -466,7 +659,7 @@ private fun MainPreviewScreen(
                     Text(
                         uploader.orEmpty(),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -475,7 +668,7 @@ private fun MainPreviewScreen(
                         Text(
                             formatFilesize(filesizeBytes),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                 }
@@ -496,52 +689,57 @@ private fun MainPreviewScreen(
             bottomEnd = androidx.compose.foundation.shape.CornerSize(50)
         )
 
-        FlowRow(
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            PreviewChip(
-                label = "Save thumbnail",
-                selected = saveThumbnail,
-                icon = FeatherIcons.Image,
-                shape = firstShape,
-                onClick = onToggleSaveThumbnail,
-            )
-            PreviewChip(
-                label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
-                selected = commandCount > 0,
-                icon = FeatherIcons.Terminal,
-                shape = lastShape,
-                onClick = onOpenCommands,
-            )
-        }
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                PreviewChip(
+                    label = "Save thumbnail",
+                    selected = saveThumbnail,
+                    icon = FeatherIcons.Image,
+                    shape = firstShape,
+                    onClick = onToggleSaveThumbnail,
+                )
+                PreviewChip(
+                    label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
+                    selected = commandCount > 0,
+                    icon = FeatherIcons.Terminal,
+                    shape = lastShape,
+                    onClick = onOpenCommands,
+                )
+            }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            PreviewChip(
-                label = "Trim Video",
-                selected = trimmed,
-                icon = FeatherIcons.Scissors,
-                shape = firstShape,
-                onClick = onOpenTrim,
-            )
-            PreviewChip(
-                label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
-                icon = FeatherIcons.Film,
-                shape = middleShape,
-                onClick = onToggleFormat,
-            )
-            PreviewChip(
-                label = "Filename Templates.",
-                selected = filenameTemplate != null,
-                icon = FeatherIcons.Tag,
-                shape = lastShape,
-                onClick = onOpenTemplates,
-            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                PreviewChip(
+                    label = "Trim Video",
+                    selected = trimmed,
+                    icon = FeatherIcons.Scissors,
+                    shape = firstShape,
+                    onClick = onOpenTrim,
+                )
+                PreviewChip(
+                    label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
+                    icon = FeatherIcons.Film,
+                    shape = middleShape,
+                    onClick = onToggleFormat,
+                )
+                PreviewChip(
+                    label = "Filename Templates.",
+                    selected = filenameTemplate != null,
+                    icon = FeatherIcons.Tag,
+                    shape = lastShape,
+                    onClick = onOpenTemplates,
+                )
+            }
         }
 
         Button(
@@ -556,8 +754,106 @@ private fun MainPreviewScreen(
     }
 }
 
+/** Assembles a human-readable shell-style yt-dlp command from the current sheet state plus global
+ *  preferences — mirrors what DownloadWorker actually passes to yt_dlp_wrapper.py. */
+private fun buildPreviewCommand(
+    context: android.content.Context,
+    url: String,
+    quality: VideoQuality,
+    outputFormat: OutputFormat,
+    saveThumbnail: Boolean,
+    segments: List<TrimSegment>,
+    filenameTemplate: String?,
+    extraCommands: List<String>,
+): String {
+    val parts = mutableListOf("yt-dlp")
+
+    // ── Quality ──────────────────────────────────────────────────────────────
+    when (quality) {
+        VideoQuality.AUDIO_ONLY -> parts += "-f bestaudio"
+        VideoQuality.BEST      -> {} // yt-dlp default, no flag needed
+        else -> {
+            val h = quality.resolutionCap()
+            parts += "-f \"bestvideo[height<=$h]+bestaudio\""
+        }
+    }
+
+    // ── Output container ─────────────────────────────────────────────────────
+    parts += "--merge-output-format ${outputFormat.extension}"
+
+    // ── Thumbnail ─────────────────────────────────────────────────────────────
+    if (GalleryDlPreferences.isEmbedThumbnail(context)) parts += "--embed-thumbnail"
+    if (saveThumbnail) parts += "--write-thumbnail"
+
+    // ── Metadata ──────────────────────────────────────────────────────────────
+    if (GalleryDlPreferences.isEmbedMetadata(context)) parts += "--embed-metadata"
+    if (GalleryDlPreferences.isWriteInfoFiles(context)) parts += "--write-info-json"
+
+    // ── Subtitles ─────────────────────────────────────────────────────────────
+    if (GalleryDlPreferences.isDownloadSubtitles(context)) {
+        parts += "--write-subs"
+        val langs = GalleryDlPreferences.getSubtitleLanguages(context)
+        if (langs.isNotBlank()) parts += "--sub-langs $langs"
+    }
+
+    // ── Playlist ──────────────────────────────────────────────────────────────
+    if (GalleryDlPreferences.isNoPlaylist(context)) parts += "--no-playlist"
+
+    // ── Live streams ──────────────────────────────────────────────────────────
+    if (GalleryDlPreferences.isLiveFromStart(context)) parts += "--live-from-start"
+
+    // ── Rate / size limits ────────────────────────────────────────────────────
+    val limitRate = GalleryDlPreferences.getSpeedLimit(context)
+    if (limitRate.isNotBlank()) parts += "-r $limitRate"
+
+    val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(context).orEmpty()
+    if (maxFilesize.isNotBlank()) parts += "--max-filesize $maxFilesize"
+
+    // ── Network ───────────────────────────────────────────────────────────────
+    val retries = GalleryDlPreferences.getNetworkRetries(context)
+    parts += "--retries $retries"
+
+    // ── Proxy ─────────────────────────────────────────────────────────────────
+    val proxy = GalleryDlPreferences.getProxyUrl(context)
+    if (proxy.isNotBlank()) parts += "--proxy \"$proxy\""
+
+    // ── Extractor args ────────────────────────────────────────────────────────
+    val extractorArgs = GalleryDlPreferences.getExtractorArgs(context)
+    if (extractorArgs.isNotBlank()) parts += "--extractor-args \"$extractorArgs\""
+
+    // ── Trim ──────────────────────────────────────────────────────────────────
+    if (segments.isNotEmpty()) {
+        val clip = segments.joinToString(",") { s ->
+            val fmt = { ms: Long -> "%d:%02d:%02d".format(ms / 3_600_000, (ms % 3_600_000) / 60_000, (ms % 60_000) / 1_000) }
+            "${fmt(s.startMs)}-${fmt(s.endMs)}"
+        }
+        parts += "--download-sections \"*$clip\""
+    }
+
+    // ── Filename template ─────────────────────────────────────────────────────
+    filenameTemplate?.takeIf { it.isNotBlank() }?.let { parts += "-o \"$it\"" }
+
+    // ── Global extra args (Settings > Advanced) ───────────────────────────────
+    val globalExtra = GalleryDlPreferences.getExtraArgs(context)
+    if (globalExtra.isNotBlank()) parts += globalExtra
+
+    // ── Per-download extra commands ───────────────────────────────────────────
+    extraCommands.forEach { parts += it }
+
+    // ── URL ───────────────────────────────────────────────────────────────────
+    parts += "\"$url\""
+
+    return parts.joinToString(" \\\n  ")
+}
+
 @Composable
 private fun ExtraCommandsScreen(
+    url: String,
+    quality: VideoQuality,
+    outputFormat: OutputFormat,
+    saveThumbnail: Boolean,
+    segments: List<TrimSegment>,
+    filenameTemplate: String?,
     commands: List<String>,
     onCommandsChange: (List<String>) -> Unit,
     onCopy: () -> Unit,
@@ -580,6 +876,18 @@ private fun ExtraCommandsScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val fullCommand = buildPreviewCommand(
+            context = context,
+            url = url,
+            quality = quality,
+            outputFormat = outputFormat,
+            saveThumbnail = saveThumbnail,
+            segments = segments,
+            filenameTemplate = filenameTemplate,
+            extraCommands = commands,
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
@@ -592,7 +900,6 @@ private fun ExtraCommandsScreen(
             )
             FilledTonalIconButton(
                 onClick = onCopy,
-                enabled = commands.isNotEmpty(),
                 modifier = Modifier.size(48.dp),
             ) {
                 Icon(FeatherIcons.Copy, contentDescription = "Copy current command")
@@ -610,20 +917,13 @@ private fun ExtraCommandsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
             ) {
-                if (commands.isEmpty()) {
-                    Text(
-                        "No extra commands yet. Anything added here is passed to the download " +
-                            "engine for this one download.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                    )
-                } else {
-                    Text(
-                        commands.joinToString(" "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
+                Text(
+                    fullCommand,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    ),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
         }
 
@@ -950,12 +1250,12 @@ private fun ViewTemplatesScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.secondaryContainer,
             ) {
                 Text(
                     "No saved templates yet. Add one on the previous screen and it'll show up here.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(16.dp),
                 )
             }
@@ -971,7 +1271,7 @@ private fun ViewTemplatesScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
                         onClick = { onPick(template) },
                     ) {
                         Row(
@@ -992,7 +1292,6 @@ private fun ViewTemplatesScreen(
                                 Icon(
                                     FeatherIcons.Trash2,
                                     contentDescription = "Delete template",
-                                    tint = MaterialTheme.colorScheme.error,
                                 )
                             }
                         }
