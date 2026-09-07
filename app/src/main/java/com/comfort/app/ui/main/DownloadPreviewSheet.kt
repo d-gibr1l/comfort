@@ -4,6 +4,7 @@ package com.comfort.app.ui.main
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,8 +34,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.comfort.app.data.GalleryDlPreferences
@@ -69,6 +72,17 @@ private const val DEFAULT_SEGMENT_LENGTH_MS = 30 * 1000L
  * closed both), so nesting real sheets here would reintroduce exactly that bug. The overlay panel
  * is a plain Surface animated with slideInVertically/slideOutVertically instead. */
 private enum class PreviewScreen { MAIN, COMMANDS, TRIM, TEMPLATES, VIEW_TEMPLATES }
+
+/** Snapshot of everything an overlay sub-screen (Commands/Trim/Templates) can touch, taken the
+ * moment MAIN opens one — restored verbatim by [PreviewScreen] back-out paths that aren't Done
+ * (scrim tap, hardware Back, drag-to-dismiss, Cancel), so backing out of a sub-screen is always a
+ * true no-op instead of each path hand-rolling its own (previously inconsistent, sometimes wrong)
+ * idea of what "discard" means. */
+private data class OverlaySnapshot(
+    val segments: List<TrimSegment>,
+    val commands: List<String>,
+    val filenameTemplate: String?,
+)
 
 /** Everything the sheet collects, handed back to the caller by [onDownload] when the user commits.
  * Every field is a per-download override — null/blank means "whatever Settings says at download
@@ -129,22 +143,6 @@ fun DownloadPreviewSheet(
 
     var screen by remember { mutableStateOf(PreviewScreen.MAIN) }
 
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        // A swipe-to-hide drag normally commits straight to Hidden. With an overlay panel open,
-        // reject that commit and back out to MAIN instead — the sheet snaps back to expanded the
-        // same way it would if the user hadn't dragged far enough, rather than visibly collapsing
-        // and then being forced back open.
-        confirmValueChange = { target ->
-            if (target == SheetValue.Hidden && screen != PreviewScreen.MAIN) {
-                screen = PreviewScreen.MAIN
-                false
-            } else {
-                true
-            }
-        },
-    )
-
     // Seeded from the global defaults, then only ever changed by this sheet's own controls — a
     // per-download override, never a write back to the global Settings value.
     var quality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
@@ -153,6 +151,59 @@ fun DownloadPreviewSheet(
     var commands by remember { mutableStateOf<List<String>>(emptyList()) }
     var segments by remember { mutableStateOf<List<TrimSegment>>(emptyList()) }
     var filenameTemplate by remember { mutableStateOf<String?>(null) }
+
+    // Taken once, the moment MAIN opens a sub-screen (openOverlay below) — null again means
+    // there's nothing open right now (or the last open/close cycle already resolved). Every
+    // non-Done way out of a sub-screen restores from this instead of each one independently
+    // deciding what "discard" means, which is what let scrim/Back/drag silently keep edits that
+    // Cancel discarded (and vice versa for a value that predated this visit, which Cancel used to
+    // wipe out to empty/null instead of restoring).
+    var overlaySnapshot by remember { mutableStateOf<OverlaySnapshot?>(null) }
+
+    // Opens a sub-screen from MAIN, snapshotting current values first — must run before any
+    // caller-side seeding (like Trim's default segment below) so the snapshot reflects what was
+    // true before this visit, not after.
+    fun openOverlay(target: PreviewScreen) {
+        if (overlaySnapshot == null) {
+            overlaySnapshot = OverlaySnapshot(segments, commands, filenameTemplate)
+        }
+        screen = target
+    }
+
+    // Done on any sub-screen: whatever's live right now becomes the real value, snapshot forgotten.
+    fun commitOverlay() {
+        overlaySnapshot = null
+        screen = PreviewScreen.MAIN
+    }
+
+    // Every other way out of a sub-screen (Cancel, scrim tap, hardware Back, drag-to-dismiss):
+    // restores exactly what openOverlay captured, discarding this visit's edits regardless of
+    // which of those four paths triggered it.
+    fun revertOverlay() {
+        overlaySnapshot?.let {
+            segments = it.segments
+            commands = it.commands
+            filenameTemplate = it.filenameTemplate
+        }
+        overlaySnapshot = null
+        screen = PreviewScreen.MAIN
+    }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        // A swipe-to-hide drag normally commits straight to Hidden. With an overlay panel open,
+        // reject that commit and back out to MAIN instead — the sheet snaps back to expanded the
+        // same way it would if the user hadn't dragged far enough, rather than visibly collapsing
+        // and then being forced back open.
+        confirmValueChange = { target ->
+            if (target == SheetValue.Hidden && screen != PreviewScreen.MAIN) {
+                revertOverlay()
+                false
+            } else {
+                true
+            }
+        },
+    )
 
     // Title/thumbnail for the preview card. The listing pass is the same one the share picker
     // already uses, so this costs nothing new on the engine side.
@@ -173,15 +224,16 @@ fun DownloadPreviewSheet(
     }
 
     // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
-    // the whole sheet, matching the forward navigation.
-    BackHandler(enabled = screen != PreviewScreen.MAIN) { screen = PreviewScreen.MAIN }
+    // the whole sheet, matching the forward navigation — and, like every other non-Done way out,
+    // discards whatever this visit changed rather than leaving it silently applied.
+    BackHandler(enabled = screen != PreviewScreen.MAIN) { revertOverlay() }
 
     ModalBottomSheet(
         // Tapping the scrim outside the sheet's own bounds fires this directly (it doesn't go
         // through sheetState/confirmValueChange above, which only guards drag-to-hide). With an
         // overlay panel open this should back out to MAIN first, same as Back and the overlay's
         // own scrim — only a tap with nothing open should actually dismiss the sheet.
-        onDismissRequest = { if (screen != PreviewScreen.MAIN) screen = PreviewScreen.MAIN else onDismiss() },
+        onDismissRequest = { if (screen != PreviewScreen.MAIN) revertOverlay() else onDismiss() },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         // The default (BottomSheetDefaults.windowInsets) pads our whole content lambda above the
@@ -202,6 +254,9 @@ fun DownloadPreviewSheet(
         PreviewSheetOverlayHost(
             screen = screen,
             onScreenChange = { screen = it },
+            onOpenOverlay = ::openOverlay,
+            onRevertOverlay = ::revertOverlay,
+            onCommitOverlay = ::commitOverlay,
             url = url,
             context = context,
             scope = scope,
@@ -236,6 +291,9 @@ fun DownloadPreviewSheet(
 private fun PreviewSheetOverlayHost(
     screen: PreviewScreen,
     onScreenChange: (PreviewScreen) -> Unit,
+    onOpenOverlay: (PreviewScreen) -> Unit,
+    onRevertOverlay: () -> Unit,
+    onCommitOverlay: () -> Unit,
     url: String,
     context: android.content.Context,
     scope: kotlinx.coroutines.CoroutineScope,
@@ -262,6 +320,13 @@ private fun PreviewSheetOverlayHost(
 ) {
     val overlayOpen = screen != PreviewScreen.MAIN
 
+    // Live drag offset for the overlay panel's own handle — follows the finger while dragging
+    // down (like the outer sheet's own handle does), snapped back to 0 whenever the overlay opens
+    // fresh for a different screen.
+    var dragOffsetPx by remember { mutableStateOf(0f) }
+    val dragScope = rememberCoroutineScope()
+    LaunchedEffect(overlayOpen) { if (overlayOpen) dragOffsetPx = 0f }
+
     Box(modifier = Modifier.fillMaxWidth()) {
         MainPreviewScreen(
             url = url,
@@ -281,14 +346,17 @@ private fun PreviewSheetOverlayHost(
             filenameTemplate = filenameTemplate,
             onCopyLink = { clipboard.setText(AnnotatedString(url)) },
             onCancel = onDismiss,
-            onOpenCommands = { onScreenChange(PreviewScreen.COMMANDS) },
+            onOpenCommands = { onOpenOverlay(PreviewScreen.COMMANDS) },
             onOpenTrim = {
+                // Snapshot first — via onOpenOverlay — so a revert (scrim/Back/drag/Cancel without
+                // Done) restores the empty state this default segment is about to replace, instead
+                // of leaving it behind as a silent, never-confirmed 30-second clip.
+                onOpenOverlay(PreviewScreen.TRIM)
                 if (segments.isEmpty()) {
                     onSegmentsChange(listOf(TrimSegment(startMs = 0L, endMs = DEFAULT_SEGMENT_LENGTH_MS)))
                 }
-                onScreenChange(PreviewScreen.TRIM)
             },
-            onOpenTemplates = { onScreenChange(PreviewScreen.TEMPLATES) },
+            onOpenTemplates = { onOpenOverlay(PreviewScreen.TEMPLATES) },
             onDownload = {
                 scope.launch {
                     onDownload(
@@ -321,7 +389,7 @@ private fun PreviewSheetOverlayHost(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) { onScreenChange(PreviewScreen.MAIN) },
+                    ) { onRevertOverlay() },
             )
         }
 
@@ -336,7 +404,38 @@ private fun PreviewSheetOverlayHost(
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Moves the whole panel down with the finger as dragOffsetPx tracks the drag
+                    // below — this is what actually makes the drag look like it's moving the
+                    // sheet, rather than just quietly counting distance toward a threshold.
+                    .offset { IntOffset(0, dragOffsetPx.roundToInt()) }
+                    // A drag anywhere on the panel — not just the handle — needs to be caught here
+                    // and not just on the handle: reproduced live, dragging down from elsewhere on
+                    // the panel fell straight through to the outer ModalBottomSheet's own
+                    // swipe-to-dismiss beneath it, same bug as the handle-only version of this fix.
+                    // Being on the Surface (an ancestor of the panel's own verticalScroll content)
+                    // means an inner scrollable still gets first claim on the drag while it has
+                    // room to scroll — this only takes over once a scroll is already at its bound
+                    // (or there's no scrollable under the finger at all), which is also normal
+                    // "drag past the top to dismiss" behavior for a sheet like this.
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                            },
+                            onDragEnd = {
+                                if (dragOffsetPx > 48.dp.toPx()) {
+                                    onRevertOverlay()
+                                } else {
+                                    dragScope.launch {
+                                        animate(dragOffsetPx, 0f) { value, _ -> dragOffsetPx = value }
+                                    }
+                                }
+                            },
+                        )
+                    },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 6.dp,
@@ -347,32 +446,13 @@ private fun PreviewSheetOverlayHost(
                 // instead of bleeding its own surfaceContainerHigh color behind the bar the way
                 // MAIN's sheet background does.
                 Column(modifier = Modifier.navigationBarsPadding()) {
-                    // A drag-handle-style bar, matching the outer sheet's own, so the panel
-                    // reads as "another sheet" rather than an inline section of the first. Without
-                    // its own gesture handling, a drag here fell straight through to the outer
-                    // ModalBottomSheet's swipe-to-dismiss underneath — reproduced live: dragging
-                    // this handle dragged the whole sheet down instead of just this overlay. This
-                    // consumes vertical drags itself, closing just the overlay past a threshold,
-                    // which is what the handle looks like it should do anyway; it's scoped to the
-                    // handle alone so scrolling/sliders in the panel's own content below are
-                    // untouched.
+                    // A drag-handle-style bar, matching the outer sheet's own, so the panel reads
+                    // as "another sheet" rather than an inline section of the first. Purely visual
+                    // now — the drag handling above lives on the whole Surface.
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp, bottom = 4.dp)
-                            .pointerInput(Unit) {
-                                var totalDrag = 0f
-                                detectVerticalDragGestures(
-                                    onDragStart = { totalDrag = 0f },
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        totalDrag += dragAmount
-                                    },
-                                    onDragEnd = {
-                                        if (totalDrag > 48.dp.toPx()) onScreenChange(PreviewScreen.MAIN)
-                                    },
-                                )
-                            },
+                            .padding(top = 12.dp, bottom = 4.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
@@ -407,11 +487,8 @@ private fun PreviewSheetOverlayHost(
                                             extraCommands = commands,
                                         )))
                                     },
-                                    onCancel = {
-                                        onCommandsChange(emptyList())
-                                        onScreenChange(PreviewScreen.MAIN)
-                                    },
-                                    onDone = { onScreenChange(PreviewScreen.MAIN) },
+                                    onCancel = onRevertOverlay,
+                                    onDone = onCommitOverlay,
                                 )
 
                                 PreviewScreen.TRIM -> TrimVideoScreen(
@@ -419,22 +496,16 @@ private fun PreviewSheetOverlayHost(
                                     onSegmentsChange = onSegmentsChange,
                                     thumbnail = previewThumbnail,
                                     pageUrl = url,
-                                    onCancel = {
-                                        onSegmentsChange(emptyList())
-                                        onScreenChange(PreviewScreen.MAIN)
-                                    },
-                                    onDone = { onScreenChange(PreviewScreen.MAIN) },
+                                    onCancel = onRevertOverlay,
+                                    onDone = onCommitOverlay,
                                 )
 
                                 PreviewScreen.TEMPLATES -> FilenameTemplatesScreen(
                                     current = filenameTemplate ?: GalleryDlPreferences.getFilenameFormat(context),
                                     onApply = onFilenameTemplateChange,
                                     onViewTemplates = { onScreenChange(PreviewScreen.VIEW_TEMPLATES) },
-                                    onCancel = {
-                                        onFilenameTemplateChange(null)
-                                        onScreenChange(PreviewScreen.MAIN)
-                                    },
-                                    onDone = { onScreenChange(PreviewScreen.MAIN) },
+                                    onCancel = onRevertOverlay,
+                                    onDone = onCommitOverlay,
                                 )
 
                                 PreviewScreen.VIEW_TEMPLATES -> ViewTemplatesScreen(
@@ -822,13 +893,14 @@ private fun buildPreviewCommand(
     if (extractorArgs.isNotBlank()) parts += "--extractor-args \"$extractorArgs\""
 
     // ── Trim ──────────────────────────────────────────────────────────────────
-    if (segments.isNotEmpty()) {
-        val clip = segments.joinToString(",") { s ->
-            val fmt = { ms: Long -> "%d:%02d:%02d".format(ms / 3_600_000, (ms % 3_600_000) / 60_000, (ms % 60_000) / 1_000) }
-            "${fmt(s.startMs)}-${fmt(s.endMs)}"
-        }
-        parts += "--download-sections \"*$clip\""
-    }
+    // The actual download path doesn't go through this flag at all — DownloadOptions.clipRange
+    // is built by the same toClipRange()/formatTimestamp() this reuses, then handed to
+    // yt_dlp_wrapper.py's _parse_clip_range, which installs a download_ranges callable on
+    // ydl_opts directly (yt-dlp's Python API), never a CLI arg. --download-sections is yt-dlp's
+    // own CLI-equivalent of that same callable, so shown here it's still a command a user could
+    // actually run to get the identical result — just reusing the real formatter now instead of a
+    // separate H:MM:SS one that silently rounded away everything sub-second.
+    segments.toClipRange()?.let { clip -> parts += "--download-sections \"*$clip\"" }
 
     // ── Filename template ─────────────────────────────────────────────────────
     filenameTemplate?.takeIf { it.isNotBlank() }?.let { parts += "-o \"$it\"" }

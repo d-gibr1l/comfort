@@ -278,10 +278,15 @@ private fun SettingsListRow(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    // A hardcoded primaryContainer background here disappeared entirely on a
+                    // PRIMARY row (Downloads, Cookies & Login) — its own Surface color IS
+                    // primaryContainer, so the circle drew in the same color as what's behind it.
+                    // A tint of the row's own onContainerColor instead stays visibly distinct no
+                    // matter which of the three row colors this is.
+                    .background(onContainerColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                Icon(icon, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {

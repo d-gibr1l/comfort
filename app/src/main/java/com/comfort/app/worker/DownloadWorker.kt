@@ -333,7 +333,7 @@ class DownloadWorker(
                                 // sibling coroutine force-kills the subprocess, unblocking the
                                 // blocking readLine() loop) — the outer catch(CancellationException)
                                 // below already knows to leave whatever status this just set alone.
-                                DownloadDispatcher.pauseDownload(applicationContext, downloadId)
+                                DownloadDispatcher.suspendForSchedule(applicationContext, downloadId)
                             }
                         }
                     }
@@ -650,15 +650,24 @@ class DownloadWorker(
                     }
                 }
 
-                if (writeInfoFiles) {
-                    // gallery-dl's --write-metadata and yt-dlp's --write-description/
-                    // --write-info-json write these silently to disk — neither engine ever prints
-                    // their path the way it prints the actual media file's, so the normal
+                if (writeInfoFiles || saveThumbnail) {
+                    // gallery-dl's --write-metadata, yt-dlp's --write-description/--write-info-json,
+                    // and yt-dlp's own --write-thumbnail (this sheet's "Save thumbnail" chip, see
+                    // saveThumbnail above) all write these silently to disk — neither engine ever
+                    // prints their path the way it prints the actual media file's, so the normal
                     // line-by-line callback above never sees them, never moves them out of
                     // stagingDir, and they'd otherwise just be wiped out by the
                     // deleteRecursively() below along with the rest of the now-empty staging dir.
+                    // (Reproduced live: "Save thumbnail" appeared to work — no error, download
+                    // finished normally — but nothing ever showed up in the gallery, because this
+                    // sweep used to run only for writeInfoFiles and only matched .json/.description.)
                     stagingDir.walkTopDown()
-                        .filter { it.isFile && (it.extension == "json" || it.name.endsWith(".description")) }
+                        .filter {
+                            it.isFile && (
+                                it.extension == "json" || it.name.endsWith(".description") ||
+                                    it.extension in setOf("jpg", "jpeg", "png", "webp")
+                                )
+                        }
                         .forEach { sidecarFile ->
                             runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, sidecarFile) }
                         }
