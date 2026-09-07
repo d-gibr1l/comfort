@@ -189,6 +189,26 @@ object DownloadDispatcher {
         )
     }
 
+    /** Called by a running DownloadWorker if the schedule window closes mid-download.
+     *  Cancels the current job and re-submits it so it goes back to SCHEDULED with the proper
+     *  delay until the window opens again, instead of staying PAUSED forever. */
+    suspend fun suspendForSchedule(context: Context, id: String) {
+        // Every other re-enqueuing path in this file bails out while globally paused
+        // (rescheduleQueuedDownloads, repairOrphanedQueue/repairOrphanedRunning via
+        // repairIfJobDead) — this one didn't, so a "Pause All" tap racing this same worker's own
+        // schedule-window check (which only polls once per 60s and lags behind cancellation, see
+        // DownloadWorker's actualCallback) could get silently undone for whichever download
+        // happened to be mid-transfer: it would come back SCHEDULED and start again on its own
+        // once the window reopened, ignoring the pause the user just asked for.
+        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        val entity = dao.getById(id) ?: return
+        dao.resetSpeed(id)
+        DownloadNotifications.cancel(context, id)
+        enqueueWork(context, id, entity.url)
+        repairOrphanedQueue(context)
+    }
+
     /** Cancels the in-flight WorkManager job (if any) and marks the entry paused — distinct from
      * [cancelDownload] so a global pauseAll()/resumeAll() cycle only ever touches downloads it
      * itself held back, never ones the user explicitly cancelled. Callable from anywhere — the
@@ -200,6 +220,7 @@ object DownloadDispatcher {
      * per paused item. The single-item paths (the in-app Pause button, the notification's own
      * Pause action) still want it, so this defaults to true rather than pauseAll() needing its own
      * separate cleanup pass. */
+
     suspend fun pauseDownload(context: Context, id: String, notify: Boolean = true) {
         withDownloadLock(id) {
             val dao = AppDatabase.getDatabase(context).downloadDao()
