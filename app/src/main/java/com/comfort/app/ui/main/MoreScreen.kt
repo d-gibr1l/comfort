@@ -156,7 +156,11 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding())
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                // Horizontal/bottom match the old uniform 20dp; top is its own much smaller value
+                // so the search bar sits right under the "Settings" title instead of leaving the
+                // same 20dp gap the title's own TopAppBar height already put beneath it.
+                .padding(horizontal = 20.dp)
+                .padding(top = 4.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             SettingsSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
