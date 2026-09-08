@@ -126,27 +126,29 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            Column(
-                modifier = Modifier
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                                MaterialTheme.colorScheme.background,
-                            )
+            TopAppBar(
+                title = { 
+                    Text("Settings", 
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                        fontSize = 40.sp
+                    ) 
+                },
+                // Same top-of-screen gradient as Home/Library (primary fading into background)
+                // instead of a flat bar, so Settings matches the rest of the app's header treatment.
+                modifier = Modifier.background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                            MaterialTheme.colorScheme.background,
                         )
                     )
-                    .statusBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 4.dp)
-            ) {
-                Text(
-                    "Settings",
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
-                    fontSize = 40.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
                 )
-            }
+            )
         }
     ) { paddingValues ->
         Column(
@@ -154,7 +156,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding())
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             SettingsSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
