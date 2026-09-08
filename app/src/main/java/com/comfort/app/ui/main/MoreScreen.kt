@@ -127,12 +127,22 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { 
-                    Text("Settings", 
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
-                        fontSize = 40.sp
-                    ) 
+                title = {
+                    // Bottom-aligned within an explicit, bounded slot (rather than the default
+                    // vertical centering) so the label sits low in the bar, close to the search
+                    // bar just below it, without touching that search bar or anything else on the
+                    // page. fillMaxHeight() here instead of a fixed height measured against
+                    // whatever unbounded height the Scaffold's topBar slot actually passes down —
+                    // reproduced live, the label ended up pushed almost entirely off the bottom of
+                    // the screen. 96dp comfortably clears this 40sp custom-font text's real height
+                    // (with room to spare) while still being far short of the whole screen.
+                    Box(modifier = Modifier.height(96.dp), contentAlignment = Alignment.BottomStart) {
+                        Text("Settings",
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                            fontSize = 40.sp
+                        )
+                    }
                 },
                 // Same top-of-screen gradient as Home/Library (primary fading into background)
                 // instead of a flat bar, so Settings matches the rest of the app's header treatment.
@@ -156,11 +166,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding())
                 .verticalScroll(rememberScrollState())
-                // Horizontal/bottom match the old uniform 20dp; top is its own much smaller value
-                // so the search bar sits right under the "Settings" title instead of leaving the
-                // same 20dp gap the title's own TopAppBar height already put beneath it.
-                .padding(horizontal = 20.dp)
-                .padding(top = 4.dp, bottom = 20.dp),
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             SettingsSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
