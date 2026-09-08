@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,6 +111,20 @@ private fun thumbnailRequest(thumbnail: String, pageUrl: String): ImageRequest =
         .addHeader("Referer", pageUrl)
         .build()
 
+private fun parseTimestampToMs(value: String): Long? {
+    val v = value.trim()
+    if (v.isEmpty()) return null
+    return try {
+        val parts = v.split(":").map { it.toFloatOrNull() ?: 0f }
+        var seconds = 0f
+        for (part in parts) {
+            seconds = seconds * 60 + part
+        }
+        (seconds * 1000).toLong()
+    } catch (e: Exception) {
+        null
+    }
+}
 private fun formatTimestamp(ms: Long): String {
     val totalSeconds = ms / 1000
     val minutes = totalSeconds / 60
@@ -1087,10 +1102,11 @@ private fun TrimVideoScreen(
 
         // The M3 Expressive slider: a thick track and a tall handle rather than the default thin
         // track + round dot, per the spec's own component guidance.
+        val maxSliderMs = maxOf(NOMINAL_DURATION_MS.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
         Slider(
-            value = playheadMs.toFloat(),
+            value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
-            valueRange = 0f..NOMINAL_DURATION_MS.toFloat(),
+            valueRange = 0f..maxSliderMs,
             thumb = { state ->
                 SliderDefaults.Thumb(
                     interactionSource = remember { MutableInteractionSource() },
@@ -1135,21 +1151,74 @@ private fun TrimVideoScreen(
                 },
             )
         }
+        var startInput by remember { mutableStateOf(formatTimestamp(active?.startMs ?: 0L)) }
+        var endInput by remember { mutableStateOf(formatTimestamp(active?.endMs ?: 0L)) }
+        
+        LaunchedEffect(active?.startMs) {
+            if (parseTimestampToMs(startInput) != active?.startMs) {
+                startInput = formatTimestamp(active?.startMs ?: 0L)
+            }
+        }
+        LaunchedEffect(active?.endMs) {
+            if (parseTimestampToMs(endInput) != active?.endMs) {
+                endInput = formatTimestamp(active?.endMs ?: 0L)
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(
-                label = formatTimestamp(active?.startMs ?: 0L),
-                onClick = { playheadMs = active?.startMs ?: 0L },
+            var isStartFocused by remember { mutableStateOf(false) }
+            var isEndFocused by remember { mutableStateOf(false) }
+
+            OutlinedTextField(
+                value = startInput,
+                onValueChange = { 
+                    startInput = it
+                    parseTimestampToMs(it)?.let { ms ->
+                        if (ms <= (active?.endMs ?: 0L)) {
+                            updateActive { segment -> segment.copy(startMs = ms) }
+                        }
+                    }
+                },
+                label = { Text("Start") },
+                singleLine = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged { 
+                        isStartFocused = it.isFocused
+                        if (!it.isFocused) {
+                            startInput = formatTimestamp(active?.startMs ?: 0L)
+                        }
+                    },
+                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Next),
             )
-            PreviewChip(
-                label = formatTimestamp(active?.endMs ?: 0L),
-                onClick = { playheadMs = active?.endMs ?: 0L },
+            OutlinedTextField(
+                value = endInput,
+                onValueChange = { 
+                    endInput = it
+                    parseTimestampToMs(it)?.let { ms ->
+                        if (ms >= (active?.startMs ?: 0L)) {
+                            updateActive { segment -> segment.copy(endMs = ms) }
+                        }
+                    }
+                },
+                label = { Text("End") },
+                singleLine = true,
+                modifier = Modifier
+                    .weight(1f)
+                    .onFocusChanged { 
+                        isEndFocused = it.isFocused
+                        if (!it.isFocused) {
+                            endInput = formatTimestamp(active?.endMs ?: 0L)
+                        }
+                    },
+                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
             )
         }
+
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1373,3 +1442,8 @@ private fun ViewTemplatesScreen(
         }
     }
 }
+
+
+
+
+

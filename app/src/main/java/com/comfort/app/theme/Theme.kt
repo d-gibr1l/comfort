@@ -20,8 +20,8 @@ import androidx.core.view.WindowCompat
 @Composable
 fun GalleryDLTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    lightTheme: AppTheme = AppTheme.MONOCHROME,
-    darkTheme: AppTheme = AppTheme.MONOCHROME,
+    lightTheme: AppTheme = AppTheme.CUSTOM,
+    darkTheme: AppTheme = AppTheme.CUSTOM,
     pureBlack: Boolean = false,
     content: @Composable () -> Unit,
 ) {
