@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
@@ -279,6 +280,8 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     "Library",
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                                    fontSize = 40.sp,
                                 )
                                 Text(
                                     "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}",
@@ -923,3 +926,5 @@ private fun MetaRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text:
         Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+

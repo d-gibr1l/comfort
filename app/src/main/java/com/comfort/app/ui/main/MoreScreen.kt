@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -126,7 +127,13 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                title = { 
+                    Text("Settings", 
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                        fontSize = 40.sp
+                    ) 
+                },
                 // Same top-of-screen gradient as Home/Library (primary fading into background)
                 // instead of a flat bar, so Settings matches the rest of the app's header treatment.
                 modifier = Modifier.background(
@@ -2203,3 +2210,5 @@ private fun SizeSheetField(
         }
     }
 }
+
+
