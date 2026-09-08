@@ -315,7 +315,11 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 .fillMaxWidth()
                                 .horizontalScroll(toolbarScrollState)
                                 .padding(horizontal = 16.dp)
-                                .padding(top = 2.dp, bottom = 10.dp),
+                                // Only top grew (2dp -> 8dp) to bring the chips down a little —
+                                // bottom stays 10dp so the thin shadow strip below this row (the
+                                // header Surface's own shadowElevation, visible right above the
+                                // list) doesn't grow along with it.
+                                .padding(top = 8.dp, bottom = 10.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                         ) {
                             Box {
