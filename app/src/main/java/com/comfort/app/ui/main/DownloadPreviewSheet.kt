@@ -226,7 +226,9 @@ fun DownloadPreviewSheet(
     var previewUploader by remember { mutableStateOf<String?>(null) }
     var previewThumbnail by remember { mutableStateOf<String?>(null) }
     var previewFilesize by remember { mutableStateOf<Long?>(null) }
-    var previewLoading by remember { mutableStateOf(true) }
+    val previewStreamUrlsState = remember { mutableStateOf<List<String>>(emptyList()) }
+    val previewDurationMsState = remember { mutableStateOf<Long?>(null) }
+    var previewLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(url) {
         previewLoading = true
@@ -235,6 +237,8 @@ fun DownloadPreviewSheet(
         previewUploader = info?.uploader
         previewThumbnail = info?.thumbnail
         previewFilesize = info?.filesizeBytes
+        previewStreamUrlsState.value = info?.streamUrls ?: emptyList()
+        previewDurationMsState.value = info?.durationMs
         previewLoading = false
     }
 
@@ -279,6 +283,8 @@ fun DownloadPreviewSheet(
             previewTitle = previewTitle,
             previewUploader = previewUploader,
             previewThumbnail = previewThumbnail,
+            previewStreamUrls = previewStreamUrlsState.value,
+            previewDurationMs = previewDurationMsState.value,
             previewFilesize = previewFilesize,
             previewLoading = previewLoading,
             quality = quality,
@@ -316,6 +322,8 @@ private fun PreviewSheetOverlayHost(
     previewTitle: String?,
     previewUploader: String?,
     previewThumbnail: String?,
+    previewStreamUrls: List<String>,
+    previewDurationMs: Long?,
     previewFilesize: Long?,
     previewLoading: Boolean,
     quality: VideoQuality,
@@ -505,12 +513,13 @@ private fun PreviewSheetOverlayHost(
                                     onCancel = onRevertOverlay,
                                     onDone = onCommitOverlay,
                                 )
-
                                 PreviewScreen.TRIM -> TrimVideoScreen(
                                     segments = segments,
                                     onSegmentsChange = onSegmentsChange,
                                     thumbnail = previewThumbnail,
                                     pageUrl = url,
+                                    streamUrls = previewStreamUrls,
+                                    durationMs = previewDurationMs,
                                     onCancel = onRevertOverlay,
                                     onDone = onCommitOverlay,
                                 )
@@ -1046,6 +1055,8 @@ private fun TrimVideoScreen(
     onSegmentsChange: (List<TrimSegment>) -> Unit,
     thumbnail: String?,
     pageUrl: String,
+    streamUrls: List<String>,
+    durationMs: Long?,
     onCancel: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -1060,6 +1071,40 @@ private fun TrimVideoScreen(
     fun updateActive(transform: (TrimSegment) -> TrimSegment) {
         val target = active ?: return
         onSegmentsChange(segments.map { if (it.id == target.id) transform(it) else it })
+    }
+    val context = LocalContext.current
+    val exoPlayer = remember { androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
+    DisposableEffect(Unit) {
+        onDispose { exoPlayer.release() }
+    }
+
+    LaunchedEffect(streamUrls) {
+        if (streamUrls.isNotEmpty()) {
+            val factory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
+            val mediaSources = streamUrls.map { factory.createMediaSource(androidx.media3.common.MediaItem.fromUri(it)) }
+            val mediaSource = if (mediaSources.size > 1) {
+                androidx.media3.exoplayer.source.MergingMediaSource(*mediaSources.toTypedArray())
+            } else {
+                mediaSources.first()
+            }
+            exoPlayer.setMediaSource(mediaSource)
+            exoPlayer.prepare()
+        }
+    }
+
+    LaunchedEffect(playheadMs) {
+        if (kotlin.math.abs(exoPlayer.currentPosition - playheadMs) > 500L) {
+            exoPlayer.seekTo(playheadMs)
+        }
+    }
+
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            if (exoPlayer.isPlaying) {
+                playheadMs = exoPlayer.currentPosition
+            }
+            kotlinx.coroutines.delay(100)
+        }
     }
 
     Column(
@@ -1078,7 +1123,18 @@ private fun TrimVideoScreen(
             color = MaterialTheme.colorScheme.primaryContainer,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (thumbnail != null) {
+                if (streamUrls.isNotEmpty()) {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        factory = { ctx ->
+                            androidx.media3.ui.PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = true
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (thumbnail != null) {
                     AsyncImage(
                         model = thumbnailRequest(thumbnail, pageUrl),
                         contentDescription = null,
@@ -1086,16 +1142,20 @@ private fun TrimVideoScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                Surface(
-                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
-                    shape = MaterialTheme.shapes.large,
-                ) {
-                    Text(
-                        formatTimestamp(playheadMs),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                
+                // Show the time overlay only if there's no stream (since ExoPlayer has its own UI)
+                if (streamUrls.isEmpty()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
+                        shape = MaterialTheme.shapes.large,
+                    ) {
+                        Text(
+                            formatTimestamp(playheadMs),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
                 }
             }
         }
@@ -1442,6 +1502,12 @@ private fun ViewTemplatesScreen(
         }
     }
 }
+
+
+
+
+
+
 
 
 
