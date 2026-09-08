@@ -1205,7 +1205,18 @@ private fun TrimVideoScreen(
 
         // The M3 Expressive slider: a thick track and a tall handle rather than the default thin
         // track + round dot, per the spec's own component guidance.
-        val maxSliderMs = maxOf(NOMINAL_DURATION_MS.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
+        //
+        // Ranged against the real video length (durationMs, from yt-dlp's own listing) whenever
+        // it's known, rather than always the fixed NOMINAL_DURATION_MS — otherwise a 19-second
+        // clip and a 19-minute one got the identical fixed 10-minute range, cramming the former's
+        // entire real length into a sliver at the very start of the track and letting the latter's
+        // last 9 minutes go completely unreachable. NOMINAL_DURATION_MS now only covers the case
+        // this was originally written for: no stream/duration resolved at all (see its own doc
+        // comment) — there's nothing real to range against yet, so it's the one honest fallback.
+        // Still widens past whatever length is used here if a typed/dragged end or the playhead
+        // itself goes further, exactly as before.
+        val effectiveDurationMs = durationMs?.takeIf { it > 0L } ?: NOMINAL_DURATION_MS
+        val maxSliderMs = maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
         Slider(
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
