@@ -180,7 +180,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                 .padding(top = 4.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            SettingsSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
+            PillSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
 
             ExpressiveSettingsList(items = filteredMainItems, emptyMessage = "No settings match \"$searchQuery\"".takeIf { isSearching && filteredMainItems.isEmpty() && filteredAboutItems.isEmpty() })
 
@@ -200,11 +200,13 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
     }
 }
 
-// A pill-shaped 56dp search bar filtering the settings rows below it in real time.
+// A pill-shaped 56dp search bar filtering whatever's below it in real time — shared with the
+// Library page (DownloadsHistoryScreen.kt), which imports this same composable rather than
+// keeping its own separate copy of the same look.
 @Composable
-private fun SettingsSearchBar(query: String, onQueryChange: (String) -> Unit) {
+fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: String = "Search", modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier.fillMaxWidth().height(56.dp),
+        modifier = modifier.fillMaxWidth().height(56.dp),
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -216,7 +218,7 @@ private fun SettingsSearchBar(query: String, onQueryChange: (String) -> Unit) {
             Spacer(Modifier.width(12.dp))
             Box(modifier = Modifier.weight(1f)) {
                 if (query.isEmpty()) {
-                    Text("Search", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 BasicTextField(
                     value = query,

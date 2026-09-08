@@ -92,7 +92,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var showDeletedOnly by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -141,7 +140,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     }
 
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
-    BackHandler(enabled = showSearch && !selectionMode) { showSearch = false; searchQuery = "" }
 
     // Checks each finished download's thumbnail against the real MediaStore once per Library
     // visit — cheap enough for typical history sizes, and it's the only way to notice a file the
@@ -210,48 +208,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         titleContentColor = MaterialTheme.colorScheme.onSurface,
                     )
                 )
-            } else if (showSearch) {
-                Surface(
-                    color = MaterialTheme.colorScheme.background,
-                    shadowElevation = 3.dp,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .fillMaxWidth()
-                            .padding(start = 4.dp, end = 16.dp, top = 10.dp, bottom = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(onClick = { showSearch = false; searchQuery = "" }) {
-                            Icon(FeatherIcons.ArrowLeft, contentDescription = "Close search")
-                        }
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Search downloads") },
-                            singleLine = true,
-                            shape = MaterialTheme.shapes.large,
-                            leadingIcon = { Icon(FeatherIcons.Search, contentDescription = null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(FeatherIcons.X, contentDescription = "Clear")
-                                    }
-                                }
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = Color.Transparent,
-                                cursorColor = MaterialTheme.colorScheme.primary,
-                                focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                                focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    }
-                }
             } else {
                 Surface(
                     color = MaterialTheme.colorScheme.background,
@@ -305,6 +261,15 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 }
                             }
                         }
+                        // Same pill search bar as the Settings page, in the same position relative
+                        // to its own title — full width, right below it — instead of the old
+                        // "Search" chip that toggled a separate full-screen search bar in its place.
+                        PillSearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            placeholder = "Search downloads",
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
                         // better-interface review: this row silently overflowed past the last
                         // couple of chips ("Deleted", Grid/List) on typical phone widths with no
                         // visible cue that anything more was scrollable. Two earlier attempts (an
@@ -336,11 +301,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            LibraryToolbarChip(
-                                icon = FeatherIcons.Search,
-                                label = "Search",
-                                onClick = { showSearch = true },
-                            )
                             Box {
                                 LibraryToolbarChip(
                                     icon = FeatherIcons.Sliders,
