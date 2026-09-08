@@ -229,6 +229,13 @@ fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: S
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 )
             }
+            // Same clear affordance as the home screen's own "Paste a link" field: only shown once
+            // there's something to clear.
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp)) {
+                    Icon(FeatherIcons.X, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                }
+            }
         }
     }
 }

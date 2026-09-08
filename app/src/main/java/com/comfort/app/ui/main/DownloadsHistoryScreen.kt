@@ -213,18 +213,33 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     color = MaterialTheme.colorScheme.background,
                     shadowElevation = 3.dp,
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                                        MaterialTheme.colorScheme.background,
+                    Column {
+                        // Title area only: the gradient background sits on this nested Column,
+                        // applied *before* statusBarsPadding (rather than after, on the Row inside
+                        // it) so it still paints from the true top of the screen behind the status
+                        // bar — the same bleed the whole header had before — while stopping right
+                        // after the title instead of also covering the search bar/chips below.
+                        // Confining it to just the title matches the Settings page, where the same
+                        // gradient only ever covers its TopAppBar, never the search bar below it.
+                        // (The header used to bleed *and* cover the whole thing at once; splitting
+                        // it into its own Column here is what lets it keep doing the former without
+                        // the latter — same underlying surfaceContainerHigh color as Settings on
+                        // both, confirmed by sampling the actual rendered pixels, but the search bar
+                        // used to read as a visibly different color purely from that extra green
+                        // context bleeding around it.)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                                            MaterialTheme.colorScheme.background,
+                                        )
                                     )
                                 )
-                            )
-                            .statusBarsPadding()
-                    ) {
+                                .statusBarsPadding()
+                        ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -261,6 +276,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 }
                             }
                         }
+                        }
                         // Same pill search bar as the Settings page, in the same position relative
                         // to its own title — full width, right below it — instead of the old
                         // "Search" chip that toggled a separate full-screen search bar in its place.
@@ -268,7 +284,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             query = searchQuery,
                             onQueryChange = { searchQuery = it },
                             placeholder = "Search downloads",
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 8.dp),
                         )
                         // better-interface review: this row silently overflowed past the last
                         // couple of chips ("Deleted", Grid/List) on typical phone widths with no
@@ -298,8 +314,9 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(toolbarScrollState)
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 2.dp, bottom = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                         ) {
                             Box {
                                 LibraryToolbarChip(
