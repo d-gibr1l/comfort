@@ -570,11 +570,29 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         # filesize is only populated once a specific format is picked; filesize_approx is what a
         # plain extraction usually carries, so fall through to it rather than showing nothing.
         filesize = entry.get("filesize") or entry.get("filesize_approx")
+        # For the Trim screen's own ExoPlayer preview (Kotlin side reads "url"/"requested_formats"/
+        # "duration" — see DownloadPreviewSheet.kt's TrimVideoScreen and GalleryDlListing's
+        # fetchPreviewInfo). extract_info() already resolves yt-dlp's normal default format
+        # selection even with download=False (same mechanism --dump-json relies on), so these are
+        # already sitting on `entry` here — just never used to reach this point before. A single
+        # progressive format lands on "url" directly; an adaptive one (YouTube's usual case, no
+        # single file has both video+audio) needs both halves merged client-side, hence
+        # requested_formats. Trimmed to bare {"url": ...} dicts rather than forwarded whole:
+        # yt-dlp's real requested_formats entries carry dozens of fields (format tables, HTTP
+        # headers, ...) that both bloat this JSON line for no reason and were never meant to leave
+        # the process.
+        requested_formats = entry.get("requested_formats")
         return {
             "title": entry.get("title"),
             "thumbnail": entry.get("thumbnail"),
             "uploader": uploader,
             "filesize": filesize,
+            "duration": entry.get("duration"),
+            "url": entry.get("url"),
+            "requested_formats": (
+                [{"url": f.get("url")} for f in requested_formats if f.get("url")]
+                if requested_formats else None
+            ),
         }
 
     try:
