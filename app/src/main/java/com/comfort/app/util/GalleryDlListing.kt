@@ -29,8 +29,10 @@ data class PreviewInfo(
     val uploader: String?,
     val thumbnail: String?,
     /** Bytes, from yt-dlp's own filesize/filesize_approx. Null when the extractor doesn't report
-     * either — common enough that the preview card just omits the size rather than guessing. */
+     * either - common enough that the preview card just omits the size rather than guessing. */
     val filesizeBytes: Long?,
+    val durationMs: Long?,
+    val streamUrls: List<String>,
 )
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
@@ -324,11 +326,22 @@ object GalleryDlListing {
                 .mapNotNull { entries.optJSONObject(it) }
                 .firstOrNull { !it.optString("title").isNullOrBlank() || !it.optString("thumbnail").isNullOrBlank() }
         } ?: json
+        val requestedFormats = entry.optJSONArray("requested_formats")
+        val streamUrls = if (requestedFormats != null && requestedFormats.length() > 0) {
+            (0 until requestedFormats.length()).mapNotNull { 
+                requestedFormats.optJSONObject(it)?.optString("url")?.takeIf { u -> u.isNotBlank() }
+            }
+        } else {
+            entry.optString("url").takeIf { it.isNotBlank() }?.let { listOf(it) } ?: emptyList()
+        }
+
         PreviewInfo(
             title = entry.optString("title").takeIf { it.isNotBlank() && it != "null" },
             uploader = entry.optString("uploader").takeIf { it.isNotBlank() && it != "null" },
             thumbnail = entry.optString("thumbnail").takeIf { it.isNotBlank() && it != "null" },
-            filesizeBytes = entry.optLong("filesize", 0L).takeIf { it > 0L },
+            filesizeBytes = entry.optLong("filesize", 0L).takeIf { it > 0L } ?: entry.optLong("filesize_approx", 0L).takeIf { it > 0L },
+            durationMs = entry.optDouble("duration", -1.0).takeIf { it > 0.0 }?.let { (it * 1000).toLong() },
+            streamUrls = streamUrls,
         )
     }
 
@@ -375,3 +388,5 @@ object GalleryDlListing {
         }
     }
 }
+
+

@@ -102,6 +102,10 @@ dependencies {
   implementation("io.coil-kt:coil-video:2.6.0")
   implementation("br.com.devsrsouza.compose.icons:feather:1.1.0")
   implementation("androidx.documentfile:documentfile:1.0.1")
+  // Media3 ExoPlayer for Trim UI Video Streaming
+  implementation("androidx.media3:media3-exoplayer:1.2.0")
+  implementation("androidx.media3:media3-ui:1.2.0")
+
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
   // Instrumented tests
@@ -134,4 +138,5 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
+
 
