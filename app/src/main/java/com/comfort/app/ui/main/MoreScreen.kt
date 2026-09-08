@@ -139,7 +139,10 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                     // bottom-aligned text here shows up as empty space between the status bar and
                     // the label — 96dp left a visibly larger gap there than necessary; 72dp still
                     // comfortably clears this 40sp custom-font text with a little room to spare.
-                    Box(modifier = Modifier.height(72.dp), contentAlignment = Alignment.BottomStart) {
+                    // A few dp start padding to line the label's own left edge up with the search
+                    // bar/list below (the content Column's own 20dp horizontal padding) — the
+                    // TopAppBar's default title inset falls a little short of that on its own.
+                    Box(modifier = Modifier.height(72.dp).padding(start = 4.dp), contentAlignment = Alignment.BottomStart) {
                         Text("Settings",
                             fontWeight = FontWeight.Bold,
                             fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
