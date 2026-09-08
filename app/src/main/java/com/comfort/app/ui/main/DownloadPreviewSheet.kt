@@ -1087,17 +1087,34 @@ private fun TrimVideoScreen(
         onDispose { exoPlayer.release() }
     }
 
+    var streamLoadFailed by remember { mutableStateOf(false) }
     LaunchedEffect(streamUrls) {
         if (streamUrls.isNotEmpty()) {
-            val factory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
-            val mediaSources = streamUrls.map { factory.createMediaSource(androidx.media3.common.MediaItem.fromUri(it)) }
-            val mediaSource = if (mediaSources.size > 1) {
-                androidx.media3.exoplayer.source.MergingMediaSource(*mediaSources.toTypedArray())
-            } else {
-                mediaSources.first()
+            // yt-dlp/site extractors resolve to whatever container/manifest format that source
+            // actually serves — confirmed live, a YouTube Shorts link resolved to an HLS (.m3u8)
+            // stream rather than a plain progressive file, and DefaultMediaSourceFactory throws a
+            // hard IllegalStateException for any content type with no matching extension on the
+            // classpath (media3-exoplayer-hls, added alongside this, covers the one actually seen
+            // so far — but a DASH/SmoothStreaming/RTSP stream from some other extractor would hit
+            // the same gap). That exception isn't caught anywhere up this LaunchedEffect's
+            // coroutine, so it crashed the whole app instead of just failing to preview. Falling
+            // back to the static thumbnail here — same as an empty streamUrls already does — keeps
+            // this a cosmetic miss instead of a crash regardless of what future content type shows up.
+            streamLoadFailed = false
+            try {
+                val factory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(context)
+                val mediaSources = streamUrls.map { factory.createMediaSource(androidx.media3.common.MediaItem.fromUri(it)) }
+                val mediaSource = if (mediaSources.size > 1) {
+                    androidx.media3.exoplayer.source.MergingMediaSource(*mediaSources.toTypedArray())
+                } else {
+                    mediaSources.first()
+                }
+                exoPlayer.setMediaSource(mediaSource)
+                exoPlayer.prepare()
+            } catch (e: Exception) {
+                android.util.Log.e("ExoPlayer", "Unsupported stream for Trim preview", e)
+                streamLoadFailed = true
             }
-            exoPlayer.setMediaSource(mediaSource)
-            exoPlayer.prepare()
         }
     }
 
@@ -1132,7 +1149,7 @@ private fun TrimVideoScreen(
             color = MaterialTheme.colorScheme.primaryContainer,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (streamUrls.isNotEmpty()) {
+                if (streamUrls.isNotEmpty() && !streamLoadFailed) {
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { ctx ->
                             androidx.media3.ui.PlayerView(ctx).apply {
@@ -1151,9 +1168,10 @@ private fun TrimVideoScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-                
-                // Show the time overlay only if there's no stream (since ExoPlayer has its own UI)
-                if (streamUrls.isEmpty()) {
+
+                // Show the time overlay whenever the player isn't (no stream, or one this device
+                // can't play — see streamLoadFailed above) — ExoPlayer has its own UI otherwise.
+                if (streamUrls.isEmpty() || streamLoadFailed) {
                     Surface(
                         color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
                         shape = MaterialTheme.shapes.large,

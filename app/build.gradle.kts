@@ -102,8 +102,16 @@ dependencies {
   implementation("io.coil-kt:coil-video:2.6.0")
   implementation("br.com.devsrsouza.compose.icons:feather:1.1.0")
   implementation("androidx.documentfile:documentfile:1.0.1")
-  // Media3 ExoPlayer for Trim UI Video Streaming
+  // Media3 ExoPlayer for Trim UI Video Streaming. media3-exoplayer-hls specifically: yt-dlp/
+  // YouTube resolve some formats (confirmed live on a YouTube Shorts link) to an HLS (.m3u8)
+  // manifest URL rather than a plain progressive file — without this on the classpath,
+  // DefaultMediaSourceFactory has no registered factory for that content type and throws
+  // IllegalStateException("No suitable media source factory found for content type: 2")
+  // straight out of a LaunchedEffect, which crashed the whole app rather than just failing to
+  // preview. DefaultMediaSourceFactory discovers this extension via reflection at runtime, so
+  // just having it on the classpath is enough — no source-level wiring needed.
   implementation("androidx.media3:media3-exoplayer:1.2.0")
+  implementation("androidx.media3:media3-exoplayer-hls:1.2.0")
   implementation("androidx.media3:media3-ui:1.2.0")
 
   // Tooling
@@ -138,5 +146,6 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
+
 
 
