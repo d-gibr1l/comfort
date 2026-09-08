@@ -1073,7 +1073,16 @@ private fun TrimVideoScreen(
         onSegmentsChange(segments.map { if (it.id == target.id) transform(it) else it })
     }
     val context = LocalContext.current
-    val exoPlayer = remember { androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
+    val exoPlayer = remember { 
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            playWhenReady = true
+            addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    android.util.Log.e("ExoPlayer", "Playback error", error)
+                }
+            })
+        }
+    }
     DisposableEffect(Unit) {
         onDispose { exoPlayer.release() }
     }
