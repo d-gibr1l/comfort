@@ -134,9 +134,12 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
                     // page. fillMaxHeight() here instead of a fixed height measured against
                     // whatever unbounded height the Scaffold's topBar slot actually passes down —
                     // reproduced live, the label ended up pushed almost entirely off the bottom of
-                    // the screen. 96dp comfortably clears this 40sp custom-font text's real height
-                    // (with room to spare) while still being far short of the whole screen.
-                    Box(modifier = Modifier.height(96.dp), contentAlignment = Alignment.BottomStart) {
+                    // the screen. This slot's own height becomes the whole TopAppBar's height (the
+                    // bar wraps to its tallest child), so whatever's reserved above the
+                    // bottom-aligned text here shows up as empty space between the status bar and
+                    // the label — 96dp left a visibly larger gap there than necessary; 72dp still
+                    // comfortably clears this 40sp custom-font text with a little room to spare.
+                    Box(modifier = Modifier.height(72.dp), contentAlignment = Alignment.BottomStart) {
                         Text("Settings",
                             fontWeight = FontWeight.Bold,
                             fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
