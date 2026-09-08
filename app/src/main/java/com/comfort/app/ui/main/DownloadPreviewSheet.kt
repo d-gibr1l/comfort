@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -1124,9 +1125,24 @@ private fun TrimVideoScreen(
         }
     }
 
+    // Tracks drags on the Slider below specifically (shared with its own interactionSource) so
+    // the poll below can tell "the user is actively dragging our Slider" apart from every other
+    // way the real position can move.
+    val sliderInteractionSource = remember { MutableInteractionSource() }
+    val isDraggingSlider by sliderInteractionSource.collectIsDraggedAsState()
+
     LaunchedEffect(exoPlayer) {
         while (true) {
-            if (exoPlayer.isPlaying) {
+            // Only gating on isPlaying here (rather than syncing unconditionally) meant this froze
+            // the instant playback paused — reproduced live: pausing, then seeking via the video's
+            // own built-in ExoPlayer controller (a tap-to-seek or drag on its scrubber, not our
+            // Slider below) moved the real player position but never touched playheadMs, so both
+            // the Slider and the visible timestamp stayed stuck wherever they were at the moment of
+            // pausing, completely disconnected from the frame actually on screen. Syncing whenever
+            // the user isn't actively dragging *our own* Slider (rather than whenever the player
+            // isn't playing) covers that case — and a paused native seek, and a playing native
+            // seek — while still not fighting the user's own drag on our Slider mid-gesture.
+            if (!isDraggingSlider) {
                 playheadMs = exoPlayer.currentPosition
             }
             kotlinx.coroutines.delay(100)
@@ -1194,9 +1210,10 @@ private fun TrimVideoScreen(
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
             valueRange = 0f..maxSliderMs,
+            interactionSource = sliderInteractionSource,
             thumb = { state ->
                 SliderDefaults.Thumb(
-                    interactionSource = remember { MutableInteractionSource() },
+                    interactionSource = sliderInteractionSource,
                     thumbSize = androidx.compose.ui.unit.DpSize(4.dp, 44.dp),
                 )
             },
@@ -1216,11 +1233,22 @@ private fun TrimVideoScreen(
             PreviewChip(
                 label = "Set Start",
                 onClick = {
+                    // playheadMs only mirrors the player's real position while it's actively
+                    // playing (see the polling LaunchedEffect above) — pausing and then scrubbing
+                    // via the video's own built-in ExoPlayer controller (rather than the Slider
+                    // below) never updates it, so it could read anywhere up to several minutes
+                    // stale relative to the frame actually on screen. Reading currentPosition
+                    // directly here (and syncing playheadMs to match, so the Slider/timestamp
+                    // catch up too) makes this always match whatever the video is showing at the
+                    // moment of the tap, not a cached mirror of it. Falls back to playheadMs itself
+                    // when there's no real stream (see NOMINAL_DURATION_MS) — nothing for the
+                    // player to be authoritative about in that case.
+                    val newStart = if (streamUrls.isNotEmpty()) exoPlayer.currentPosition else playheadMs
+                    playheadMs = newStart
                     // Mirrors the spec's safety constraint: a start at or past the current end
                     // would be an invalid (negative-length) clip, so the end is pushed out to keep
                     // at least a second of video rather than letting the segment collapse.
                     updateActive { segment ->
-                        val newStart = playheadMs
                         val newEnd = if (newStart >= segment.endMs) newStart + 1000L else segment.endMs
                         segment.copy(startMs = newStart, endMs = newEnd)
                     }
@@ -1229,9 +1257,11 @@ private fun TrimVideoScreen(
             PreviewChip(
                 label = "Set End",
                 onClick = {
+                    // Same staleness fix as Set Start above.
+                    val newEnd = if (streamUrls.isNotEmpty()) exoPlayer.currentPosition else playheadMs
+                    playheadMs = newEnd
                     // The reverse constraint, clamped at zero so the start can't go negative.
                     updateActive { segment ->
-                        val newEnd = playheadMs
                         val newStart = if (newEnd <= segment.startMs) (newEnd - 1000L).coerceAtLeast(0L) else segment.startMs
                         segment.copy(startMs = newStart, endMs = newEnd)
                     }
