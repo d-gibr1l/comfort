@@ -254,7 +254,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              no_check_certificates=False, sleep_interval_seconds=None, custom_headers=None,
              format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
-             socket_timeout_seconds=None, buffer_size_kb=None):
+             socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -664,7 +664,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # A no-op for anything that isn't currently live (info_dict.get('is_live') gates every
         # actual use of this internally), so safe to set unconditionally from a global preference.
         ydl_opts["live_from_start"] = True
-    parsed_extractor_args = _parse_extractor_args(extractor_args)
+    # _parse_extractor_args returns None (not {}) for an empty/unset field — the common case, since
+    # this is normally left blank — which setdefault() below would crash on.
+    parsed_extractor_args = _parse_extractor_args(extractor_args) or {}
+    if youtube_client_rotation:
+        # Rotates through multiple internal YouTube API clients instead of just "web" — if one
+        # client's endpoint is throttling or returning degraded formats, yt-dlp falls back to the
+        # next. A default only: merged in first so an explicit youtube:player_client=... already
+        # present in extractor_args (the free-text Advanced setting) still wins outright, same
+        # "app default, explicit override wins" shape custom_headers already uses above.
+        youtube_args = parsed_extractor_args.setdefault("youtube", {})
+        youtube_args.setdefault("player_client", ["android", "web", "ios"])
     if parsed_extractor_args:
         ydl_opts["extractor_args"] = parsed_extractor_args
     if save_thumbnail:
@@ -878,5 +888,6 @@ if __name__ == "__main__":
         fragment_retries=(int(a[38]) if len(a) > 38 and a[38] else None),
         socket_timeout_seconds=(_s(a[39]) if len(a) > 39 else None),
         buffer_size_kb=(int(a[40]) if len(a) > 40 and a[40] else None),
+        youtube_client_rotation=_b(a[41]) if len(a) > 41 else False,
     )
     print(f"[__status__] {status}", flush=True)

@@ -1694,6 +1694,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
     var customHeaders by remember { mutableStateOf(GalleryDlPreferences.getCustomHeaders(context)) }
     var customHeadersSaved by remember { mutableStateOf(false) }
     var verboseLogging by remember { mutableStateOf(GalleryDlPreferences.isVerboseLogging(context)) }
+    var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
 
     SettingsSubScaffold(title = "Advanced", onBack = onBack) {
         SettingsSection(title = "Extra arguments", icon = FeatherIcons.Terminal) {
@@ -1730,6 +1731,19 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = FeatherIcons.CheckCircle, text = "Extra arguments saved", tint = SuccessGreen40)
             }
+        }
+
+        SettingsSection(title = "YouTube", icon = FeatherIcons.Cpu) {
+            IconToggleRow(
+                icon = FeatherIcons.RefreshCw,
+                title = "Rotate player clients",
+                subtitle = "Tries the android, web, and ios internal API clients instead of just web — if one's throttled or serving degraded formats, yt-dlp falls back to the next. An explicit youtube:player_client=... in Extractor arguments below still wins.",
+                checked = youtubeClientRotation,
+                onCheckedChange = {
+                    youtubeClientRotation = it
+                    GalleryDlPreferences.setYoutubeClientRotationEnabled(context, it)
+                },
+            )
         }
 
         SettingsSection(title = "yt-dlp extractor arguments", icon = FeatherIcons.Terminal) {
@@ -1919,6 +1933,27 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(12.dp))
+
+            // A site's own rate-limiting/anti-bot systems associate a session with the account
+            // behind it, not just the device — a heavy download session with real personal cookies
+            // risks a site-level restriction on that actual account, not just this app or a fresh
+            // IP the way an unauthenticated 429 does (see the rate-limit tip on the Queue's own
+            // ERRORED cards). A throwaway account sidesteps that entirely.
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    FeatherIcons.AlertTriangle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp).padding(top = 2.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Consider using a secondary/throwaway account rather than your primary one — heavy download activity risks a site-level restriction on the account behind the cookies, not just this device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.height(16.dp))
 
             Button(
