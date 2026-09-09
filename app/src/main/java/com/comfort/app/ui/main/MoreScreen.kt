@@ -2524,11 +2524,12 @@ private fun AboutScreen(onBack: () -> Unit) {
         EnginesSection()
 
         // gallery-dl was the only credit here before — a real gap for an app that's really built on
-        // five separately-licensed open-source projects, not one: yt-dlp does just as much of the
+        // six separately-licensed open-source projects, not one: yt-dlp does just as much of the
         // actual downloading (see VideoSiteRouter), and PythonRuntime's own doc comment describes
         // running YTDLnis's published interpreter/curl_cffi build as a subprocess, FFmpeg
-        // (FfmpegRuntime) merging video/audio, and QuickJS (QuickJsRuntime) solving yt-dlp's JS
-        // challenges — none of them previously credited or linked anywhere in the app.
+        // (FfmpegRuntime) merging video/audio, QuickJS (QuickJsRuntime) solving yt-dlp's JS
+        // challenges, and aria2 (Aria2Runtime) doing real multi-connection downloads — none of them
+        // previously credited or linked anywhere in the app.
         SettingsSection(title = "Credits", icon = FeatherIcons.Link) {
             LinkRow(
                 icon = FeatherIcons.Code,
@@ -2554,6 +2555,11 @@ private fun AboutScreen(onBack: () -> Unit) {
                 icon = FeatherIcons.Package,
                 title = "YTDLnis Python runtime (curl_cffi build)",
                 url = "https://github.com/deniscerri/ytdlnis-packages",
+            )
+            LinkRow(
+                icon = FeatherIcons.Zap,
+                title = "aria2 (multi-connection downloads)",
+                url = "https://aria2.github.io/",
             )
         }
     }
