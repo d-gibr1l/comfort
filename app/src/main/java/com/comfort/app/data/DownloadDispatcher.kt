@@ -419,14 +419,20 @@ object DownloadDispatcher {
 
     private const val STAGING_CLEANUP_WORK_NAME = "staging-cleanup-sweep"
 
-    /** (Re)applies the "Clean-up leftover downloads" interval (Settings > Downloads) to
+    /** (Re)applies the "Clean up leftover downloads" interval (Settings > Downloads) to
      * StagingCleanupWorker's periodic schedule — called once at app startup (so a change made in
      * a previous session takes effect again) and immediately whenever the setting itself changes,
      * since a PeriodicWorkRequest's own interval is fixed at the moment it's enqueued and won't
-     * otherwise notice a later change. */
+     * otherwise notice a later change. Gated on the same master toggle as on-failure cleanup
+     * ([GalleryDlPreferences.isDeleteLeftoverOnFailure]) — the stored interval itself is left
+     * untouched while off, so turning the toggle back on restores whichever interval was picked
+     * before, the same "off preserves the value for re-enabling" shape every other toggle+value
+     * setting on this page already uses (Proxy's URL, Speed limit's number, ...). */
     fun rescheduleStagingCleanup(context: Context) {
         val workManager = WorkManager.getInstance(context)
-        val intervalDays = when (GalleryDlPreferences.getCleanupLeftoverInterval(context)) {
+        val intervalDays = if (!GalleryDlPreferences.isDeleteLeftoverOnFailure(context)) null else when (
+            GalleryDlPreferences.getCleanupLeftoverInterval(context)
+        ) {
             "daily" -> 1L
             "weekly" -> 7L
             "monthly" -> 30L
