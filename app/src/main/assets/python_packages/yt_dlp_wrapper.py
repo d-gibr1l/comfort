@@ -253,7 +253,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              extractor_args=None, save_thumbnail=False, force_ipv4=False, concurrent_fragments=None,
              no_check_certificates=False, sleep_interval_seconds=None, custom_headers=None,
              format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
-             restrict_filenames=True, trim_filenames=True, fragment_retries=None):
+             restrict_filenames=True, trim_filenames=True, fragment_retries=None,
+             socket_timeout_seconds=None, buffer_size_kb=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -453,6 +454,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # rather than a range, so both ends of the pair are pinned to it.
         ydl_opts["sleep_interval"] = int(sleep_interval_seconds)
         ydl_opts["max_sleep_interval"] = int(sleep_interval_seconds)
+    if socket_timeout_seconds:
+        # How long a single read/connect can stall before yt-dlp gives up on it (then retries,
+        # per the "retries" handling above) — yt-dlp's own default is 20s, generous enough that
+        # most users never touch this; only useful on a slow/flaky connection where 20s of
+        # silence isn't actually a dead request yet.
+        ydl_opts["socket_timeout"] = float(socket_timeout_seconds)
+    if buffer_size_kb:
+        # yt-dlp's own --buffer-size, in bytes — this app's own setting is entered in KB for a
+        # more human-scaled number.
+        ydl_opts["buffersize"] = int(buffer_size_kb) * 1024
     if custom_headers:
         # "Header-Name: value" lines, one per header — merged into (not replacing) yt-dlp's own
         # default request headers, the same override-specific-headers behavior --add-header has on
@@ -861,5 +872,7 @@ if __name__ == "__main__":
         restrict_filenames=_b(a[36]) if len(a) > 36 else True,
         trim_filenames=_b(a[37]) if len(a) > 37 else True,
         fragment_retries=(int(a[38]) if len(a) > 38 and a[38] else None),
+        socket_timeout_seconds=(_s(a[39]) if len(a) > 39 else None),
+        buffer_size_kb=(int(a[40]) if len(a) > 40 and a[40] else None),
     )
     print(f"[__status__] {status}", flush=True)
