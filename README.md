@@ -1,4 +1,8 @@
-# Comfort
+<p align="center">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="96" alt="Comfort icon">
+</p>
+
+<h1 align="center">Comfort</h1>
 
 Comfort is a personal, free and open-source video/gallery downloader for Android 7.0 and above,
 built on top of [gallery-dl](https://github.com/mikf/gallery-dl) and
