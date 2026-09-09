@@ -707,7 +707,7 @@ private fun MainPreviewScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(12.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Box(
@@ -1027,11 +1027,13 @@ private fun ExtraCommandsScreen(
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Add Command") },
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            placeholder = { Text("Add Command") },
             leadingIcon = { Icon(FeatherIcons.Terminal, contentDescription = null) },
             trailingIcon = {
-                PreviewChip(label = "Add", onClick = { add() })
+                Box(modifier = Modifier.padding(end = 8.dp)) {
+                    PreviewChip(label = "Add", onClick = { add() })
+                }
             },
             singleLine = true,
             shape = MaterialTheme.shapes.medium,
@@ -1539,12 +1541,12 @@ private fun ViewTemplatesScreen(
                 templates.forEach { template ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.secondaryContainer,
                         onClick = { onPick(template) },
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -1554,13 +1556,17 @@ private fun ViewTemplatesScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
                             )
-                            IconButton(onClick = {
-                                GalleryDlPreferences.removeFilenameTemplate(context, template)
-                                templates = GalleryDlPreferences.getFilenameTemplates(context)
-                            }) {
+                            IconButton(
+                                onClick = {
+                                    GalleryDlPreferences.removeFilenameTemplate(context, template)
+                                    templates = GalleryDlPreferences.getFilenameTemplates(context)
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
                                 Icon(
                                     FeatherIcons.Trash2,
                                     contentDescription = "Delete template",
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
