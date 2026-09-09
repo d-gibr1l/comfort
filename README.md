@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="96" alt="Comfort icon">
+  <img src="icon.svg" width="96" alt="Comfort icon">
 </p>
 
 <h1 align="center">Comfort</h1>
