@@ -4,7 +4,6 @@ import re
 import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
-from yt_dlp.utils import download_range_func
 from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 
 class _Cancelled(Exception):
@@ -71,10 +70,20 @@ def _parse_timestamp(value):
 
 def _parse_clip_range(clip_range):
     """Converts "start-end" range string(s) — either side of a range optionally blank, meaning
-    "from the beginning"/"to the end" — into a yt-dlp download_ranges callable, or None if none of
-    them parse to anything. Several comma-separated ranges ("00:10-00:20,01:00-01:30") are
-    accepted, matching the preview sheet's multi-segment trim: download_range_func takes a list, so
-    yt-dlp cuts and concatenates every segment into the one output file."""
+    "from the beginning"/"to the end" — into a list of (start, end) second tuples, or None if none
+    of them parse to anything. Several comma-separated ranges ("00:10-00:20,01:00-01:30") are
+    accepted, matching the preview sheet's multi-segment trim — see _LocalTrimPP, which cuts and
+    concatenates every segment into the one final output file.
+
+    Deliberately NOT a yt-dlp download_ranges callable (what this fed directly into ydl_opts
+    before) — that requires the FFmpegFD downloader, which shells ffmpeg out to the source's
+    remote HTTPS URL directly so it can seek-and-trim over the network. This bundled ffmpeg build
+    has no network protocol support at all (its own `ffmpeg -version` configure string:
+    `--disable-network --enable-protocol='file,pipe'`), so that path always failed outright with a
+    bare "ffmpeg exited with code 8" — reproduced live against a real Instagram Reel — regardless
+    of force_keyframes_at_cuts or any other yt-dlp-side option. _LocalTrimPP instead trims the
+    already-fully-downloaded local file after the fact, which only needs the file protocol this
+    build does have."""
     if not clip_range:
         return None
     ranges = []
@@ -87,9 +96,7 @@ def _parse_clip_range(clip_range):
         if start is None and end is None:
             continue
         ranges.append((start or 0, end if end is not None else float("inf")))
-    if not ranges:
-        return None
-    return download_range_func(None, ranges)
+    return ranges or None
 
 def _parse_extractor_args(raw):
     """Converts yt-dlp CLI-syntax --extractor-args strings ("youtube:player_client=android,web")
@@ -119,6 +126,98 @@ def _parse_extractor_args(raw):
         if args:
             result[ie_key] = args
     return result or None
+
+class _LocalTrimPP(FFmpegPostProcessor):
+    """Trims the just-produced file to `ranges` (a list of (start, end) second tuples — see
+    _parse_clip_range) via a plain local, file-to-file ffmpeg subprocess, replacing it in place at
+    the same path once done. Registered as the *last* postprocessor (see download()'s own
+    ydl.add_post_processor call) so it runs after merging and any thumbnail/metadata/subtitle
+    embedding already have — trimming last keeps this one operation, on whatever the real final
+    file already is, rather than needing its own opinion about which of those other steps to run
+    before/after.
+
+    Stream-copy only ("-c copy", `stream_copy_opts()`) — this bundled ffmpeg build has no encoders
+    at all (see _parse_clip_range's own doc comment), so a cut lands on the nearest existing
+    keyframe rather than the exact requested timestamp. Multiple ranges are each cut to their own
+    temp file, then concatenated via ffmpeg's own concat demuxer — also stream-copy-safe, since
+    every segment shares the same source codecs."""
+
+    def __init__(self, downloader, ranges):
+        super().__init__(downloader)
+        self._ranges = ranges
+
+    @classmethod
+    def pp_key(cls):
+        # PostProcessor.__init__ sets self.PP_NAME = self.pp_key() *after* any class-level
+        # PP_NAME is defined, silently overwriting it — and the base implementation derives the
+        # key from cls.__name__[:-2] (built for the "FfmpegXxxPP" naming convention), which for
+        # this class's actual name ("_LocalTrimPP") yields "_LocalTrim" (leading underscore
+        # intact), not "LocalTrim". postprocessor_hook (below) reports d["postprocessor"] from
+        # this same pp_key(), and custom_pp_keys' "LocalTrim" entry (see download()) never
+        # matched that leading-underscore variant — is_final was always False, so the finished
+        # file's path never reached `callback`, DownloadWorker never saw a real output file, and
+        # the download was reported as errored ("No downloadable content found") even though the
+        # trim had actually succeeded on disk. Reproduced live against the Instagram Reel trim
+        # case that originally motivated this whole postprocessor. Overriding pp_key() explicitly
+        # sidesteps the naming convention entirely instead of relying on this class's Python name.
+        return "LocalTrim"
+
+    def run(self, info):
+        filepath = info.get("filepath")
+        if not filepath or not self._ranges or not os.path.exists(filepath):
+            return [], info
+
+        base, ext = os.path.splitext(filepath)
+        ext = ext.lstrip(".")
+        segment_paths = []
+        try:
+            for i, (start, end) in enumerate(self._ranges):
+                seg_path = f"{base}.trimseg{i}.{ext}"
+                seek_opts = ["-ss", str(start)]
+                if end != float("inf"):
+                    seek_opts += ["-to", str(end)]
+                # -ss/-to given here (as part of the *input*'s own opts, ahead of "-i" — see
+                # real_run_ffmpeg) rather than after -i: an input-side seek is a fast, plain
+                # demuxer-level skip: exactly what a stream-copy-only build can still do. An
+                # output-side seek needs to decode every discarded frame first, which this build
+                # can't do at all.
+                self.real_run_ffmpeg(
+                    [(filepath, seek_opts)],
+                    [(seg_path, list(self.stream_copy_opts(ext=ext)))],
+                )
+                segment_paths.append(seg_path)
+
+            if len(segment_paths) == 1:
+                trimmed_path = segment_paths[0]
+            else:
+                concat_list_path = f"{base}.trimconcat.txt"
+                with open(concat_list_path, "w", encoding="utf-8") as f:
+                    for seg_path in segment_paths:
+                        f.write("file '{}'\n".format(seg_path.replace("'", "'\\''")))
+                trimmed_path = f"{base}.trimmed.{ext}"
+                self.real_run_ffmpeg(
+                    [(concat_list_path, ["-f", "concat", "-safe", "0"])],
+                    [(trimmed_path, list(self.stream_copy_opts(ext=ext)))],
+                )
+                os.remove(concat_list_path)
+                for seg_path in segment_paths:
+                    os.remove(seg_path)
+
+            # Same path the file already had — nothing downstream (this module's own
+            # postprocessor_hook, DownloadWorker's file-move logic on the Kotlin side) needs to
+            # know a trim happened at all.
+            os.replace(trimmed_path, filepath)
+        except Exception:
+            # The untrimmed original at `filepath` is still intact at this point (os.replace above
+            # never ran) — best-effort cleanup of whatever temp segments did get created, then
+            # let the real error propagate through yt-dlp's own postprocessor error handling (the
+            # same path "ERROR: ffmpeg exited with code 8" itself was already surfacing through).
+            for seg_path in segment_paths:
+                if os.path.exists(seg_path):
+                    os.remove(seg_path)
+            raise
+
+        return [], info
 
 class _Logger:
     """Routes yt-dlp's own log messages through the same per-line callback DownloadWorker
@@ -176,6 +275,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # *last* one's own completion is reported instead — this list (in the same order they're
     # appended to ydl_opts below) is what tells postprocessor_hook which one that is. Only
     # meaningful with ffmpeg bundled, since every one of these postprocessors requires it.
+    # Parsed early (not down where it's actually used, alongside the other ydl_opts) so its
+    # presence can feed custom_pp_keys below, same as every other postprocessor-triggering flag.
+    clip_ranges = _parse_clip_range(clip_range)
+
     custom_pp_keys = []
     if ffmpeg_path:
         if audio_only:
@@ -186,6 +289,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             custom_pp_keys.append("Metadata")
         if download_subtitles and not audio_only:
             custom_pp_keys.append("EmbedSubtitle")
+        if clip_ranges:
+            # _LocalTrimPP (registered further down, once the YoutubeDL instance exists to
+            # construct it with) always runs last regardless of what else is requested — see its
+            # own doc comment — so it's always the last key appended here too, matching whichever
+            # combination of the above actually applies this run.
+            custom_pp_keys.append("LocalTrim")
 
     def progress_hook(d):
         if should_cancel is not None and should_cancel():
@@ -476,13 +585,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     if write_info_files:
         ydl_opts["writedescription"] = True
         ydl_opts["writeinfojson"] = True
-    range_func = _parse_clip_range(clip_range)
-    if range_func:
-        ydl_opts["download_ranges"] = range_func
-        # Without this, a cut can only land on the nearest existing keyframe (often a second or
-        # more off the requested timestamp) since ffmpeg -ss/-to on a copy-codec trim can't
-        # re-encode to an exact frame — this forces a keyframe to actually exist at the cut point.
-        ydl_opts["force_keyframes_at_cuts"] = True
+    # clip_ranges was already parsed earlier (feeds custom_pp_keys above) — _LocalTrimPP itself is
+    # registered below, once the YoutubeDL instance exists to construct it with.
+
     if extra_args:
         # yt-dlp has no CLI-args-string constructor, so only a small, safe subset of raw options
         # is supported this way: "key=value" pairs matching real yt_dlp option names, one per line
@@ -494,6 +599,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            if clip_ranges and ffmpeg_path:
+                # Added directly rather than through ydl_opts["postprocessors"] (a list of plain
+                # {"key": ...} dicts yt-dlp itself resolves to stock Ffmpeg*PP classes) since
+                # _LocalTrimPP isn't one of those — this is yt-dlp's own supported way to add a
+                # custom postprocessor instance. "post_process" is the same stage every stock
+                # postprocessor above runs at, and instances added here run *after* ones already
+                # registered via ydl_opts at that same stage — see _LocalTrimPP's own doc comment
+                # for why running last is what we want here anyway.
+                ydl.add_post_processor(_LocalTrimPP(ydl, clip_ranges), when="post_process")
             ydl.download([url])
         return "Done"
     except _Cancelled:
