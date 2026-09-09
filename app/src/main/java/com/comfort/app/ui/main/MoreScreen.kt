@@ -435,6 +435,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var maxFilesize by remember { mutableStateOf(GalleryDlPreferences.getMaxFilesize(context)) }
     var instantShare by remember { mutableStateOf(GalleryDlPreferences.isInstantShareEnabled(context)) }
     var deleteLeftoverOnFailure by remember { mutableStateOf(GalleryDlPreferences.isDeleteLeftoverOnFailure(context)) }
+    var cleanupLeftoverInterval by remember { mutableStateOf(GalleryDlPreferences.getCleanupLeftoverInterval(context)) }
     var preventDuplicateDownloads by remember { mutableStateOf(GalleryDlPreferences.isPreventDuplicateDownloads(context)) }
     var rememberDownloadType by remember { mutableStateOf(GalleryDlPreferences.isRememberDownloadType(context)) }
     var networkRetries by remember { mutableStateOf(GalleryDlPreferences.getNetworkRetries(context)) }
@@ -959,6 +960,46 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                     GalleryDlPreferences.setDeleteLeftoverOnFailure(context, it)
                 },
             )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            Text("Clean up leftover downloads", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Periodically sweeps cancelled or errored downloads' partial files from cache — a safety net for when the app was killed outright before it got the chance to clean up on its own.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf("" to "Off", "daily" to "Daily", "weekly" to "Weekly", "monthly" to "Monthly").forEach { (value, label) ->
+                    val selected = cleanupLeftoverInterval == value
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        onClick = {
+                            cleanupLeftoverInterval = value
+                            GalleryDlPreferences.setCleanupLeftoverInterval(context, value)
+                            DownloadDispatcher.rescheduleStagingCleanup(context)
+                        },
+                    ) {
+                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

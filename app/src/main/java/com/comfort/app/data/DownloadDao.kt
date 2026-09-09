@@ -137,6 +137,14 @@ interface DownloadDao {
     @Query("DELETE FROM downloads WHERE id = :id")
     suspend fun delete(id: String)
 
+    /** Used by the periodic leftover-downloads cleanup sweep (Settings > Downloads) — cancelled
+     * or errored downloads whose staging directory may still be sitting in cache (either because
+     * "Delete leftover on failure" was off at the time, or the process was killed before that
+     * cleanup code ever ran). QUEUED/SCHEDULED/RUNNING/PAUSED are deliberately excluded since
+     * their staging dir is still in active use. */
+    @Query("SELECT id FROM downloads WHERE status IN ('CANCELLED', 'ERRORED')")
+    suspend fun getCancelledOrErroredIdsOnce(): List<String>
+
     /** Records that [filename] has been moved into the gallery for [downloadId]. Returns -1 if it
      * was already recorded (a duplicate announcement from gallery-dl) or the new row id otherwise
      * — callers use that to tell "genuinely new file" apart from "already handled, don't recount". */

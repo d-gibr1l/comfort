@@ -95,6 +95,16 @@ class MainActivity : ComponentActivity() {
       // See DownloadDispatcher.repairOrphanedRunning()'s own doc comment for the full story.
       LaunchedEffect(Unit) {
         DownloadDispatcher.repairOrphanedRunning(context)
+        // Same idea, for QUEUED/SCHEDULED rows — see repairOrphanedQueue's own doc comment for
+        // why this needed a startup call too, not just its existing reactive ones.
+        DownloadDispatcher.repairOrphanedQueue(context)
+      }
+
+      // (Re)applies the "Clean-up leftover downloads" interval every cold start — a
+      // PeriodicWorkRequest's interval is fixed at enqueue time, so this is what makes a change
+      // from a previous session actually take effect again. See its own doc comment.
+      LaunchedEffect(Unit) {
+        DownloadDispatcher.rescheduleStagingCleanup(context)
       }
 
       var lightTheme by remember { mutableStateOf(ThemePreferences.getLightTheme(context)) }

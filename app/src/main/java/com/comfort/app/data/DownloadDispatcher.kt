@@ -2,14 +2,17 @@ package com.comfort.app.data
 
 import android.content.Context
 import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.comfort.app.worker.DownloadNotifications
 import com.comfort.app.worker.DownloadWorker
+import com.comfort.app.worker.StagingCleanupWorker
 import java.io.File
 import java.util.Calendar
 import java.util.UUID
@@ -299,8 +302,15 @@ object DownloadDispatcher {
      * later — 15+ times in under two minutes, so nothing ever actually finished (this is what
      * surfaced as "concurrency is 2 but only 1 is ever really downloading"). Checking each entry's
      * live WorkInfo first means a healthy job is never touched, only ones WorkManager's chain-cancel
-     * cascade actually killed out from under the DB's back. */
-    private suspend fun repairOrphanedQueue(context: Context) {
+     * cascade actually killed out from under the DB's back.
+     *
+     * Also called once per cold start (MainActivity, alongside [repairOrphanedRunning]) — not
+     * just reactively. Reproduced live: several QUEUED rows sat for days with "nothing running"
+     * because their recorded workRequestId no longer existed in WorkManager's own database at
+     * all (confirmed directly — zero matching WorkSpec rows), and every one of this function's
+     * other call sites is a reaction to some *other* action (a pause/cancel/schedule change) that
+     * simply never happened in between, so nothing ever re-checked them. */
+    suspend fun repairOrphanedQueue(context: Context) {
         // A null workRequestId is also how a global pauseAll() deliberately parks a download added
         // while paused (see DownloadsViewModel.resumeAll()'s own matching filter) — not every null
         // means "orphaned by the chain cascade." Leave those alone here; resumeAll() is what's
@@ -405,6 +415,33 @@ object DownloadDispatcher {
         dao.getRunningOnce().forEach { entity ->
             enqueueWork(context, entity.id, entity.url)
         }
+    }
+
+    private const val STAGING_CLEANUP_WORK_NAME = "staging-cleanup-sweep"
+
+    /** (Re)applies the "Clean-up leftover downloads" interval (Settings > Downloads) to
+     * StagingCleanupWorker's periodic schedule — called once at app startup (so a change made in
+     * a previous session takes effect again) and immediately whenever the setting itself changes,
+     * since a PeriodicWorkRequest's own interval is fixed at the moment it's enqueued and won't
+     * otherwise notice a later change. */
+    fun rescheduleStagingCleanup(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+        val intervalDays = when (GalleryDlPreferences.getCleanupLeftoverInterval(context)) {
+            "daily" -> 1L
+            "weekly" -> 7L
+            "monthly" -> 30L
+            else -> null
+        }
+        if (intervalDays == null) {
+            workManager.cancelUniqueWork(STAGING_CLEANUP_WORK_NAME)
+            return
+        }
+        val request = PeriodicWorkRequestBuilder<StagingCleanupWorker>(intervalDays, TimeUnit.DAYS).build()
+        workManager.enqueueUniquePeriodicWork(
+            STAGING_CLEANUP_WORK_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request,
+        )
     }
 
     /** Plain resume for a single PAUSED download — the "Resume" action on its own static paused

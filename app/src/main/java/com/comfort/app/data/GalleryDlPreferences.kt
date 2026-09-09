@@ -80,6 +80,7 @@ object GalleryDlPreferences {
     const val KEY_EMBED_CHAPTERS = "embed_chapters"
     const val KEY_SAVE_SUBTITLE_FILES = "save_subtitle_files"
     const val KEY_DELETE_LEFTOVER_ON_FAILURE = "delete_leftover_on_failure"
+    const val KEY_CLEANUP_LEFTOVER_INTERVAL = "cleanup_leftover_interval"
     const val KEY_PREVENT_DUPLICATE_DOWNLOADS = "prevent_duplicate_downloads"
     const val KEY_REMEMBER_DOWNLOAD_TYPE = "remember_download_type"
     const val KEY_AUDIO_LOCATION_URI = "audio_location_uri"
@@ -763,6 +764,20 @@ object GalleryDlPreferences {
 
     fun setDeleteLeftoverOnFailure(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_DELETE_LEFTOVER_ON_FAILURE, enabled).apply()
+    }
+
+    /** Periodic sweep (ported from YTDLnis's own "Clean-up leftover downloads (cancelled,
+     * errored)") that catches what [isDeleteLeftoverOnFailure] can't: a staging directory left
+     * behind because the process was killed outright (OS out-of-memory kill, force-stop, a crash)
+     * before that per-download cleanup code ever got to run, or because the setting was off at the
+     * time. "" means disabled (the default — matches YTDLnis's own default of unset/disabled). See
+     * StagingCleanupWorker. */
+    fun getCleanupLeftoverInterval(context: Context): String {
+        return prefs(context).getString(KEY_CLEANUP_LEFTOVER_INTERVAL, "") ?: ""
+    }
+
+    fun setCleanupLeftoverInterval(context: Context, interval: String) {
+        prefs(context).edit().putString(KEY_CLEANUP_LEFTOVER_INTERVAL, interval).apply()
     }
 
     /** When enabled, a new download whose URL exactly matches an existing non-terminal
