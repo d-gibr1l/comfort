@@ -41,6 +41,7 @@ object GalleryDlPreferences {
     const val KEY_CONCURRENT_DOWNLOADS = "concurrent_downloads"
     const val KEY_WIFI_ONLY = "wifi_only"
     const val KEY_SCHEDULE_ENABLED = "schedule_enabled"
+    const val KEY_ALARM_SCHEDULING_ENABLED = "alarm_scheduling_enabled"
     const val KEY_SCHEDULE_START_MIN = "schedule_start_min"
     const val KEY_SCHEDULE_END_MIN = "schedule_end_min"
     const val KEY_SPEED_LIMIT = "speed_limit"
@@ -70,6 +71,7 @@ object GalleryDlPreferences {
     const val KEY_CONCURRENT_FRAGMENTS = "concurrent_fragments"
     const val KEY_NO_CHECK_CERTIFICATES = "no_check_certificates"
     const val KEY_SLEEP_INTERVAL_SECONDS = "sleep_interval_seconds"
+    const val MAX_SLEEP_INTERVAL_SECONDS = 20
     const val KEY_CUSTOM_HEADERS = "custom_headers"
     const val KEY_FORMAT_SORT = "format_sort"
     const val KEY_VERBOSE_LOGGING = "verbose_logging"
@@ -247,6 +249,20 @@ object GalleryDlPreferences {
 
     fun setScheduleEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_SCHEDULE_ENABLED, enabled).apply()
+    }
+
+    /** Ported from YTDLnis's own "Use alarm for scheduling" — an AlarmManager backstop
+     * (DownloadDispatcher.scheduleWindowAlarm) that wakes the device near the Schedule window's
+     * real open time, since a long WorkManager setInitialDelay() alone has no absolute wall-clock
+     * target and Doze/App Standby can defer it well past the intended moment. Off (the default,
+     * matching YTDLnis) leaves the window purely to WorkManager's own countdown, same as before
+     * this setting existed. */
+    fun isAlarmSchedulingEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_ALARM_SCHEDULING_ENABLED, false)
+    }
+
+    fun setAlarmSchedulingEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ALARM_SCHEDULING_ENABLED, enabled).apply()
     }
 
     /** Minutes since midnight (0-1439). */
@@ -688,23 +704,26 @@ object GalleryDlPreferences {
         prefs(context).edit().putBoolean(KEY_NO_CHECK_CERTIFICATES, enabled).apply()
     }
 
-    /** Seconds to pause before each request — yt-dlp's own --sleep-requests/--max-sleep-interval,
-     * both set to this same fixed value (a range isn't exposed here, just a flat delay). 0 means
-     * no throttling, the default. Eases the same rate-limit/bot-detection pressure a lower
-     * concurrent-downloads count does, just per-request instead of per-download-slot. */
+    /** The *ceiling* of a random 2-to-this-many-second pause before each yt-dlp request (the
+     * floor is fixed at 2s in yt_dlp_wrapper.py, not user-configurable) — a real range, like
+     * yt-dlp's own --min-sleep-interval/--max-sleep-interval pair is meant to be used, rather
+     * than a fixed per-request delay a site's rate-limit/bot-detection could fingerprint as a
+     * clockwork pattern. Eases the same pressure a lower concurrent-downloads count does, just
+     * per-request instead of per-download-slot. */
     fun getSleepIntervalSeconds(context: Context): Int {
-        return prefs(context).getInt(KEY_SLEEP_INTERVAL_SECONDS, 0).coerceIn(0, 300)
+        return prefs(context).getInt(KEY_SLEEP_INTERVAL_SECONDS, MAX_SLEEP_INTERVAL_SECONDS / 2).coerceIn(2, MAX_SLEEP_INTERVAL_SECONDS)
     }
 
     fun setSleepIntervalSeconds(context: Context, seconds: Int) {
-        prefs(context).edit().putInt(KEY_SLEEP_INTERVAL_SECONDS, seconds.coerceIn(0, 300)).apply()
+        prefs(context).edit().putInt(KEY_SLEEP_INTERVAL_SECONDS, seconds.coerceIn(2, MAX_SLEEP_INTERVAL_SECONDS)).apply()
     }
 
-    /** Whether [getSleepIntervalSeconds] actually applies — defaults true, harmless either way for
-     * an install that never touched this (default value 0 is already a no-op downstream). Off
-     * forces that same no-op regardless of the stored value. */
+    /** Whether [getSleepIntervalSeconds] actually applies. Defaults false — unlike before this
+     * became a real range, the "off" value (0, no delay) is no longer reachable within the
+     * slider's own 2-20 range, so the toggle itself has to carry that no-op instead for a fresh
+     * or never-touched install to see the same no-throttling behavior as always. */
     fun isSleepIntervalEnabled(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_SLEEP_INTERVAL_ENABLED, true)
+        return prefs(context).getBoolean(KEY_SLEEP_INTERVAL_ENABLED, false)
     }
 
     fun setSleepIntervalEnabled(context: Context, enabled: Boolean) {

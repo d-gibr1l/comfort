@@ -181,11 +181,11 @@ class DownloadWorker(
                 val startTime = System.currentTimeMillis()
                 dao.setStartTime(downloadId, startTime)
 
-                // Sites gallery-dl either can't parse at all or (TikTok specifically) handles
-                // more weakly than yt-dlp skip the gallery-dl attempt entirely; everything else
-                // goes through gallery-dl first since that's the engine with real gallery/image
-                // support, with yt-dlp used afterward as a fallback or a same-post video
-                // supplement (see below).
+                // Sites gallery-dl can't parse at all skip the gallery-dl attempt entirely;
+                // everything else goes through gallery-dl first since that's the engine with real
+                // gallery/image support, with yt-dlp used afterward as a fallback or a same-post
+                // video supplement (see below) — including TikTok, whose "photo mode" slideshow
+                // posts are real image galleries, not video (see VideoSiteRouter's own doc comment).
                 val engine = VideoSiteRouter.classify(url)
 
                 // The share-picker flow already knows the total (it enumerated the gallery to
@@ -662,13 +662,9 @@ class DownloadWorker(
                             // video child of an otherwise-fine photo carousel, so gallery-dl's own
                             // listing genuinely never saw a video to report, and this would
                             // otherwise skip yt-dlp entirely with no trace of a video ever having
-                            // existed. Instagram (unlike most gallery-dl sites — image boards, art
-                            // platforms — which never carry embedded video at all) routinely mixes
-                            // video into posts, so it's worth an always-on supplementary attempt
-                            // there specifically: yt-dlp fails fast and silently (no user-facing
-                            // error; see actualCallback's default branch) on a genuinely video-less
-                            // post, so the cost is a few extra seconds, not a broken download.
-                            val alwaysTryVideo = VideoSiteRouter.isInstagram(url)
+                            // existed. See VideoSiteRouter.alwaysSupplementsVideo's own doc comment
+                            // for which hosts get this always-on attempt and why.
+                            val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
                             if (savedCount.get() == 0) {
                                 // gallery-dl found nothing at all — unsupported URL, blocked
                                 // request, or a genuinely empty gallery. Try yt-dlp on the same

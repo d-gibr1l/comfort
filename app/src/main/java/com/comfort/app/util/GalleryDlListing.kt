@@ -91,12 +91,12 @@ object GalleryDlListing {
      * network error, ...) and should be shown, not silently swallowed into the same fallback. */
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
         when (VideoSiteRouter.classify(url)) {
-            // Video-only sources (Reels, TikTok, YouTube, ...) skip gallery-dl's listing entirely,
-            // same as the real download does — gallery-dl either can't parse them at all, or
-            // (Instagram Reels specifically) lists them fine but only with an internal
-            // "ytdl:"-prefixed pseudo-URL as the item's own "url", which isn't a real fetchable
-            // preview image (see yt_dlp_wrapper.py's list_info() doc comment). yt-dlp's own
-            // extractor already resolves a real thumbnail as part of normal metadata extraction.
+            // Video-only sources (Reels, YouTube, ...) skip gallery-dl's listing entirely, same as
+            // the real download does — gallery-dl either can't parse them at all, or (Instagram
+            // Reels specifically) lists them fine but only with an internal "ytdl:"-prefixed
+            // pseudo-URL as the item's own "url", which isn't a real fetchable preview image (see
+            // yt_dlp_wrapper.py's list_info() doc comment). yt-dlp's own extractor already resolves
+            // a real thumbnail as part of normal metadata extraction.
             DownloadEngine.YT_DLP -> listViaYtDlp(context, url)
             DownloadEngine.GALLERY_DL -> {
                 val result = listViaGalleryDl(context, url)

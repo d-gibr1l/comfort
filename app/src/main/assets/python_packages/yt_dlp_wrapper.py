@@ -449,11 +449,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     if no_check_certificates:
         ydl_opts["nocheckcertificate"] = True
     if sleep_interval_seconds:
-        # Same fixed value for both — yt-dlp's own --min-sleep-interval/--max-sleep-interval pair
-        # normally lets a random range be specified; this app's own setting is a single flat delay
-        # rather than a range, so both ends of the pair are pinned to it.
-        ydl_opts["sleep_interval"] = int(sleep_interval_seconds)
-        ydl_opts["max_sleep_interval"] = int(sleep_interval_seconds)
+        # A real random range, like yt-dlp's own --min-sleep-interval/--max-sleep-interval pair is
+        # meant to be used — a fixed per-request delay is exactly the kind of clockwork pattern
+        # that's easy for a site's own rate-limit/bot-detection to fingerprint. The floor is
+        # hardcoded at 2s (not user-configurable) since anything lower isn't meaningfully
+        # different from no delay at all; the app's own setting is just the ceiling.
+        ydl_opts["sleep_interval"] = 2
+        # max(2, ...) since yt-dlp asserts min <= max — guards a stale/out-of-range stored value
+        # from a version before this setting became a 2-20 slider (see GalleryDlPreferences).
+        ydl_opts["max_sleep_interval"] = max(2, int(sleep_interval_seconds))
     if socket_timeout_seconds:
         # How long a single read/connect can stall before yt-dlp gives up on it (then retries,
         # per the "retries" handling above) — yt-dlp's own default is 20s, generous enough that

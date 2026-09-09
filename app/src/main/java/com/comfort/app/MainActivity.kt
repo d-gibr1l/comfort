@@ -107,6 +107,13 @@ class MainActivity : ComponentActivity() {
         DownloadDispatcher.rescheduleStagingCleanup(context)
       }
 
+      // Re-arms the Schedule window's exact-alarm backstop every cold start — an AlarmManager
+      // alarm doesn't survive a reboot on its own, so this is what re-establishes it. See
+      // DownloadDispatcher.scheduleWindowAlarm's own doc comment.
+      LaunchedEffect(Unit) {
+        DownloadDispatcher.scheduleWindowAlarm(context)
+      }
+
       var lightTheme by remember { mutableStateOf(ThemePreferences.getLightTheme(context)) }
       var darkTheme by remember { mutableStateOf(ThemePreferences.getDarkTheme(context)) }
       var pureBlack by remember { mutableStateOf(ThemePreferences.isPureBlack(context)) }

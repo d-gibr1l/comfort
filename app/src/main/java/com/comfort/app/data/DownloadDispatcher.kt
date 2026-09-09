@@ -1,6 +1,9 @@
 package com.comfort.app.data
 
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -12,6 +15,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.comfort.app.worker.DownloadNotifications
 import com.comfort.app.worker.DownloadWorker
+import com.comfort.app.worker.ScheduleAlarmReceiver
 import com.comfort.app.worker.StagingCleanupWorker
 import java.io.File
 import java.util.Calendar
@@ -189,6 +193,7 @@ object DownloadDispatcher {
             .build()
 
         dao.setWorkRequestId(id, workRequest.id.toString())
+        scheduleWindowAlarm(context)
         // SCHEDULED vs QUEUED distinguishes "waiting on the schedule window" from "waiting on a
         // concurrency slot" in the UI — recomputed on every (re-)enqueue so a schedule change
         // flips this correctly for anything rescheduleQueuedDownloads() re-submits.
@@ -497,5 +502,42 @@ object DownloadDispatcher {
 
         val minutesUntilStart = if (nowMin < startMin) startMin - nowMin else (24 * 60 - nowMin) + startMin
         return TimeUnit.MINUTES.toMillis(minutesUntilStart.toLong())
+    }
+
+    private const val SCHEDULE_ALARM_REQUEST_CODE = 1001
+
+    /** (Re)arms — or cancels — the exact-alarm backstop for the Schedule window, ported from
+     * YTDLnis's own "Use alarm for scheduling" toggle. WorkManager's setInitialDelay() is a plain
+     * countdown with no concept of an absolute wake time; Doze/App Standby can defer a
+     * long-delayed job well past its intended fire time, silently pushing a "start at 1am"
+     * schedule to whenever the OS next lets the app wake for maintenance. setAndAllowWhileIdle()
+     * wakes the device close to the real target time even during Doze, without needing the
+     * SCHEDULE_EXACT_ALARM permission a true setExactAndAllowWhileIdle() would require on API
+     * 31+ — ScheduleAlarmReceiver just kicks rescheduleQueuedDownloads() when it fires, the same
+     * recovery ClockChangeReceiver already uses for a clock/timezone change.
+     *
+     * Called from [enqueueWork] (whenever something actually lands in SCHEDULED state, so the
+     * alarm always matches the freshest computed window-open time) and from Settings whenever the
+     * Schedule window or this toggle itself changes — deliberately *not* from the receiver after
+     * it fires, since scheduleDelayMillis() is ~0 right when the window opens and there's nothing
+     * to re-arm for until the next SCHEDULED item comes along naturally. */
+    fun scheduleWindowAlarm(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, SCHEDULE_ALARM_REQUEST_CODE,
+            Intent(context, ScheduleAlarmReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        if (!GalleryDlPreferences.isScheduleEnabled(context) || !GalleryDlPreferences.isAlarmSchedulingEnabled(context)) {
+            alarmManager.cancel(pendingIntent)
+            return
+        }
+        val delayMillis = scheduleDelayMillis(context)
+        if (delayMillis <= 0L) {
+            // Already inside the window (or nothing configured) — nothing to wake up for.
+            alarmManager.cancel(pendingIntent)
+            return
+        }
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
     }
 }

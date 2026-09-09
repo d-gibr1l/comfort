@@ -92,6 +92,14 @@
             </intent-filter>
         </receiver>
 
+        <!-- Fires the Schedule window's exact-alarm backstop ("Use alarm for scheduling",
+             Settings > Downloads > Schedule) — see ScheduleAlarmReceiver's own doc comment. No
+             manifest permission needed: setAndAllowWhileIdle() doesn't require
+             SCHEDULE_EXACT_ALARM (only a true setExactAndAllowWhileIdle() would on API 31+). -->
+        <receiver
+            android:name=".worker.ScheduleAlarmReceiver"
+            android:exported="false" />
+
         <!-- WorkManager's own service, declared here only to add the foregroundServiceType that
              DownloadWorker's ForegroundInfo requires on API 34+; without a matching declaration
              here, setForeground() throws "foregroundServiceType is not a subset of ... manifest". -->

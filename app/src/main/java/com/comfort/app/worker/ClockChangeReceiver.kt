@@ -30,6 +30,10 @@ class ClockChangeReceiver : BroadcastReceiver() {
                 // current — the same recovery rescheduleQueuedDownloads already does for an actual
                 // schedule-setting change.
                 DownloadDispatcher.rescheduleQueuedDownloads(appContext)
+                // The alarm backstop (see its own doc comment) also has an absolute wall-clock
+                // target baked in when it was armed — needs the same re-arm against the clock/
+                // timezone that's now current.
+                DownloadDispatcher.scheduleWindowAlarm(appContext)
             } finally {
                 pendingResult.finish()
             }
