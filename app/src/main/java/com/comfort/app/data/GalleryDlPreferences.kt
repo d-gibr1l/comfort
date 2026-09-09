@@ -104,6 +104,7 @@ object GalleryDlPreferences {
     const val KEY_BUFFER_SIZE_ENABLED = "buffer_size_enabled"
     const val KEY_FORMAT_ID_OVERRIDE = "format_id_override"
     const val KEY_YOUTUBE_CLIENT_ROTATION_ENABLED = "youtube_client_rotation_enabled"
+    const val KEY_IMPERSONATE_ENABLED = "impersonate_enabled"
     // yt-dlp's own built-in default for --fragment-retries, kept separate from
     // DEFAULT_NETWORK_RETRIES below (see getEffectiveFragmentRetries) so a merge download's
     // per-fragment retry budget can be tuned independently of whole-request retries.
@@ -649,6 +650,21 @@ object GalleryDlPreferences {
 
     fun setYoutubeClientRotationEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_YOUTUBE_CLIENT_ROTATION_ENABLED, enabled).apply()
+    }
+
+    /** yt-dlp only — spoofs a real browser's TLS handshake (via curl_cffi) for every download,
+     * not just requests, so the site sees a genuine browser fingerprint instead of a recognizable
+     * script signature. yt_dlp_wrapper.py already does this unconditionally for one specific,
+     * reproduced case (a Reddit share-link redirect getting WAF-blocked) — this is the general,
+     * opt-in "try it everywhere" version for other sites hitting bot detection. Off by default:
+     * curl_cffi's impersonation profiles track real browser versions and can go stale, and a site
+     * that already works fine shouldn't pay that overhead or risk for nothing. */
+    fun isImpersonateEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_IMPERSONATE_ENABLED, false)
+    }
+
+    fun setImpersonateEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_IMPERSONATE_ENABLED, enabled).apply()
     }
 
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update
