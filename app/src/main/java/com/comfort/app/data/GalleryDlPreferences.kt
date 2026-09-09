@@ -91,6 +91,12 @@ object GalleryDlPreferences {
     // stripping that trailing bracket, so the two need to keep matching.
     private const val LEGACY_DEFAULT_FILENAME_FORMAT_2 = "{uploader|category} - {title|id} - {filename}.{extension}"
     const val DEFAULT_FILENAME_FORMAT = "{uploader|category} - {title|category} [{filename}].{extension}"
+    private const val DEFAULT_FILENAME_TEMPLATES = """%(title)s.%(ext)s
+%(uploader)s - %(title)s [%(id)s].%(ext)s
+%(playlist_index)s - %(title)s.%(ext)s
+{category} - {filename}.{extension}
+{uploader} - {title}.{extension}"""
+
     const val DEFAULT_CONCURRENT_DOWNLOADS = 2
     const val MAX_CONCURRENT_DOWNLOADS = 5
 
@@ -126,7 +132,9 @@ object GalleryDlPreferences {
      * so there's nothing to escape and nothing to parse wrongly. Empty until the user saves one —
      * the sheet shows its own empty state rather than shipping sample templates. */
     fun getFilenameTemplates(context: Context): List<String> {
-        return (prefs(context).getString(KEY_FILENAME_TEMPLATES, "") ?: "")
+        val stored = prefs(context).getString(KEY_FILENAME_TEMPLATES, null)
+        val raw = if (stored == null) DEFAULT_FILENAME_TEMPLATES else stored
+        return raw
             .split("\n")
             .map { it.trim() }
             .filter { it.isNotEmpty() }
