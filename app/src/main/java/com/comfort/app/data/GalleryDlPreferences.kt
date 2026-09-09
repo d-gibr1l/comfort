@@ -642,10 +642,10 @@ object GalleryDlPreferences {
      * instead of just "web", so a throttled or degraded endpoint on one client falls back to
      * another rather than failing the whole download. A default only: an explicit
      * "youtube:player_client=..." already present in the free-text Extractor arguments field
-     * (Settings > Advanced) still wins. Off by default — safe either way, but not worth silently
-     * changing which client every YouTube download uses for someone who never asked for it. */
+     * (Settings > Advanced) still wins. On by default — free resilience with no real downside: if
+     * one client's endpoint is throttled, yt-dlp falls back to another instead of failing outright. */
     fun isYoutubeClientRotationEnabled(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_YOUTUBE_CLIENT_ROTATION_ENABLED, false)
+        return prefs(context).getBoolean(KEY_YOUTUBE_CLIENT_ROTATION_ENABLED, true)
     }
 
     fun setYoutubeClientRotationEnabled(context: Context, enabled: Boolean) {
