@@ -31,6 +31,7 @@ import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.GalleryItem
+import com.comfort.app.util.ListingResult
 import com.comfort.app.util.rememberIsNetworkAvailable
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
@@ -49,6 +50,13 @@ fun SharePickerScreen(
     onDownload: (url: String, itemFilter: String?, totalItems: Int, videoQuality: VideoQuality?) -> Unit,
     modifier: Modifier = Modifier,
     onHeightChange: (Dp) -> Unit = {},
+    // ShareActivity already runs this exact listing pass once itself, to decide whether this
+    // gallery item-picker is even the right UI to show (see its own doc comment) or a single
+    // detected video should skip straight to DownloadPreviewSheet instead. Reusing that result
+    // here avoids a second, redundant network round trip for every share — real cost on sites
+    // like Twitter/Reddit that need a fresh guest-token/auth request per listing attempt. Null
+    // (the default) means "fetch it myself," unchanged from every other caller of this screen.
+    preloadedResult: ListingResult? = null,
 ) {
     val context = LocalContext.current
     var state by remember { mutableStateOf(ListingState.LOADING) }
@@ -116,7 +124,7 @@ fun SharePickerScreen(
     LaunchedEffect(url) {
         state = ListingState.LOADING
         errorMessage = null
-        val result = GalleryDlListing.listItems(context, url)
+        val result = preloadedResult ?: GalleryDlListing.listItems(context, url)
         when {
             result.items.isNotEmpty() -> {
                 items = result.items
