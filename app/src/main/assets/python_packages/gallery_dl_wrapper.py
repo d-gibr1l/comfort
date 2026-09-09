@@ -67,7 +67,7 @@ class CallbackWriter:
             self._emit(self.buffer)
             self.buffer = ""
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None):
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -105,6 +105,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         args.extend(["-o", f"extractor.retries={retries}", "-o", f"downloader.retries={retries}"])
     if max_filesize:
         args.extend(["-o", f"downloader.filesize-max={max_filesize}"])
+    if socket_timeout_seconds:
+        # Same idea as yt_dlp_wrapper.py's socket_timeout — gallery-dl's own default is 30s;
+        # covers both the metadata/listing request and each individual file fetch, same two
+        # config paths "retries" above already needed to cover both places.
+        args.extend(["-o", f"extractor.timeout={socket_timeout_seconds}", "-o", f"downloader.timeout={socket_timeout_seconds}"])
     if write_info_files:
         # gallery-dl's closest analog to yt-dlp's --write-info-json: one JSON sidecar per
         # downloaded file, containing the same metadata used for --filename/-filter expressions.
@@ -248,6 +253,7 @@ if __name__ == "__main__":
             max_filesize=_s(_rest[10]) if len(_rest) > 10 else None,
             write_info_files=(_rest[11] == "1") if len(_rest) > 11 else False,
             proxy_url=_s(_rest[12]) if len(_rest) > 12 else None,
+            socket_timeout_seconds=_s(_rest[13]) if len(_rest) > 13 else None,
         )
         print(f"[__status__] {_status}", file=_real_stdout, flush=True)
     elif _cmd == "list_items":

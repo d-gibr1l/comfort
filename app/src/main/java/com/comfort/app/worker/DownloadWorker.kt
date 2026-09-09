@@ -534,6 +534,7 @@ class DownloadWorker(
                 val writeInfoFiles = GalleryDlPreferences.isWriteInfoFiles(applicationContext)
                 val proxyUrl = GalleryDlPreferences.getEffectiveProxyUrl(applicationContext)
                 val extractorArgs = GalleryDlPreferences.getExtractorArgs(applicationContext)
+                val socketTimeoutSeconds = GalleryDlPreferences.getEffectiveSocketTimeoutSeconds(applicationContext)
 
                 // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
                 // call into one shared interpreter — the race PythonEngineLock existed to prevent
@@ -548,6 +549,7 @@ class DownloadWorker(
                             filenameFormat, extraArgs, galleryArchivePath, limitRate,
                             entity?.itemFilter.orEmpty(), if (excludeVideo) "1" else "0",
                             networkRetries, maxFilesize, if (writeInfoFiles) "1" else "0", proxyUrl,
+                            socketTimeoutSeconds,
                         ),
                         actualCallback,
                     )
@@ -603,6 +605,8 @@ class DownloadWorker(
                 val restrictFilenames = GalleryDlPreferences.isRestrictFilenames(applicationContext)
                 val trimFilenames = GalleryDlPreferences.isTrimFilenames(applicationContext)
                 val fragmentRetries = GalleryDlPreferences.getEffectiveFragmentRetries(applicationContext)
+                val bufferSizeKb = GalleryDlPreferences.getEffectiveBufferSizeKb(applicationContext)
+                val formatIdOverride = GalleryDlPreferences.getFormatIdOverride(applicationContext)
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -612,7 +616,7 @@ class DownloadWorker(
                         applicationContext, "yt_dlp_wrapper.py",
                         listOf(
                             "download", url, stagingDir.absolutePath, cookiesArg,
-                            "", "", ytDlpArchivePath, limitRate, "",
+                            "", "", ytDlpArchivePath, limitRate, formatIdOverride,
                             jsRuntimePath, ffmpegPath,
                             if (audioOnly) "1" else "0", if (downloadSubtitles) "1" else "0", subtitleLangs,
                             if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
@@ -633,6 +637,8 @@ class DownloadWorker(
                             if (restrictFilenames) "1" else "0",
                             if (trimFilenames) "1" else "0",
                             fragmentRetries,
+                            socketTimeoutSeconds,
+                            bufferSizeKb,
                         ),
                         actualCallback,
                     )

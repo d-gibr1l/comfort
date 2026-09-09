@@ -451,6 +451,10 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var noCheckCertificates by remember { mutableStateOf(GalleryDlPreferences.isNoCheckCertificates(context)) }
     var sleepIntervalSeconds by remember { mutableStateOf(GalleryDlPreferences.getSleepIntervalSeconds(context)) }
     var sleepIntervalEnabled by remember { mutableStateOf(GalleryDlPreferences.isSleepIntervalEnabled(context)) }
+    var socketTimeoutSeconds by remember { mutableStateOf(GalleryDlPreferences.getSocketTimeoutSeconds(context)) }
+    var socketTimeoutEnabled by remember { mutableStateOf(GalleryDlPreferences.isSocketTimeoutEnabled(context)) }
+    var bufferSizeKb by remember { mutableStateOf(GalleryDlPreferences.getBufferSizeKb(context)) }
+    var bufferSizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isBufferSizeEnabled(context)) }
     var downloadDelayEnabled by remember { mutableStateOf(GalleryDlPreferences.isDownloadDelayEnabled(context)) }
     var downloadDelaySeconds by remember { mutableStateOf(GalleryDlPreferences.getDownloadDelaySeconds(context)) }
     var incognitoDefault by remember { mutableStateOf(GalleryDlPreferences.isIncognitoDefault(context)) }
@@ -752,6 +756,65 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Seconds") },
                     placeholder = { Text("0") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    shape = MaterialTheme.shapes.medium,
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Clock,
+                title = "Socket timeout",
+                subtitle = "How long a single stalled connection is allowed before giving up on it (then retried, per Retries above). Off uses each engine's own default (yt-dlp: 20s, gallery-dl: 30s).",
+                checked = socketTimeoutEnabled,
+                onCheckedChange = {
+                    socketTimeoutEnabled = it
+                    GalleryDlPreferences.setSocketTimeoutEnabled(context, it)
+                },
+            )
+            if (socketTimeoutEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SettingsSlider(
+                    value = socketTimeoutSeconds,
+                    valueRange = 5..120,
+                    label = { "${it}s" },
+                    onValueChange = {
+                        socketTimeoutSeconds = it
+                        GalleryDlPreferences.setSocketTimeoutSeconds(context, it)
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Database,
+                title = "Buffer size",
+                subtitle = "yt-dlp only — the download stream's read chunk size. Off uses yt-dlp's own default (1024 KB); rarely worth changing.",
+                checked = bufferSizeEnabled,
+                onCheckedChange = {
+                    bufferSizeEnabled = it
+                    GalleryDlPreferences.setBufferSizeEnabled(context, it)
+                },
+            )
+            if (bufferSizeEnabled) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = if (bufferSizeKb > 0) bufferSizeKb.toString() else "",
+                    onValueChange = { input ->
+                        val kb = input.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        bufferSizeKb = kb
+                        GalleryDlPreferences.setBufferSizeKb(context, kb)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("KB") },
+                    placeholder = { Text("1024") },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                     shape = MaterialTheme.shapes.medium,
@@ -1275,6 +1338,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit) {
     var downloadSubtitles by remember { mutableStateOf(GalleryDlPreferences.isDownloadSubtitles(context)) }
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
     var saveSubtitleFiles by remember { mutableStateOf(GalleryDlPreferences.isSaveSubtitleFiles(context)) }
+    var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
 
     SettingsSubScaffold(title = "Processing", onBack = onBack) {
         SettingsSection(title = "Video downloads", icon = FeatherIcons.Film) {
@@ -1507,6 +1571,31 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit) {
                     saveSubtitleFiles = it
                     GalleryDlPreferences.setSaveSubtitleFiles(context, it)
                 },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            Text("Format ID override", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "yt-dlp only — a raw format selector (e.g. \"137+140\", or any of yt-dlp's own -f expression syntax) that fully replaces Video quality above for every download. Leave blank to let the quality picker choose as usual.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = formatIdOverride,
+                onValueChange = {
+                    formatIdOverride = it
+                    GalleryDlPreferences.setFormatIdOverride(context, it)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Format selector") },
+                placeholder = { Text("bv+ba/b") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
             )
         }
     }

@@ -96,6 +96,11 @@ object GalleryDlPreferences {
     const val KEY_SLEEP_INTERVAL_ENABLED = "sleep_interval_enabled"
     const val KEY_FRAGMENT_RETRIES = "fragment_retries"
     const val KEY_FRAGMENT_RETRIES_ENABLED = "fragment_retries_enabled"
+    const val KEY_SOCKET_TIMEOUT_SECONDS = "socket_timeout_seconds"
+    const val KEY_SOCKET_TIMEOUT_ENABLED = "socket_timeout_enabled"
+    const val KEY_BUFFER_SIZE_KB = "buffer_size_kb"
+    const val KEY_BUFFER_SIZE_ENABLED = "buffer_size_enabled"
+    const val KEY_FORMAT_ID_OVERRIDE = "format_id_override"
     // yt-dlp's own built-in default for --fragment-retries, kept separate from
     // DEFAULT_NETWORK_RETRIES below (see getEffectiveFragmentRetries) so a merge download's
     // per-fragment retry budget can be tuned independently of whole-request retries.
@@ -552,6 +557,67 @@ object GalleryDlPreferences {
     fun getEffectiveFragmentRetries(context: Context): String {
         if (!isFragmentRetriesEnabled(context)) return ""
         return getFragmentRetries(context).toString()
+    }
+
+    /** How long a single stalled read/connect is allowed before the engine gives up on it (and
+     * falls back to its own retry handling). Shared by both engines — yt_dlp_wrapper.py's
+     * socket_timeout and gallery_dl_wrapper.py's extractor.timeout/downloader.timeout. Off means
+     * each engine's own built-in default (yt-dlp: 20s, gallery-dl: 30s). */
+    fun getSocketTimeoutSeconds(context: Context): Int {
+        return prefs(context).getInt(KEY_SOCKET_TIMEOUT_SECONDS, 20).coerceIn(1, 300)
+    }
+
+    fun setSocketTimeoutSeconds(context: Context, seconds: Int) {
+        prefs(context).edit().putInt(KEY_SOCKET_TIMEOUT_SECONDS, seconds.coerceIn(1, 300)).apply()
+    }
+
+    fun isSocketTimeoutEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_SOCKET_TIMEOUT_ENABLED, false)
+    }
+
+    fun setSocketTimeoutEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SOCKET_TIMEOUT_ENABLED, enabled).apply()
+    }
+
+    fun getEffectiveSocketTimeoutSeconds(context: Context): String {
+        if (!isSocketTimeoutEnabled(context)) return ""
+        return getSocketTimeoutSeconds(context).toString()
+    }
+
+    /** yt-dlp only (--buffer-size has no gallery-dl equivalent) — the download-stream read chunk
+     * size, in KB. yt-dlp's own default is 1024 KB; off leaves it at that. */
+    fun getBufferSizeKb(context: Context): Int {
+        return prefs(context).getInt(KEY_BUFFER_SIZE_KB, 1024).coerceIn(1, 65536)
+    }
+
+    fun setBufferSizeKb(context: Context, kb: Int) {
+        prefs(context).edit().putInt(KEY_BUFFER_SIZE_KB, kb.coerceIn(1, 65536)).apply()
+    }
+
+    fun isBufferSizeEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_BUFFER_SIZE_ENABLED, false)
+    }
+
+    fun setBufferSizeEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_BUFFER_SIZE_ENABLED, enabled).apply()
+    }
+
+    fun getEffectiveBufferSizeKb(context: Context): String {
+        if (!isBufferSizeEnabled(context)) return ""
+        return getBufferSizeKb(context).toString()
+    }
+
+    /** yt-dlp only — a raw format selector (e.g. "137+140", or any of yt-dlp's own -f expression
+     * syntax) that fully replaces the app's own quality-cap-derived selector for every download,
+     * for power users who want exact control. Empty (the default) leaves the normal quality
+     * picker in charge — this is yt_dlp_wrapper.py's own pre-existing format_selector kwarg,
+     * previously never actually wired up to a Settings field. */
+    fun getFormatIdOverride(context: Context): String {
+        return prefs(context).getString(KEY_FORMAT_ID_OVERRIDE, "") ?: ""
+    }
+
+    fun setFormatIdOverride(context: Context, formatId: String) {
+        prefs(context).edit().putString(KEY_FORMAT_ID_OVERRIDE, formatId).apply()
     }
 
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update
