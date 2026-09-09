@@ -52,7 +52,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "39"
+    private const val PROVISION_VERSION = "41"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -112,7 +112,13 @@ object PythonRuntime {
         // deleted) again — Reddit's block is a separate, still-unresolved issue unrelated to this,
         // and TikTok genuinely needs curl_cffi's impersonation to get past its bot detection.
 
-        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py")) {
+        // cacert.pem (Mozilla's CA bundle via curl.se's own maintained mirror) rides along here
+        // too — aria2c's GnuTLS-linked TLS stack has no CA trust store of its own in this bundled
+        // environment (unlike a request made through Python's own ssl module or OkHttp, which both
+        // go through Android's system trust store transparently), so every aria2c-downloaded
+        // HTTPS URL failed with "SSL/TLS handshake failure: not signed by known authorities"
+        // until yt_dlp_wrapper.py started passing --ca-certificate=<this file> explicitly.
+        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "cacert.pem")) {
             context.assets.open("python_packages/$name").use { input ->
                 File(root, name).outputStream().use { input.copyTo(it) }
             }
@@ -146,7 +152,9 @@ object PythonRuntime {
      * out as a regular file whose tiny content is just the link target's name. A real .so is
      * always far bigger than that, so "suspiciously small file next to the target it names" is a
      * safe, narrow heuristic — confirmed against the actual broken entries during that spike. */
-    private fun fixBrokenSymlinks(libDir: File) {
+    // internal, not private — Aria2Runtime.kt reuses this for its own zip.so's broken-symlink
+    // entries (identical artifact, same underlying zip/unzip limitation).
+    internal fun fixBrokenSymlinks(libDir: File) {
         val files = libDir.listFiles() ?: return
         for (file in files) {
             if (!file.isFile || file.length() > 200) continue

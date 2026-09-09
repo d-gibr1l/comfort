@@ -14,6 +14,7 @@ import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
+import com.comfort.app.util.Aria2Runtime
 import com.comfort.app.util.FfmpegRuntime
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.MediaStoreHelper
@@ -609,6 +610,13 @@ class DownloadWorker(
                 val formatIdOverride = GalleryDlPreferences.getFormatIdOverride(applicationContext)
                 val youtubeClientRotation = GalleryDlPreferences.isYoutubeClientRotationEnabled(applicationContext)
                 val impersonate = GalleryDlPreferences.isImpersonateEnabled(applicationContext)
+                val aria2Enabled = GalleryDlPreferences.isAria2Enabled(applicationContext)
+                val aria2Path = if (aria2Enabled) Aria2Runtime.getExecutablePath(applicationContext).orEmpty() else ""
+                val aria2LibDir = if (aria2Enabled) {
+                    Aria2Runtime.ensureProvisioned(applicationContext)?.absolutePath.orEmpty()
+                } else {
+                    ""
+                }
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -643,6 +651,8 @@ class DownloadWorker(
                             bufferSizeKb,
                             if (youtubeClientRotation) "1" else "0",
                             if (impersonate) "1" else "0",
+                            aria2Path,
+                            aria2LibDir,
                         ),
                         actualCallback,
                     )
