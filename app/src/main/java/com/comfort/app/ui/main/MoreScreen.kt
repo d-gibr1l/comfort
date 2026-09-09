@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
@@ -51,13 +52,16 @@ import com.comfort.app.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalTime
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 
-enum class SettingsRoute { ROOT, APPEARANCE, DOWNLOADS, ADVANCED, COOKIES, ABOUT }
+enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, ABOUT }
 
 /** [route]/[onNavigate] are hoisted up to MainScreen rather than owned here — this composable
  * itself gets torn down and rebuilt every time the Settings tab is switched away from and back
@@ -83,7 +87,9 @@ fun MoreScreen(route: SettingsRoute, onNavigate: (SettingsRoute) -> Unit) {
             when (route) {
                 SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = onNavigate)
                 SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.FOLDERS -> FoldersSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
                 SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
                 SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
                 SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
                 SettingsRoute.ABOUT -> AboutScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
@@ -108,12 +114,18 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
     val hasCookies = remember { GalleryDlPreferences.getCookies(context).isNotBlank() }
 
     var searchQuery by remember { mutableStateOf("") }
+    // Split across Folders/Downloads/Processing (previously all one "Downloads" page) to match
+    // YTDLnis's own settings shape — see gallery-dl.md's "Break up the Downloads settings page"
+    // entry for why: one page covering filenames+folders+network+scheduling+quality+embedding all
+    // at once had grown too long to scan.
     val mainItems = remember(themeSummary, filenameFormat, hasCookies) {
         listOf(
-            SettingsItemSpec(FeatherIcons.Sun, "Appearance", themeSummary, SettingsItemColor.TERTIARY) { onNavigate(SettingsRoute.APPEARANCE) },
-            SettingsItemSpec(FeatherIcons.Download, "Downloads", filenameFormat, SettingsItemColor.PRIMARY) { onNavigate(SettingsRoute.DOWNLOADS) },
+            SettingsItemSpec(FeatherIcons.Sun, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE) },
+            SettingsItemSpec(FeatherIcons.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS) },
+            SettingsItemSpec(FeatherIcons.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS) },
+            SettingsItemSpec(FeatherIcons.Film, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING) },
             SettingsItemSpec(FeatherIcons.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED) },
-            SettingsItemSpec(FeatherIcons.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.PRIMARY) { onNavigate(SettingsRoute.COOKIES) },
+            SettingsItemSpec(FeatherIcons.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES) },
         )
     }
     val aboutItems = remember {
@@ -355,7 +367,14 @@ private fun SettingsSubScaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(title, fontWeight = FontWeight.Bold) },
+                title = { 
+                    Text(
+                        title, 
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                        fontSize = 36.sp
+                    ) 
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
@@ -402,41 +421,37 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
-    var filenameFormat by remember { mutableStateOf(GalleryDlPreferences.getFilenameFormat(context)) }
-    var filenameFormatSaved by remember { mutableStateOf(false) }
     var concurrentDownloads by remember { mutableStateOf(GalleryDlPreferences.getConcurrentDownloads(context)) }
+    var concurrentDownloadsEnabled by remember { mutableStateOf(GalleryDlPreferences.isConcurrentDownloadsEnabled(context)) }
     var wifiOnly by remember { mutableStateOf(GalleryDlPreferences.isWifiOnly(context)) }
     var scheduleEnabled by remember { mutableStateOf(GalleryDlPreferences.isScheduleEnabled(context)) }
     var scheduleStartMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleStartMinutes(context)) }
     var scheduleEndMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleEndMinutes(context)) }
     var speedLimit by remember { mutableStateOf(GalleryDlPreferences.getSpeedLimit(context)) }
+    var speedLimitEnabled by remember { mutableStateOf(GalleryDlPreferences.isSpeedLimitEnabled(context)) }
     var proxyUrl by remember { mutableStateOf(GalleryDlPreferences.getProxyUrl(context)) }
+    var proxyEnabled by remember { mutableStateOf(GalleryDlPreferences.isProxyEnabled(context)) }
     var maxFilesizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isMaxFilesizeEnabled(context)) }
     var maxFilesize by remember { mutableStateOf(GalleryDlPreferences.getMaxFilesize(context)) }
     var instantShare by remember { mutableStateOf(GalleryDlPreferences.isInstantShareEnabled(context)) }
-    var videoQuality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
-    var noPlaylist by remember { mutableStateOf(GalleryDlPreferences.isNoPlaylist(context)) }
-    var liveFromStart by remember { mutableStateOf(GalleryDlPreferences.isLiveFromStart(context)) }
-    var downloadSubtitles by remember { mutableStateOf(GalleryDlPreferences.isDownloadSubtitles(context)) }
-    var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
-    var embedThumbnail by remember { mutableStateOf(GalleryDlPreferences.isEmbedThumbnail(context)) }
-    var embedMetadata by remember { mutableStateOf(GalleryDlPreferences.isEmbedMetadata(context)) }
-    var writeInfoFiles by remember { mutableStateOf(GalleryDlPreferences.isWriteInfoFiles(context)) }
-    var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
+    var deleteLeftoverOnFailure by remember { mutableStateOf(GalleryDlPreferences.isDeleteLeftoverOnFailure(context)) }
+    var preventDuplicateDownloads by remember { mutableStateOf(GalleryDlPreferences.isPreventDuplicateDownloads(context)) }
+    var rememberDownloadType by remember { mutableStateOf(GalleryDlPreferences.isRememberDownloadType(context)) }
     var networkRetries by remember { mutableStateOf(GalleryDlPreferences.getNetworkRetries(context)) }
-    var downloadLocationUri by remember { mutableStateOf(GalleryDlPreferences.getDownloadLocationUri(context)) }
-    val downloadLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-            downloadLocationUri = uri
-            GalleryDlPreferences.setDownloadLocationUri(context, uri)
-        }
-    }
+    var networkRetriesEnabled by remember { mutableStateOf(GalleryDlPreferences.isNetworkRetriesEnabled(context)) }
+    var fragmentRetries by remember { mutableStateOf(GalleryDlPreferences.getFragmentRetries(context)) }
+    var fragmentRetriesEnabled by remember { mutableStateOf(GalleryDlPreferences.isFragmentRetriesEnabled(context)) }
+    // Imported from YTDLnis's own downloading_preferences.xml (see GalleryDlPreferences' own doc
+    // comments on each of these).
+    var forceIpv4 by remember { mutableStateOf(GalleryDlPreferences.isForceIpv4(context)) }
+    var concurrentFragments by remember { mutableStateOf(GalleryDlPreferences.getConcurrentFragments(context)) }
+    var concurrentFragmentsEnabled by remember { mutableStateOf(GalleryDlPreferences.isConcurrentFragmentsEnabled(context)) }
+    var noCheckCertificates by remember { mutableStateOf(GalleryDlPreferences.isNoCheckCertificates(context)) }
+    var sleepIntervalSeconds by remember { mutableStateOf(GalleryDlPreferences.getSleepIntervalSeconds(context)) }
+    var sleepIntervalEnabled by remember { mutableStateOf(GalleryDlPreferences.isSleepIntervalEnabled(context)) }
+    var downloadDelayEnabled by remember { mutableStateOf(GalleryDlPreferences.isDownloadDelayEnabled(context)) }
+    var downloadDelaySeconds by remember { mutableStateOf(GalleryDlPreferences.getDownloadDelaySeconds(context)) }
+    var incognitoDefault by remember { mutableStateOf(GalleryDlPreferences.isIncognitoDefault(context)) }
 
     // A download forced past the schedule window (Start Now) requests setExpedited(), but Android
     // grants each app only a limited expedited-job quota — once a burst of Start Now taps burns
@@ -458,302 +473,6 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }
 
     SettingsSubScaffold(title = "Downloads", onBack = onBack) {
-        SettingsSection(title = "Filename format", icon = FeatherIcons.Type) {
-            Text(
-                "Filename format applied to every downloaded file.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = filenameFormat,
-                onValueChange = { filenameFormat = it; filenameFormatSaved = false },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Filename format") },
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Placeholders: {uploader} {title} {id} {extension} and more — see gallery-dl's format string docs.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    val toSave = filenameFormat.ifBlank { GalleryDlPreferences.DEFAULT_FILENAME_FORMAT }
-                    filenameFormat = toSave
-                    sharedPreferences.edit().putString(GalleryDlPreferences.KEY_FILENAME_FORMAT, toSave).apply()
-                    filenameFormatSaved = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Save format")
-            }
-
-            if (filenameFormatSaved) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Filename format saved", tint = MaterialTheme.colorScheme.secondary)
-            }
-        }
-
-        SettingsSection(title = "Download location", icon = FeatherIcons.Folder) {
-            val locationName = remember(downloadLocationUri) {
-                downloadLocationUri?.let { uri ->
-                    runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
-                }
-            }
-            Text(
-                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Pictures/Comfort folder.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (locationName != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Custom folders won't automatically appear in Photos/Gallery apps — only the default location is indexed as media.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = { downloadLocationLauncher.launch(null) },
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(FeatherIcons.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Choose folder")
-                }
-                if (locationName != null) {
-                    OutlinedButton(
-                        onClick = {
-                            downloadLocationUri = null
-                            GalleryDlPreferences.setDownloadLocationUri(context, null)
-                        },
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Text("Use default")
-                    }
-                }
-            }
-        }
-
-        SettingsSection(title = "Video downloads", icon = FeatherIcons.Film) {
-            Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Applies to video links handled by yt-dlp (YouTube, Twitter/X, and similar).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                // Bleeds past the settings page's own 20dp side margin so the row's scrollable
-                // viewport spans the full screen width, then re-adds that 20dp as inner padding so
-                // the resting position still looks inset like the rest of the page — chips can now
-                // scroll flush to the true screen edge instead of getting clipped mid-chip right at
-                // the page margin, which read as "cut off." Widens via a custom layout rather than
-                // Modifier.padding with a negative value — Compose's padding() throws at runtime on
-                // negative dp, it isn't a supported way to do this.
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .layout { measurable, constraints ->
-                        val bleed = 20.dp.roundToPx()
-                        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
-                        layout(placeable.width - bleed * 2, placeable.height) {
-                            placeable.placeRelative(-bleed, 0)
-                        }
-                    }
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                VideoQuality.entries.forEach { quality ->
-                    val selected = videoQuality == quality
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = {
-                            videoQuality = quality
-                            GalleryDlPreferences.setVideoQuality(context, quality)
-                        },
-                    ) {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text(
-                                quality.label,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            Text("Output format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Only applies when video and audio need merging (most yt-dlp sources). A single already-muxed file, or anything gallery-dl fetches directly, keeps its own format regardless. If MP4 is picked but a source's video can't actually go in an MP4 (Instagram Reels are usually like this), that one download saves as MKV instead rather than an unplayable MP4.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutputFormat.entries.forEach { format ->
-                    val selected = outputFormat == format
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = {
-                            outputFormat = format
-                            GalleryDlPreferences.setOutputFormat(context, format)
-                        },
-                    ) {
-                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(
-                                format.label,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = FeatherIcons.List,
-                title = "Single video only",
-                subtitle = "A link that's part of a playlist or channel downloads just that one video. Can noticeably slow down extraction on some sites, so it's off by default.",
-                checked = noPlaylist,
-                onCheckedChange = {
-                    noPlaylist = it
-                    GalleryDlPreferences.setNoPlaylist(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = FeatherIcons.Rewind,
-                title = "Live streams from the start",
-                subtitle = "Download an in-progress live stream from its beginning instead of starting at the current moment. Has no effect on a video that isn't currently live.",
-                checked = liveFromStart,
-                onCheckedChange = {
-                    liveFromStart = it
-                    GalleryDlPreferences.setLiveFromStart(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = FeatherIcons.Image,
-                title = "Embed thumbnail",
-                subtitle = "Save the video's thumbnail as cover art inside the file.",
-                checked = embedThumbnail,
-                onCheckedChange = {
-                    embedThumbnail = it
-                    GalleryDlPreferences.setEmbedThumbnail(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = FeatherIcons.Tag,
-                title = "Embed metadata",
-                subtitle = "Tag the file with its title, uploader, and other details.",
-                checked = embedMetadata,
-                onCheckedChange = {
-                    embedMetadata = it
-                    GalleryDlPreferences.setEmbedMetadata(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = FeatherIcons.FileText,
-                title = "Write description / info.json files",
-                subtitle = "Save a separate JSON metadata file alongside each download.",
-                checked = writeInfoFiles,
-                onCheckedChange = {
-                    writeInfoFiles = it
-                    GalleryDlPreferences.setWriteInfoFiles(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = FeatherIcons.MessageSquare,
-                title = "Download subtitles",
-                subtitle = "Fetch and embed subtitles when they're available.",
-                checked = downloadSubtitles,
-                onCheckedChange = {
-                    downloadSubtitles = it
-                    GalleryDlPreferences.setDownloadSubtitles(context, it)
-                },
-            )
-            if (downloadSubtitles) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = subtitleLanguages,
-                    onValueChange = {
-                        subtitleLanguages = it
-                        GalleryDlPreferences.setSubtitleLanguages(context, it)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Subtitle languages") },
-                    placeholder = { Text("en") },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.medium,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Comma-separated language codes, e.g. \"en,es\".",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
         SettingsSection(title = "Sharing", icon = FeatherIcons.Share2) {
             IconToggleRow(
                 icon = FeatherIcons.Zap,
@@ -768,45 +487,39 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
         }
 
         SettingsSection(title = "Concurrent downloads", icon = FeatherIcons.Layers) {
-            Text(
-                "How many downloads gallery-dl runs at the same time.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            IconToggleRow(
+                icon = FeatherIcons.Layers,
+                title = "Multiple concurrent downloads",
+                subtitle = "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.",
+                checked = concurrentDownloadsEnabled,
+                onCheckedChange = {
+                    concurrentDownloadsEnabled = it
+                    GalleryDlPreferences.setConcurrentDownloadsEnabled(context, it)
+                    scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                },
             )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                for (count in 1..GalleryDlPreferences.MAX_CONCURRENT_DOWNLOADS) {
-                    val selected = concurrentDownloads == count
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = {
-                            concurrentDownloads = count
-                            sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_CONCURRENT_DOWNLOADS, count).apply()
-                            // Without this, everything already queued stays chained in whatever
-                            // round-robin lane(s) it was originally assigned to (e.g. all in
-                            // gallery_dl_queue_0 from when the setting was 1) and keeps running
-                            // exactly that concurrently regardless of the new setting — it only
-                            // ever applied to downloads added *after* this tap. Redistributes the
-                            // existing backlog across the new lane count immediately instead of
-                            // leaving the user's current queue stuck on the old concurrency.
-                            scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
-                        },
-                    ) {
-                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "$count",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
+            if (concurrentDownloadsEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SettingsSlider(
+                    value = concurrentDownloads,
+                    // Starts at 2, not 1 — 1 is exactly what the toggle above already means when
+                    // off, so the slider (only shown while it's on) has nothing meaningful to say
+                    // at that value; every position on it should actually mean "more than one."
+                    valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_DOWNLOADS,
+                    label = { "$it at once" },
+                    onValueChange = {
+                        concurrentDownloads = it
+                        sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_CONCURRENT_DOWNLOADS, it).apply()
+                        // Without this, everything already queued stays chained in whatever
+                        // round-robin lane(s) it was originally assigned to (e.g. all in
+                        // gallery_dl_queue_0 from when the setting was 1) and keeps running
+                        // exactly that concurrently regardless of the new setting — it only
+                        // ever applied to downloads added *after* this tap. Redistributes the
+                        // existing backlog across the new lane count immediately instead of
+                        // leaving the user's current queue stuck on the old concurrency.
+                        scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                    },
+                )
             }
         }
 
@@ -823,107 +536,224 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
             )
 
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Text("Speed limit", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Caps download bandwidth for all future downloads.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            SizeSheetField(
-                currentValue = speedLimit,
-                label = "Speed limit",
-                units = SPEED_UNITS,
-                onValueChange = {
-                    speedLimit = it
-                    GalleryDlPreferences.setSpeedLimit(context, it)
-                    // A speed limit is only ever read fresh when a new subprocess is spawned — no
-                    // IPC channel reaches an already-running one, so changing it here used to do
-                    // nothing for whatever's downloading right now, only the next thing queued.
+            IconToggleRow(
+                icon = FeatherIcons.ArrowDown,
+                title = "Speed limit",
+                subtitle = "Caps download bandwidth for all future downloads.",
+                checked = speedLimitEnabled,
+                onCheckedChange = {
+                    speedLimitEnabled = it
+                    GalleryDlPreferences.setSpeedLimitEnabled(context, it)
                     scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
                 },
             )
+            if (speedLimitEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SizeSheetField(
+                    currentValue = speedLimit,
+                    label = "Speed limit",
+                    units = SPEED_UNITS,
+                    onValueChange = {
+                        speedLimit = it
+                        GalleryDlPreferences.setSpeedLimit(context, it)
+                        // A speed limit is only ever read fresh when a new subprocess is spawned —
+                        // no IPC channel reaches an already-running one, so changing it here used
+                        // to do nothing for whatever's downloading right now, only the next thing
+                        // queued.
+                        scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                    },
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Text("Retries", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "How many times a failed request is retried before the download actually fails.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            IconToggleRow(
+                icon = FeatherIcons.RefreshCw,
+                title = "Retries",
+                subtitle = "How many times a failed request is retried before the download actually fails. Off uses each engine's own built-in default.",
+                checked = networkRetriesEnabled,
+                onCheckedChange = {
+                    networkRetriesEnabled = it
+                    GalleryDlPreferences.setNetworkRetriesEnabled(context, it)
+                },
             )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // 10 is yt-dlp's own built-in default (see GalleryDlPreferences.DEFAULT_NETWORK_RETRIES) —
-                // included as a preset rather than only reachable by not touching this setting at all.
-                listOf(3, 5, 10, 20).forEach { count ->
-                    val selected = networkRetries == count
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = {
-                            networkRetries = count
-                            GalleryDlPreferences.setNetworkRetries(context, count)
-                        },
-                    ) {
-                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "$count",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+            if (networkRetriesEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SettingsSlider(
+                    value = networkRetries,
+                    valueRange = 1..GalleryDlPreferences.MAX_NETWORK_RETRIES,
+                    label = { "$it retries" },
+                    onValueChange = {
+                        networkRetries = it
+                        GalleryDlPreferences.setNetworkRetries(context, it)
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.RefreshCw,
+                title = "Fragment retries",
+                subtitle = "How many times a failed piece of a merge download (separate video/audio fragments) is retried, independent of Retries above. Off shares the same budget as Retries.",
+                checked = fragmentRetriesEnabled,
+                onCheckedChange = {
+                    fragmentRetriesEnabled = it
+                    GalleryDlPreferences.setFragmentRetriesEnabled(context, it)
+                },
+            )
+            if (fragmentRetriesEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SettingsSlider(
+                    value = fragmentRetries,
+                    valueRange = 1..GalleryDlPreferences.MAX_FRAGMENT_RETRIES,
+                    label = { "$it retries" },
+                    onValueChange = {
+                        fragmentRetries = it
+                        GalleryDlPreferences.setFragmentRetries(context, it)
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Lock,
+                title = "Proxy",
+                subtitle = "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.",
+                checked = proxyEnabled,
+                onCheckedChange = {
+                    proxyEnabled = it
+                    GalleryDlPreferences.setProxyEnabled(context, it)
+                    scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                },
+            )
+            if (proxyEnabled) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = proxyUrl,
+                    onValueChange = {
+                        proxyUrl = it
+                        GalleryDlPreferences.setProxyUrl(context, it)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Proxy") },
+                    placeholder = { Text("None") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                )
+                // Same reasoning as the speed-limit toggle above — a proxy is only ever read
+                // fresh when a new subprocess is spawned, so changing it here otherwise does
+                // nothing for whatever's downloading right now. Debounced so typing a new URL
+                // doesn't restart every currently running download on every keystroke.
+                var proxyUrlSettled by remember { mutableStateOf(proxyUrl) }
+                LaunchedEffect(proxyUrl) {
+                    delay(800)
+                    if (proxyUrl != proxyUrlSettled) {
+                        proxyUrlSettled = proxyUrl
+                        DownloadDispatcher.restartRunningDownloads(context)
                     }
                 }
             }
 
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Text("Proxy", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = proxyUrl,
-                onValueChange = {
-                    proxyUrl = it
-                    GalleryDlPreferences.setProxyUrl(context, it)
+            IconToggleRow(
+                icon = FeatherIcons.Globe,
+                title = "Force IPv4",
+                subtitle = "Binds outgoing connections to IPv4 — try this if a site's downloads fail with a broken IPv6 route.",
+                checked = forceIpv4,
+                onCheckedChange = {
+                    forceIpv4 = it
+                    GalleryDlPreferences.setForceIpv4(context, it)
                 },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Proxy") },
-                placeholder = { Text("None") },
-                singleLine = true,
-                shape = MaterialTheme.shapes.medium,
             )
-            // Same reasoning as speedLimitSettled elsewhere in this file — a proxy is only ever
-            // read fresh when a new subprocess is spawned, so changing it here otherwise does
-            // nothing for whatever's downloading right now. Debounced so typing a new URL doesn't
-            // restart every currently running download on every keystroke.
-            var proxyUrlSettled by remember { mutableStateOf(proxyUrl) }
-            LaunchedEffect(proxyUrl) {
-                delay(800)
-                if (proxyUrl != proxyUrlSettled) {
-                    proxyUrlSettled = proxyUrl
-                    DownloadDispatcher.restartRunningDownloads(context)
-                }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.ShieldOff,
+                title = "Skip certificate checks",
+                subtitle = "Disables TLS certificate validation. Only useful against a misconfigured server — leave off otherwise.",
+                checked = noCheckCertificates,
+                onCheckedChange = {
+                    noCheckCertificates = it
+                    GalleryDlPreferences.setNoCheckCertificates(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.GitPullRequest,
+                title = "Concurrent fragments",
+                subtitle = "How many pieces of a single video download in parallel — separate from the concurrent downloads count above.",
+                checked = concurrentFragmentsEnabled,
+                onCheckedChange = {
+                    concurrentFragmentsEnabled = it
+                    GalleryDlPreferences.setConcurrentFragmentsEnabled(context, it)
+                },
+            )
+            if (concurrentFragmentsEnabled) {
+                Spacer(Modifier.height(16.dp))
+                SettingsSlider(
+                    value = concurrentFragments,
+                    // Same reasoning as Concurrent downloads' own slider above — 1 is already what
+                    // the toggle above means when off.
+                    valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_FRAGMENTS,
+                    label = { "$it at once" },
+                    onValueChange = {
+                        concurrentFragments = it
+                        GalleryDlPreferences.setConcurrentFragments(context, it)
+                    },
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Clock,
+                title = "Sleep interval",
+                subtitle = "Pauses this many seconds before each request — eases rate-limit/bot-detection pressure the same way a lower concurrency does, just per-request.",
+                checked = sleepIntervalEnabled,
+                onCheckedChange = {
+                    sleepIntervalEnabled = it
+                    GalleryDlPreferences.setSleepIntervalEnabled(context, it)
+                },
+            )
+            if (sleepIntervalEnabled) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+                    onValueChange = { input ->
+                        val seconds = input.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        sleepIntervalSeconds = seconds
+                        GalleryDlPreferences.setSleepIntervalSeconds(context, seconds)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Seconds") },
+                    placeholder = { Text("0") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    shape = MaterialTheme.shapes.medium,
+                )
             }
         }
 
@@ -1038,6 +868,603 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                 )
             }
         }
+
+        // Imported from YTDLnis's own "Download Delay" and "Incognito" settings.
+        SettingsSection(title = "Pacing & privacy", icon = FeatherIcons.EyeOff) {
+            IconToggleRow(
+                icon = FeatherIcons.Clock,
+                title = "Download delay",
+                subtitle = "Waits this many seconds after one queued download finishes before the next one in the same slot starts.",
+                checked = downloadDelayEnabled,
+                onCheckedChange = {
+                    downloadDelayEnabled = it
+                    GalleryDlPreferences.setDownloadDelayEnabled(context, it)
+                },
+            )
+
+            if (downloadDelayEnabled) {
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = if (downloadDelaySeconds > 0) downloadDelaySeconds.toString() else "",
+                    onValueChange = { input ->
+                        val seconds = input.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        downloadDelaySeconds = seconds
+                        GalleryDlPreferences.setDownloadDelaySeconds(context, seconds)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Seconds") },
+                    placeholder = { Text("0") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    shape = MaterialTheme.shapes.medium,
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.EyeOff,
+                title = "Incognito by default",
+                subtitle = "New downloads still save their file normally, but are removed from Library/history the moment they finish.",
+                checked = incognitoDefault,
+                onCheckedChange = {
+                    incognitoDefault = it
+                    GalleryDlPreferences.setIncognitoDefault(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Copy,
+                title = "Prevent duplicate downloads",
+                subtitle = "A link that's already queued, running, or finished is skipped instead of starting a second copy.",
+                checked = preventDuplicateDownloads,
+                onCheckedChange = {
+                    preventDuplicateDownloads = it
+                    GalleryDlPreferences.setPreventDuplicateDownloads(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.RotateCcw,
+                title = "Remember last quality",
+                subtitle = "Changing the quality chip on the download sheet also becomes the new default for future downloads.",
+                checked = rememberDownloadType,
+                onCheckedChange = {
+                    rememberDownloadType = it
+                    GalleryDlPreferences.setRememberDownloadType(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Trash2,
+                title = "Delete leftover files on failure",
+                subtitle = "A failed download's partial files are removed automatically. Turn off to inspect or manually resume them.",
+                checked = deleteLeftoverOnFailure,
+                onCheckedChange = {
+                    deleteLeftoverOnFailure = it
+                    GalleryDlPreferences.setDeleteLeftoverOnFailure(context, it)
+                },
+            )
+        }
+    }
+}
+
+/** Paths, filenames, and local storage — split out of what used to be one long "Downloads" page,
+ * matching YTDLnis's own Folders/Downloads/Processing split (see gallery-dl.md's "Break up the
+ * Downloads settings page" entry) instead of one screen covering everything. */
+@Composable
+private fun FoldersSettingsScreen(onBack: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
+    var filenameFormat by remember { mutableStateOf(GalleryDlPreferences.getFilenameFormat(context)) }
+    var filenameFormatSaved by remember { mutableStateOf(false) }
+    var restrictFilenames by remember { mutableStateOf(GalleryDlPreferences.isRestrictFilenames(context)) }
+    var trimFilenames by remember { mutableStateOf(GalleryDlPreferences.isTrimFilenames(context)) }
+    var downloadLocationUri by remember { mutableStateOf(GalleryDlPreferences.getDownloadLocationUri(context)) }
+    val downloadLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+            downloadLocationUri = uri
+            GalleryDlPreferences.setDownloadLocationUri(context, uri)
+        }
+    }
+
+    // Imported from YTDLnis's own separate music/video folder settings — each independently
+    // optional, falling back to the shared downloadLocationUri above (then the built-in default)
+    // when unset. Same take-persistable-permission dance as the shared picker.
+    var audioLocationUri by remember { mutableStateOf(GalleryDlPreferences.getAudioLocationUri(context)) }
+    val audioLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+            audioLocationUri = uri
+            GalleryDlPreferences.setAudioLocationUri(context, uri)
+        }
+    }
+    var videoLocationUri by remember { mutableStateOf(GalleryDlPreferences.getVideoLocationUri(context)) }
+    val videoLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+            videoLocationUri = uri
+            GalleryDlPreferences.setVideoLocationUri(context, uri)
+        }
+    }
+
+    SettingsSubScaffold(title = "Folders", onBack = onBack) {
+        SettingsSection(title = "Filename format", icon = FeatherIcons.Type) {
+            Text(
+                "Filename format applied to every downloaded file.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = filenameFormat,
+                onValueChange = { filenameFormat = it; filenameFormatSaved = false },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Filename format") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Placeholders: {uploader} {title} {id} {extension} and more — see gallery-dl's format string docs.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    val toSave = filenameFormat.ifBlank { GalleryDlPreferences.DEFAULT_FILENAME_FORMAT }
+                    filenameFormat = toSave
+                    sharedPreferences.edit().putString(GalleryDlPreferences.KEY_FILENAME_FORMAT, toSave).apply()
+                    filenameFormatSaved = true
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Save format")
+            }
+
+            if (filenameFormatSaved) {
+                Spacer(Modifier.height(8.dp))
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Filename format saved", tint = SuccessGreen40)
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Type,
+                title = "Restrict filenames",
+                subtitle = "ASCII letters/digits only, spaces replaced with underscores — safer for older file systems and some file-sharing apps.",
+                checked = restrictFilenames,
+                onCheckedChange = {
+                    restrictFilenames = it
+                    GalleryDlPreferences.setRestrictFilenames(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Scissors,
+                title = "Trim filenames",
+                subtitle = "Caps an overlong title at 150 characters instead of using it in full. Only affects the default filename format above, not a custom one.",
+                checked = trimFilenames,
+                onCheckedChange = {
+                    trimFilenames = it
+                    GalleryDlPreferences.setTrimFilenames(context, it)
+                },
+            )
+        }
+
+        SettingsSection(title = "Download location", icon = FeatherIcons.Folder) {
+            val locationName = remember(downloadLocationUri) {
+                downloadLocationUri?.let { uri ->
+                    runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
+                }
+            }
+            Text(
+                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Pictures/Comfort folder.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (locationName != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Custom folders won't automatically appear in Photos/Gallery apps — only the default location is indexed as media.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { downloadLocationLauncher.launch(null) },
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(FeatherIcons.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Choose folder")
+                }
+                if (locationName != null) {
+                    OutlinedButton(
+                        onClick = {
+                            downloadLocationUri = null
+                            GalleryDlPreferences.setDownloadLocationUri(context, null)
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Text("Use default")
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            FolderOverrideRow(
+                label = "Audio folder",
+                fallbackDescription = "audio downloads land in the folder above (or the default) unless this is set.",
+                uri = audioLocationUri,
+                onChoose = { audioLocationLauncher.launch(null) },
+                onUseDefault = { audioLocationUri = null; GalleryDlPreferences.setAudioLocationUri(context, null) },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            FolderOverrideRow(
+                label = "Video folder",
+                fallbackDescription = "video downloads land in the folder above (or the default) unless this is set.",
+                uri = videoLocationUri,
+                onChoose = { videoLocationLauncher.launch(null) },
+                onUseDefault = { videoLocationUri = null; GalleryDlPreferences.setVideoLocationUri(context, null) },
+            )
+        }
+
+        SettingsSection(title = "Storage", icon = FeatherIcons.HardDrive) {
+            var cacheSizeBytes by remember { mutableStateOf<Long?>(null) }
+            var cacheCleared by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                cacheSizeBytes = withContext(Dispatchers.IO) {
+                    runCatching { context.cacheDir?.walkTopDown()?.filter { it.isFile }?.sumOf { it.length() } }.getOrNull() ?: 0L
+                }
+            }
+            Text(
+                cacheSizeBytes?.let { bytes ->
+                    val mb = bytes / (1024f * 1024f)
+                    if (mb >= 1f) "Cache: %.1f MB".format(mb) else "Cache: ${bytes / 1024} KB"
+                } ?: "Calculating cache size…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Leftover temp files from interrupted downloads and preview thumbnails. Safe to clear — nothing here is a finished download.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            runCatching { context.cacheDir?.listFiles()?.forEach { it.deleteRecursively() } }
+                        }
+                        cacheSizeBytes = 0L
+                        cacheCleared = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Clear cache")
+            }
+            if (cacheCleared) {
+                Spacer(Modifier.height(8.dp))
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cache cleared", tint = SuccessGreen40)
+            }
+        }
+    }
+}
+
+/** Quality/format and embed-into-the-file choices — the other half of what used to be one long
+ * "Downloads" page, split out to match YTDLnis's own Processing screen. */
+@Composable
+private fun ProcessingSettingsScreen(onBack: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var videoQuality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
+    var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
+    var noPlaylist by remember { mutableStateOf(GalleryDlPreferences.isNoPlaylist(context)) }
+    var liveFromStart by remember { mutableStateOf(GalleryDlPreferences.isLiveFromStart(context)) }
+    var embedThumbnail by remember { mutableStateOf(GalleryDlPreferences.isEmbedThumbnail(context)) }
+    var embedMetadata by remember { mutableStateOf(GalleryDlPreferences.isEmbedMetadata(context)) }
+    var embedChapters by remember { mutableStateOf(GalleryDlPreferences.isEmbedChapters(context)) }
+    var writeInfoFiles by remember { mutableStateOf(GalleryDlPreferences.isWriteInfoFiles(context)) }
+    var downloadSubtitles by remember { mutableStateOf(GalleryDlPreferences.isDownloadSubtitles(context)) }
+    var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
+    var saveSubtitleFiles by remember { mutableStateOf(GalleryDlPreferences.isSaveSubtitleFiles(context)) }
+
+    SettingsSubScaffold(title = "Processing", onBack = onBack) {
+        SettingsSection(title = "Video downloads", icon = FeatherIcons.Film) {
+            Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Applies to video links handled by yt-dlp (YouTube, Twitter/X, and similar).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                // Bleeds past the settings page's own 20dp side margin so the row's scrollable
+                // viewport spans the full screen width, then re-adds that 20dp as inner padding so
+                // the resting position still looks inset like the rest of the page — chips can now
+                // scroll flush to the true screen edge instead of getting clipped mid-chip right at
+                // the page margin, which read as "cut off." Widens via a custom layout rather than
+                // Modifier.padding with a negative value — Compose's padding() throws at runtime on
+                // negative dp, it isn't a supported way to do this.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .layout { measurable, constraints ->
+                        val bleed = 20.dp.roundToPx()
+                        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
+                        layout(placeable.width - bleed * 2, placeable.height) {
+                            placeable.placeRelative(-bleed, 0)
+                        }
+                    }
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                VideoQuality.entries.forEach { quality ->
+                    val selected = videoQuality == quality
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        onClick = {
+                            videoQuality = quality
+                            GalleryDlPreferences.setVideoQuality(context, quality)
+                        },
+                    ) {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Text(
+                                quality.label,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            Text("Output format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Only applies when video and audio need merging (most yt-dlp sources). A single already-muxed file, or anything gallery-dl fetches directly, keeps its own format regardless. If MP4 is picked but a source's video can't actually go in an MP4 (Instagram Reels are usually like this), that one download saves as MKV instead rather than an unplayable MP4.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutputFormat.entries.forEach { format ->
+                    val selected = outputFormat == format
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        onClick = {
+                            outputFormat = format
+                            GalleryDlPreferences.setOutputFormat(context, format)
+                        },
+                    ) {
+                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(
+                                format.label,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.List,
+                title = "Single video only",
+                subtitle = "A link that's part of a playlist or channel downloads just that one video. Can noticeably slow down extraction on some sites, so it's off by default.",
+                checked = noPlaylist,
+                onCheckedChange = {
+                    noPlaylist = it
+                    GalleryDlPreferences.setNoPlaylist(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Rewind,
+                title = "Live streams from the start",
+                subtitle = "Download an in-progress live stream from its beginning instead of starting at the current moment. Has no effect on a video that isn't currently live.",
+                checked = liveFromStart,
+                onCheckedChange = {
+                    liveFromStart = it
+                    GalleryDlPreferences.setLiveFromStart(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Image,
+                title = "Embed thumbnail",
+                subtitle = "Save the video's thumbnail as cover art inside the file.",
+                checked = embedThumbnail,
+                onCheckedChange = {
+                    embedThumbnail = it
+                    GalleryDlPreferences.setEmbedThumbnail(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Tag,
+                title = "Embed metadata",
+                subtitle = "Tag the file with its title, uploader, and other details.",
+                checked = embedMetadata,
+                onCheckedChange = {
+                    embedMetadata = it
+                    GalleryDlPreferences.setEmbedMetadata(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.List,
+                title = "Embed chapters",
+                subtitle = "Save the source's chapter markers inside the file, independent of Embed metadata.",
+                checked = embedChapters,
+                onCheckedChange = {
+                    embedChapters = it
+                    GalleryDlPreferences.setEmbedChapters(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.FileText,
+                title = "Write description / info.json files",
+                subtitle = "Save a separate JSON metadata file alongside each download.",
+                checked = writeInfoFiles,
+                onCheckedChange = {
+                    writeInfoFiles = it
+                    GalleryDlPreferences.setWriteInfoFiles(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.MessageSquare,
+                title = "Download subtitles",
+                subtitle = "Fetch and embed subtitles when they're available.",
+                checked = downloadSubtitles,
+                onCheckedChange = {
+                    downloadSubtitles = it
+                    GalleryDlPreferences.setDownloadSubtitles(context, it)
+                },
+            )
+            if (downloadSubtitles) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = subtitleLanguages,
+                    onValueChange = {
+                        subtitleLanguages = it
+                        GalleryDlPreferences.setSubtitleLanguages(context, it)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Subtitle languages") },
+                    placeholder = { Text("en") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Comma-separated language codes, e.g. \"en,es\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.MessageCircle,
+                title = "Save subtitle files",
+                subtitle = "Keeps a separate .srt/.vtt file alongside the video — independent of Download subtitles above, which only embeds.",
+                checked = saveSubtitleFiles,
+                onCheckedChange = {
+                    saveSubtitleFiles = it
+                    GalleryDlPreferences.setSaveSubtitleFiles(context, it)
+                },
+            )
+        }
     }
 }
 
@@ -1111,6 +1538,11 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
     var saved by remember { mutableStateOf(false) }
     var extractorArgs by remember { mutableStateOf(GalleryDlPreferences.getExtractorArgs(context)) }
     var extractorArgsSaved by remember { mutableStateOf(false) }
+    var formatSort by remember { mutableStateOf(GalleryDlPreferences.getFormatSort(context)) }
+    var formatSortSaved by remember { mutableStateOf(false) }
+    var customHeaders by remember { mutableStateOf(GalleryDlPreferences.getCustomHeaders(context)) }
+    var customHeadersSaved by remember { mutableStateOf(false) }
+    var verboseLogging by remember { mutableStateOf(GalleryDlPreferences.isVerboseLogging(context)) }
 
     SettingsSubScaffold(title = "Advanced", onBack = onBack) {
         SettingsSection(title = "Extra arguments", icon = FeatherIcons.Terminal) {
@@ -1145,7 +1577,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
 
             if (saved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extra arguments saved", tint = MaterialTheme.colorScheme.secondary)
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extra arguments saved", tint = SuccessGreen40)
             }
         }
 
@@ -1183,8 +1615,98 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
 
             if (extractorArgsSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extractor arguments saved", tint = MaterialTheme.colorScheme.secondary)
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extractor arguments saved", tint = SuccessGreen40)
             }
+        }
+
+        // Imported from YTDLnis's own advanced_preferences.xml (Format Sorting, User Agent
+        // Header) — yt-dlp only, same reasoning as this screen's other two fields above.
+        SettingsSection(title = "Format sort", icon = FeatherIcons.Filter) {
+            Text(
+                "Raw yt-dlp --format-sort syntax (e.g. \"codec:vp9,fps\"), applied after this app's own " +
+                    "quality-cap and MP4-compatibility bias so it can still reorder or override them.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = formatSort,
+                onValueChange = { formatSort = it; formatSortSaved = false },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("e.g. codec:vp9,fps") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    GalleryDlPreferences.setFormatSort(context, formatSort)
+                    formatSortSaved = true
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Save format sort")
+            }
+
+            if (formatSortSaved) {
+                Spacer(Modifier.height(8.dp))
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Format sort saved", tint = SuccessGreen40)
+            }
+        }
+
+        SettingsSection(title = "Custom headers", icon = FeatherIcons.Terminal) {
+            Text(
+                "One \"Header-Name: value\" per line, sent on every yt-dlp download — overrides that " +
+                    "header's own default (including User-Agent/Referer) rather than only adding new ones.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = customHeaders,
+                onValueChange = { customHeaders = it; customHeadersSaved = false },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                label = { Text("e.g. Referer: https://example.com") },
+                shape = MaterialTheme.shapes.medium,
+            )
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    GalleryDlPreferences.setCustomHeaders(context, customHeaders)
+                    customHeadersSaved = true
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Save headers")
+            }
+
+            if (customHeadersSaved) {
+                Spacer(Modifier.height(8.dp))
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Headers saved", tint = SuccessGreen40)
+            }
+        }
+
+        SettingsSection(title = "Debugging", icon = FeatherIcons.Terminal) {
+            IconToggleRow(
+                icon = FeatherIcons.Terminal,
+                title = "Verbose logging",
+                subtitle = "Every internal yt-dlp debug line, not just what this app's own UI already shows. For troubleshooting a failure.",
+                checked = verboseLogging,
+                onCheckedChange = {
+                    verboseLogging = it
+                    GalleryDlPreferences.setVerboseLogging(context, it)
+                },
+            )
         }
     }
 }
@@ -1260,7 +1782,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 
             if (extractedCookies.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies extracted successfully", tint = MaterialTheme.colorScheme.secondary)
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies extracted successfully", tint = SuccessGreen40)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -1334,7 +1856,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
 
             if (savedConfirmation) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies saved and applied", tint = MaterialTheme.colorScheme.secondary)
+                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies saved and applied", tint = SuccessGreen40)
             }
             pasteError?.let { message ->
                 Spacer(Modifier.height(8.dp))
@@ -1415,7 +1937,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
                         }
                     }
                     if (index != cookieSites.lastIndex) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -1943,7 +2465,7 @@ private fun EnginesSection() {
             },
         )
         Spacer(Modifier.height(16.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(16.dp))
 
         val currentStatuses = statuses
@@ -2020,7 +2542,7 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
             status.latestVersion != null -> Text(
                 "Up to date",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                color = SuccessGreen40,
             )
             else -> Text(
                 "Couldn't check",
@@ -2096,10 +2618,10 @@ private fun IconToggleRow(
             modifier = Modifier
                 .size(32.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -2122,6 +2644,90 @@ private fun IconToggleRow(
                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
             ),
         )
+    }
+}
+
+/** An integer-valued Material 3 slider for a Settings row — [label] renders the current value
+ * above the track (e.g. "4 at once"), snapping to whole numbers only (one step per integer in
+ * [valueRange]). Used for Concurrent downloads/fragments and Retries, replacing what used to be a
+ * fixed row of preset chips — a slider covers the whole range continuously instead of only the
+ * handful of values a chip row could fit. */
+@Composable
+private fun SettingsSlider(
+    value: Int,
+    valueRange: IntRange,
+    label: (Int) -> String,
+    onValueChange: (Int) -> Unit,
+) {
+    // A stored value can sit below valueRange.first — e.g. a fresh install's concurrentFragments
+    // defaults to 1, but this slider (shown only while its own toggle is on) starts at 2, see the
+    // Concurrent downloads/fragments call sites' own comments. Corrected immediately (not just
+    // displayed clamped) so the actually-applied setting always matches what the slider shows —
+    // without this, the label could read "2 at once" while the real stored value stayed 1, same
+    // as toggle-off, silently doing nothing.
+    LaunchedEffect(value, valueRange) {
+        if (value !in valueRange) onValueChange(valueRange.first)
+    }
+    val displayValue = value.coerceIn(valueRange.first, valueRange.last)
+    Text(
+        label(displayValue),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+    )
+    Slider(
+        value = displayValue.toFloat(),
+        onValueChange = { onValueChange(it.roundToInt().coerceIn(valueRange.first, valueRange.last)) },
+        valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
+        steps = (valueRange.last - valueRange.first - 1).coerceAtLeast(0),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+/** A compact "override the shared download location for just this media type" row — Audio
+ * folder/Video folder in Settings > Downloads. Unset (the default) means whatever
+ * [saveMediaToGallery]'s own fallback chain resolves to for that type; only shown as a name once
+ * actually set, matching the shared Download location row's own "only show Use default once
+ * there's something to reset" pattern. */
+@Composable
+private fun FolderOverrideRow(
+    label: String,
+    fallbackDescription: String,
+    uri: android.net.Uri?,
+    onChoose: () -> Unit,
+    onUseDefault: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val name = remember(uri) {
+        uri?.let { runCatching { DocumentFile.fromTreeUri(context, it)?.name }.getOrNull() }
+    }
+    Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        if (name != null) "Saving to \"$name\"." else "Not set — $fallbackDescription",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(12.dp))
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(
+            onClick = onChoose,
+            modifier = Modifier.weight(1f).height(50.dp),
+            shape = MaterialTheme.shapes.medium,
+        ) {
+            Icon(FeatherIcons.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Choose folder")
+        }
+        if (name != null) {
+            OutlinedButton(
+                onClick = onUseDefault,
+                modifier = Modifier.weight(1f).height(50.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Text("Use default")
+            }
+        }
     }
 }
 

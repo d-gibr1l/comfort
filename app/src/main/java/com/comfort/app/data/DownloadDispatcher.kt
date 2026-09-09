@@ -91,6 +91,12 @@ object DownloadDispatcher {
         saveThumbnail: Boolean? = null,
     ): String {
         val dao = AppDatabase.getDatabase(context).downloadDao()
+        // Imported from YTDLnis's own "Prevent duplicate downloads" setting — off by default, so
+        // this only ever short-circuits when the user has actually turned it on. Returns the
+        // existing entry's own id rather than creating a redundant second row for the same URL.
+        if (GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
+            dao.findActiveOrFinishedByUrl(url)?.let { existing -> return existing.id }
+        }
         val id = UUID.randomUUID().toString()
         val globallyPaused = GalleryDlPreferences.isGloballyPaused(context)
         dao.insert(
@@ -125,6 +131,10 @@ object DownloadDispatcher {
                 outputFormat = outputFormat?.name,
                 filenameTemplate = filenameTemplate,
                 saveThumbnail = saveThumbnail,
+                // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
+                // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
+                // this as (a plain Settings switch, not a per-download picker).
+                incognito = GalleryDlPreferences.isIncognitoDefault(context),
             )
         )
         // While globally paused, new downloads sit undispatched — resumeAll() picks up anything
@@ -148,7 +158,12 @@ object DownloadDispatcher {
 
         val networkType = if (GalleryDlPreferences.isWifiOnly(context)) NetworkType.UNMETERED else NetworkType.CONNECTED
         val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
-        val delayMillis = if (forceImmediate) 0L else scheduleDelayMillis(context)
+        // Imported from YTDLnis's own "Download Delay" setting — a flat pause applied to every
+        // dispatch (not just ones the schedule window above is already holding back), same
+        // "Start now" bypass as the schedule delay for the same reason: jumping the queue means
+        // skipping every reason this item would otherwise wait, not just one of them.
+        val downloadDelayMillis = if (forceImmediate) 0L else GalleryDlPreferences.getEffectiveDownloadDelaySeconds(context) * 1000L
+        val delayMillis = (if (forceImmediate) 0L else scheduleDelayMillis(context)) + downloadDelayMillis
 
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(workDataOf("downloadId" to id, "url" to url))
@@ -176,7 +191,7 @@ object DownloadDispatcher {
         // flips this correctly for anything rescheduleQueuedDownloads() re-submits.
         dao.updateStatus(id, if (delayMillis > 0) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED)
 
-        val concurrentDownloads = GalleryDlPreferences.getConcurrentDownloads(context)
+        val concurrentDownloads = GalleryDlPreferences.getEffectiveConcurrentDownloads(context)
         val slot = nextQueueSlot.getAndUpdate { (it + 1) % concurrentDownloads }
         
         val uniqueName = if (forceImmediate) "gallery_dl_now_$id" else "gallery_dl_queue_$slot"

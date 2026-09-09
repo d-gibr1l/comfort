@@ -249,7 +249,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              embed_thumbnail=False, embed_metadata=False, no_playlist=True,
              resolution_cap=None, output_format=None, retries=None, playlist_items=None, max_filesize=None,
              write_info_files=False, clip_range=None, proxy_url=None, live_from_start=False,
-             extractor_args=None, save_thumbnail=False):
+             extractor_args=None, save_thumbnail=False, force_ipv4=False, concurrent_fragments=None,
+             no_check_certificates=False, sleep_interval_seconds=None, custom_headers=None,
+             format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
+             restrict_filenames=True, trim_filenames=True, fragment_retries=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -398,7 +401,13 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # to the literal default only once every field in the list is empty; DownloadWorker derives
     # the entity's own display title from this same "name - caption [id]" shape (see its own
     # comment on that), so the two need to keep matching.
-    outtmpl = filename_format or "%(uploader,channel,creator|Unknown)s - %(title,description|Unknown).150B [%(id)s].%(ext)s"
+    # ".150B" caps the title field at 150 bytes so an overlong caption doesn't produce an
+    # unreasonably long filename — trim_filenames (Settings > Folders) toggles this cap off,
+    # matching YTDLnis's own "Trim filenames" setting. Only affects this *default* template; a
+    # caller-supplied filename_format (a saved template, or a per-download override) is used
+    # exactly as given either way.
+    title_field = "%(title,description|Unknown).150B" if trim_filenames else "%(title,description|Unknown)s"
+    outtmpl = filename_format or f"%(uploader,channel,creator|Unknown)s - {title_field} [%(id)s].%(ext)s"
     ydl_opts = {
         "outtmpl": os.path.join(download_dir, outtmpl),
         "format": chosen_format,
@@ -408,7 +417,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         "noprogress": True,
         "quiet": True,
         "no_color": True,
-        "restrictfilenames": True,
+        # Was hardcoded True unconditionally — now a real Settings > Folders choice (see
+        # GalleryDlPreferences.isRestrictFilenames's own doc comment), defaulting to the same
+        # always-on behavior this had before so an existing install's downloads look identical
+        # unless the user actually changes it.
+        "restrictfilenames": restrict_filenames,
         # The CLI sets this by default (unless --abort-on-error is passed); the raw YoutubeDL API
         # does not — without it, one bad item in a multi-item URL (e.g. an Instagram carousel's
         # non-video photo entries, which legitimately have "No video formats found") raises
@@ -420,6 +433,39 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # post, etc.) raise normally — it only tolerates individual items failing mid-playlist.
         "ignoreerrors": "only_download",
     }
+    if verbose:
+        # Every internal debug line yt-dlp itself would print with --verbose on the real CLI, not
+        # just the handful this app's own _Logger.debug() (see its own comment) already forwards
+        # regardless of this flag — troubleshooting-only, see GalleryDlPreferences.isVerboseLogging.
+        ydl_opts["verbose"] = True
+    if force_ipv4:
+        # yt-dlp's own -4/--force-ipv4 CLI flag is implemented as exactly this under the hood —
+        # binding outgoing connections to 0.0.0.0 forces IPv4 address resolution.
+        ydl_opts["source_address"] = "0.0.0.0"
+    if concurrent_fragments:
+        ydl_opts["concurrent_fragment_downloads"] = int(concurrent_fragments)
+    if no_check_certificates:
+        ydl_opts["nocheckcertificate"] = True
+    if sleep_interval_seconds:
+        # Same fixed value for both — yt-dlp's own --min-sleep-interval/--max-sleep-interval pair
+        # normally lets a random range be specified; this app's own setting is a single flat delay
+        # rather than a range, so both ends of the pair are pinned to it.
+        ydl_opts["sleep_interval"] = int(sleep_interval_seconds)
+        ydl_opts["max_sleep_interval"] = int(sleep_interval_seconds)
+    if custom_headers:
+        # "Header-Name: value" lines, one per header — merged into (not replacing) yt-dlp's own
+        # default request headers, the same override-specific-headers behavior --add-header has on
+        # the real CLI.
+        headers = {}
+        for line in custom_headers.splitlines():
+            if ":" not in line:
+                continue
+            name, _, value = line.partition(":")
+            name, value = name.strip(), value.strip()
+            if name and value:
+                headers[name] = value
+        if headers:
+            ydl_opts["http_headers"] = headers
     if _REDDIT_SHARE_LINK_RE.match(url):
         # An empty ImpersonateTarget() (rather than a specific browser/version string) asks yt-dlp
         # for its own default target — the first one whose backend is actually available in this
@@ -433,11 +479,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # Constructing the real object ourselves sidesteps that.
         ydl_opts["impersonate"] = ImpersonateTarget()
     if retries:
-        # Same count for both — "retries" alone only covers whole-request failures (extraction,
-        # a plain single-file fetch); a merge download's separate video/audio fragments each get
-        # their own retry budget via "fragment_retries", uncovered by the first one on its own.
+        # "retries" alone only covers whole-request failures (extraction, a plain single-file
+        # fetch); a merge download's separate video/audio fragments each get their own retry
+        # budget via "fragment_retries", uncovered by the first one on its own — default it to
+        # the same count unless the caller supplies its own value below.
         ydl_opts["retries"] = int(retries)
         ydl_opts["fragment_retries"] = int(retries)
+    if fragment_retries is not None:
+        # Explicit override, kept separate from "retries" above so a user can give flaky
+        # fragmented downloads (HLS/DASH) a different retry budget than whole-request retries.
+        ydl_opts["fragment_retries"] = int(fragment_retries)
     # Built once, combining every reason to prefer one format over another, rather than each
     # concern setting "format_sort" independently and silently clobbering whichever ran last.
     format_sort_terms = []
@@ -465,6 +516,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # available when a source has no AAC variant.
         format_sort_terms.append("vcodec:h264")
         format_sort_terms.append("acodec:aac")
+    if format_sort_extra:
+        # Raw --format-sort syntax (e.g. "codec:vp9,fps") from Settings > Advanced — appended
+        # last so it can still reorder/override the quality-cap and MP4-compatibility terms above
+        # rather than being silently outranked by them.
+        format_sort_terms.extend(term.strip() for term in format_sort_extra.split(",") if term.strip())
     if format_sort_terms:
         ydl_opts["format_sort"] = format_sort_terms
     if playlist_items:
@@ -532,17 +588,22 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         if embed_thumbnail:
             ydl_opts["writethumbnail"] = True
             postprocessors.append({"key": "EmbedThumbnail"})
-        if embed_metadata:
-            postprocessors.append({"key": "FFmpegMetadata"})
-        if download_subtitles and not audio_only:
-            # Embedding requires actually fetching the subtitle track first, hence writesubtitles
-            # alongside FFmpegEmbedSubtitle — a bare writesubtitles-only mode (sidecar .srt files
-            # left next to the video) isn't supported here since DownloadWorker's callback pipeline
-            # only knows how to move a single reported file per download into the gallery, not
-            # track extra sidecar files alongside it.
+        if embed_metadata or embed_chapters:
+            # A single FFmpegMetadata entry handles both — add_chapters is that postprocessor's
+            # own independent kwarg (this is literally how the real CLI's --embed-chapters is
+            # implemented), so embed_chapters doesn't need a metadata embed to come along with it.
+            postprocessors.append({"key": "FFmpegMetadata", "add_chapters": embed_chapters})
+        if (download_subtitles or save_subtitle_files) and not audio_only:
+            # writesubtitles alone (no EmbedSubtitle postprocessor) leaves the fetched track as
+            # its own sidecar .srt/.vtt file next to the video — DownloadWorker's own staging-dir
+            # sidecar sweep (the same mechanism that already saves .json/.description/thumbnail
+            # sidecars) picks these up and moves them into the gallery, same as any other
+            # non-primary output file. Embedding (download_subtitles) and the sidecar file
+            # (save_subtitle_files) are independent choices; either, both, or neither can be on.
             ydl_opts["writesubtitles"] = True
             ydl_opts["subtitleslangs"] = [lang.strip() for lang in (subtitle_langs or "en").split(",") if lang.strip()]
-            postprocessors.append({"key": "FFmpegEmbedSubtitle"})
+            if download_subtitles:
+                postprocessors.append({"key": "FFmpegEmbedSubtitle"})
         if postprocessors:
             ydl_opts["postprocessors"] = postprocessors
     if js_runtime_path:
@@ -768,5 +829,20 @@ if __name__ == "__main__":
         live_from_start=_b(a[24]) if len(a) > 24 else False,
         extractor_args=_s(a[25]) if len(a) > 25 else None,
         save_thumbnail=_b(a[26]) if len(a) > 26 else False,
+        force_ipv4=_b(a[27]) if len(a) > 27 else False,
+        concurrent_fragments=(int(a[28]) if len(a) > 28 and a[28] else None),
+        no_check_certificates=_b(a[29]) if len(a) > 29 else False,
+        sleep_interval_seconds=(int(a[30]) if len(a) > 30 and a[30] else None),
+        # No escaping needed — PythonRuntime.run() execs via ProcessBuilder with a real argv list,
+        # not a shell, so a literal newline inside this one positional argument passes through
+        # exactly as typed (same reasoning already applies to extractor_args above).
+        custom_headers=_s(a[31]) if len(a) > 31 else None,
+        format_sort_extra=_s(a[32]) if len(a) > 32 else None,
+        verbose=_b(a[33]) if len(a) > 33 else False,
+        embed_chapters=_b(a[34]) if len(a) > 34 else False,
+        save_subtitle_files=_b(a[35]) if len(a) > 35 else False,
+        restrict_filenames=_b(a[36]) if len(a) > 36 else True,
+        trim_filenames=_b(a[37]) if len(a) > 37 else True,
+        fragment_retries=(int(a[38]) if len(a) > 38 and a[38] else None),
     )
     print(f"[__status__] {status}", flush=True)
