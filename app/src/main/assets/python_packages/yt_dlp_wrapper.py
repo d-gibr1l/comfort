@@ -5,6 +5,7 @@ import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
 class _Cancelled(Exception):
     pass
@@ -583,6 +584,22 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # the runtime hook event names strip the "Ffmpeg" prefix (-> "ExtractAudio"), which is
         # why custom_pp_keys uses the stripped form even though these dicts use the full name.
         postprocessors = []
+        # Same trick YTDLnis's own generated command uses (--parse-metadata "%(uploader,channel,
+        # creator|)l:^(?P<uploader>.*?)(?:(?= - Topic)|$)"): YouTube's auto-generated "Topic"
+        # channels (for albums/singles with no official upload) report an uploader literally named
+        # "<Artist> - Topic". Stripping that suffix here, unconditionally and pre_process (so it
+        # runs before the filename template above is evaluated), cleans up both the embedded
+        # metadata and the "%(uploader,channel,creator|Unknown)s" piece of the default filename —
+        # same field/fallback chain the outtmpl above already uses, for consistency.
+        postprocessors.append({
+            "key": "MetadataParser",
+            "when": "pre_process",
+            "actions": [(
+                MetadataParserPP.Actions.INTERPRET,
+                "%(uploader,channel,creator|Unknown)s",
+                r"(?P<uploader>.*?)(?: - Topic)?$",
+            )],
+        })
         if audio_only:
             postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "5"})
         if embed_thumbnail:
