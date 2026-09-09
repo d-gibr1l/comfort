@@ -77,6 +77,8 @@ val LightColorScheme = lightColorScheme(
 
     tertiary = Teal40,
     onTertiary = Color.White,
+    tertiaryContainer = Teal90,
+    onTertiaryContainer = Color(0xFF00201C),
 
     background = Neutral99,
     onBackground = Neutral10,
@@ -113,6 +115,8 @@ val DarkColorScheme = darkColorScheme(
 
     tertiary = Teal80,
     onTertiary = Color(0xFF00201C),
+    tertiaryContainer = Color(0xFF0B4A42),
+    onTertiaryContainer = Teal90,
 
     background = Neutral00,
     onBackground = Neutral90,

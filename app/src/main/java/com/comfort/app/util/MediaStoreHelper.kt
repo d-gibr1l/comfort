@@ -73,7 +73,16 @@ object MediaStoreHelper {
         // closely. The file itself was never actually broken — it played fine — this was a
         // display-only symptom of the MIME lie.
 
-        val customTreeUri = GalleryDlPreferences.getDownloadLocationUri(context)
+        // Imported from YTDLnis's own separate music/video folder settings — checked first, each
+        // falling back to the shared "download location" (then the built-in default) when unset,
+        // so someone who only ever sets the one shared folder sees no change in behavior.
+        val customTreeUri = when {
+            mimeType.startsWith("audio/") -> GalleryDlPreferences.getAudioLocationUri(context)
+                ?: GalleryDlPreferences.getDownloadLocationUri(context)
+            mimeType.startsWith("video/") -> GalleryDlPreferences.getVideoLocationUri(context)
+                ?: GalleryDlPreferences.getDownloadLocationUri(context)
+            else -> GalleryDlPreferences.getDownloadLocationUri(context)
+        }
         if (customTreeUri != null) {
             saveToCustomTree(context, customTreeUri, sourceFile, mimeType)?.let { return it }
             // Permission revoked or the folder was deleted outside the app — fall back to the

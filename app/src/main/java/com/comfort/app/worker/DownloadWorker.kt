@@ -85,7 +85,7 @@ private object DownloadConcurrencyGate {
 
     suspend fun acquire(context: Context) {
         while (true) {
-            val limit = GalleryDlPreferences.getConcurrentDownloads(context).coerceAtLeast(1)
+            val limit = GalleryDlPreferences.getEffectiveConcurrentDownloads(context).coerceAtLeast(1)
             // Not perfectly atomic against another waiter passing this same check at the same
             // moment — worst case briefly overshoots the limit by however many racing waiters all
             // read a stale "still under limit" value together, and self-corrects on the very next
@@ -528,11 +528,11 @@ class DownloadWorker(
                 val ytDlpArchivePath = File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt")
                     .apply { parentFile?.mkdirs() }
                     .absolutePath
-                val limitRate = GalleryDlPreferences.getSpeedLimit(applicationContext)
-                val networkRetries = GalleryDlPreferences.getNetworkRetries(applicationContext).toString()
+                val limitRate = GalleryDlPreferences.getEffectiveSpeedLimit(applicationContext)
+                val networkRetries = GalleryDlPreferences.getEffectiveNetworkRetries(applicationContext)
                 val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(applicationContext).orEmpty()
                 val writeInfoFiles = GalleryDlPreferences.isWriteInfoFiles(applicationContext)
-                val proxyUrl = GalleryDlPreferences.getProxyUrl(applicationContext)
+                val proxyUrl = GalleryDlPreferences.getEffectiveProxyUrl(applicationContext)
                 val extractorArgs = GalleryDlPreferences.getExtractorArgs(applicationContext)
 
                 // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
@@ -587,6 +587,22 @@ class DownloadWorker(
                 // specific playlist videos, but yt-dlp itself never heard about that selection and
                 // downloaded based only on the global "Download Playlists" setting instead.
                 val ytDlpPlaylistItems = ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
+                // Imported from YTDLnis's own settings screens — see GalleryDlPreferences' own
+                // doc comments on each of these for why they're yt-dlp-only.
+                val forceIpv4 = GalleryDlPreferences.isForceIpv4(applicationContext)
+                val concurrentFragments = GalleryDlPreferences.getEffectiveConcurrentFragments(applicationContext)
+                val noCheckCertificates = GalleryDlPreferences.isNoCheckCertificates(applicationContext)
+                val sleepIntervalSeconds = GalleryDlPreferences.getEffectiveSleepIntervalSeconds(applicationContext)
+                val customHeaders = GalleryDlPreferences.getCustomHeaders(applicationContext)
+                val formatSort = GalleryDlPreferences.getFormatSort(applicationContext)
+                val verboseLogging = GalleryDlPreferences.isVerboseLogging(applicationContext)
+                // Second YTDLnis settings-import batch — see GalleryDlPreferences' own doc
+                // comments on each of these.
+                val embedChapters = GalleryDlPreferences.isEmbedChapters(applicationContext)
+                val saveSubtitleFiles = GalleryDlPreferences.isSaveSubtitleFiles(applicationContext)
+                val restrictFilenames = GalleryDlPreferences.isRestrictFilenames(applicationContext)
+                val trimFilenames = GalleryDlPreferences.isTrimFilenames(applicationContext)
+                val fragmentRetries = GalleryDlPreferences.getEffectiveFragmentRetries(applicationContext)
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -605,6 +621,18 @@ class DownloadWorker(
                             if (writeInfoFiles) "1" else "0", clipRange, proxyUrl,
                             if (liveFromStart) "1" else "0", extractorArgs,
                             if (saveThumbnail) "1" else "0",
+                            if (forceIpv4) "1" else "0",
+                            if (concurrentFragments > 1) concurrentFragments.toString() else "",
+                            if (noCheckCertificates) "1" else "0",
+                            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+                            customHeaders,
+                            formatSort,
+                            if (verboseLogging) "1" else "0",
+                            if (embedChapters) "1" else "0",
+                            if (saveSubtitleFiles) "1" else "0",
+                            if (restrictFilenames) "1" else "0",
+                            if (trimFilenames) "1" else "0",
+                            fragmentRetries,
                         ),
                         actualCallback,
                     )
@@ -650,7 +678,7 @@ class DownloadWorker(
                     }
                 }
 
-                if (writeInfoFiles || saveThumbnail) {
+                if (writeInfoFiles || saveThumbnail || saveSubtitleFiles) {
                     // gallery-dl's --write-metadata, yt-dlp's --write-description/--write-info-json,
                     // and yt-dlp's own --write-thumbnail (this sheet's "Save thumbnail" chip, see
                     // saveThumbnail above) all write these silently to disk — neither engine ever
@@ -665,7 +693,11 @@ class DownloadWorker(
                         .filter {
                             it.isFile && (
                                 it.extension == "json" || it.name.endsWith(".description") ||
-                                    it.extension in setOf("jpg", "jpeg", "png", "webp")
+                                    it.extension in setOf("jpg", "jpeg", "png", "webp") ||
+                                    // Save subtitle files (Settings > Processing) — the sidecar
+                                    // .srt/.vtt yt_dlp_wrapper.py's own writesubtitles produces
+                                    // when requested independently of embedding.
+                                    it.extension in setOf("srt", "vtt")
                                 )
                         }
                         .forEach { sidecarFile ->
@@ -709,9 +741,18 @@ class DownloadWorker(
                     return@withContext Result.success()
                 }
 
-                dao.updateStatus(downloadId, DownloadStatus.FINISHED)
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
                 DownloadNotifications.notifyFinished(applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail)
+                if (entity?.incognito == true) {
+                    // Imported from YTDLnis's own Incognito setting (see
+                    // GalleryDlPreferences.isIncognitoDefault's doc comment): the real file is
+                    // already saved to the gallery/Downloads folder by this point (savedCount > 0
+                    // is what got here at all) — only this row, the record of the download ever
+                    // having happened in this app's own Library/queue, is removed.
+                    dao.delete(downloadId)
+                } else {
+                    dao.updateStatus(downloadId, DownloadStatus.FINISHED)
+                }
                 DownloadDispatcher.forgetLock(downloadId)
                 Result.success()
             } catch (e: CancellationException) {
@@ -732,6 +773,22 @@ class DownloadWorker(
                     val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it) }
                     dao.updateError(downloadId, DownloadStatus.ERRORED, sanitized)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, sanitized)
+                    // Imported from YTDLnis's own "Cleanup leftover downloads" setting — a genuine
+                    // failure here (unlike the savedCount==0 branch above, which already ran the
+                    // unconditional deleteRecursively() before this catch could ever see it) leaves
+                    // whatever partial fragments/staging files exist untouched by default, so this
+                    // is the one real place leftover files actually accumulate. Deleting them is
+                    // still the default (matches every prior release's behavior); off lets a user
+                    // inspect or manually resume a failed download's partial files instead.
+                    if (GalleryDlPreferences.isDeleteLeftoverOnFailure(applicationContext)) {
+                        // stagingDir itself is out of scope here (declared inside the try block
+                        // above) — reconstructed the same way DownloadDispatcher's own
+                        // deleteStagingDir() does, from the one thing both always agree on: this
+                        // download's id.
+                        runCatching {
+                            File(applicationContext.cacheDir, "gallery-dl-staging/$downloadId").deleteRecursively()
+                        }
+                    }
                     DownloadDispatcher.forgetLock(downloadId)
                     Result.success()
                 }

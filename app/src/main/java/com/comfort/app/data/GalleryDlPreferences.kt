@@ -66,6 +66,40 @@ object GalleryDlPreferences {
     const val KEY_OUTPUT_FORMAT = "output_format"
     const val KEY_NETWORK_RETRIES = "network_retries"
     const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
+    const val KEY_FORCE_IPV4 = "force_ipv4"
+    const val KEY_CONCURRENT_FRAGMENTS = "concurrent_fragments"
+    const val KEY_NO_CHECK_CERTIFICATES = "no_check_certificates"
+    const val KEY_SLEEP_INTERVAL_SECONDS = "sleep_interval_seconds"
+    const val KEY_CUSTOM_HEADERS = "custom_headers"
+    const val KEY_FORMAT_SORT = "format_sort"
+    const val KEY_VERBOSE_LOGGING = "verbose_logging"
+    const val KEY_DOWNLOAD_DELAY_SECONDS = "download_delay_seconds"
+    const val KEY_INCOGNITO_DEFAULT = "incognito_default"
+    const val DEFAULT_CONCURRENT_FRAGMENTS = 1
+    const val MAX_CONCURRENT_FRAGMENTS = 16
+    const val KEY_EMBED_CHAPTERS = "embed_chapters"
+    const val KEY_SAVE_SUBTITLE_FILES = "save_subtitle_files"
+    const val KEY_DELETE_LEFTOVER_ON_FAILURE = "delete_leftover_on_failure"
+    const val KEY_PREVENT_DUPLICATE_DOWNLOADS = "prevent_duplicate_downloads"
+    const val KEY_REMEMBER_DOWNLOAD_TYPE = "remember_download_type"
+    const val KEY_AUDIO_LOCATION_URI = "audio_location_uri"
+    const val KEY_VIDEO_LOCATION_URI = "video_location_uri"
+    const val KEY_RESTRICT_FILENAMES = "restrict_filenames"
+    const val KEY_TRIM_FILENAMES = "trim_filenames"
+    const val KEY_DOWNLOAD_DELAY_ENABLED = "download_delay_enabled"
+    const val KEY_CONCURRENT_DOWNLOADS_ENABLED = "concurrent_downloads_enabled"
+    const val KEY_SPEED_LIMIT_ENABLED = "speed_limit_enabled"
+    const val KEY_NETWORK_RETRIES_ENABLED = "network_retries_enabled"
+    const val KEY_PROXY_ENABLED = "proxy_enabled"
+    const val KEY_CONCURRENT_FRAGMENTS_ENABLED = "concurrent_fragments_enabled"
+    const val KEY_SLEEP_INTERVAL_ENABLED = "sleep_interval_enabled"
+    const val KEY_FRAGMENT_RETRIES = "fragment_retries"
+    const val KEY_FRAGMENT_RETRIES_ENABLED = "fragment_retries_enabled"
+    // yt-dlp's own built-in default for --fragment-retries, kept separate from
+    // DEFAULT_NETWORK_RETRIES below (see getEffectiveFragmentRetries) so a merge download's
+    // per-fragment retry budget can be tuned independently of whole-request retries.
+    const val DEFAULT_FRAGMENT_RETRIES = 10
+    const val MAX_FRAGMENT_RETRIES = 50
     // yt-dlp's own built-in default (used whenever this preference hasn't been touched) — chosen
     // to match rather than invent a different "app default", so leaving the setting alone behaves
     // exactly like it always did before this preference existed.
@@ -172,6 +206,27 @@ object GalleryDlPreferences {
         prefs(context).edit().putInt(KEY_CONCURRENT_DOWNLOADS, count.coerceIn(1, MAX_CONCURRENT_DOWNLOADS)).apply()
     }
 
+    /** Whether [getConcurrentDownloads]'s own slider value actually applies — same on/off-plus-
+     * value shape as [isMaxFilesizeEnabled]/[isDownloadDelayEnabled]. Defaults to true so an
+     * existing install (already running [DEFAULT_CONCURRENT_DOWNLOADS] = 2 at once) sees no
+     * behavior change until the user actually touches this toggle; off means exactly one download
+     * runs at a time regardless of whatever the slider is set to underneath. */
+    fun isConcurrentDownloadsEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_CONCURRENT_DOWNLOADS_ENABLED, true)
+    }
+
+    fun setConcurrentDownloadsEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_CONCURRENT_DOWNLOADS_ENABLED, enabled).apply()
+    }
+
+    /** The value to actually apply — 1 whenever the toggle is off, so call sites don't need to
+     * re-check [isConcurrentDownloadsEnabled] themselves (same shape as [getEffectiveMaxFilesize]/
+     * [getEffectiveDownloadDelaySeconds]). */
+    fun getEffectiveConcurrentDownloads(context: Context): Int {
+        if (!isConcurrentDownloadsEnabled(context)) return 1
+        return getConcurrentDownloads(context)
+    }
+
     fun isWifiOnly(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_WIFI_ONLY, false)
     }
@@ -222,6 +277,22 @@ object GalleryDlPreferences {
         prefs(context).edit().putString(KEY_SPEED_LIMIT, sanitized).apply()
     }
 
+    /** Whether [getSpeedLimit] actually applies — defaults true so an existing install (where a
+     * blank value already meant "unlimited" either way) sees no behavior change; off forces
+     * unlimited even if a real limit is still saved underneath, without erasing it. */
+    fun isSpeedLimitEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_SPEED_LIMIT_ENABLED, true)
+    }
+
+    fun setSpeedLimitEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SPEED_LIMIT_ENABLED, enabled).apply()
+    }
+
+    fun getEffectiveSpeedLimit(context: Context): String {
+        if (!isSpeedLimitEnabled(context)) return ""
+        return getSpeedLimit(context)
+    }
+
     fun isMaxFilesizeEnabled(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_MAX_FILESIZE_ENABLED, false)
     }
@@ -258,6 +329,22 @@ object GalleryDlPreferences {
 
     fun setProxyUrl(context: Context, url: String) {
         prefs(context).edit().putString(KEY_PROXY_URL, url.trim()).apply()
+    }
+
+    /** Whether [getProxyUrl] actually applies — defaults true (an existing saved URL was already
+     * being used; a blank one was already a no-op either way). Off forces no proxy without
+     * erasing the saved URL, so it can be flipped back on later. */
+    fun isProxyEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_PROXY_ENABLED, true)
+    }
+
+    fun setProxyEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_PROXY_ENABLED, enabled).apply()
+    }
+
+    fun getEffectiveProxyUrl(context: Context): String {
+        if (!isProxyEnabled(context)) return ""
+        return getProxyUrl(context)
     }
 
     /** A user-chosen SAF folder to save downloads into, or null to use the default
@@ -417,6 +504,55 @@ object GalleryDlPreferences {
         prefs(context).edit().putInt(KEY_NETWORK_RETRIES, retries.coerceIn(1, MAX_NETWORK_RETRIES)).apply()
     }
 
+    /** Whether [getNetworkRetries] actually applies — defaults true so an existing install (which
+     * always applied [DEFAULT_NETWORK_RETRIES] regardless) sees no behavior change; off means
+     * "" — neither engine gets an explicit --retries, falling back to its own built-in default
+     * instead of this app's chosen one. */
+    fun isNetworkRetriesEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_NETWORK_RETRIES_ENABLED, true)
+    }
+
+    fun setNetworkRetriesEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_NETWORK_RETRIES_ENABLED, enabled).apply()
+    }
+
+    /** String form (empty when disabled) — matches the shape DownloadWorker already hands both
+     * engines' own CLI-arg lists as. */
+    fun getEffectiveNetworkRetries(context: Context): String {
+        if (!isNetworkRetriesEnabled(context)) return ""
+        return getNetworkRetries(context).toString()
+    }
+
+    /** How many times a failed fragment fetch (one piece of an HLS/DASH merge download) is
+     * retried, independent of [getNetworkRetries]'s whole-request budget — yt-dlp only, via
+     * yt_dlp_wrapper.py's own fragment_retries kwarg (gallery-dl has no fragment concept). */
+    fun getFragmentRetries(context: Context): Int {
+        return prefs(context).getInt(KEY_FRAGMENT_RETRIES, DEFAULT_FRAGMENT_RETRIES).coerceIn(1, MAX_FRAGMENT_RETRIES)
+    }
+
+    fun setFragmentRetries(context: Context, retries: Int) {
+        prefs(context).edit().putInt(KEY_FRAGMENT_RETRIES, retries.coerceIn(1, MAX_FRAGMENT_RETRIES)).apply()
+    }
+
+    /** Whether [getFragmentRetries] actually applies — defaults false, since before this setting
+     * existed a fragment's retry budget silently rode along with [getNetworkRetries] instead
+     * (yt_dlp_wrapper.py's "retries" sets both retries and fragment_retries to the same count);
+     * off means yt_dlp_wrapper.py leaves fragment_retries to fall back to that shared value. */
+    fun isFragmentRetriesEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_FRAGMENT_RETRIES_ENABLED, false)
+    }
+
+    fun setFragmentRetriesEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_FRAGMENT_RETRIES_ENABLED, enabled).apply()
+    }
+
+    /** String form (empty when disabled) — matches the shape DownloadWorker already hands both
+     * engines' own CLI-arg lists as. */
+    fun getEffectiveFragmentRetries(context: Context): String {
+        if (!isFragmentRetriesEnabled(context)) return ""
+        return getFragmentRetries(context).toString()
+    }
+
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update
      * it finds automatically instead of only flagging it for the user to apply by hand. */
     fun isAutoUpdateEnginesEnabled(context: Context): Boolean {
@@ -425,5 +561,275 @@ object GalleryDlPreferences {
 
     fun setAutoUpdateEnginesEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_AUTO_UPDATE_ENGINES, enabled).apply()
+    }
+
+    // --- Imported from YTDLnis's own settings screens (see gallery-dl.md's "YTDLnis settings
+    // import" entry), adapted to this app's engine (yt-dlp only for all of these — same precedent
+    // as live_from_start/js_runtimes/impersonation elsewhere in this file: gallery-dl's own CLI-arg
+    // shape doesn't map cleanly onto them, and its existing free-form "Extra arguments" field
+    // already lets a power user pass the equivalent raw flag by hand). ---
+
+    /** yt-dlp's own -4/--force-ipv4 (binds outgoing connections to 0.0.0.0, forcing IPv4
+     * resolution) — useful on networks where IPv6 routing to a given site is broken/blocked but
+     * IPv4 works fine. */
+    fun isForceIpv4(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_FORCE_IPV4, false)
+    }
+
+    fun setForceIpv4(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_FORCE_IPV4, enabled).apply()
+    }
+
+    /** How many fragments (pieces of a single format — HLS/DASH segments, not separate
+     * video+audio tracks) download in parallel. Separate from [getConcurrentDownloads], which
+     * controls how many *whole downloads* run at once — this is yt-dlp's own
+     * --concurrent-fragments, one format's own internal parallelism. 1 (sequential) matches
+     * yt-dlp's built-in default. */
+    fun getConcurrentFragments(context: Context): Int {
+        return prefs(context).getInt(KEY_CONCURRENT_FRAGMENTS, DEFAULT_CONCURRENT_FRAGMENTS)
+            .coerceIn(1, MAX_CONCURRENT_FRAGMENTS)
+    }
+
+    fun setConcurrentFragments(context: Context, count: Int) {
+        prefs(context).edit().putInt(KEY_CONCURRENT_FRAGMENTS, count.coerceIn(1, MAX_CONCURRENT_FRAGMENTS)).apply()
+    }
+
+    /** Whether [getConcurrentFragments] actually applies — defaults true, harmless either way for
+     * an install that never touched this (default value 1 is already a no-op downstream — see
+     * DownloadWorker's own "only forward when > 1" check). Off forces that same no-op regardless
+     * of the stored slider value. */
+    fun isConcurrentFragmentsEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_CONCURRENT_FRAGMENTS_ENABLED, true)
+    }
+
+    fun setConcurrentFragmentsEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_CONCURRENT_FRAGMENTS_ENABLED, enabled).apply()
+    }
+
+    fun getEffectiveConcurrentFragments(context: Context): Int {
+        if (!isConcurrentFragmentsEnabled(context)) return 1
+        return getConcurrentFragments(context)
+    }
+
+    /** yt-dlp's own --no-check-certificate — skips TLS certificate validation. Only useful against
+     * a self-signed/misconfigured server; off by default since it's a real security downgrade. */
+    fun isNoCheckCertificates(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_NO_CHECK_CERTIFICATES, false)
+    }
+
+    fun setNoCheckCertificates(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_NO_CHECK_CERTIFICATES, enabled).apply()
+    }
+
+    /** Seconds to pause before each request — yt-dlp's own --sleep-requests/--max-sleep-interval,
+     * both set to this same fixed value (a range isn't exposed here, just a flat delay). 0 means
+     * no throttling, the default. Eases the same rate-limit/bot-detection pressure a lower
+     * concurrent-downloads count does, just per-request instead of per-download-slot. */
+    fun getSleepIntervalSeconds(context: Context): Int {
+        return prefs(context).getInt(KEY_SLEEP_INTERVAL_SECONDS, 0).coerceIn(0, 300)
+    }
+
+    fun setSleepIntervalSeconds(context: Context, seconds: Int) {
+        prefs(context).edit().putInt(KEY_SLEEP_INTERVAL_SECONDS, seconds.coerceIn(0, 300)).apply()
+    }
+
+    /** Whether [getSleepIntervalSeconds] actually applies — defaults true, harmless either way for
+     * an install that never touched this (default value 0 is already a no-op downstream). Off
+     * forces that same no-op regardless of the stored value. */
+    fun isSleepIntervalEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_SLEEP_INTERVAL_ENABLED, true)
+    }
+
+    fun setSleepIntervalEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SLEEP_INTERVAL_ENABLED, enabled).apply()
+    }
+
+    fun getEffectiveSleepIntervalSeconds(context: Context): Int {
+        if (!isSleepIntervalEnabled(context)) return 0
+        return getSleepIntervalSeconds(context)
+    }
+
+    /** Raw "Header-Name: value" lines (one per header), merged into yt-dlp's own http_headers dict
+     * — its --add-header equivalent. A header here overrides yt-dlp's own default for the same
+     * name (including User-Agent/Referer) rather than only adding new ones. */
+    fun getCustomHeaders(context: Context): String {
+        return prefs(context).getString(KEY_CUSTOM_HEADERS, "") ?: ""
+    }
+
+    fun setCustomHeaders(context: Context, headers: String) {
+        prefs(context).edit().putString(KEY_CUSTOM_HEADERS, headers).apply()
+    }
+
+    /** Raw comma-separated yt-dlp format_sort terms (e.g. "codec:vp9,fps"), the same syntax
+     * --format-sort takes on the real CLI — merged after (so it can still be overridden by) the
+     * quality-cap/MP4-compatibility terms yt_dlp_wrapper.py already builds internally. Matches the
+     * existing "yt-dlp extractor arguments" field's raw-CLI-syntax precedent rather than a
+     * per-codec dropdown UI. */
+    fun getFormatSort(context: Context): String {
+        return prefs(context).getString(KEY_FORMAT_SORT, "") ?: ""
+    }
+
+    fun setFormatSort(context: Context, formatSort: String) {
+        prefs(context).edit().putString(KEY_FORMAT_SORT, formatSort.trim()).apply()
+    }
+
+    /** yt-dlp's own --verbose — every internal debug line (format selection, extractor traces,
+     * ...), not just the [title]/[progress]/[error] lines this app's own UI already parses. Off by
+     * default; meant for troubleshooting a failure with the log around it, not everyday use. */
+    fun isVerboseLogging(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_VERBOSE_LOGGING, false)
+    }
+
+    fun setVerboseLogging(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_VERBOSE_LOGGING, enabled).apply()
+    }
+
+    /** Whether [getDownloadDelaySeconds] actually applies — same on/off-plus-value shape as
+     * [isMaxFilesizeEnabled]/[getMaxFilesize], rather than overloading 0 seconds as "off": leaves
+     * the last-typed value in place so re-enabling doesn't lose it. */
+    fun isDownloadDelayEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_DOWNLOAD_DELAY_ENABLED, false)
+    }
+
+    fun setDownloadDelayEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_DOWNLOAD_DELAY_ENABLED, enabled).apply()
+    }
+
+    /** Seconds to wait after one queued download finishes before the next one in the same
+     * concurrency lane starts — DownloadDispatcher applies this as each dispatched WorkRequest's
+     * own initial delay, which (since a lane is a real WorkManager dependency chain — see
+     * DownloadDispatcher's own comment on that) means "wait N seconds after the previous item in
+     * this lane" exactly, not merely "wait N seconds after being enqueued." Only takes effect when
+     * [isDownloadDelayEnabled] is also true — see [getEffectiveDownloadDelaySeconds]. */
+    fun getDownloadDelaySeconds(context: Context): Int {
+        return prefs(context).getInt(KEY_DOWNLOAD_DELAY_SECONDS, 0).coerceIn(0, 3600)
+    }
+
+    fun setDownloadDelaySeconds(context: Context, seconds: Int) {
+        prefs(context).edit().putInt(KEY_DOWNLOAD_DELAY_SECONDS, seconds.coerceIn(0, 3600)).apply()
+    }
+
+    /** The value to actually apply — 0 whenever the toggle is off, so call sites don't need to
+     * re-check [isDownloadDelayEnabled] themselves (same shape as [getEffectiveMaxFilesize]). */
+    fun getEffectiveDownloadDelaySeconds(context: Context): Int {
+        if (!isDownloadDelayEnabled(context)) return 0
+        return getDownloadDelaySeconds(context)
+    }
+
+    /** Default for a new download's own DownloadEntity.incognito flag (still overridable per-
+     * download, same relationship as every other "global default, per-download override" setting
+     * in this file). An incognito download still saves its real file to the gallery/Downloads
+     * folder like normal — only its own row in this app's Library/queue history is removed once it
+     * finishes, so nothing about *what got downloaded* is retained here afterward. */
+    fun isIncognitoDefault(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_INCOGNITO_DEFAULT, false)
+    }
+
+    fun setIncognitoDefault(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_INCOGNITO_DEFAULT, enabled).apply()
+    }
+
+    // --- Second YTDLnis settings-import batch (see gallery-dl.md's "YTDLnis settings import,
+    // round 2" entry) — genuine gaps found by reading every one of YTDLnis's own settings XML
+    // files directly, not just the subset already covered by the first batch. ---
+
+    /** yt-dlp's own --embed-chapters (FFmpegMetadata's add_chapters kwarg) — muxes the source's
+     * chapter markers into the file, independent of [isEmbedMetadata]. */
+    fun isEmbedChapters(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_EMBED_CHAPTERS, false)
+    }
+
+    fun setEmbedChapters(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_EMBED_CHAPTERS, enabled).apply()
+    }
+
+    /** Saves the subtitle track as its own sidecar file (.srt/.vtt) alongside the video — a
+     * separate choice from [isDownloadSubtitles], which only ever muxes the track into the video
+     * itself. Both can be on at once (embed AND keep the sidecar). */
+    fun isSaveSubtitleFiles(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_SAVE_SUBTITLE_FILES, false)
+    }
+
+    fun setSaveSubtitleFiles(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SAVE_SUBTITLE_FILES, enabled).apply()
+    }
+
+    /** Whether a failed/errored download's staging directory (partially-fetched fragments, etc.)
+     * is deleted automatically (the default, matching this app's existing behavior) or left in
+     * place for manual inspection/resume. */
+    fun isDeleteLeftoverOnFailure(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_DELETE_LEFTOVER_ON_FAILURE, true)
+    }
+
+    fun setDeleteLeftoverOnFailure(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_DELETE_LEFTOVER_ON_FAILURE, enabled).apply()
+    }
+
+    /** When enabled, a new download whose URL exactly matches an existing non-terminal
+     * (QUEUED/RUNNING/PAUSED) or already-FINISHED entry is skipped instead of creating a second,
+     * redundant row — see DownloadDispatcher.enqueueDownload's own use of this. */
+    fun isPreventDuplicateDownloads(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_PREVENT_DUPLICATE_DOWNLOADS, false)
+    }
+
+    fun setPreventDuplicateDownloads(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_PREVENT_DUPLICATE_DOWNLOADS, enabled).apply()
+    }
+
+    /** When enabled, changing the quality chip on the download preview sheet also updates the
+     * global default (same relationship as every other "global default, per-download override"
+     * setting in this file) — the next download starts pre-selected at whatever was last picked,
+     * instead of always resetting to the stored global default. */
+    fun isRememberDownloadType(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_REMEMBER_DOWNLOAD_TYPE, false)
+    }
+
+    fun setRememberDownloadType(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_REMEMBER_DOWNLOAD_TYPE, enabled).apply()
+    }
+
+    /** A user-chosen SAF folder for audio-only downloads specifically — falls back to
+     * [getDownloadLocationUri] (the shared default), then the built-in Pictures/gallery-dl
+     * location, when unset. Mirrors [getVideoLocationUri] for the video side. */
+    fun getAudioLocationUri(context: Context): Uri? {
+        val stored = prefs(context).getString(KEY_AUDIO_LOCATION_URI, null) ?: return null
+        return runCatching { Uri.parse(stored) }.getOrNull()
+    }
+
+    fun setAudioLocationUri(context: Context, uri: Uri?) {
+        prefs(context).edit().putString(KEY_AUDIO_LOCATION_URI, uri?.toString()).apply()
+    }
+
+    /** A user-chosen SAF folder for video downloads specifically — see [getAudioLocationUri]. */
+    fun getVideoLocationUri(context: Context): Uri? {
+        val stored = prefs(context).getString(KEY_VIDEO_LOCATION_URI, null) ?: return null
+        return runCatching { Uri.parse(stored) }.getOrNull()
+    }
+
+    fun setVideoLocationUri(context: Context, uri: Uri?) {
+        prefs(context).edit().putString(KEY_VIDEO_LOCATION_URI, uri?.toString()).apply()
+    }
+
+    /** yt-dlp's own --restrict-filenames (ASCII-only, no spaces/special characters in the
+     * output filename) — was previously hardcoded on unconditionally in yt_dlp_wrapper.py; now a
+     * real Settings choice. Defaults to true to match that previous always-on behavior exactly,
+     * so leaving this alone changes nothing for an existing install. */
+    fun isRestrictFilenames(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_RESTRICT_FILENAMES, true)
+    }
+
+    fun setRestrictFilenames(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_RESTRICT_FILENAMES, enabled).apply()
+    }
+
+    /** Whether [DEFAULT_FILENAME_FORMAT]'s title field is capped at 150 bytes (the default,
+     * keeping filenames from an overlong caption unreasonably long) or left uncapped. Only
+     * affects the *default* template — a custom saved template's own length is never touched. */
+    fun isTrimFilenames(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_TRIM_FILENAMES, true)
+    }
+
+    fun setTrimFilenames(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_TRIM_FILENAMES, enabled).apply()
     }
 }

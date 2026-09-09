@@ -107,6 +107,14 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE id = :id")
     suspend fun getById(id: String): DownloadEntity?
 
+    /** Used by "Prevent duplicate downloads" (Settings > Downloads) — an existing entry for the
+     * exact same URL that's still meaningful to the user: actively queued/running/paused, or
+     * already finished. CANCELLED/DELETED/ERRORED rows don't count as a duplicate — those
+     * represent a download the user explicitly gave up on or that never produced anything, so a
+     * fresh attempt at the same URL is a deliberate retry, not an accidental re-submission. */
+    @Query("SELECT * FROM downloads WHERE url = :url AND status IN ('QUEUED', 'SCHEDULED', 'RUNNING', 'PAUSED', 'FINISHED') LIMIT 1")
+    suspend fun findActiveOrFinishedByUrl(url: String): DownloadEntity?
+
     /** One-shot (non-Flow) snapshot of everything still waiting to start — used to re-submit
      * their WorkManager jobs when a setting that affects delay (like the schedule window)
      * changes, since a job's setInitialDelay() is fixed at the moment it was enqueued and won't

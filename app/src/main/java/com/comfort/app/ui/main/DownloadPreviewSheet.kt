@@ -289,7 +289,16 @@ fun DownloadPreviewSheet(
             previewFilesize = previewFilesize,
             previewLoading = previewLoading,
             quality = quality,
-            onQualityChange = { quality = it },
+            onQualityChange = {
+                quality = it
+                // Imported from YTDLnis's own "Remember download type" setting — off by default,
+                // same "global default, per-download override" relationship as every other such
+                // setting: writing back here only ever changes what the *next* download's own
+                // preview sheet starts pre-selected at, never this one's own already-open state.
+                if (GalleryDlPreferences.isRememberDownloadType(context)) {
+                    GalleryDlPreferences.setVideoQuality(context, it)
+                }
+            },
             outputFormat = outputFormat,
             onToggleFormat = {
                 outputFormat = if (outputFormat == OutputFormat.MP4) OutputFormat.MKV else OutputFormat.MP4
