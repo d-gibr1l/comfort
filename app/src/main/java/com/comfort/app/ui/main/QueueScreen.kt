@@ -63,6 +63,16 @@ private val COOKIE_ERROR_KEYWORDS = listOf(
 private fun isCookieRelatedError(message: String?): Boolean =
     message != null && COOKIE_ERROR_KEYWORDS.any { message.contains(it, ignoreCase = true) }
 
+// HTTP 429 ("Too Many Requests") is a real, temporary IP-level block from the site, not something
+// retrying the same download fixes on its own — most mobile connections and home routers sit
+// behind a dynamic IP (often Carrier-Grade NAT), so toggling airplane mode or power-cycling the
+// router usually gets a fresh one and clears it. Keyword-based for the same reason
+// COOKIE_ERROR_KEYWORDS is: both engines phrase this in plain English, not a structured error type.
+private val RATE_LIMIT_ERROR_KEYWORDS = listOf("429", "too many requests", "rate-limit", "rate limit", "rate limited")
+
+private fun isRateLimitError(message: String?): Boolean =
+    message != null && RATE_LIMIT_ERROR_KEYWORDS.any { message.contains(it, ignoreCase = true) }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QueueScreen(
@@ -957,6 +967,14 @@ fun QueueItemCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                if (isRateLimitError(item.errorMessage)) {
+                    Text(
+                        text = "Temporarily rate-limited by the site — this isn't fixed by retrying immediately. Toggling airplane mode or restarting your router usually gets a fresh IP and clears it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
 
             if (!selectionMode) {

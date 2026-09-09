@@ -607,6 +607,7 @@ class DownloadWorker(
                 val fragmentRetries = GalleryDlPreferences.getEffectiveFragmentRetries(applicationContext)
                 val bufferSizeKb = GalleryDlPreferences.getEffectiveBufferSizeKb(applicationContext)
                 val formatIdOverride = GalleryDlPreferences.getFormatIdOverride(applicationContext)
+                val youtubeClientRotation = GalleryDlPreferences.isYoutubeClientRotationEnabled(applicationContext)
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -639,6 +640,7 @@ class DownloadWorker(
                             fragmentRetries,
                             socketTimeoutSeconds,
                             bufferSizeKb,
+                            if (youtubeClientRotation) "1" else "0",
                         ),
                         actualCallback,
                     )

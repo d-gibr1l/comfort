@@ -103,6 +103,7 @@ object GalleryDlPreferences {
     const val KEY_BUFFER_SIZE_KB = "buffer_size_kb"
     const val KEY_BUFFER_SIZE_ENABLED = "buffer_size_enabled"
     const val KEY_FORMAT_ID_OVERRIDE = "format_id_override"
+    const val KEY_YOUTUBE_CLIENT_ROTATION_ENABLED = "youtube_client_rotation_enabled"
     // yt-dlp's own built-in default for --fragment-retries, kept separate from
     // DEFAULT_NETWORK_RETRIES below (see getEffectiveFragmentRetries) so a merge download's
     // per-fragment retry budget can be tuned independently of whole-request retries.
@@ -634,6 +635,20 @@ object GalleryDlPreferences {
 
     fun setFormatIdOverride(context: Context, formatId: String) {
         prefs(context).edit().putString(KEY_FORMAT_ID_OVERRIDE, formatId).apply()
+    }
+
+    /** yt-dlp only — rotates through multiple internal YouTube API clients (android/web/ios)
+     * instead of just "web", so a throttled or degraded endpoint on one client falls back to
+     * another rather than failing the whole download. A default only: an explicit
+     * "youtube:player_client=..." already present in the free-text Extractor arguments field
+     * (Settings > Advanced) still wins. Off by default — safe either way, but not worth silently
+     * changing which client every YouTube download uses for someone who never asked for it. */
+    fun isYoutubeClientRotationEnabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_YOUTUBE_CLIENT_ROTATION_ENABLED, false)
+    }
+
+    fun setYoutubeClientRotationEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_YOUTUBE_CLIENT_ROTATION_ENABLED, enabled).apply()
     }
 
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update
