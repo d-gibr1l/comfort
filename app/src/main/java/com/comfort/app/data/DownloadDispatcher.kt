@@ -26,6 +26,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/** [DownloadDispatcher.enqueueDownload]'s outcome — most callers only ever want [id] (both
+ * branches carry one, so `.id` works regardless), but the share sheet specifically needs to tell
+ * the two apart to show its own duplicate-detected Snackbar only when [Duplicate] comes back. */
+sealed class EnqueueResult(val id: String) {
+    class Started(id: String) : EnqueueResult(id)
+    class Duplicate(id: String) : EnqueueResult(id)
+}
+
 /** Enqueue logic shared between the in-app ViewModel and the instant-share path (which runs
  * outside any Compose/ViewModel lifecycle, straight from the Activity handling a share intent). */
 object DownloadDispatcher {
@@ -96,13 +104,30 @@ object DownloadDispatcher {
         outputFormat: OutputFormat? = null,
         filenameTemplate: String? = null,
         saveThumbnail: Boolean? = null,
-    ): String {
+        // Set true for the explicit "Redownload anyway" action on a duplicate's own Snackbar/
+        // Library entry — skips the check below for just this one deliberate retry, same shape as
+        // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
+        forceDuplicate: Boolean = false,
+    ): EnqueueResult {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         // Imported from YTDLnis's own "Prevent duplicate downloads" setting — off by default, so
-        // this only ever short-circuits when the user has actually turned it on. Returns the
-        // existing entry's own id rather than creating a redundant second row for the same URL.
-        if (GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
-            dao.findActiveOrFinishedByUrl(url)?.let { existing -> return existing.id }
+        // this only ever short-circuits when the user has actually turned it on. Records the skip
+        // in duplicate_attempts (see DuplicateAttempt's own doc comment) rather than creating a
+        // redundant second downloads row for the same URL.
+        if (!forceDuplicate && GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
+            dao.findActiveOrFinishedByUrl(url)?.let { existing ->
+                dao.insertDuplicateAttempt(
+                    DuplicateAttempt(
+                        id = UUID.randomUUID().toString(),
+                        url = url,
+                        title = title,
+                        thumbnailPath = existing.thumbnailPath,
+                        originalDownloadId = existing.id,
+                        dateAdded = System.currentTimeMillis(),
+                    )
+                )
+                return EnqueueResult.Duplicate(existing.id)
+            }
         }
         val id = UUID.randomUUID().toString()
         val globallyPaused = GalleryDlPreferences.isGloballyPaused(context)
@@ -149,7 +174,7 @@ object DownloadDispatcher {
         if (!globallyPaused) {
             enqueueWork(context, id, url)
         }
-        return id
+        return EnqueueResult.Started(id)
     }
 
     /** (Re-)submits a WorkManager job for an existing download entry. gallery-dl's own download

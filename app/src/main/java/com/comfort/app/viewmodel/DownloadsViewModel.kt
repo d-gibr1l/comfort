@@ -70,6 +70,26 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         .map { list -> list.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    /** Library's own "Duplicates" filter — see DuplicateAttempt's doc comment for what these
+     * actually are (a link that "Prevent duplicate downloads" recognized as already queued/
+     * running/finished, so nothing was actually re-downloaded). */
+    val duplicateAttemptsFlow: StateFlow<List<com.comfort.app.data.DuplicateAttempt>> = dao.getDuplicateAttemptsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** The "Redownload" action on a Duplicates entry — same forceDuplicate escape hatch the share
+     * sheet's own Snackbar action uses, then clears this specific log entry since it's been acted
+     * on (a fresh, real download now exists for this URL; there's nothing left to "resolve"). */
+    fun redownloadDuplicate(attempt: com.comfort.app.data.DuplicateAttempt) {
+        viewModelScope.launch {
+            DownloadDispatcher.enqueueDownload(getApplication(), attempt.url, attempt.title, forceDuplicate = true)
+            dao.deleteDuplicateAttempt(attempt.id)
+        }
+    }
+
+    fun dismissDuplicateAttempt(id: String) {
+        viewModelScope.launch { dao.deleteDuplicateAttempt(id) }
+    }
+
     fun enqueueDownload(
         url: String,
         title: String,

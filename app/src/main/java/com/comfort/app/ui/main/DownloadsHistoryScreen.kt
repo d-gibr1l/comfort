@@ -92,6 +92,8 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var showDeletedOnly by remember { mutableStateOf(false) }
+    var showDuplicatesOnly by remember { mutableStateOf(false) }
+    val duplicateAttempts by viewModel.duplicateAttemptsFlow.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -255,7 +257,11 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     fontSize = 40.sp,
                                 )
                                 Text(
-                                    "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}",
+                                    if (showDuplicatesOnly) {
+                                        "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
+                                    } else {
+                                        "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}"
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -344,13 +350,28 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 icon = FeatherIcons.Star,
                                 label = "Favorites",
                                 active = favoritesOnly,
-                                onClick = { favoritesOnly = !favoritesOnly; if (favoritesOnly) showDeletedOnly = false },
+                                onClick = {
+                                    favoritesOnly = !favoritesOnly
+                                    if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false }
+                                },
                             )
                             LibraryToolbarChip(
                                 icon = FeatherIcons.Trash2,
                                 label = "Deleted",
                                 active = showDeletedOnly,
-                                onClick = { showDeletedOnly = !showDeletedOnly; if (showDeletedOnly) favoritesOnly = false },
+                                onClick = {
+                                    showDeletedOnly = !showDeletedOnly
+                                    if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false }
+                                },
+                            )
+                            LibraryToolbarChip(
+                                icon = FeatherIcons.Copy,
+                                label = "Duplicates",
+                                active = showDuplicatesOnly,
+                                onClick = {
+                                    showDuplicatesOnly = !showDuplicatesOnly
+                                    if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false }
+                                },
                             )
                             LibraryToolbarChip(
                                 icon = if (gridView) FeatherIcons.List else FeatherIcons.Grid,
@@ -366,6 +387,24 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
             }
         }
     ) { paddingValues ->
+        if (showDuplicatesOnly) {
+            if (duplicateAttempts.isEmpty()) {
+                EmptyState(
+                    icon = FeatherIcons.Copy,
+                    title = "No duplicates",
+                    subtitle = "A link you share in that's already queued, running, or finished lands here instead of starting a second copy.",
+                    modifier = Modifier.padding(paddingValues),
+                )
+            } else {
+                DuplicatesList(
+                    attempts = duplicateAttempts,
+                    contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
+                    onRedownload = { viewModel.redownloadDuplicate(it) },
+                    onDismiss = { viewModel.dismissDuplicateAttempt(it) },
+                )
+            }
+            return@Scaffold
+        }
         if (visibleItems.isEmpty()) {
             val searching = searchQuery.isNotBlank()
             EmptyState(
@@ -482,6 +521,74 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 row()
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Library's "Duplicates" filter content — a plain audit log, not the rich gallery grid/list the
+ * rest of this screen renders, since a duplicate attempt was never actually downloaded (no
+ * progress, no size, no favorite/delete state — just "you tried this link and already had it").
+ * Each row can redownload anyway (bypassing the duplicate check for just that one link) or be
+ * dismissed on its own, independent of the real download it matched. */
+@Composable
+private fun DuplicatesList(
+    attempts: List<com.comfort.app.data.DuplicateAttempt>,
+    contentPadding: PaddingValues,
+    onRedownload: (com.comfort.app.data.DuplicateAttempt) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+    val sdf = remember { SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()) }
+    LazyColumn(contentPadding = contentPadding.let { PaddingValues(top = it.calculateTopPadding(), bottom = it.calculateBottomPadding(), start = 16.dp, end = 16.dp) }) {
+        items(attempts, key = { it.id }) { attempt ->
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (attempt.thumbnailPath != null) {
+                        AsyncImage(
+                            model = attempt.thumbnailPath,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small),
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(FeatherIcons.Copy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            attempt.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            "Already downloaded • tried again ${sdf.format(Date(attempt.dateAdded))}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(onClick = { onRedownload(attempt) }) {
+                        Icon(FeatherIcons.RotateCcw, contentDescription = "Redownload")
+                    }
+                    IconButton(onClick = { onDismiss(attempt.id) }) {
+                        Icon(FeatherIcons.X, contentDescription = "Dismiss")
                     }
                 }
             }
