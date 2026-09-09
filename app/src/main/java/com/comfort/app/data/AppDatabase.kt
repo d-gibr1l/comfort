@@ -70,7 +70,25 @@ private val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
-@Database(entities = [DownloadEntity::class, DownloadedFileRecord::class], version = 12, exportSchema = false)
+// Adds the duplicate_attempts table — see DuplicateAttempt's own doc comment for what it tracks
+// and why it's a separate table rather than another DownloadStatus value on the main downloads
+// table (a skipped duplicate never actually enters the download pipeline at all, so it isn't a
+// lifecycle state of a real download row the way RUNNING/QUEUED/etc. are).
+private val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS duplicate_attempts (" +
+                "id TEXT NOT NULL PRIMARY KEY, url TEXT NOT NULL, title TEXT NOT NULL, " +
+                "thumbnailPath TEXT, originalDownloadId TEXT NOT NULL, dateAdded INTEGER NOT NULL)"
+        )
+    }
+}
+
+@Database(
+    entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
+    version = 13,
+    exportSchema = false,
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
@@ -83,7 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
                     .addMigrations(
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
-                        MIGRATION_10_11, MIGRATION_11_12,
+                        MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

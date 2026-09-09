@@ -153,4 +153,16 @@ interface DownloadDao {
 
     @Query("DELETE FROM downloaded_files WHERE downloadId = :downloadId")
     suspend fun clearDownloadedFileRecords(downloadId: String)
+
+    @Query("SELECT * FROM duplicate_attempts ORDER BY dateAdded DESC")
+    fun getDuplicateAttemptsFlow(): Flow<List<DuplicateAttempt>>
+
+    @Insert
+    suspend fun insertDuplicateAttempt(attempt: DuplicateAttempt)
+
+    @Query("DELETE FROM duplicate_attempts WHERE id = :id")
+    suspend fun deleteDuplicateAttempt(id: String)
+
+    @Query("DELETE FROM duplicate_attempts")
+    suspend fun clearDuplicateAttempts()
 }
