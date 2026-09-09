@@ -256,11 +256,14 @@ object GalleryDlPreferences {
     /** Ported from YTDLnis's own "Use alarm for scheduling" — an AlarmManager backstop
      * (DownloadDispatcher.scheduleWindowAlarm) that wakes the device near the Schedule window's
      * real open time, since a long WorkManager setInitialDelay() alone has no absolute wall-clock
-     * target and Doze/App Standby can defer it well past the intended moment. Off (the default,
-     * matching YTDLnis) leaves the window purely to WorkManager's own countdown, same as before
-     * this setting existed. */
+     * target and Doze/App Standby can defer it well past the intended moment. On by default —
+     * scheduleWindowAlarm() only ever actually arms an alarm when isScheduleEnabled is *also*
+     * true, so this has zero effect on anyone not using the Schedule window at all; for anyone who
+     * does turn it on, this backstop should just come along automatically rather than needing a
+     * second, easy-to-miss toggle to get scheduling that actually fires on time. Still its own
+     * separate toggle underneath "Restrict to time window" for turning it back off specifically. */
     fun isAlarmSchedulingEnabled(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_ALARM_SCHEDULING_ENABLED, false)
+        return prefs(context).getBoolean(KEY_ALARM_SCHEDULING_ENABLED, true)
     }
 
     fun setAlarmSchedulingEnabled(context: Context, enabled: Boolean) {
