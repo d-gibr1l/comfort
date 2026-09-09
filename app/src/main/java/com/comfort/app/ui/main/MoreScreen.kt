@@ -1695,6 +1695,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
     var customHeadersSaved by remember { mutableStateOf(false) }
     var verboseLogging by remember { mutableStateOf(GalleryDlPreferences.isVerboseLogging(context)) }
     var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
+    var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
 
     SettingsSubScaffold(title = "Advanced", onBack = onBack) {
         SettingsSection(title = "Extra arguments", icon = FeatherIcons.Terminal) {
@@ -1742,6 +1743,19 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
                 onCheckedChange = {
                     youtubeClientRotation = it
                     GalleryDlPreferences.setYoutubeClientRotationEnabled(context, it)
+                },
+            )
+        }
+
+        SettingsSection(title = "Bot detection", icon = FeatherIcons.ShieldOff) {
+            IconToggleRow(
+                icon = FeatherIcons.ShieldOff,
+                title = "Impersonate a browser",
+                subtitle = "Spoofs a real browser's TLS handshake for every download, not just headers — makes the app harder to fingerprint as a script. Already always on for one specific known case (a Reddit share-link redirect); this extends it to every site.",
+                checked = impersonateEnabled,
+                onCheckedChange = {
+                    impersonateEnabled = it
+                    GalleryDlPreferences.setImpersonateEnabled(context, it)
                 },
             )
         }

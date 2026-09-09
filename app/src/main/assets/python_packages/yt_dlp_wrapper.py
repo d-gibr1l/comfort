@@ -254,7 +254,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              no_check_certificates=False, sleep_interval_seconds=None, custom_headers=None,
              format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
-             socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False):
+             socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
+             impersonate=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -482,7 +483,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 headers[name] = value
         if headers:
             ydl_opts["http_headers"] = headers
-    if _REDDIT_SHARE_LINK_RE.match(url):
+    if impersonate or _REDDIT_SHARE_LINK_RE.match(url):
         # An empty ImpersonateTarget() (rather than a specific browser/version string) asks yt-dlp
         # for its own default target — the first one whose backend is actually available in this
         # bundled environment (see _REDDIT_SHARE_LINK_RE's own comment for why this is needed at
@@ -493,6 +494,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # isinstance(target, ImpersonateTarget)` in is_supported_target() instead (reproduced live:
         # AssertionError with an empty message, right out of YoutubeDL(ydl_opts) construction).
         # Constructing the real object ourselves sidesteps that.
+        #
+        # The Reddit short-link case above is always on regardless of the impersonate param — it's
+        # a targeted fix for one specific, reproduced WAF block, not a general-purpose toggle;
+        # `impersonate` (Settings > Advanced) is the opt-in "try this everywhere" version for other
+        # sites hitting bot detection, off by default so a site that already works fine doesn't pay
+        # curl_cffi's overhead or risk a TLS profile going stale for no reason.
         ydl_opts["impersonate"] = ImpersonateTarget()
     if retries:
         # "retries" alone only covers whole-request failures (extraction, a plain single-file
@@ -889,5 +896,6 @@ if __name__ == "__main__":
         socket_timeout_seconds=(_s(a[39]) if len(a) > 39 else None),
         buffer_size_kb=(int(a[40]) if len(a) > 40 and a[40] else None),
         youtube_client_rotation=_b(a[41]) if len(a) > 41 else False,
+        impersonate=_b(a[42]) if len(a) > 42 else False,
     )
     print(f"[__status__] {status}", flush=True)
