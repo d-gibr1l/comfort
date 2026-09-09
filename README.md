@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.svg" width="96" alt="Comfort icon">
+  <img src="icon.svg" width="110" alt="Comfort icon">
 </p>
 
 <h1 align="center">Comfort</h1>
