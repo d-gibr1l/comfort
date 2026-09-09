@@ -16,14 +16,24 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,13 +49,14 @@ import androidx.lifecycle.lifecycleScope
 import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
-import com.comfort.app.theme.DarkColorScheme
-import com.comfort.app.theme.LightColorScheme
-import com.comfort.app.theme.Shapes
-import com.comfort.app.theme.ThemeMode
+import com.comfort.app.theme.GalleryDLTheme
 import com.comfort.app.theme.ThemePreferences
-import com.comfort.app.theme.Typography
+import com.comfort.app.ui.main.DownloadPreviewSheet
 import com.comfort.app.ui.main.SharePickerScreen
+import com.comfort.app.util.GalleryDlListing
+import com.comfort.app.util.ListingResult
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.ArrowDown
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -138,23 +149,157 @@ class ShareActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
+            // Reads the same named theme/dynamic-color/pure-black selections MainActivity's own
+            // GalleryDLTheme call does — this used to build its own plain MaterialTheme here with
+            // only the hardcoded default light/dark ColorScheme, silently ignoring whichever named
+            // theme (Expressive Purple, ...), dynamic color, or pure-black setting the user had
+            // actually picked in Settings. Reproduced live: the share sheet's colors didn't match
+            // the rest of the app at all once a non-default theme was selected.
             val themeMode = remember { ThemePreferences.getThemeMode(context) }
-            val darkTheme = when (themeMode) {
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
-            }
-            val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+            val lightTheme = remember { ThemePreferences.getLightTheme(context) }
+            val darkTheme = remember { ThemePreferences.getDarkTheme(context) }
+            val pureBlack = remember { ThemePreferences.isPureBlack(context) }
 
-            MaterialTheme(colorScheme = colorScheme, typography = Typography, shapes = Shapes) {
-                SharePickerSheet(url = url, onFinished = { finish() })
+            GalleryDLTheme(themeMode = themeMode, lightTheme = lightTheme, darkTheme = darkTheme, pureBlack = pureBlack) {
+                ShareRouter(url = url, onFinished = { finish() })
+            }
+        }
+    }
+}
+
+/** Runs the same listing pass SharePickerScreen itself would (see its own `preloadedResult` doc
+ * comment) to decide, for *any* site — not a fixed host list — whether this share is a single
+ * detected video: if so, DownloadPreviewSheet (quality/trim/format/commands/filename) is a much
+ * more useful landing spot than a picker grid with nothing to pick between. Anything else (a real
+ * multi-item gallery, an image-only post, an unlistable link, a genuine listing failure) falls
+ * through to the existing SharePickerScreen item-picker unchanged, fed this same already-fetched
+ * result so it isn't listed a second time. */
+@Composable
+private fun ShareRouter(url: String, onFinished: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var listingResult by remember { mutableStateOf<ListingResult?>(null) }
+
+    LaunchedEffect(url) {
+        listingResult = GalleryDlListing.listItems(context, url)
+    }
+
+    val result = listingResult
+    val singleVideoItem = result != null && result.items.size == 1 &&
+        result.items[0].filename?.let(VideoSiteRouter::isVideoFilename) == true
+
+    when {
+        result == null -> LoadingSheet(
+            onDismiss = onFinished,
+            // Detection (the listing pass above) can take a real few seconds on a slow/rate-
+            // limited site — this lets an impatient share skip straight to a plain whole-URL
+            // download instead of waiting it out, the same fire-and-forget shape Instant Share
+            // itself already uses.
+            onDownloadNow = {
+                scope.launch {
+                    DownloadDispatcher.enqueueDownload(context, url, "Downloading from ${VideoSiteRouter.siteName(url)}")
+                    onFinished()
+                }
+            },
+        )
+        singleVideoItem -> DownloadPreviewSheet(
+            url = url,
+            onDismiss = onFinished,
+            onDownload = { options ->
+                scope.launch {
+                    DownloadDispatcher.enqueueDownload(
+                        context = context,
+                        url = url,
+                        title = "Downloading from ${VideoSiteRouter.siteName(url)}",
+                        videoQuality = options.quality,
+                        clipRange = options.clipRange,
+                        extraCommands = options.extraCommands,
+                        outputFormat = options.outputFormat,
+                        filenameTemplate = options.filenameTemplate,
+                        saveThumbnail = options.saveThumbnail,
+                    )
+                    onFinished()
+                }
+            },
+        )
+        else -> SharePickerSheet(url = url, preloadedResult = result, onFinished = onFinished)
+    }
+}
+
+/** The translucent bottom-sheet shell shared by every state this Activity can show (loading,
+ * SharePickerScreen's picker) — pulled out so the brief "detecting whether this is a single
+ * video" window before ShareRouter picks a real screen doesn't flash a bare spinner floating with
+ * no sheet/scrim at all, which reads as broken rather than "still loading." */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun LoadingSheet(onDismiss: () -> Unit, onDownloadNow: () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    BackHandler { visible = false }
+    LaunchedEffect(visible) {
+        if (!visible) {
+            delay(SHEET_ANIM_MS.toLong())
+            onDismiss()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { visible = false }
+        )
+        AnimatedVisibility(
+            visible = visible,
+            enter = slideInVertically(tween(SHEET_ANIM_MS), initialOffsetY = { it }),
+            exit = slideOutVertically(tween(SHEET_ANIM_MS), targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().height(280.dp),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Same wavy indicator + copy as SharePickerScreen's own LOADING state (see its
+                    // ListingState.LOADING branch) — this sheet covers the exact same listing
+                    // fetch, just before ShareRouter knows which real screen to hand off to, so it
+                    // should read as a continuation of that same "looking at what's there" moment,
+                    // not a different, unlabeled spinner.
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "Looking at what's there…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // Detection can take a real few seconds on a slow/rate-limited site — this
+                    // skips straight to a plain whole-URL download instead of waiting it out.
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Button(
+                            onClick = onDownloadNow,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Download")
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SharePickerSheet(url: String, onFinished: () -> Unit) {
+private fun SharePickerSheet(url: String, preloadedResult: ListingResult? = null, onFinished: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var visible by remember { mutableStateOf(false) }
@@ -207,6 +352,7 @@ private fun SharePickerSheet(url: String, onFinished: () -> Unit) {
                         visible = false
                     },
                     onHeightChange = { sheetHeight = it },
+                    preloadedResult = preloadedResult,
                 )
             }
         }
