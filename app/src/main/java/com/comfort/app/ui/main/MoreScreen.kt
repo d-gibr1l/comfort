@@ -35,6 +35,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -952,50 +953,52 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
 
             IconToggleRow(
                 icon = FeatherIcons.Trash2,
-                title = "Delete leftover files on failure",
-                subtitle = "A failed download's partial files are removed automatically. Turn off to inspect or manually resume them.",
+                title = "Clean up leftover downloads",
+                subtitle = "A cancelled or errored download's partial files are removed from cache. Off leaves them for manual inspection or resume.",
                 checked = deleteLeftoverOnFailure,
                 onCheckedChange = {
                     deleteLeftoverOnFailure = it
                     GalleryDlPreferences.setDeleteLeftoverOnFailure(context, it)
+                    DownloadDispatcher.rescheduleStagingCleanup(context)
                 },
             )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            Text("Clean up leftover downloads", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Periodically sweeps cancelled or errored downloads' partial files from cache — a safety net for when the app was killed outright before it got the chance to clean up on its own.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                listOf("" to "Off", "daily" to "Daily", "weekly" to "Weekly", "monthly" to "Monthly").forEach { (value, label) ->
-                    val selected = cleanupLeftoverInterval == value
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = {
-                            cleanupLeftoverInterval = value
-                            GalleryDlPreferences.setCleanupLeftoverInterval(context, value)
-                            DownloadDispatcher.rescheduleStagingCleanup(context)
-                        },
-                    ) {
-                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+            if (deleteLeftoverOnFailure) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "\"On failure\" only runs from inside the download itself, so it can't catch the app being killed outright — the periodic options add that as a backstop, on top of the same on-failure cleanup.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // "Never" isn't one of the options here — the toggle above already covers
+                    // that state, so (same off-value-redundancy fix as Concurrent downloads/
+                    // fragments' sliders) it's deliberately excluded from what's reachable once
+                    // the toggle reveals this row, rather than being selectable two different ways.
+                    listOf("" to "On failure", "daily" to "Daily", "weekly" to "Weekly", "monthly" to "Monthly").forEach { (value, label) ->
+                        val selected = cleanupLeftoverInterval == value
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            onClick = {
+                                cleanupLeftoverInterval = value
+                                GalleryDlPreferences.setCleanupLeftoverInterval(context, value)
+                                DownloadDispatcher.rescheduleStagingCleanup(context)
+                            },
+                        ) {
+                            Box(modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
