@@ -105,6 +105,7 @@ object GalleryDlPreferences {
     const val KEY_FORMAT_ID_OVERRIDE = "format_id_override"
     const val KEY_YOUTUBE_CLIENT_ROTATION_ENABLED = "youtube_client_rotation_enabled"
     const val KEY_IMPERSONATE_ENABLED = "impersonate_enabled"
+    const val KEY_ARIA2_ENABLED = "aria2_enabled"
     // yt-dlp's own built-in default for --fragment-retries, kept separate from
     // DEFAULT_NETWORK_RETRIES below (see getEffectiveFragmentRetries) so a merge download's
     // per-fragment retry budget can be tuned independently of whole-request retries.
@@ -668,6 +669,19 @@ object GalleryDlPreferences {
 
     fun setImpersonateEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_IMPERSONATE_ENABLED, enabled).apply()
+    }
+
+    /** yt-dlp only — real multi-connection segmented downloading of a single file via a bundled
+     * aria2c binary (see Aria2Runtime.kt's own doc comment for where it comes from and its actual
+     * ~6.8MB footprint), instead of yt-dlp's own one-file-one-connection downloader. Meaningful on
+     * a slow/high-latency connection, negligible on a fast one — off by default since it's a real
+     * added app-size cost, not something to switch on for someone who never asked for it. */
+    fun isAria2Enabled(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_ARIA2_ENABLED, false)
+    }
+
+    fun setAria2Enabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ARIA2_ENABLED, enabled).apply()
     }
 
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update

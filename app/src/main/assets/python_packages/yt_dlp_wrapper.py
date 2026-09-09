@@ -255,7 +255,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
-             impersonate=False):
+             impersonate=False, aria2_path=None, aria2_lib_dir=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -469,6 +469,27 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # yt-dlp's own --buffer-size, in bytes — this app's own setting is entered in KB for a
         # more human-scaled number.
         ydl_opts["buffersize"] = int(buffer_size_kb) * 1024
+    if aria2_path:
+        # Real multi-connection segmented downloading of a single file (yt-dlp's own downloader
+        # fetches one file with one connection) — matches --downloader in the real CLI. aria2c
+        # isn't statically linked (see Aria2Runtime.kt's own doc comment for the full dependency
+        # story), so its own dynamic linker needs LD_LIBRARY_PATH pointed at the unzipped bundle of
+        # its actual shared-library deps; os.environ here is inherited by the subprocess yt-dlp's
+        # own Aria2cFD spawns aria2c as, same as any other child process inheriting its parent's
+        # environment unless explicitly overridden.
+        ydl_opts["external_downloader"] = aria2_path
+        if aria2_lib_dir:
+            existing = os.environ.get("LD_LIBRARY_PATH")
+            os.environ["LD_LIBRARY_PATH"] = f"{aria2_lib_dir}:{existing}" if existing else aria2_lib_dir
+        # aria2c's GnuTLS-linked TLS stack has no CA trust store of its own here (unlike a request
+        # made through Python's own ssl module, which transparently uses Android's system trust
+        # store) — reproduced live as every HTTPS URL failing with "SSL/TLS handshake failure: not
+        # signed by known authorities", aria2c's own generic error for "I have literally no CA
+        # certificates to check against". cacert.pem sits next to this script itself (copied there
+        # by PythonRuntime.ensureProvisioned alongside the wrapper scripts).
+        cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+        if os.path.exists(cacert_path):
+            ydl_opts["external_downloader_args"] = {"aria2c": [f"--ca-certificate={cacert_path}"]}
     if custom_headers:
         # "Header-Name: value" lines, one per header — merged into (not replacing) yt-dlp's own
         # default request headers, the same override-specific-headers behavior --add-header has on
@@ -897,5 +918,7 @@ if __name__ == "__main__":
         buffer_size_kb=(int(a[40]) if len(a) > 40 and a[40] else None),
         youtube_client_rotation=_b(a[41]) if len(a) > 41 else False,
         impersonate=_b(a[42]) if len(a) > 42 else False,
+        aria2_path=(_s(a[43]) if len(a) > 43 else None),
+        aria2_lib_dir=(_s(a[44]) if len(a) > 44 else None),
     )
     print(f"[__status__] {status}", flush=True)

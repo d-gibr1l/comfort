@@ -456,6 +456,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var socketTimeoutEnabled by remember { mutableStateOf(GalleryDlPreferences.isSocketTimeoutEnabled(context)) }
     var bufferSizeKb by remember { mutableStateOf(GalleryDlPreferences.getBufferSizeKb(context)) }
     var bufferSizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isBufferSizeEnabled(context)) }
+    var aria2Enabled by remember { mutableStateOf(GalleryDlPreferences.isAria2Enabled(context)) }
     var downloadDelayEnabled by remember { mutableStateOf(GalleryDlPreferences.isDownloadDelayEnabled(context)) }
     var downloadDelaySeconds by remember { mutableStateOf(GalleryDlPreferences.getDownloadDelaySeconds(context)) }
     var incognitoDefault by remember { mutableStateOf(GalleryDlPreferences.isIncognitoDefault(context)) }
@@ -819,6 +820,21 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                     shape = MaterialTheme.shapes.medium,
                 )
             }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = FeatherIcons.Zap,
+                title = "Multi-connection downloads (aria2c)",
+                subtitle = "yt-dlp only — downloads a file over several connections at once instead of one, via a bundled aria2c binary (~7 MB added). Real speed gain on a slow/high-latency connection, negligible on a fast one.",
+                checked = aria2Enabled,
+                onCheckedChange = {
+                    aria2Enabled = it
+                    GalleryDlPreferences.setAria2Enabled(context, it)
+                },
+            )
         }
 
         SettingsSection(title = "Reliability", icon = FeatherIcons.Zap) {
