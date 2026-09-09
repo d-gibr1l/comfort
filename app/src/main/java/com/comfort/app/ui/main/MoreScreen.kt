@@ -426,6 +426,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
     var concurrentDownloadsEnabled by remember { mutableStateOf(GalleryDlPreferences.isConcurrentDownloadsEnabled(context)) }
     var wifiOnly by remember { mutableStateOf(GalleryDlPreferences.isWifiOnly(context)) }
     var scheduleEnabled by remember { mutableStateOf(GalleryDlPreferences.isScheduleEnabled(context)) }
+    var alarmSchedulingEnabled by remember { mutableStateOf(GalleryDlPreferences.isAlarmSchedulingEnabled(context)) }
     var scheduleStartMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleStartMinutes(context)) }
     var scheduleEndMin by remember { mutableStateOf(GalleryDlPreferences.getScheduleEndMinutes(context)) }
     var speedLimit by remember { mutableStateOf(GalleryDlPreferences.getSpeedLimit(context)) }
@@ -737,7 +738,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
             IconToggleRow(
                 icon = FeatherIcons.Clock,
                 title = "Sleep interval",
-                subtitle = "Pauses this many seconds before each request — eases rate-limit/bot-detection pressure the same way a lower concurrency does, just per-request.",
+                subtitle = "Pauses a random 2-to-this-many seconds before each request — a real range (not a fixed delay) eases rate-limit/bot-detection pressure the same way a lower concurrency does, just per-request.",
                 checked = sleepIntervalEnabled,
                 onCheckedChange = {
                     sleepIntervalEnabled = it
@@ -746,19 +747,17 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
             )
             if (sleepIntervalEnabled) {
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
-                    onValueChange = { input ->
-                        val seconds = input.filter { it.isDigit() }.toIntOrNull() ?: 0
-                        sleepIntervalSeconds = seconds
-                        GalleryDlPreferences.setSleepIntervalSeconds(context, seconds)
+                SettingsSlider(
+                    value = sleepIntervalSeconds,
+                    // Starts at 2, not the toggle's own off-value (0) — same off-value-redundancy
+                    // reasoning as Concurrent downloads/fragments' sliders — and the floor
+                    // yt_dlp_wrapper.py itself hardcodes for the random range's lower end.
+                    valueRange = 2..GalleryDlPreferences.MAX_SLEEP_INTERVAL_SECONDS,
+                    label = { "2-${it}s" },
+                    onValueChange = {
+                        sleepIntervalSeconds = it
+                        GalleryDlPreferences.setSleepIntervalSeconds(context, it)
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Seconds") },
-                    placeholder = { Text("0") },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                    shape = MaterialTheme.shapes.medium,
                 )
             }
 
@@ -873,6 +872,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                     // Otherwise a download already queued under the old setting just sits
                     // there until its stale delay elapses — see rescheduleQueuedDownloads().
                     scope.launch { com.comfort.app.data.DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                    com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
                 },
             )
 
@@ -890,6 +890,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                             scheduleStartMin = minutes
                             sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_SCHEDULE_START_MIN, minutes).apply()
                             scope.launch { com.comfort.app.data.DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                            com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
                         },
                     )
                     TimePickerButton(
@@ -900,9 +901,26 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
                             scheduleEndMin = minutes
                             sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_SCHEDULE_END_MIN, minutes).apply()
                             scope.launch { com.comfort.app.data.DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                            com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
                         },
                     )
                 }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = FeatherIcons.RefreshCw,
+                    title = "Use alarm for scheduling",
+                    subtitle = "Wakes the device near the window's real open time even during Doze/battery-saving, instead of trusting WorkManager's own countdown — which the OS can silently defer past the intended moment for a long wait.",
+                    checked = alarmSchedulingEnabled,
+                    onCheckedChange = {
+                        alarmSchedulingEnabled = it
+                        GalleryDlPreferences.setAlarmSchedulingEnabled(context, it)
+                        com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
+                    },
+                )
             }
         }
 

@@ -5,18 +5,18 @@ import java.net.URI
 enum class DownloadEngine { GALLERY_DL, YT_DLP }
 
 /** Decides which engine a URL's *primary* pass should go through. Sites that only ever post
- * video skip gallery-dl entirely (it can't extract them, or extracts them poorly — see the
- * TikTok photo-vs-video investigation this was built from); everything else goes through
+ * video skip gallery-dl entirely (it can't extract them at all); everything else goes through
  * gallery-dl first, since that's the engine with real image/gallery support, and DownloadWorker
- * separately falls back to (or supplements with) yt-dlp per item as needed. */
+ * separately falls back to (or supplements with) yt-dlp per item as needed — including TikTok,
+ * whose "photo mode" slideshow posts are real image galleries gallery-dl handles properly, not
+ * video at all; only its actual video posts need yt-dlp's supplement pass (see
+ * [alwaysSupplementsVideo] below, same reasoning as Instagram's mixed carousels). */
 object VideoSiteRouter {
     // Deliberately a fixed list rather than "try gallery-dl, see if it fails" for these — gallery-dl
-    // either doesn't support them at all or (TikTok) has a real but weaker path than yt-dlp's, so
-    // there's no value in paying for a doomed gallery-dl attempt first the way the fallback does
-    // for genuinely unknown sites.
+    // doesn't support them at all, so there's no value in paying for a doomed gallery-dl attempt
+    // first the way the fallback does for genuinely unknown sites.
     private val videoOnlyHosts = setOf(
         "youtube.com", "youtu.be",
-        "tiktok.com",
         "vimeo.com",
         "twitch.tv",
         "crunchyroll.com",
@@ -53,14 +53,22 @@ object VideoSiteRouter {
         return ext in videoExtensions
     }
 
-    /** Whether [url] is an Instagram link — used to decide when a yt-dlp supplement pass is worth
-     * attempting even without gallery-dl's own listing having flagged a video: unlike most
-     * gallery-dl sites (image boards, art platforms) that never carry embedded video at all,
-     * Instagram routinely does, and gallery-dl's listing can miss one it should have caught (see
-     * DownloadWorker's own comment on this). */
-    fun isInstagram(url: String): Boolean {
+    // Hosts where gallery-dl's own listing can't be trusted to flag every video item — unlike most
+    // gallery-dl sites (image boards, art platforms) that never carry embedded video at all,
+    // these routinely mix video into otherwise-image posts (Instagram's carousels) or post real
+    // video under the same extractor as its image "photo mode" posts (TikTok), and a listing miss
+    // means DownloadWorker's normal hasVideoItem check would otherwise skip yt-dlp entirely with
+    // no trace of a video ever having existed (see DownloadWorker's own comment on this).
+    private val alwaysSupplementVideoHosts = setOf("instagram.com", "tiktok.com")
+
+    /** Whether [url]'s host is one where a yt-dlp supplement pass is always worth attempting after
+     * gallery-dl's own image-only pass, even without its listing having flagged a video item —
+     * see [alwaysSupplementVideoHosts] above. yt-dlp fails fast and silently (no user-facing
+     * error; see DownloadWorker's actualCallback default branch) on a genuinely video-less post,
+     * so the cost of a wrong guess is a few extra seconds, not a broken download. */
+    fun alwaysSupplementsVideo(url: String): Boolean {
         val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.") ?: return false
-        return host == "instagram.com" || host.endsWith(".instagram.com")
+        return alwaysSupplementVideoHosts.any { host == it || host.endsWith(".$it") }
     }
 
     /** A short, human-readable site name for [url] — "Instagram" rather than "instagram.com" or
