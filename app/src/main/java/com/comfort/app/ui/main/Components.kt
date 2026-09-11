@@ -218,7 +218,7 @@ fun EmptyState(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize().padding(top = 96.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier

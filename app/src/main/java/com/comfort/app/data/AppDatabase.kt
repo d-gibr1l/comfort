@@ -84,9 +84,18 @@ private val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+// Added erroredAt (when a download most recently entered ERRORED) — getQueueFlow now sorts the
+// errored group by this, newest first, instead of by queueOrder/dateAdded (when it was *added*,
+// not when it actually failed).
+private val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN erroredAt INTEGER")
+    }
+}
+
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -101,7 +110,7 @@ abstract class AppDatabase : RoomDatabase() {
                 Room.databaseBuilder(context, AppDatabase::class.java, "gallerydl_database")
                     .addMigrations(
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
-                        MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+                        MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

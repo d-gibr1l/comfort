@@ -24,16 +24,20 @@ interface DownloadDao {
     // ERRORED first (rank 0, everything else rank 1) so a failed download always surfaces at the
     // top instead of wherever plain chronological order happened to leave it — reproduced live: a
     // download that fails immediately keeps the queueOrder/dateAdded of when it was *added*, which
-    // in a long queue buries it off-screen at the bottom, easy to miss entirely. Within each rank,
-    // queueOrder first so "Start now" (which jumps a waiting download to a very negative order)
-    // still moves it to the top of the non-errored group regardless of when it was added;
-    // dateAdded as the tiebreaker keeps everything else in plain oldest-added-first order.
+    // in a long queue buries it off-screen at the bottom, easy to miss entirely. Within the errored
+    // rank, newest erroredAt first — the download that just failed jumps above errors that have
+    // been sitting there a while, rather than all errors settling into queueOrder/dateAdded order
+    // regardless of which one actually just happened (COALESCE to dateAdded covers rows from
+    // before erroredAt existed). Within the non-errored rank: queueOrder first so "Start now"
+    // (which jumps a waiting download to a very negative order) still moves it to the top of that
+    // group regardless of when it was added; dateAdded as the tiebreaker keeps everything else in
+    // plain oldest-added-first order.
     @Query("""
         SELECT * FROM downloads
         WHERE status NOT IN ('FINISHED', 'SAVED', 'DELETED')
         ORDER BY
             CASE WHEN status = 'ERRORED' THEN 0 ELSE 1 END ASC,
-            queueOrder ASC,
+            CASE WHEN status = 'ERRORED' THEN -COALESCE(erroredAt, dateAdded) ELSE queueOrder END ASC,
             dateAdded ASC
     """)
     fun getQueueFlow(): Flow<List<DownloadEntity>>
@@ -51,8 +55,8 @@ interface DownloadDao {
     @Query("UPDATE downloads SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: String, status: DownloadStatus)
     
-    @Query("UPDATE downloads SET status = :status, errorMessage = :errorMessage WHERE id = :id")
-    suspend fun updateError(id: String, status: DownloadStatus, errorMessage: String?)
+    @Query("UPDATE downloads SET status = :status, errorMessage = :errorMessage, erroredAt = :erroredAt WHERE id = :id")
+    suspend fun updateError(id: String, status: DownloadStatus, errorMessage: String?, erroredAt: Long = System.currentTimeMillis())
 
     @Query("UPDATE downloads SET downloadStartTime = :startTime WHERE id = :id")
     suspend fun setStartTime(id: String, startTime: Long)
