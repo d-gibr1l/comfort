@@ -37,8 +37,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import com.comfort.app.theme.FavoriteGold
 import com.comfort.app.theme.SuccessGreen40
 import com.comfort.app.util.rememberIsReducedMotionEnabled
@@ -63,6 +71,12 @@ import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// How far the status bar's own text-protection scrim (see its own comment further down) extends
+// past the real status bar height before fading to fully transparent — matches Samsung Gallery's
+// own version of this same scrim, which doesn't stop exactly at the status bar's own edge either,
+// so the fade reads as a soft falloff into the content behind it rather than a hard-edged strip.
+private val STATUS_BAR_SCRIM_EXTRA_HEIGHT = 24.dp
 
 private enum class LibrarySort(val label: String) {
     DATE_NEWEST("Newest first"),
@@ -137,6 +151,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     // you scrolled wherever you were before, with the new item off-screen above.
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    val scrollTopScope = rememberCoroutineScope()
     LaunchedEffect(isQueueOpen) {
         if (!isQueueOpen) {
             listState.scrollToItem(0)
@@ -144,35 +159,28 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         }
     }
 
-    // Drives the header's own AnimatedVisibility further down — hides on any scroll toward more
-    // content, reappears on any scroll back toward the top (not just once it's fully back at the
-    // top), same "toolbar chases scroll direction" behavior most feeds use so the list gets the
-    // header's own screen space back while actually browsing. (index, offset) comparison rather
-    // than one scalar pixel position: a LazyColumn/LazyGrid only exposes its *current* item's own
-    // index+offset cheaply — reconstructing a true absolute scroll-pixel position would mean
-    // summing every prior item's real measured height, which isn't available for items that have
-    // scrolled off and been discarded. Comparing the pair directly like this still gets the
-    // direction right in the cases that matter (a changed index, or a changed offset within the
-    // same one) even though it isn't a real distance metric.
-    var headerVisible by remember { mutableStateOf(true) }
-    LaunchedEffect(gridView) {
-        var previousIndex = 0
-        var previousOffset = 0
-        val positions = if (gridView) {
-            snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
-        } else {
-            snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-        }
-        positions.collect { (index, offset) ->
-            headerVisible = when {
-                index == 0 && offset == 0 -> true
-                index > previousIndex || (index == previousIndex && offset > previousOffset) -> false
-                index < previousIndex || (index == previousIndex && offset < previousOffset) -> true
-                else -> headerVisible
-            }
-            previousIndex = index
-            previousOffset = offset
-        }
+    // Real nested-scroll-driven collapse instead of polling LazyListState/LazyGridState's own
+    // position after the fact (the previous approach here) — that only ever sees where the list
+    // *ended up* a frame late, coarse and index/offset-based, which is exactly why it needed a
+    // slop threshold hacked in to stop flickering on tiny movements and still never actually
+    // followed the finger, just snapped fully open/closed. TopAppBarScrollBehavior's own
+    // NestedScrollConnection intercepts real scroll deltas as the gesture happens — the same
+    // continuous, finger-following collapse Gmail/most apps' own toolbars use, and reused here
+    // as-is rather than hand-rolling the drag/fling/overscroll edge cases it already handles.
+    // enterAlways (not exitUntilCollapsed): reappears on ANY scroll back up, not only once
+    // already at the very top of the list — matches "chases scroll direction" like a feed's
+    // toolbar, not a page-detail screen's.
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
+    // The header's own natural (fully expanded) height in px — TopAppBarState needs this as its
+    // heightOffsetLimit (how far *down* heightOffset, a value from 0 to this negative limit, can
+    // collapse) to know when it's fully collapsed. Measured off the header's own inner content
+    // (see its Modifier.onGloballyPositioned below), not the outer collapsing Box that wraps it —
+    // that outer Box's own height IS the animated, currently-collapsing value, so measuring it
+    // instead would be measuring its own output, never converging on the header's true full size.
+    var headerHeightPx by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(headerHeightPx) {
+        if (headerHeightPx > 0f) topAppBarState.heightOffsetLimit = -headerHeightPx
     }
 
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
@@ -200,6 +208,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -245,21 +254,34 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     )
                 )
             } else {
-                // shrinkTowards/expandFrom = Bottom (not the default Top) so the header reads as
-                // sliding *up* and away past the top of the screen as it hides — clipped away from
-                // its own top edge first, its bottom edge (nearest the revealed list) the last
-                // sliver visible — rather than looking squashed from the bottom. Scaffold measures
-                // this whole topBar slot fresh every frame, so its shrinking height here is what
-                // actually drives the list's own top content padding (paddingValues.
-                // calculateTopPadding(), used by every LazyColumn/LazyVerticalGrid below) to shrink
-                // in step — no separate offset/nested-scroll bookkeeping needed for the list to
-                // reclaim the space.
-                AnimatedVisibility(
-                    visible = headerVisible,
-                    enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
-                ) {
+                // Modifier.layout, not a plain Box(Modifier.height(...)) wrapping this Surface —
+                // that first version measured the Surface WITH the collapsing height as its own
+                // incoming constraint (a plain Box passes its own constraints straight through to
+                // an unconstrained child), so onGloballyPositioned kept reporting back whatever the
+                // *already-collapsed* height currently was instead of the header's true natural
+                // size. That fed straight back into heightOffsetLimit, which fed back into the
+                // collapsed height itself — a real feedback loop, reproduced live as the header
+                // visibly flickering while scrolling rather than collapsing smoothly. Forcing
+                // maxHeight = Infinity for measurement (ignoring the incoming constraint entirely)
+                // is what breaks that loop: this Surface always measures at its one true natural
+                // size regardless of how much of it is currently visible, and only the *placement*
+                // — what this layout node reports upward to Scaffold's topBar slot, which is what
+                // actually drives every LazyColumn/LazyVerticalGrid's own top content padding via
+                // paddingValues.calculateTopPadding() — shrinks/grows continuously with
+                // scrollBehavior.state.heightOffset. clipToBounds() crops the natural-size content
+                // to that same smaller placed height instead of letting it draw past it.
                 Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clipToBounds()
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                            headerHeightPx = placeable.height.toFloat()
+                            val visibleHeight = (placeable.height + scrollBehavior.state.heightOffset)
+                                .coerceIn(0f, placeable.height.toFloat())
+                                .toInt()
+                            layout(placeable.width, visibleHeight) { placeable.placeRelative(0, 0) }
+                        },
                     color = MaterialTheme.colorScheme.background,
                     shadowElevation = 3.dp,
                 ) {
@@ -416,6 +438,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 icon = FeatherIcons.Copy,
                                 label = "Duplicates",
                                 active = showDuplicatesOnly,
+                                count = duplicateAttempts.size,
                                 onClick = {
                                     showDuplicatesOnly = !showDuplicatesOnly
                                     if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false }
@@ -432,17 +455,21 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         }
                     }
                 }
-                }
             }
         }
     ) { paddingValues ->
+        // Wraps the whole branch below (previously each ending in its own early return@Scaffold)
+        // so the bottom gradient scrim further down can sit as one unconditional sibling instead
+        // of needing to be duplicated into every branch — see that scrim's own comment for why it
+        // exists at all.
+        Box(modifier = Modifier.fillMaxSize()) {
         if (showDuplicatesOnly) {
             if (duplicateAttempts.isEmpty()) {
                 EmptyState(
                     icon = FeatherIcons.Copy,
                     title = "No duplicates",
                     subtitle = "A link you share in that's already queued, running, or finished lands here instead of starting a second copy.",
-                    modifier = Modifier.padding(paddingValues),
+                    modifier = Modifier.padding(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
                 )
             } else {
                 DuplicatesList(
@@ -452,15 +479,13 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     onDismiss = { viewModel.dismissDuplicateAttempt(it) },
                 )
             }
-            return@Scaffold
-        }
-        if (visibleItems.isEmpty()) {
+        } else if (visibleItems.isEmpty()) {
             val searching = searchQuery.isNotBlank()
             EmptyState(
                 icon = if (searching) FeatherIcons.Search else if (showDeletedOnly) FeatherIcons.Trash2 else if (favoritesOnly) FeatherIcons.Star else FeatherIcons.Image,
                 title = if (searching) "No matches" else if (showDeletedOnly) "Nothing deleted" else if (favoritesOnly) "No favorites yet" else "Nothing here yet",
                 subtitle = if (searching) "Try a different search." else if (showDeletedOnly) "Pictures you remove from your device gallery will show up here." else if (favoritesOnly) "Star a download to pin it here." else "Downloaded pictures will show up in this gallery.",
-                modifier = Modifier.padding(paddingValues),
+                modifier = Modifier.padding(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
             )
         } else if (gridView) {
             LazyVerticalGrid(
@@ -574,6 +599,91 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                 }
             }
         }
+
+        // Mirrors the header's own top gradient (primary fading into background) at the bottom of
+        // the screen instead — the header provided a visual "ceiling" that content faded into near
+        // the status bar; once it collapses away on scroll, content now reaches edge-to-edge with
+        // nothing softening where it meets the floating nav pill either, which read as an abrupt,
+        // unfinished edge rather than an intentional one. Tied directly to the same
+        // scrollBehavior.state.collapsedFraction driving the header's own collapse (0f fully
+        // expanded, 1f fully collapsed) so it fades in exactly as the header fades away, not as a
+        // separate on/off toggle of its own. FloatingNavBar itself (MainScreen.kt) composes after —
+        // on top of — this whole screen, so this scrim sits correctly behind the pill without this
+        // screen needing to know anything about it directly.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(navBarClearance())
+                .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
+        )
+
+        // Same underlying problem at the top: the header's own gradient (bleeding up under the
+        // status bar via its own internal statusBarsPadding) is what currently keeps that area
+        // from being flat, undifferentiated background — once the header collapses away, that
+        // goes with it. This is a real "status bar text protection" scrim now (a Samsung Gallery-
+        // style treatment), not a tinted echo of the header's own primary-colored gradient: pure
+        // black, alpha-blended, fading to fully transparent — legible white status bar icons
+        // against literally any content scrolled underneath, not just this app's own palette.
+        // Extends STATUS_BAR_SCRIM_EXTRA_HEIGHT past the real status bar height rather than
+        // stopping exactly at it, so the fade reads as a soft falloff into whatever's scrolled
+        // there rather than a hard-edged strip — same reasoning Samsung's own implementation uses.
+        //
+        // NOT driven by the raw collapsedFraction the way the bottom scrim is — that produced a
+        // visible hard pop-in, reproduced live: the header's own status-bar-height sliver is the
+        // FIRST part of its content (the statusBarsPadding spacer sits above the title/search/
+        // chips) and the LAST part clipped away, since Modifier.layout's collapsing placement
+        // above keeps the header's top edge fixed and clips from the bottom up. So for nearly the
+        // whole collapse gesture, the header's own real (opaque) status-bar strip is still fully
+        // there occluding this scrim completely regardless of this scrim's own alpha — it only
+        // stops being occluded in the final sliver of the gesture, once the header's own visible
+        // height drops below the status bar's own height. Fading this scrim in across the WHOLE
+        // collapsedFraction range meant it was already most of the way faded in by the time that
+        // occlusion finally lifted, so it suddenly snapped into view instead of easing in. Scoping
+        // the fade to only that final sliver — 0 while the header still fully covers the status
+        // bar, ramping to 1 exactly as the header's own edge reaches the status bar's own height —
+        // makes this scrim's reveal actually match when it becomes physically visible at all.
+        val density = LocalDensity.current
+        val statusBarPx = with(density) { WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx() }
+        val visibleHeaderPx = (headerHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f)
+        val statusBarScrimAlpha = if (statusBarPx > 0f) {
+            ((statusBarPx - visibleHeaderPx) / statusBarPx).coerceIn(0f, 1f)
+        } else 0f
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(with(density) { statusBarPx.toDp() } + STATUS_BAR_SCRIM_EXTRA_HEIGHT)
+                .graphicsLayer { alpha = statusBarScrimAlpha }
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.38f), Color.Transparent)))
+        )
+
+        val showScrollToTopFab by remember {
+            derivedStateOf {
+                !showDuplicatesOnly &&
+                    (if (gridView) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex) >= 6
+            }
+        }
+        AnimatedVisibility(
+            visible = showScrollToTopFab,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = navBarClearance(), end = 24.dp),
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    scrollTopScope.launch {
+                        if (gridView) gridState.animateScrollToItem(0) else listState.animateScrollToItem(0)
+                    }
+                },
+            ) {
+                Icon(FeatherIcons.ArrowUp, contentDescription = "Scroll to top")
+            }
+        }
+        }
     }
 }
 
@@ -590,8 +700,56 @@ private fun DuplicatesList(
     onDismiss: (String) -> Unit,
 ) {
     val sdf = remember { SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()) }
+    // Same entrance/removal treatment as the real download rows further up (HistoryRow/
+    // HistoryGridItem) — a plain instant pop-out on Dismiss read as jarring/inconsistent next to
+    // every other list in this app already animating removals, once actually compared side by
+    // side. Own id-keyed "already played its entrance" map (own id-space — DuplicateAttempt ids,
+    // never collide with a real download's own id) rather than sharing the outer screen's
+    // alreadyAnimatedIds: a Lazy layout recycling this composable in and out of view shouldn't
+    // replay the slide-in every time, same reasoning as that other map's own doc comment.
+    val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
+    val reducedMotion = rememberIsReducedMotionEnabled()
     LazyColumn(contentPadding = contentPadding.let { PaddingValues(top = it.calculateTopPadding(), bottom = it.calculateBottomPadding(), start = 16.dp, end = 16.dp) }) {
         items(attempts, key = { it.id }) { attempt ->
+            val visibleState = remember(attempt.id) {
+                MutableTransitionState(alreadyAnimatedIds.containsKey(attempt.id)).apply { targetState = true }
+            }
+            SideEffect { alreadyAnimatedIds[attempt.id] = true }
+            AnimatedVisibility(
+                visibleState = visibleState,
+                enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                // Exit is deliberately ExitTransition.None — the item's removal from `attempts`
+                // itself (once onDismiss's caller drops it from the flow) is what actually removes
+                // this row; animateItem() below handles that fade-out + the rest of the list
+                // smoothly reflowing into the gap, same split as every other list in this file.
+                exit = ExitTransition.None,
+                modifier = Modifier.animateItem(),
+            ) {
+            // Same swipe-to-delete pattern as the real download rows above (HistoryRow) — no
+            // confirmation, matching the existing Dismiss (X) button below, which already removes
+            // an attempt with no confirmation either.
+            val dismissState = rememberSwipeToDismissBoxState(
+                confirmValueChange = { value ->
+                    if (value != SwipeToDismissBoxValue.Settled) {
+                        onDismiss(attempt.id)
+                    }
+                    true
+                },
+            )
+            SwipeToDismissBox(
+                state = dismissState,
+                backgroundContent = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .padding(horizontal = 24.dp),
+                        contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
+                    ) {
+                        Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                },
+            ) {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                 shape = MaterialTheme.shapes.medium,
@@ -641,6 +799,8 @@ private fun DuplicatesList(
                     }
                 }
             }
+            }
+            }
         }
     }
 }
@@ -655,6 +815,11 @@ private fun LibraryToolbarChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     active: Boolean = false,
+    // Null (the default) renders a plain icon — only Duplicates passes this today. Same
+    // BadgedBox+Badge treatment as this screen's own "Active downloads" queue button above
+    // (and FloatingNavBar's own Settings-tab dot), not a "(N)" suffix on the label text, so a
+    // count on any icon in this app always looks like the same one thing.
+    count: Int? = null,
 ) {
     val bg by animateColorAsState(
         targetValue = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -666,20 +831,47 @@ private fun LibraryToolbarChip(
         animationSpec = tween(200),
         label = "chipTint",
     )
-    Row(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .background(bg)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // better-interface review: this icon's contentDescription duplicated the visible Text
-        // right next to it inside one clickable (merged-semantics) row — decorative next to real
-        // text, so null here, not a repeat of the same name TalkBack already gets from the Text.
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Medium)
+    // Badge sits on the whole pill's own top-right corner (not the icon inside it — tried that
+    // first, reported live as reading like it belonged to the icon rather than as a count on the
+    // chip itself) — an outer Box wrapping the real chip Row plus the badge as its own sibling,
+    // so [modifier] (whatever a caller passes — e.g. the Sort chip's own wrapping Box for its
+    // DropdownMenu) still sizes/positions the *whole* chip+badge unit as one thing.
+    //
+    // Positioned via a measured pixel width, not .align(Alignment.TopEnd) — tried that on the
+    // (differently-scoped) icon-only version of this earlier and it landed top-left instead of
+    // top-right despite it, for reasons that didn't trace back to anything in this file (no RTL/
+    // LayoutDirection override anywhere here). A plain top-left-anchored offset (Box's own default
+    // child placement, no alignment modifier) sidesteps needing to trust that alignment resolution
+    // at all — and doing it off this Row's own real onSizeChanged width, rather than a fixed dp
+    // guess, keeps the badge correctly at the corner regardless of the label text's own length.
+    var chipWidthPx by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .onSizeChanged { chipWidthPx = it.width }
+                .clip(MaterialTheme.shapes.large)
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // better-interface review: this icon's contentDescription duplicated the visible Text
+            // right next to it inside one clickable (merged-semantics) row — decorative next to
+            // real text, so null here, not a repeat of the same name TalkBack already gets from
+            // the Text.
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Medium)
+        }
+        if (count != null && count > 0 && chipWidthPx > 0) {
+            Badge(
+                containerColor = MaterialTheme.colorScheme.error,
+                // -10dp so roughly half the badge overlaps the chip's own corner (the usual
+                // notification-badge look) instead of sitting fully outside it.
+                modifier = Modifier.offset(x = with(density) { chipWidthPx.toDp() } - 10.dp, y = (-6).dp),
+            ) { Text(count.toString()) }
+        }
     }
 }
 

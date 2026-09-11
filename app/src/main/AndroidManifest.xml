@@ -55,7 +55,17 @@
             android:name=".ShareActivity"
             android:exported="true"
             android:theme="@style/Theme.GalleryDL.Transparent"
-            android:excludeFromRecents="true">
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask">
+            <!-- singleTask: at most one instance of this Activity ever exists — a share arriving
+                 while one's already open reuses it (delivered via onNewIntent, see its own doc
+                 comment in ShareActivity.kt) instead of creating another one on top. Without this,
+                 the default launchMode lets instances pile up indefinitely, one per share — most
+                 of the time invisible since each one normally finish()es itself quickly, but a
+                 single instance that doesn't (reproduced live: one left open from Library >
+                 Duplicates confirmation-sheet testing) then just sits there forever, its own
+                 translucent/dimmed window compositing on top of whatever the user does next in a
+                 completely different app. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
