@@ -10,7 +10,10 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -141,6 +144,37 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         }
     }
 
+    // Drives the header's own AnimatedVisibility further down — hides on any scroll toward more
+    // content, reappears on any scroll back toward the top (not just once it's fully back at the
+    // top), same "toolbar chases scroll direction" behavior most feeds use so the list gets the
+    // header's own screen space back while actually browsing. (index, offset) comparison rather
+    // than one scalar pixel position: a LazyColumn/LazyGrid only exposes its *current* item's own
+    // index+offset cheaply — reconstructing a true absolute scroll-pixel position would mean
+    // summing every prior item's real measured height, which isn't available for items that have
+    // scrolled off and been discarded. Comparing the pair directly like this still gets the
+    // direction right in the cases that matter (a changed index, or a changed offset within the
+    // same one) even though it isn't a real distance metric.
+    var headerVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(gridView) {
+        var previousIndex = 0
+        var previousOffset = 0
+        val positions = if (gridView) {
+            snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
+        } else {
+            snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+        }
+        positions.collect { (index, offset) ->
+            headerVisible = when {
+                index == 0 && offset == 0 -> true
+                index > previousIndex || (index == previousIndex && offset > previousOffset) -> false
+                index < previousIndex || (index == previousIndex && offset < previousOffset) -> true
+                else -> headerVisible
+            }
+            previousIndex = index
+            previousOffset = offset
+        }
+    }
+
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
 
     // Checks each finished download's thumbnail against the real MediaStore once per Library
@@ -211,6 +245,20 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     )
                 )
             } else {
+                // shrinkTowards/expandFrom = Bottom (not the default Top) so the header reads as
+                // sliding *up* and away past the top of the screen as it hides — clipped away from
+                // its own top edge first, its bottom edge (nearest the revealed list) the last
+                // sliver visible — rather than looking squashed from the bottom. Scaffold measures
+                // this whole topBar slot fresh every frame, so its shrinking height here is what
+                // actually drives the list's own top content padding (paddingValues.
+                // calculateTopPadding(), used by every LazyColumn/LazyVerticalGrid below) to shrink
+                // in step — no separate offset/nested-scroll bookkeeping needed for the list to
+                // reclaim the space.
+                AnimatedVisibility(
+                    visible = headerVisible,
+                    enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+                ) {
                 Surface(
                     color = MaterialTheme.colorScheme.background,
                     shadowElevation = 3.dp,
@@ -253,8 +301,8 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     "Library",
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
-                                    fontSize = 40.sp,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
+                                    fontSize = 36.sp,
                                 )
                                 Text(
                                     if (showDuplicatesOnly) {
@@ -383,6 +431,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                             )
                         }
                     }
+                }
                 }
             }
         }

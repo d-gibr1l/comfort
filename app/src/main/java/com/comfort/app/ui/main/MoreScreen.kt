@@ -272,8 +272,8 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                     Box(modifier = Modifier.height(72.dp).padding(start = 4.dp), contentAlignment = Alignment.BottomStart) {
                         Text("Settings",
                             fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
-                            fontSize = 40.sp
+                            fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
+                            fontSize = 36.sp
                         )
                     }
                 },
@@ -565,7 +565,7 @@ private fun SettingsSubScaffold(
                     Text(
                         title, 
                         fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
                         fontSize = 36.sp
                     ) 
                 },
