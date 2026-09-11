@@ -12,8 +12,15 @@ android {
         applicationId = "com.comfort.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Bump both on every release you publish to github.com/d-gibr1l/comfort — versionName is
+        // what AppUpdater.kt actually compares against that repo's latest GitHub Release tag (a
+        // leading "v" is stripped, e.g. tag "v1.1.0" -> "1.1.0"), so a release with a versionName
+        // this app doesn't already consider newer than what's installed won't get offered as an
+        // update at all. versionCode has no reader of its own in this app (it's the Play Store's
+        // own install/upgrade key, not used here) but real Android tooling still expects it to move
+        // in step, so bump it anyway on principle.
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -29,7 +36,22 @@ android {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a", "x86_64")
+            // armeabi-v7a added for real budget devices (Samsung's own A0-Core line confirmed) that
+            // ship a 32-bit-only Android build despite 64-bit-capable silicon — Build.SUPPORTED_ABIS
+            // reports armeabi-v7a there with no arm64-v8a at all, so without this split the app
+            // installed and ran (no native-code dependency in the Kotlin/Compose UI) but every
+            // native-backed feature silently had nothing to load, surfacing as PythonRuntime's
+            // graceful "Failed to provision the Python runtime" rather than a crash. Only
+            // jniLibs/armeabi-v7a/lib{python,qjs,aria2c}* exist for this ABI so far (all three
+            // follow the same zip.so-or-plain-binary shape already used for arm64-v8a/x86_64) —
+            // libffmpeg.so for this ABI (from the same ytdlnis-packages source as libpython.so/
+            // libqjs.so here) uses a different, dynamically-linked-plus-zip.so-deps shape than the
+            // fully static single-binary libffmpeg.so already bundled for the other two ABIs, so it
+            // wasn't dropped in here — FfmpegRuntime.getExecutablePath() already documents and
+            // handles a missing-for-this-ABI binary as a real, non-crashing case (yt-dlp just can't
+            // mux separate video+audio streams on this ABI yet), so this is a real but scoped-out
+            // follow-up, not a regression.
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,7 +55,7 @@ import compose.icons.feathericons.Check
 // mode" toggles. Their version drives this off an Android Preference/RecyclerView stack; this is
 // the same visual result built natively in Compose against this app's own AppTheme palette.
 @Composable
-fun AppearanceScreen(onBack: () -> Unit) {
+fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val themeState = LocalThemeState.current
     val dynamicAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val availableThemes = remember(dynamicAvailable) {
@@ -64,6 +67,11 @@ fun AppearanceScreen(onBack: () -> Unit) {
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> systemDark
     }
+    // Own scroll state + HighlightController, mirroring SettingsSubScaffold's own copy of this —
+    // this screen has its own separate Scaffold (see its own doc comment) rather than that shared
+    // one, so it can't just receive one from there.
+    val scrollState = rememberScrollState()
+    val highlight = remember(highlightKey) { HighlightController(highlightKey, scrollState) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -90,12 +98,14 @@ fun AppearanceScreen(onBack: () -> Unit) {
             )
         }
     ) { paddingValues ->
+        CompositionLocalProvider(LocalHighlightState provides highlight) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp)
+                .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
         ) {
             Text("Appearance", 
                 fontWeight = FontWeight.Bold,
@@ -112,7 +122,7 @@ fun AppearanceScreen(onBack: () -> Unit) {
             )
             Spacer(Modifier.height(16.dp))
 
-            Text("Light theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("Light theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = highlightRowModifier("Light theme"))
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -153,7 +163,7 @@ fun AppearanceScreen(onBack: () -> Unit) {
             }
             Spacer(Modifier.height(24.dp))
 
-            Text("Dark theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text("Dark theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = highlightRowModifier("Dark theme"))
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -212,13 +222,14 @@ fun AppearanceScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(navBarClearance()))
         }
+        }
     }
 }
 
 @Composable
 private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)).padding(vertical = 14.dp, horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -10,6 +10,9 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -33,6 +36,8 @@ import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +54,7 @@ import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.theme.LocalThemeState
 import com.comfort.app.theme.ThemeMode
+import com.comfort.app.util.AppUpdater
 import com.comfort.app.util.EngineUpdater
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
@@ -64,6 +70,110 @@ import compose.icons.feathericons.*
 
 enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, ABOUT }
 
+private fun SettingsRoute.displayName(): String = when (this) {
+    SettingsRoute.ROOT -> "Settings"
+    SettingsRoute.APPEARANCE -> "Appearance"
+    SettingsRoute.FOLDERS -> "Folders"
+    SettingsRoute.DOWNLOADS -> "Downloads"
+    SettingsRoute.PROCESSING -> "Processing"
+    SettingsRoute.ADVANCED -> "Advanced"
+    SettingsRoute.COOKIES -> "Cookies & Login"
+    SettingsRoute.ABOUT -> "About"
+}
+
+private fun SettingsRoute.icon(): ImageVector = when (this) {
+    SettingsRoute.ROOT -> FeatherIcons.Settings
+    SettingsRoute.APPEARANCE -> FeatherIcons.Sun
+    SettingsRoute.FOLDERS -> FeatherIcons.Folder
+    SettingsRoute.DOWNLOADS -> FeatherIcons.Download
+    SettingsRoute.PROCESSING -> FeatherIcons.Film
+    SettingsRoute.ADVANCED -> FeatherIcons.Terminal
+    SettingsRoute.COOKIES -> FeatherIcons.Lock
+    SettingsRoute.ABOUT -> FeatherIcons.Info
+}
+
+/** One individual row from inside a settings sub-screen — as opposed to SettingsItemSpec below,
+ * which only covers the handful of top-level nav entries on the Settings root. Lets the search bar
+ * match something like "TLS" or "aria2c" against a row buried three screens deep without that
+ * screen's own composable ever running. */
+private data class SubpageSearchEntry(val title: String, val subtitle: String, val route: SettingsRoute) {
+    fun matches(query: String): Boolean =
+        title.contains(query, ignoreCase = true) || subtitle.contains(query, ignoreCase = true)
+}
+
+// Hand-maintained index of every toggle/field across the settings sub-screens — title/subtitle
+// text copied verbatim from each row's own composable further down (and AppearanceScreen.kt).
+// Nothing generates this automatically (the screens are built ad hoc, not off one shared model
+// those rows could be collected from), so keep it in sync by hand: add an entry here whenever a
+// new settings row is added elsewhere, and update the text here if a row's own title/subtitle
+// changes. Order doesn't matter — this is only ever filtered, never displayed as-is.
+private val SUBPAGE_SEARCH_INDEX = listOf(
+    // Downloads
+    SubpageSearchEntry("Instant download", "Sharing a link downloads it right away in the background. Off shows a picker to choose which images to download.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Multiple concurrent downloads", "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Wi-Fi only", "Queued downloads wait for a Wi-Fi connection instead of using mobile data.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Speed limit", "Caps download bandwidth for all future downloads.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Retries", "How many times a failed request is retried before the download actually fails.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Fragment retries", "How many times a failed piece of a merge download (separate video/audio fragments) is retried.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Proxy", "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Force IPv4", "Binds outgoing connections to IPv4 — try this if a site's downloads fail with a broken IPv6 route.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Skip certificate checks", "Disables TLS certificate validation.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Concurrent fragments", "How many pieces of a single video download in parallel.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Sleep interval", "Pauses a random 2-to-this-many seconds before each request — eases rate-limit/bot-detection pressure.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Socket timeout", "How long a single stalled connection is allowed before giving up on it.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Buffer size", "yt-dlp only — the download stream's read chunk size.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Multi-connection downloads (aria2c)", "yt-dlp only — downloads a file over several connections at once via a bundled aria2c binary.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Restrict to time window", "New downloads wait in the queue until the window opens.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Use alarm for scheduling", "Wakes the device near the window's real open time even during Doze/battery-saving.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Limit max file size", "Files larger than this are skipped instead of downloaded.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Download delay", "Waits this many seconds after one queued download finishes before the next one starts.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Incognito by default", "New downloads are removed from Library/history the moment they finish.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Prevent duplicate downloads", "A link that's already queued, running, or finished is skipped instead of starting a second copy.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Remember last quality", "Changing the quality chip on the download sheet also becomes the new default.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Clean up leftover downloads", "A cancelled or errored download's partial files are removed from cache.", SettingsRoute.DOWNLOADS),
+
+    // Folders
+    SubpageSearchEntry("Filename format", "How downloaded files are named.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry("Restrict filenames", "ASCII letters/digits only, spaces replaced with underscores.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry("Trim filenames", "Caps an overlong title at 150 characters instead of using it in full.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry("Download location", "Where downloaded files are saved.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry("Storage", "How much space downloads are using.", SettingsRoute.FOLDERS),
+
+    // Processing
+    SubpageSearchEntry("Single video only", "A link that's part of a playlist or channel downloads just that one video.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Live streams from the start", "Download an in-progress live stream from its beginning.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Embed thumbnail", "Save the video's thumbnail as cover art inside the file.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Embed metadata", "Tag the file with its title, uploader, and other details.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Embed chapters", "Save the source's chapter markers inside the file.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Write description / info.json files", "Save a separate JSON metadata file alongside each download.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Download subtitles", "Fetch and embed subtitles when they're available.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Save subtitle files", "Keeps a separate .srt/.vtt file alongside the video.", SettingsRoute.PROCESSING),
+
+    // Advanced
+    SubpageSearchEntry("Extra arguments", "Raw gallery-dl command-line arguments.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Rotate player clients", "Tries the android, web, and ios internal API clients instead of just web.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Impersonate a browser", "Spoofs a real browser's TLS handshake for every download.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("yt-dlp extractor arguments", "Site-specific extractor options passed straight to yt-dlp.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Format sort", "Custom yt-dlp format-selection priority.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Custom headers", "Extra HTTP headers sent with every request.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Verbose logging", "Every internal yt-dlp debug line, for troubleshooting a failure.", SettingsRoute.ADVANCED),
+
+    // Cookies & Login
+    SubpageSearchEntry("Cookies", "Sign in to sites that require it, via a real embedded browser.", SettingsRoute.COOKIES),
+    SubpageSearchEntry("Saved cookies", "Sites you've already signed in to.", SettingsRoute.COOKIES),
+
+    // Appearance
+    SubpageSearchEntry("Follow system theme", "Switch between your light and dark theme automatically.", SettingsRoute.APPEARANCE),
+    SubpageSearchEntry("Pure black dark mode", "Use true black backgrounds in dark theme.", SettingsRoute.APPEARANCE),
+    SubpageSearchEntry("Light theme", "Pick this app's light-mode color scheme.", SettingsRoute.APPEARANCE),
+    SubpageSearchEntry("Dark theme", "Pick this app's dark-mode color scheme.", SettingsRoute.APPEARANCE),
+
+    // About
+    SubpageSearchEntry("App update", "Check for a newer version of this app.", SettingsRoute.ABOUT),
+    SubpageSearchEntry("Engines", "Update yt-dlp and gallery-dl independently of an app update.", SettingsRoute.ABOUT),
+    SubpageSearchEntry("Credits", "gallery-dl, yt-dlp, FFmpeg, QuickJS, aria2, and the bundled Python runtime.", SettingsRoute.ABOUT),
+)
+
 /** [route]/[onNavigate] are hoisted up to MainScreen rather than owned here — this composable
  * itself gets torn down and rebuilt every time the Settings tab is switched away from and back
  * (MainScreen's `when(selectedTab)` only composes the selected tab's screen at all), so a plain
@@ -72,7 +182,7 @@ enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADV
  * back on the root list instead of Downloads). Hoisting to MainScreen (which stays composed for
  * the app's whole lifetime) is what actually survives a tab switch. */
 @Composable
-fun MoreScreen(route: SettingsRoute, onNavigate: (SettingsRoute) -> Unit) {
+fun MoreScreen(route: SettingsRoute, highlightKey: String?, onNavigate: (SettingsRoute, String?) -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         // The root settings list is what a sub-screen's back gesture reveals — kept composed
         // underneath whenever we're not already on it, same reasoning as MainScreen's Home-behind-
@@ -82,18 +192,18 @@ fun MoreScreen(route: SettingsRoute, onNavigate: (SettingsRoute) -> Unit) {
         }
 
         val backProgress = rememberPredictiveBackProgress(enabled = route != SettingsRoute.ROOT) {
-            onNavigate(SettingsRoute.ROOT)
+            onNavigate(SettingsRoute.ROOT, null)
         }
         Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(backProgress)) {
             when (route) {
                 SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = onNavigate)
-                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
-                SettingsRoute.FOLDERS -> FoldersSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
-                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
-                SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
-                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
-                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
-                SettingsRoute.ABOUT -> AboutScreen(onBack = { onNavigate(SettingsRoute.ROOT) })
+                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.FOLDERS -> FoldersSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.ABOUT -> AboutScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
             }
         }
     }
@@ -101,7 +211,7 @@ fun MoreScreen(route: SettingsRoute, onNavigate: (SettingsRoute) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
+private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val themeState = LocalThemeState.current
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
@@ -121,20 +231,24 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
     // at once had grown too long to scan.
     val mainItems = remember(themeSummary, filenameFormat, hasCookies) {
         listOf(
-            SettingsItemSpec(FeatherIcons.Sun, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE) },
-            SettingsItemSpec(FeatherIcons.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS) },
-            SettingsItemSpec(FeatherIcons.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS) },
-            SettingsItemSpec(FeatherIcons.Film, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING) },
-            SettingsItemSpec(FeatherIcons.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED) },
-            SettingsItemSpec(FeatherIcons.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES) },
+            SettingsItemSpec(FeatherIcons.Sun, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
+            SettingsItemSpec(FeatherIcons.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
+            SettingsItemSpec(FeatherIcons.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
+            SettingsItemSpec(FeatherIcons.Film, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
+            SettingsItemSpec(FeatherIcons.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
+            SettingsItemSpec(FeatherIcons.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
         )
     }
     val aboutItems = remember {
-        listOf(SettingsItemSpec(FeatherIcons.Info, "About", "Version, credits & source", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT) })
+        listOf(SettingsItemSpec(FeatherIcons.Info, "About", "Version, credits & source", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT, null) })
     }
     val filteredMainItems = mainItems.filter { it.matches(searchQuery) }
     val filteredAboutItems = aboutItems.filter { it.matches(searchQuery) }
     val isSearching = searchQuery.isNotBlank()
+    // Only computed while actually searching — SUBPAGE_SEARCH_INDEX.filter() over ~50 static
+    // entries is cheap enough to just do inline (no remember needed), but there's no reason to pay
+    // even that when the search bar is empty and this can never show anything anyway.
+    val filteredSubpageResults = if (isSearching) SUBPAGE_SEARCH_INDEX.filter { it.matches(searchQuery) } else emptyList()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -195,9 +309,32 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute) -> Unit) {
         ) {
             PillSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
 
-            ExpressiveSettingsList(items = filteredMainItems, emptyMessage = "No settings match \"$searchQuery\"".takeIf { isSearching && filteredMainItems.isEmpty() && filteredAboutItems.isEmpty() })
+            ExpressiveSettingsList(
+                items = filteredMainItems,
+                emptyMessage = "No settings match \"$searchQuery\"".takeIf {
+                    isSearching && filteredMainItems.isEmpty() && filteredAboutItems.isEmpty() && filteredSubpageResults.isEmpty()
+                },
+            )
+
+            // Individual rows from inside a sub-screen (e.g. searching "TLS" surfaces Advanced's
+            // own "Impersonate a browser" toggle) rather than just the 6 top-level nav entries
+            // above — each one navigates straight to its own sub-screen, same as tapping that
+            // sub-screen's own nav row would, just skipping the trip through its own list first.
+            // Only ever shown while actually searching: unlike the nav entries above, these aren't
+            // a real navigation surface on their own (no menu ever lists them directly), so there's
+            // nothing sensible to show here once the query's cleared.
+            if (isSearching && filteredSubpageResults.isNotEmpty()) {
+                ExpressiveSettingsList(
+                    items = filteredSubpageResults.map { entry ->
+                        SettingsItemSpec(entry.route.icon(), entry.title, "In ${entry.route.displayName()}", SettingsItemColor.SURFACE_HIGH) {
+                            onNavigate(entry.route, entry.title)
+                        }
+                    },
+                )
+            }
 
             if (!isSearching) {
+                QuickAppUpdateSection()
                 QuickEngineUpdateSection()
             }
 
@@ -357,13 +494,69 @@ private fun SettingsListRow(
     }
 }
 
+// Carries a sub-screen's "scroll to and flash this row" request down to whichever row actually
+// matches it, without every row composable needing an explicit parameter threaded all the way
+// down from its own screen's top — SettingsSection/IconToggleRow/ThemeToggleRow (AppearanceScreen)
+// all just read this directly via highlightRowModifier() below. Not `private`: AppearanceScreen.kt
+// (a separate file, same package) needs it too, and Kotlin's own same-package visibility means no
+// import is needed either way.
+class HighlightController(val targetKey: String?, val scrollState: ScrollState) {
+    // Set once by the sub-screen's own root Column right after it's laid out — every row's own
+    // target-scroll math below is relative to *this*, not the row's raw on-screen position, so it
+    // stays correct regardless of how deep the row is nested (inside a SettingsSection's own Card,
+    // itself inside the scrolling Column).
+    var containerWindowY = 0f
+}
+
+val LocalHighlightState = compositionLocalOf<HighlightController?> { null }
+
+/** Applied to a settings row's own outer Modifier — a no-op Modifier unless this row is the
+ * ambient [LocalHighlightState]'s current target, in which case it scrolls the sub-screen's own
+ * ScrollState to bring this row on-screen and flashes a brief background tint behind it. [title]
+ * is matched with startsWith (not equals) since a couple of real row titles carry a dynamic suffix
+ * the search index's own copy of that title can't predict (e.g. "Saved cookies (3)" for a target
+ * key of "Saved cookies") — every actual title in SUBPAGE_SEARCH_INDEX is still specific enough
+ * that this doesn't risk matching the wrong row. */
+@Composable
+fun highlightRowModifier(title: String): Modifier {
+    val highlight = LocalHighlightState.current
+    val targetKey = highlight?.targetKey
+    if (highlight == null || targetKey == null || !title.startsWith(targetKey, ignoreCase = true)) return Modifier
+
+    var rowWindowY by remember(highlight) { mutableStateOf<Float?>(null) }
+    val flash = remember(highlight) { Animatable(0f) }
+
+    LaunchedEffect(rowWindowY) {
+        val y = rowWindowY ?: return@LaunchedEffect
+        // A beat for the sub-screen's own enter transition (slide-in from Settings root) to finish
+        // before scrolling — animating scroll position mid-transition read as a jarring double
+        // motion when tested without this.
+        delay(300)
+        val target = (highlight.scrollState.value + (y - highlight.containerWindowY)).roundToInt().coerceAtLeast(0)
+        highlight.scrollState.animateScrollTo(target)
+        flash.animateTo(1f, tween(150))
+        delay(450)
+        flash.animateTo(0f, tween(600))
+    }
+
+    return Modifier
+        .onGloballyPositioned { if (rowWindowY == null) rowWindowY = it.positionInWindow().y }
+        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = flash.value * 0.6f), RoundedCornerShape(14.dp))
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsSubScaffold(
     title: String,
     onBack: () -> Unit,
+    // Non-null only when this screen was opened from a Settings-search result (see
+    // SettingsRootScreen's subpage results list) — see HighlightController's own doc comment for
+    // how a row actually consumes this.
+    highlightKey: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val scrollState = rememberScrollState()
+    val highlight = remember(highlightKey) { HighlightController(highlightKey, scrollState) }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -398,11 +591,12 @@ private fun SettingsSubScaffold(
             )
         }
     ) { paddingValues ->
+        CompositionLocalProvider(LocalHighlightState provides highlight) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding())
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 // Extra bottom inset beyond the normal 20dp: the floating nav bar overlays the
                 // bottom of the screen without reserving space, so without this the last section
                 // (e.g. Schedule's Start/End time buttons) scrolls to right underneath it and is
@@ -410,15 +604,17 @@ private fun SettingsSubScaffold(
                 // the real system nav bar inset on devices where it's taller than this app's own
                 // pill assumed — see its own doc comment (MainScreen.kt) for the full story. Used
                 // by every settings sub-page through this one shared scaffold.
-                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + navBarClearance()),
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + navBarClearance())
+                .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
             verticalArrangement = Arrangement.spacedBy(24.dp),
             content = content,
         )
+        }
     }
 }
 
 @Composable
-private fun DownloadsSettingsScreen(onBack: () -> Unit) {
+private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
@@ -480,7 +676,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
         ActivityResultContracts.StartActivityForResult()
     ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }
 
-    SettingsSubScaffold(title = "Downloads", onBack = onBack) {
+    SettingsSubScaffold(title = "Downloads", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Sharing", icon = FeatherIcons.Share2) {
             IconToggleRow(
                 icon = FeatherIcons.Zap,
@@ -1108,7 +1304,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit) {
  * matching YTDLnis's own Folders/Downloads/Processing split (see gallery-dl.md's "Break up the
  * Downloads settings page" entry) instead of one screen covering everything. */
 @Composable
-private fun FoldersSettingsScreen(onBack: () -> Unit) {
+private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
@@ -1160,7 +1356,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    SettingsSubScaffold(title = "Folders", onBack = onBack) {
+    SettingsSubScaffold(title = "Folders", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Filename format", icon = FeatherIcons.Type) {
             Text(
                 "Filename format applied to every downloaded file.",
@@ -1359,7 +1555,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit) {
 /** Quality/format and embed-into-the-file choices — the other half of what used to be one long
  * "Downloads" page, split out to match YTDLnis's own Processing screen. */
 @Composable
-private fun ProcessingSettingsScreen(onBack: () -> Unit) {
+private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var videoQuality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
     var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
@@ -1374,7 +1570,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit) {
     var saveSubtitleFiles by remember { mutableStateOf(GalleryDlPreferences.isSaveSubtitleFiles(context)) }
     var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
 
-    SettingsSubScaffold(title = "Processing", onBack = onBack) {
+    SettingsSubScaffold(title = "Processing", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Video downloads", icon = FeatherIcons.Film) {
             Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
@@ -1698,7 +1894,7 @@ private fun TimePickerButton(
 }
 
 @Composable
-private fun AdvancedSettingsScreen(onBack: () -> Unit) {
+private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     var extraArgs by remember { mutableStateOf(GalleryDlPreferences.getExtraArgs(context)) }
@@ -1713,7 +1909,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
     var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
     var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
 
-    SettingsSubScaffold(title = "Advanced", onBack = onBack) {
+    SettingsSubScaffold(title = "Advanced", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Extra arguments", icon = FeatherIcons.Terminal) {
             Text(
                 "Extra command-line arguments passed to gallery-dl on every download. For advanced users.",
@@ -1907,7 +2103,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun CookiesSettingsScreen(onBack: () -> Unit) {
+private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     val cookiesFile = remember { java.io.File(context.filesDir, "cookies.txt") }
@@ -1956,7 +2152,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit) {
         )
     }
 
-    SettingsSubScaffold(title = "Cookies & Login", onBack = onBack) {
+    SettingsSubScaffold(title = "Cookies & Login", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Cookies", icon = FeatherIcons.Lock) {
             Text(
                 "Sign in through the built-in browser to unlock private/age-restricted content, or paste a cookies.txt below.",
@@ -2481,13 +2677,13 @@ fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): 
 }
 
 @Composable
-private fun AboutScreen(onBack: () -> Unit) {
+private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val versionName = remember {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "—"
     }
 
-    SettingsSubScaffold(title = "About", onBack = onBack) {
+    SettingsSubScaffold(title = "About", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "App", icon = FeatherIcons.Info) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
@@ -2520,6 +2716,8 @@ private fun AboutScreen(onBack: () -> Unit) {
                 }
             }
         }
+
+        AppUpdateSection()
 
         EnginesSection()
 
@@ -2560,6 +2758,168 @@ private fun AboutScreen(onBack: () -> Unit) {
                 icon = FeatherIcons.Zap,
                 title = "aria2 (multi-connection downloads)",
                 url = "https://aria2.github.io/",
+            )
+        }
+    }
+}
+
+/** App-itself equivalent of QuickEngineUpdateSection() just below — same "only ever appears as
+ * news, not a permanent fixture" reasoning (renders nothing once there's nothing to report), just
+ * checking AppUpdater's GitHub Releases instead of PyPI. Listed first (a whole app release is
+ * arguably bigger news than an extractor-fix engine bump) but otherwise fully independent of it —
+ * both can be visible at once if both happen to have something new. */
+@Composable
+private fun QuickAppUpdateSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<AppUpdater.UpdateStatus?>(null) }
+    var downloading by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val result = AppUpdater.check(context)
+        status = result
+        GalleryDlPreferences.setAppUpdateAvailable(context, result.updateAvailable)
+        GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
+        AppUpdateSignal.hasUpdate = result.updateAvailable
+    }
+
+    val current = status
+    if (current == null || !current.updateAvailable) return
+
+    SettingsSection(title = "App update available", icon = FeatherIcons.Download) {
+        AppUpdateRow(
+            status = current,
+            downloading = downloading,
+            onUpdate = {
+                val url = current.downloadUrl ?: return@AppUpdateRow
+                downloading = true
+                errorText = null
+                scope.launch {
+                    val result = AppUpdater.downloadApk(context, url)
+                    downloading = false
+                    result.onSuccess { apk ->
+                        if (AppUpdater.canInstall(context)) {
+                            AppUpdater.installApk(context, apk)
+                        } else {
+                            errorText = "Allow installing from this app in the settings screen that just opened, then tap Update again."
+                            AppUpdater.requestInstallPermission(context)
+                        }
+                    }
+                    result.onFailure { e -> errorText = "Couldn't download update: ${e.message ?: "unknown error"}" }
+                }
+            },
+        )
+        if (errorText != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+/** Persistent panel for About > this app's own update check — mirrors EnginesSection() below (a
+ * persistent "Checking…"/"Up to date" utility panel, unlike QuickAppUpdateSection above which only
+ * ever shows up as news) but for one thing, not a list. Always does its own fresh check regardless
+ * of the cached flag/interval MainScreen's periodic one respects, same as EnginesSection. */
+@Composable
+private fun AppUpdateSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<AppUpdater.UpdateStatus?>(null) }
+    var checking by remember { mutableStateOf(false) }
+    var downloading by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    fun runCheck() {
+        checking = true
+        errorText = null
+        scope.launch {
+            val result = AppUpdater.check(context)
+            status = result
+            checking = false
+            GalleryDlPreferences.setAppUpdateAvailable(context, result.updateAvailable)
+            GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
+            AppUpdateSignal.hasUpdate = result.updateAvailable
+        }
+    }
+
+    LaunchedEffect(Unit) { runCheck() }
+
+    SettingsSection(title = "App Update", icon = FeatherIcons.Download) {
+        val current = status
+        if (current == null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("Checking for updates…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            AppUpdateRow(
+                status = current,
+                downloading = downloading,
+                onUpdate = {
+                    val url = current.downloadUrl ?: return@AppUpdateRow
+                    downloading = true
+                    errorText = null
+                    scope.launch {
+                        val result = AppUpdater.downloadApk(context, url)
+                        downloading = false
+                        result.onSuccess { apk ->
+                            if (AppUpdater.canInstall(context)) {
+                                AppUpdater.installApk(context, apk)
+                            } else {
+                                errorText = "Allow installing from this app in the settings screen that just opened, then tap Update again."
+                                AppUpdater.requestInstallPermission(context)
+                            }
+                        }
+                        result.onFailure { e -> errorText = "Couldn't download update: ${e.message ?: "unknown error"}" }
+                    }
+                },
+            )
+        }
+        if (errorText != null) {
+            Spacer(Modifier.height(10.dp))
+            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        Spacer(Modifier.height(14.dp))
+        OutlinedButton(onClick = { runCheck() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
+            if (checking) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(FeatherIcons.RefreshCw, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Check for updates")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloading: Boolean, onUpdate: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Comfort", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "v${status.installedVersion}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        when {
+            downloading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            status.updateAvailable -> Button(
+                onClick = onUpdate,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            ) { Text("Update to v${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
+            status.latestVersion != null -> Text(
+                "Up to date",
+                style = MaterialTheme.typography.labelMedium,
+                color = SuccessGreen40,
+            )
+            else -> Text(
+                "Couldn't check",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -2811,7 +3171,7 @@ private fun SettingsSection(title: String, icon: ImageVector? = null, content: @
         }
         Spacer(Modifier.height(10.dp))
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
@@ -2832,7 +3192,7 @@ private fun IconToggleRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)).padding(4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

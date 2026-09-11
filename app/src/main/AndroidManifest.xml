@@ -19,6 +19,12 @@
          can exhaust the expedited-job quota and the resulting plain background job gets silently
          held indefinitely by Battery Saver once the app is backgrounded. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Lets this app launch Android's own package installer on a freshly downloaded update APK
+         (AppUpdater.installApk) — this app isn't Play-distributed, so an in-app update check needs
+         this the same way any sideloaded APK's own self-update flow does. Doesn't itself grant the
+         install; the user still confirms per-app in Settings (AppUpdater.canInstall/
+         requestInstallPermission), same two-step shape as the battery-optimization exemption above. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:extractNativeLibs="true"
@@ -107,6 +113,20 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- Hands a downloaded update APK (AppUpdater, cacheDir/app_update.apk) to the system
+             installer as a content:// Uri instead of a file:// one — required since Android 7
+             (FileUriExposedException otherwise) for any file this app's own process hands to
+             another app/activity, not specific to APKs. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
