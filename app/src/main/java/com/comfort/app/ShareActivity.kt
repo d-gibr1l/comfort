@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,6 +79,34 @@ private const val SHEET_ANIM_MS = 280
  * Compose internals. (Note: `adb shell screencap` renders this whole effect as solid black even
  * when it's genuinely working — verify visually on-device, not from an adb screenshot.) */
 class ShareActivity : ComponentActivity() {
+    // Own mutableStateOf, not a local val inside onCreate — onNewIntent (see its own override
+    // below, and the manifest's launchMode="singleTask" that makes it actually fire) needs a way
+    // to feed a fresh share into this same already-running instance so its Compose tree reacts to
+    // it, rather than the new Intent just sitting unread against whatever was parsed the first
+    // time onCreate ran.
+    private var sharedUrls by mutableStateOf<List<String>>(emptyList())
+
+    /** while(find()), not a single if — used to stop at the first match, so sharing a block of
+     * text with two separate links (e.g. a text message with two TikTok URLs) silently discarded
+     * the second one. Every match is collected the same way, in the order they appear in the
+     * text. Shared by onCreate and onNewIntent (below) — a second share arriving while this
+     * Activity is already open needs the exact same parse, not a copy that's quietly drifted. */
+    private fun parseUrls(intent: Intent): List<String> {
+        val sharedText = when {
+            intent.action == Intent.ACTION_SEND && intent.type == "text/plain" -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            // Direct link taps (twitter.com, instagram.com, pixiv.net — see the manifest's
+            // ACTION_VIEW intent-filter) arrive with the URL as the intent's data, not an extra.
+            intent.action == Intent.ACTION_VIEW -> intent.dataString
+            else -> null
+        }
+        val urls = mutableListOf<String>()
+        if (sharedText != null) {
+            val matcher = Patterns.WEB_URL.matcher(sharedText)
+            while (matcher.find()) urls.add(sharedText.substring(matcher.start(), matcher.end()))
+        }
+        return urls
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Without this the window still defaults to decorFitsSystemWindows=true, meaning the
         // system reserves its own space for the nav bar regardless of this Activity's transparent
@@ -94,24 +123,8 @@ class ShareActivity : ComponentActivity() {
 
         com.comfort.app.util.AppImageLoader.install(applicationContext)
 
-        val sharedText = when {
-            intent.action == Intent.ACTION_SEND && intent.type == "text/plain" -> intent.getStringExtra(Intent.EXTRA_TEXT)
-            // Direct link taps (twitter.com, instagram.com, pixiv.net — see the manifest's
-            // ACTION_VIEW intent-filter) arrive with the URL as the intent's data, not an extra.
-            intent.action == Intent.ACTION_VIEW -> intent.dataString
-            else -> null
-        }
-        // while(find()), not a single if — used to stop at the first match, so sharing a block of
-        // text with two separate links (e.g. a text message with two TikTok URLs) silently
-        // discarded the second one. Every match is collected the same way, in the order they
-        // appear in the text.
-        val urls = mutableListOf<String>()
-        if (sharedText != null) {
-            val matcher = Patterns.WEB_URL.matcher(sharedText)
-            while (matcher.find()) urls.add(sharedText.substring(matcher.start(), matcher.end()))
-        }
-
-        if (urls.isEmpty()) {
+        sharedUrls = parseUrls(intent)
+        if (sharedUrls.isEmpty()) {
             finish()
             return
         }
@@ -145,25 +158,60 @@ class ShareActivity : ComponentActivity() {
                 // the bottom, so this is the one place a Snackbar can sit without the two fighting
                 // for the same screen region.
                 val snackbarHostState = remember { SnackbarHostState() }
+                val urls = sharedUrls
                 Box(Modifier.fillMaxSize()) {
-                    when {
-                        // Multiple links: the picker/preview sheets below are built around
-                        // reviewing/filtering exactly one link's own gallery, and stacking one per
-                        // link would be terrible UX — so this bypasses them (and the "Instant
-                        // download" preference, which only ever gated whether *one* link's sheet
-                        // appears) and just enqueues every link found.
-                        urls.size > 1 -> MultiLinkHandler(urls = urls, onFinished = { finish() })
-                        GalleryDlPreferences.isInstantShareEnabled(context) -> InstantShareHandler(
-                            url = urls[0],
-                            snackbarHostState = snackbarHostState,
-                            onFinished = { finish() },
-                        )
-                        else -> ShareRouter(url = urls[0], snackbarHostState = snackbarHostState, onFinished = { finish() })
+                    // Keyed on the current share itself — a second share landing on this same
+                    // singleTask instance (see onNewIntent below) should start completely fresh,
+                    // not resume whatever ShareRouter's own remembered listing state (or
+                    // MultiLinkHandler/InstantShareHandler's own in-flight work) happened to be
+                    // mid-way through for the *previous* share when this Activity was reused
+                    // instead of recreated.
+                    key(urls) {
+                        when {
+                            // Multiple links: the picker/preview sheets below are built around
+                            // reviewing/filtering exactly one link's own gallery, and stacking one
+                            // per link would be terrible UX — so this bypasses them (and the
+                            // "Instant download" preference, which only ever gated whether *one*
+                            // link's sheet appears) and just enqueues every link found.
+                            urls.size > 1 -> MultiLinkHandler(urls = urls, onFinished = { finish() })
+                            GalleryDlPreferences.isInstantShareEnabled(context) -> InstantShareHandler(
+                                url = urls[0],
+                                snackbarHostState = snackbarHostState,
+                                onFinished = { finish() },
+                            )
+                            else -> ShareRouter(url = urls[0], snackbarHostState = snackbarHostState, onFinished = { finish() })
+                        }
                     }
                     SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp))
                 }
             }
         }
+    }
+
+    /** Fires because the manifest declares this Activity launchMode="singleTask" — without both
+     * of those, a second share while this Activity is already open (or hasn't finished yet)
+     * always creates a brand new instance instead of reusing this one, so this override would
+     * simply never run. Reproduced live without it (well, without singleTask — this override
+     * didn't exist yet to matter): a run of Library > Duplicates confirmation-sheet testing left
+     * an instance of this Activity open and never dismissed, its own translucent/dimmed window
+     * quietly compositing on top of whatever the user did next in a *completely different app*
+     * (Instagram, then even a different Android user profile/Secure Folder) until the process was
+     * force-stopped — a real, visible bug, not just a theoretical one. singleTask makes that class
+     * of stray instance impossible in the first place (there's only ever one), and this override
+     * is what makes a *repeat* share actually go somewhere instead of silently doing nothing once
+     * that one instance already exists: parses the new Intent the exact same way onCreate did for
+     * the first one, and feeds it into the same already-composed Compose tree via [sharedUrls] —
+     * see its own key(urls) wrapper further up for why that safely starts fresh rather than
+     * resuming whatever the *previous* share's own screen was mid-way through. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val urls = parseUrls(intent)
+        if (urls.isEmpty()) {
+            finish()
+            return
+        }
+        sharedUrls = urls
     }
 }
 
