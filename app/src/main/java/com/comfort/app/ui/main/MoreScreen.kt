@@ -2102,6 +2102,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -2133,6 +2134,16 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         mutableStateOf(runCatching { cookiesFile.takeIf { it.exists() }?.readText() }.getOrNull().orEmpty())
     }
     val parsedCookies = remember(savedCookiesContent) { parseCookiesFile(savedCookiesContent) }
+    // Hoisted here (not local to the "Saved cookies" SettingsSection below, where this used to
+    // live) since the confirm-delete sheet further down — a sibling of the SettingsSubScaffold call
+    // this whole screen is built from, not nested inside it — needs it too, to describe what a
+    // "Clear all" is about to remove.
+    val cookieSites = remember(parsedCookies) { groupCookiesBySite(parsedCookies) }
+    // Non-null while the confirm-delete sheet is up — both delete paths below (a single site's
+    // Trash2 button, and the "Clear all" button) now go through this instead of calling persist()
+    // straight from their own onClick, so neither can wipe a saved login from one stray tap with no
+    // way back.
+    var pendingDelete by remember { mutableStateOf<PendingCookieDelete?>(null) }
 
     fun persist(content: String) {
         sharedPreferences.edit().putString(GalleryDlPreferences.KEY_COOKIES, content).apply()
@@ -2293,8 +2304,8 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         // shows as one row regardless of how many individual cookies back that session, same for
         // Reddit, etc. — with a per-site delete that removes that whole group's cookies at once.
         // Still sourced from the real cookies.txt (see savedCookiesContent's own comment), so it
-        // always reflects exactly what a download would actually send.
-        val cookieSites = remember(parsedCookies) { groupCookiesBySite(parsedCookies) }
+        // always reflects exactly what a download would actually send. (cookieSites itself is
+        // declared up with parsedCookies, not here — see that declaration's own comment for why.)
         SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = FeatherIcons.List) {
             if (cookieSites.isEmpty()) {
                 Text(
@@ -2333,18 +2344,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         }) {
                             Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
                         }
-                        IconButton(onClick = {
-                            val toRemove = site.cookies.toSet()
-                            // Same header requirement as the Save button's own merge logic above —
-                            // parseCookiesFile() strips comment/header lines when parsing, so
-                            // rebuilding purely from the surviving cookies' rawLine values needs the
-                            // "# Netscape HTTP Cookie File" header added back explicitly, or the
-                            // result fails gallery-dl/yt-dlp's strict format check the same way.
-                            val remaining = parsedCookies.filter { it !in toRemove }
-                            val updated = (listOf("# Netscape HTTP Cookie File") + remaining.map { it.rawLine })
-                                .joinToString("\n")
-                            persist(updated)
-                        }) {
+                        IconButton(onClick = { pendingDelete = PendingCookieDelete.Site(site) }) {
                             Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
                     }
@@ -2368,7 +2368,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         Text("Copy all")
                     }
                     OutlinedButton(
-                        onClick = { persist("") },
+                        onClick = { pendingDelete = PendingCookieDelete.All },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -2378,6 +2378,88 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         Text("Clear all")
                     }
                 }
+            }
+        }
+    }
+
+    pendingDelete?.let { pending ->
+        val (title, message) = when (pending) {
+            is PendingCookieDelete.Site -> "Remove ${pending.site.label}?" to
+                "This deletes ${pending.site.cookies.size} saved cookie${if (pending.site.cookies.size == 1) "" else "s"} for ${pending.site.label}. You'll need to sign in there again next time."
+            PendingCookieDelete.All -> "Clear all cookies?" to
+                "This deletes all ${parsedCookies.size} saved cookie${if (parsedCookies.size == 1) "" else "s"} across ${cookieSites.size} site${if (cookieSites.size == 1) "" else "s"}. You'll need to sign in again everywhere."
+        }
+        ConfirmDeleteSheet(
+            title = title,
+            message = message,
+            confirmLabel = "Delete",
+            onConfirm = {
+                when (pending) {
+                    is PendingCookieDelete.Site -> {
+                        val toRemove = pending.site.cookies.toSet()
+                        // Same header requirement as the Save button's own merge logic above —
+                        // parseCookiesFile() strips comment/header lines when parsing, so
+                        // rebuilding purely from the surviving cookies' rawLine values needs the
+                        // "# Netscape HTTP Cookie File" header added back explicitly, or the
+                        // result fails gallery-dl/yt-dlp's strict format check the same way.
+                        val remaining = parsedCookies.filter { it !in toRemove }
+                        val updated = (listOf("# Netscape HTTP Cookie File") + remaining.map { it.rawLine })
+                            .joinToString("\n")
+                        persist(updated)
+                    }
+                    PendingCookieDelete.All -> persist("")
+                }
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null },
+        )
+    }
+}
+
+// Which delete action the confirm sheet is confirming — a single site's cookies (the per-row
+// Trash2 button) or every saved cookie at once (the "Clear all" button). Both otherwise silently
+// discarded a real signed-in session with no way back before this existed.
+private sealed class PendingCookieDelete {
+    data class Site(val site: SiteCookies) : PendingCookieDelete()
+    data object All : PendingCookieDelete()
+}
+
+/** Real ModalBottomSheet (not an AlertDialog) so this matches the rest of the app's own sheet-first
+ * interaction language (DownloadPreviewSheet, the size-limit picker above, ...) instead of
+ * introducing the one dialog-shaped confirmation in an app that otherwise never uses one. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConfirmDeleteSheet(title: String, message: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    FeatherIcons.AlertTriangle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(22.dp).padding(top = 2.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) { Text("Cancel") }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) { Text(confirmLabel) }
             }
         }
     }
