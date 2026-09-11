@@ -51,6 +51,7 @@ import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.theme.PillShape
+import com.comfort.app.util.AppUpdater
 import com.comfort.app.util.EngineUpdater
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
@@ -77,6 +78,15 @@ private val tabs = listOf(
  * update — sets this directly, so the badge (which just reads it, no LaunchedEffect polling needed)
  * updates the instant any of them do, same-session, regardless of which screen did it. */
 object EngineUpdateSignal {
+    var hasUpdate by mutableStateOf(false)
+}
+
+/** Same shape as [EngineUpdateSignal], for AppUpdater's own GitHub Releases check on the app
+ * itself instead of PyPI on yt-dlp/gallery-dl — kept as a separate signal (not folded into the one
+ * above) since About > App Update and About > Engines are separate sections a user acts on
+ * independently; the nav-bar dot itself still just ORs the two together (see FloatingNavBar's call
+ * site) since it means "something in Settings needs attention," not specifically which. */
+object AppUpdateSignal {
     var hasUpdate by mutableStateOf(false)
 }
 
@@ -118,6 +128,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
     // and back to the Settings tab — see MoreScreen's own doc comment for why a local remember
     // there wasn't enough.
     var settingsRoute by remember { mutableStateOf(SettingsRoute.ROOT) }
+    // Set alongside settingsRoute only when navigating in from a Settings-search result (see
+    // SettingsRootScreen's subpage results list) — tells that sub-screen which one row to scroll
+    // to and flash. Hoisted for the same reason settingsRoute is: MoreScreen itself is torn down
+    // and rebuilt on every Settings-tab revisit, so anything that needs to survive that has to live
+    // up here instead.
+    var settingsHighlightKey by remember { mutableStateOf<String?>(null) }
     // Same RUNNING+QUEUED count already shown inside the Library screen's own queue-icon badge
     // (DownloadsHistoryScreen) — kept consistent with that existing definition of "active" rather
     // than introducing a second, differently-scoped count just for this badge.
@@ -158,6 +174,20 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
         EngineUpdateSignal.hasUpdate = available
         GalleryDlPreferences.setEngineUpdateAvailable(context, available)
         GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+    }
+
+    // Same rate-limited-auto-check shape as the engine one just above, for AppUpdater's own GitHub
+    // Releases check instead — a separate LaunchedEffect (not folded into that one) since it's a
+    // fully independent check against a different service on its own interval
+    // (APP_UPDATE_CHECK_INTERVAL_MS), not a step of the engine-update flow.
+    LaunchedEffect(Unit) {
+        AppUpdateSignal.hasUpdate = GalleryDlPreferences.isAppUpdateAvailable(context)
+        val lastCheck = GalleryDlPreferences.getAppUpdateLastCheckMs(context)
+        if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.APP_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
+        val status = AppUpdater.check(context)
+        AppUpdateSignal.hasUpdate = status.updateAvailable
+        GalleryDlPreferences.setAppUpdateAvailable(context, status.updateAvailable)
+        GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
     }
 
     // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
@@ -201,14 +231,18 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
                     onOpenQueue = { showQueueScreen = true },
                     isQueueOpen = showQueueScreen,
                 )
-                2 -> MoreScreen(route = settingsRoute, onNavigate = { settingsRoute = it })
+                2 -> MoreScreen(
+                    route = settingsRoute,
+                    highlightKey = settingsHighlightKey,
+                    onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
+                )
             }
         }
 
         FloatingNavBar(
             selectedTab = selectedTab,
             activeDownloadsCount = activeDownloadsCount,
-            hasEngineUpdate = EngineUpdateSignal.hasUpdate,
+            hasEngineUpdate = EngineUpdateSignal.hasUpdate || AppUpdateSignal.hasUpdate,
             onSelect = { index ->
                 // Tapping the already-selected Library tab again jumps to the Queue, matching
                 // the "tap again for more" pattern used elsewhere in the app.

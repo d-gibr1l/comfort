@@ -20,8 +20,8 @@ object QuickJsRuntime {
     private const val BINARY_NAME = "libqjs.so"
 
     /** Path to the qjs executable, or null if it wasn't bundled for this device's ABI (shouldn't
-     * happen for arm64-v8a/x86_64, the app's declared ABIs, but a missing runtime should degrade
-     * to yt-dlp's own reduced-functionality fallback, not crash). */
+     * happen for arm64-v8a/armeabi-v7a/x86_64, the app's declared ABIs, but a missing runtime
+     * should degrade to yt-dlp's own reduced-functionality fallback, not crash). */
     fun getExecutablePath(context: Context): String? {
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY_NAME)
         return binary.takeIf { it.exists() }?.absolutePath

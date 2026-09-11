@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes only context.cacheDir (where AppUpdater.downloadApk writes app_update.apk) through
+     the FileProvider declared in AndroidManifest.xml — nothing else in the app's storage is
+     reachable through it. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="app_update" path="." />
+</paths>

@@ -64,6 +64,8 @@ object GalleryDlPreferences {
     const val KEY_LIVE_FROM_START = "live_from_start"
     const val KEY_ENGINE_UPDATE_LAST_CHECK_MS = "engine_update_last_check_ms"
     const val KEY_ENGINE_UPDATE_AVAILABLE = "engine_update_available"
+    const val KEY_APP_UPDATE_LAST_CHECK_MS = "app_update_last_check_ms"
+    const val KEY_APP_UPDATE_AVAILABLE = "app_update_available"
     const val KEY_OUTPUT_FORMAT = "output_format"
     const val KEY_NETWORK_RETRIES = "network_retries"
     const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
@@ -121,6 +123,10 @@ object GalleryDlPreferences {
     // short span doesn't spam it. 6h is frequent enough to catch a same-day extractor fix without
     // being effectively "every launch" for typical usage.
     const val ENGINE_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
+    // Same idea as ENGINE_UPDATE_CHECK_INTERVAL_MS above, just longer — an app release (a whole new
+    // APK to build/sign/publish) happens far less often than an extractor fix, so checking GitHub
+    // Releases this rarely on launch is already generous, not a compromise.
+    const val APP_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
     // The naive "{uploader} - {title} - {id}" pattern collapses to the literal string
     // "None - None - None" on sources that don't expose that metadata, which makes every item
     // in the gallery resolve to the same filename — only the first survives, the rest are
@@ -504,6 +510,20 @@ object GalleryDlPreferences {
 
     fun setEngineUpdateAvailable(context: Context, available: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENGINE_UPDATE_AVAILABLE, available).apply()
+    }
+
+    // Same "cached flag + rate-limited re-check" shape as the engine-update pair above, just for
+    // AppUpdater's own GitHub Releases check instead of PyPI.
+    fun getAppUpdateLastCheckMs(context: Context): Long = prefs(context).getLong(KEY_APP_UPDATE_LAST_CHECK_MS, 0L)
+
+    fun setAppUpdateLastCheckMs(context: Context, ms: Long) {
+        prefs(context).edit().putLong(KEY_APP_UPDATE_LAST_CHECK_MS, ms).apply()
+    }
+
+    fun isAppUpdateAvailable(context: Context): Boolean = prefs(context).getBoolean(KEY_APP_UPDATE_AVAILABLE, false)
+
+    fun setAppUpdateAvailable(context: Context, available: Boolean) {
+        prefs(context).edit().putBoolean(KEY_APP_UPDATE_AVAILABLE, available).apply()
     }
 
     /** Only affects a merged video (audio+video muxed via ffmpeg) — a single already-muxed format
