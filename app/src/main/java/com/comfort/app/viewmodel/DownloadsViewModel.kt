@@ -101,6 +101,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         outputFormat: OutputFormat? = null,
         filenameTemplate: String? = null,
         saveThumbnail: Boolean? = null,
+        // Pass true from a caller whose own "Download" button already checked
+        // DownloadDispatcher.isDuplicate and relabeled itself "Redownload" (DownloadPreviewSheet
+        // does this internally) — the button already told the user, so tapping it is the
+        // confirmation; nothing here should silently no-op a tap that says "Redownload" on its face.
+        forceDuplicate: Boolean = false,
     ) {
         viewModelScope.launch {
             DownloadDispatcher.enqueueDownload(
@@ -111,6 +116,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 outputFormat = outputFormat,
                 filenameTemplate = filenameTemplate,
                 saveThumbnail = saveThumbnail,
+                forceDuplicate = forceDuplicate,
             )
         }
     }

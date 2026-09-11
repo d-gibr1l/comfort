@@ -32,10 +32,6 @@ import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -151,13 +147,6 @@ class ShareActivity : ComponentActivity() {
             val pureBlack = remember { ThemePreferences.isPureBlack(context) }
 
             GalleryDLTheme(themeMode = themeMode, lightTheme = lightTheme, darkTheme = darkTheme, pureBlack = pureBlack) {
-                // Shared by every path below so a duplicate detected *anywhere* — instant share, a
-                // bare "Download now," the preview sheet, or a picked item — surfaces through the
-                // same "Already downloaded — Redownload" Snackbar instead of each path needing its
-                // own. Docked at the top: every one of this Activity's own sheets slides up from
-                // the bottom, so this is the one place a Snackbar can sit without the two fighting
-                // for the same screen region.
-                val snackbarHostState = remember { SnackbarHostState() }
                 val urls = sharedUrls
                 Box(Modifier.fillMaxSize()) {
                     // Keyed on the current share itself — a second share landing on this same
@@ -176,13 +165,11 @@ class ShareActivity : ComponentActivity() {
                             urls.size > 1 -> MultiLinkHandler(urls = urls, onFinished = { finish() })
                             GalleryDlPreferences.isInstantShareEnabled(context) -> InstantShareHandler(
                                 url = urls[0],
-                                snackbarHostState = snackbarHostState,
                                 onFinished = { finish() },
                             )
-                            else -> ShareRouter(url = urls[0], snackbarHostState = snackbarHostState, onFinished = { finish() })
+                            else -> ShareRouter(url = urls[0], onFinished = { finish() })
                         }
                     }
-                    SnackbarHost(snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp))
                 }
             }
         }
@@ -240,14 +227,23 @@ private fun MultiLinkHandler(urls: List<String>, onFinished: () -> Unit) {
     }
 }
 
-/** No sheet, no frame ever drawn for the common case — enqueues in the background and closes
- * immediately, same as before this existed. Only a genuine duplicate keeps the (fully transparent,
- * dimmed) window open long enough to show the Snackbar and its "Redownload" action. */
+/** No sheet, no frame ever drawn — enqueues in the background and closes immediately, always,
+ * duplicate or not. Instant Share's whole premise is "no interaction at all," so unlike the
+ * screens below (which have a real Download button that can just say "Redownload" up front) a
+ * duplicate here has nowhere to surface a choice to — it silently folds into
+ * DownloadDispatcher.enqueueDownload's own skip-and-record (see EnqueueResult.Duplicate; Library
+ * > Duplicates is the audit trail), same as MultiLinkHandler already does for several links at
+ * once. */
 @Composable
-private fun InstantShareHandler(url: String, snackbarHostState: SnackbarHostState, onFinished: () -> Unit) {
+private fun InstantShareHandler(url: String, onFinished: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(url) {
-        enqueueAndHandleDuplicate(context, snackbarHostState, url, "Downloading from ${VideoSiteRouter.siteName(url)}")
+        val result = DownloadDispatcher.enqueueDownload(context, url, "Downloading from ${VideoSiteRouter.siteName(url)}")
+        Toast.makeText(
+            context,
+            if (result is EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started",
+            Toast.LENGTH_SHORT,
+        ).show()
         onFinished()
     }
 }
@@ -260,13 +256,20 @@ private fun InstantShareHandler(url: String, snackbarHostState: SnackbarHostStat
  * through to the existing SharePickerScreen item-picker unchanged, fed this same already-fetched
  * result so it isn't listed a second time. */
 @Composable
-private fun ShareRouter(url: String, snackbarHostState: SnackbarHostState, onFinished: () -> Unit) {
+private fun ShareRouter(url: String, onFinished: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var listingResult by remember { mutableStateOf<ListingResult?>(null) }
+    // Checked purely off the url — unlike the listing pass below, doesn't need to wait on it, so
+    // LoadingSheet's own "Download now" button can already read "Redownload" the moment this
+    // screen opens rather than only DownloadPreviewSheet (once listing resolves) being able to.
+    var isDuplicate by remember { mutableStateOf(false) }
 
     LaunchedEffect(url) {
         listingResult = GalleryDlListing.listItems(context, url)
+    }
+    LaunchedEffect(url) {
+        isDuplicate = DownloadDispatcher.isDuplicate(context, url)
     }
 
     val result = listingResult
@@ -276,13 +279,17 @@ private fun ShareRouter(url: String, snackbarHostState: SnackbarHostState, onFin
     when {
         result == null -> LoadingSheet(
             onDismiss = onFinished,
+            isDuplicate = isDuplicate,
             // Detection (the listing pass above) can take a real few seconds on a slow/rate-
             // limited site — this lets an impatient share skip straight to a plain whole-URL
             // download instead of waiting it out, the same fire-and-forget shape Instant Share
-            // itself already uses.
+            // itself already uses. forceDuplicate unconditionally true: the button already told
+            // the user "Redownload" when isDuplicate is true, so tapping it is the confirmation —
+            // no separate Snackbar+action needed to ask again.
             onDownloadNow = {
                 scope.launch {
-                    enqueueAndHandleDuplicate(context, snackbarHostState, url, "Downloading from ${VideoSiteRouter.siteName(url)}")
+                    DownloadDispatcher.enqueueDownload(context, url, "Downloading from ${VideoSiteRouter.siteName(url)}", forceDuplicate = true)
+                    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
@@ -290,11 +297,13 @@ private fun ShareRouter(url: String, snackbarHostState: SnackbarHostState, onFin
         singleVideoItem -> DownloadPreviewSheet(
             url = url,
             onDismiss = onFinished,
+            // Same forceDuplicate = true reasoning as LoadingSheet above — DownloadPreviewSheet's
+            // own Download button already says "Redownload" when this url is a duplicate (its own
+            // independent isDuplicate check), so this is never a surprise skip-past.
             onDownload = { options ->
                 scope.launch {
-                    enqueueAndHandleDuplicate(
+                    DownloadDispatcher.enqueueDownload(
                         context = context,
-                        snackbarHostState = snackbarHostState,
                         url = url,
                         title = "Downloading from ${VideoSiteRouter.siteName(url)}",
                         videoQuality = options.quality,
@@ -303,56 +312,14 @@ private fun ShareRouter(url: String, snackbarHostState: SnackbarHostState, onFin
                         outputFormat = options.outputFormat,
                         filenameTemplate = options.filenameTemplate,
                         saveThumbnail = options.saveThumbnail,
+                        forceDuplicate = true,
                     )
+                    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
         )
-        else -> SharePickerSheet(url = url, preloadedResult = result, snackbarHostState = snackbarHostState, onFinished = onFinished)
-    }
-}
-
-/** Shared by every download-triggering action in this Activity (instant share, "Download now,"
- * the preview sheet, a picked share-sheet item) — enqueues, and if [DownloadDispatcher.
- * enqueueDownload] reports it's a duplicate (see EnqueueResult), shows a Snackbar with a
- * "Redownload" action that bypasses the check for just this one deliberate retry
- * (forceDuplicate = true) instead of silently doing nothing with no way back short of digging it
- * up in Library > Duplicates. A plain Toast covers the ordinary non-duplicate case, same as
- * before any of this existed. */
-private suspend fun enqueueAndHandleDuplicate(
-    context: android.content.Context,
-    snackbarHostState: SnackbarHostState,
-    url: String,
-    title: String,
-    itemFilter: String? = null,
-    totalItems: Int = 0,
-    videoQuality: com.comfort.app.data.VideoQuality? = null,
-    clipRange: String? = null,
-    extraCommands: String? = null,
-    outputFormat: com.comfort.app.data.OutputFormat? = null,
-    filenameTemplate: String? = null,
-    saveThumbnail: Boolean? = null,
-) {
-    val result = DownloadDispatcher.enqueueDownload(
-        context, url, title, itemFilter, totalItems, videoQuality, clipRange,
-        extraCommands, outputFormat, filenameTemplate, saveThumbnail,
-    )
-    if (result is EnqueueResult.Duplicate) {
-        val action = snackbarHostState.showSnackbar(
-            message = "Already downloaded",
-            actionLabel = "Redownload",
-            duration = SnackbarDuration.Long,
-        )
-        if (action == SnackbarResult.ActionPerformed) {
-            DownloadDispatcher.enqueueDownload(
-                context, url, title, itemFilter, totalItems, videoQuality, clipRange,
-                extraCommands, outputFormat, filenameTemplate, saveThumbnail,
-                forceDuplicate = true,
-            )
-            Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
-        }
-    } else {
-        Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+        else -> SharePickerSheet(url = url, preloadedResult = result, onFinished = onFinished)
     }
 }
 
@@ -362,7 +329,7 @@ private suspend fun enqueueAndHandleDuplicate(
  * no sheet/scrim at all, which reads as broken rather than "still loading." */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LoadingSheet(onDismiss: () -> Unit, onDownloadNow: () -> Unit) {
+private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownloadNow: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
     BackHandler { visible = false }
@@ -419,7 +386,7 @@ private fun LoadingSheet(onDismiss: () -> Unit, onDownloadNow: () -> Unit) {
                         ) {
                             Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Download")
+                            Text(if (isDuplicate) "Redownload" else "Download")
                         }
                     }
                 }
@@ -432,15 +399,14 @@ private fun LoadingSheet(onDismiss: () -> Unit, onDownloadNow: () -> Unit) {
 private fun SharePickerSheet(
     url: String,
     preloadedResult: ListingResult? = null,
-    snackbarHostState: SnackbarHostState,
     onFinished: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var visible by remember { mutableStateOf(false) }
     // Set the moment a download is actually kicked off — the exit-animation effect below awaits
-    // it before finishing the Activity, so a duplicate's Snackbar+"Redownload" still gets to show
-    // (and be interacted with) even though the sheet itself has already slid away.
+    // it before finishing the Activity, so the "Download started"/"Already downloaded" Toast still
+    // gets a moment to show even though the sheet itself has already slid away.
     var downloadJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) { visible = true }
@@ -486,12 +452,21 @@ private fun SharePickerSheet(
                     url = url,
                     onDismiss = { visible = false },
                     onDownload = { downloadUrl, itemFilter, totalItems, videoQuality ->
+                        // Not force-checked ahead of time the way DownloadPreviewSheet/LoadingSheet
+                        // are — a picked item here doesn't have its own dedicated "Download" button
+                        // this screen relabels per-item, so a duplicate just folds into the same
+                        // silent skip-and-record MultiLinkHandler already uses for several links at
+                        // once (Library > Duplicates is the audit trail either way).
                         downloadJob = scope.launch {
-                            enqueueAndHandleDuplicate(
-                                context, snackbarHostState, downloadUrl,
-                                "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}",
+                            val result = DownloadDispatcher.enqueueDownload(
+                                context, downloadUrl, "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}",
                                 itemFilter, totalItems, videoQuality,
                             )
+                            Toast.makeText(
+                                context,
+                                if (result is EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                         visible = false
                     },
