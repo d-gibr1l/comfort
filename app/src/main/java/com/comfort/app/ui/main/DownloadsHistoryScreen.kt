@@ -739,9 +739,17 @@ private fun DuplicatesList(
             SwipeToDismissBox(
                 state = dismissState,
                 backgroundContent = {
+                    // Matches the card's own Surface shape/margin below (fillMaxWidth + vertical
+                    // padding + rounded shape), not a plain edge-to-edge rectangle like HistoryRow's
+                    // own version of this same background — this card is a rounded, margin-inset
+                    // pill rather than an edge-to-edge row, so a rectangular background peeked out
+                    // at the corners and in the vertical gaps between cards even at rest, reading as
+                    // a permanent colored halo around every card instead of a swipe reveal.
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                            .clip(MaterialTheme.shapes.medium)
                             .background(MaterialTheme.colorScheme.errorContainer)
                             .padding(horizontal = 24.dp),
                         contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,

@@ -282,6 +282,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 url = pendingUrl,
                 onDismiss = { previewUrl = null },
                 onDownload = { options ->
+                    // forceDuplicate = true: DownloadPreviewSheet's own Download button already
+                    // checked DownloadDispatcher.isDuplicate and would already be reading
+                    // "Redownload" here if this url was one — see that button's own doc comment.
                     viewModel.enqueueDownload(
                         url = pendingUrl,
                         title = "Downloading from ${VideoSiteRouter.siteName(pendingUrl)}",
@@ -291,6 +294,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         outputFormat = options.outputFormat,
                         filenameTemplate = options.filenameTemplate,
                         saveThumbnail = options.saveThumbnail,
+                        forceDuplicate = true,
                     )
                     previewUrl = null
                 },

@@ -92,6 +92,20 @@ object DownloadDispatcher {
         File(context.cacheDir, "gallery-dl-staging/$id").deleteRecursively()
     }
 
+    /** True if [url] would currently be treated as a duplicate by [enqueueDownload] — "Prevent
+     * duplicate downloads" is on AND a matching active/finished download already exists. Screens
+     * that show a real "Download" button before actually enqueuing (DownloadPreviewSheet,
+     * ShareActivity's LoadingSheet) call this ahead of time to relabel it "Redownload" instead of
+     * enqueuing first and finding out only via EnqueueResult.Duplicate afterward — replaces the
+     * old flow where a duplicate was only discovered post-hoc, surfaced through a Snackbar with
+     * its own separate "Redownload" action to confirm. Once the button itself already says
+     * "Redownload," tapping it is the confirmation; callers pass forceDuplicate = true straight
+     * through rather than needing a second confirmation step here. */
+    suspend fun isDuplicate(context: Context, url: String): Boolean {
+        if (!GalleryDlPreferences.isPreventDuplicateDownloads(context)) return false
+        return AppDatabase.getDatabase(context).downloadDao().findActiveOrFinishedByUrl(url) != null
+    }
+
     suspend fun enqueueDownload(
         context: Context,
         url: String,

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
@@ -230,6 +231,12 @@ fun DownloadPreviewSheet(
     val previewStreamUrlsState = remember { mutableStateOf<List<String>>(emptyList()) }
     val previewDurationMsState = remember { mutableStateOf<Long?>(null) }
     var previewLoading by remember { mutableStateOf(false) }
+    // Checked once per url, independent of the listing fetch below — drives MAIN's own Download
+    // button reading "Redownload" instead, so a duplicate is known *before* the user commits to
+    // downloading rather than only surfacing afterward. Replaces the old post-hoc Snackbar+its own
+    // separate "Redownload" action; the button itself already saying "Redownload" here is the
+    // confirmation, so the caller's own onDownload now just forces straight through.
+    var isDuplicate by remember { mutableStateOf(false) }
 
     LaunchedEffect(url) {
         previewLoading = true
@@ -241,6 +248,9 @@ fun DownloadPreviewSheet(
         previewStreamUrlsState.value = info?.streamUrls ?: emptyList()
         previewDurationMsState.value = info?.durationMs
         previewLoading = false
+    }
+    LaunchedEffect(url) {
+        isDuplicate = DownloadDispatcher.isDuplicate(context, url)
     }
 
     // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
@@ -273,6 +283,7 @@ fun DownloadPreviewSheet(
         // extension overload instead and refuses to call it without an explicit receiver.
         PreviewSheetOverlayHost(
             screen = screen,
+            isDuplicate = isDuplicate,
             onScreenChange = { screen = it },
             onOpenOverlay = ::openOverlay,
             onRevertOverlay = ::revertOverlay,
@@ -321,6 +332,7 @@ fun DownloadPreviewSheet(
 @Composable
 private fun PreviewSheetOverlayHost(
     screen: PreviewScreen,
+    isDuplicate: Boolean,
     onScreenChange: (PreviewScreen) -> Unit,
     onOpenOverlay: (PreviewScreen) -> Unit,
     onRevertOverlay: () -> Unit,
@@ -363,6 +375,7 @@ private fun PreviewSheetOverlayHost(
     Box(modifier = Modifier.fillMaxWidth()) {
         MainPreviewScreen(
             url = url,
+            isDuplicate = isDuplicate,
             title = previewTitle,
             uploader = previewUploader,
             thumbnail = previewThumbnail,
@@ -632,6 +645,7 @@ private fun formatFilesize(bytes: Long): String = when {
 @Composable
 private fun MainPreviewScreen(
     url: String,
+    isDuplicate: Boolean,
     title: String?,
     uploader: String?,
     thumbnail: String?,
@@ -854,7 +868,11 @@ private fun MainPreviewScreen(
         ) {
             Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Download")
+            // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
+            // only after tapping — replaces the old flow where this always said "Download" and a
+            // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
+            // action to confirm.
+            Text(if (isDuplicate) "Redownload" else "Download")
         }
     }
 }
