@@ -368,6 +368,10 @@ fun QueueScreen(
                     icon = FeatherIcons.Inbox,
                     title = "No downloads in queue",
                     subtitle = "Paste a link on Home to start one.",
+                    // weight(1f): without it, this Column child requests the Column's full height
+                    // rather than just what's left below the filter row, so its centered content
+                    // sat well below true middle. Bottom padding excludes the floating nav pill.
+                    modifier = Modifier.weight(1f).padding(bottom = navBarClearance()),
                 )
             } else {
                 LazyColumn(

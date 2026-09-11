@@ -15,6 +15,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import android.os.Handler
 import android.os.Looper
+import com.comfort.app.MainActivity
 import com.comfort.app.R
 import com.comfort.app.ui.main.formatFileSize
 import java.util.concurrent.atomic.AtomicInteger
@@ -107,6 +108,24 @@ object DownloadNotifications {
      * cancellable, no service lifecycle involved. */
     const val FOREGROUND_SERVICE_NOTIFICATION_ID = 0x646C664B // "dlfK" — arbitrary but stable
 
+    /** Tapping either of the two "downloading right now" notifications ([progressNotification],
+     * [foregroundServiceNotification]) opens the app straight to the Download Queue, instead of
+     * just to whatever tab Home last was — that's the one place actually showing what these
+     * notifications describe. FLAG_ACTIVITY_NEW_TASK reuses MainActivity's existing singleTask
+     * instance (delivered via onNewIntent) rather than starting a second one when the app's
+     * already open. Request code shared across every call (not per-download, unlike
+     * [actionPendingIntent]) is intentional: they'd all resolve to the same destination anyway. */
+    private fun openQueuePendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_OPEN_QUEUE, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return PendingIntent.getActivity(
+            context, "open_queue".hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     private fun actionPendingIntent(context: Context, action: String, downloadId: String): PendingIntent {
         val intent = Intent(context, DownloadActionReceiver::class.java).apply {
             this.action = action
@@ -132,6 +151,7 @@ object DownloadNotifications {
             .setSmallIcon(R.drawable.ic_notif_logo)
             .setContentTitle("Downloading…")
             .setContentText("Comfort is downloading in the background")
+            .setContentIntent(openQueuePendingIntent(context))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -173,6 +193,7 @@ object DownloadNotifications {
                     else -> "Starting…"
                 }
             )
+            .setContentIntent(openQueuePendingIntent(context))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setProgress(100, progressPercent ?: 0, progressPercent == null)

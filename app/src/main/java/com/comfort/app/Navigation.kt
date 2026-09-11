@@ -11,7 +11,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.comfort.app.ui.main.MainScreen
 
 @Composable
-fun MainNavigation() {
+fun MainNavigation(openQueueSignal: Int = 0) {
   val backStack = rememberNavBackStack(Main)
 
   NavDisplay(
@@ -20,7 +20,7 @@ fun MainNavigation() {
     entryProvider =
       entryProvider {
         entry<Main> {
-          MainScreen()
+          MainScreen(openQueueSignal = openQueueSignal)
         }
       },
   )

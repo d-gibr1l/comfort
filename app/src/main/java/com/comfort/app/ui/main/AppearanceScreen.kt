@@ -109,7 +109,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
         ) {
             Text("Appearance", 
                 fontWeight = FontWeight.Bold,
-                fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.crystal_radio_kit)),
+                fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
                 fontSize = 36.sp
             )
             Spacer(Modifier.height(28.dp))

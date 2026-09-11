@@ -117,9 +117,16 @@ fun navBarClearance(): Dp = NAV_BAR_RESERVED_HEIGHT + WindowInsets.navigationBar
 
 
 @Composable
-fun MainScreen(viewModel: DownloadsViewModel = viewModel()) {
+fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
+    // A download-in-progress notification tap bumps this (MainActivity.openQueueSignal) — jump
+    // straight to Queue regardless of which tab was showing. Keyed on the signal itself (not
+    // Unit) so a second tap while already on Queue still re-triggers this instead of being a no-op
+    // LaunchedEffect restart.
+    LaunchedEffect(openQueueSignal) {
+        if (openQueueSignal > 0) showQueueScreen = true
+    }
     // Non-null while the download preview sheet is up for that URL — the Home screen's Download
     // button opens the sheet instead of enqueueing straight away, so per-download quality/format/
     // trim/commands/filename can be set before anything starts.

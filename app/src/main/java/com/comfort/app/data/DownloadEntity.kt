@@ -89,6 +89,12 @@ data class DownloadEntity(
     val outputFormat: String? = null,
     val filenameTemplate: String? = null,
     val saveThumbnail: Boolean? = null,
+    // When this download most recently entered ERRORED, not when it was added — getQueueFlow
+    // sorts errored downloads by this (newest first) so a download that just failed jumps above
+    // errors that have been sitting there a while, instead of all errors settling into plain
+    // queueOrder/dateAdded order regardless of which one actually just happened. Null for anything
+    // that has never errored.
+    val erroredAt: Long? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

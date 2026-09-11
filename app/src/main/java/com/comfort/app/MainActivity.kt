@@ -1,6 +1,7 @@
 package com.comfort.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -15,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,12 +37,38 @@ import androidx.compose.runtime.DisposableEffect
 import com.comfort.app.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
+  companion object {
+    /** Set on the Intent that opens/refocuses this Activity to jump straight to the Download
+     * Queue — used by the download-in-progress notifications (DownloadNotifications.kt) so
+     * tapping one while a download is running takes you right to it instead of just to Home. */
+    const val EXTRA_OPEN_QUEUE = "open_queue"
+  }
+
+  // A plain Compose State field (not `remember`ed — this Activity, not a composable, owns it) so
+  // onNewIntent below can bump it from outside composition and still have setContent's read of it
+  // trigger recomposition, the standard way to thread an Activity-level Intent into Compose state.
+  private val openQueueSignal = mutableIntStateOf(0)
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
+      openQueueSignal.intValue++
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Must be called before super.onCreate() — it reads the activity's theme (Theme.App.Starting,
     // set in the manifest) to know which splash to show, and installs the exit-animation hook
     // before the window's normal onCreate machinery runs.
     val splashScreen = installSplashScreen()
     super.onCreate(savedInstanceState)
+
+    // Cold start (app wasn't running) carries the extra on this initial Intent instead of
+    // reaching onNewIntent, which only fires for an already-running singleTask instance.
+    if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
+      openQueueSignal.intValue++
+    }
 
     // The androidx compat SplashScreen dismisses as soon as the first frame is drawn — for a
     // lightweight Compose screen like this one that can happen well before the 700ms staggered
@@ -144,7 +172,9 @@ class MainActivity : ComponentActivity() {
 
       CompositionLocalProvider(LocalThemeState provides themeState) {
         GalleryDLTheme(themeMode = themeMode, lightTheme = lightTheme, darkTheme = darkTheme, pureBlack = pureBlack) {
-          Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { MainNavigation() }
+          Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            MainNavigation(openQueueSignal = openQueueSignal.intValue)
+          }
         }
       }
     }
