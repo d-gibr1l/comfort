@@ -68,10 +68,16 @@ private fun isCookieRelatedError(message: String?): Boolean =
 // behind a dynamic IP (often Carrier-Grade NAT), so toggling airplane mode or power-cycling the
 // router usually gets a fresh one and clears it. Keyword-based for the same reason
 // COOKIE_ERROR_KEYWORDS is: both engines phrase this in plain English, not a structured error type.
-private val RATE_LIMIT_ERROR_KEYWORDS = listOf("429", "too many requests", "rate-limit", "rate limit", "rate limited")
+private val RATE_LIMIT_ERROR_KEYWORDS = listOf("too many requests", "rate-limit", "rate limit", "rate limited")
+
+// A plain substring check for "429" (like the phrase keywords above use) false-positives on any
+// error message that happens to contain those digits for an unrelated reason — a URL/video id, a
+// byte count, anything numeric. \b429\b requires it to stand alone as its own token instead.
+private val RATE_LIMIT_429_RE = Regex("""\b429\b""")
 
 private fun isRateLimitError(message: String?): Boolean =
-    message != null && RATE_LIMIT_ERROR_KEYWORDS.any { message.contains(it, ignoreCase = true) }
+    message != null &&
+        (RATE_LIMIT_ERROR_KEYWORDS.any { message.contains(it, ignoreCase = true) } || RATE_LIMIT_429_RE.containsMatchIn(message))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
