@@ -451,22 +451,21 @@ private fun SharePickerSheet(
                 SharePickerScreen(
                     url = url,
                     onDismiss = { visible = false },
-                    onDownload = { downloadUrl, itemFilter, totalItems, videoQuality ->
-                        // Not force-checked ahead of time the way DownloadPreviewSheet/LoadingSheet
-                        // are — a picked item here doesn't have its own dedicated "Download" button
-                        // this screen relabels per-item, so a duplicate just folds into the same
-                        // silent skip-and-record MultiLinkHandler already uses for several links at
-                        // once (Library > Duplicates is the audit trail either way).
+                    onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate ->
+                        // SharePickerScreen's own "Download N"/"Redownload N" button now checks
+                        // duplicate status against the exact (url, itemFilter) pair for the
+                        // currently-selected items itself (DownloadDao.findActiveOrFinishedByUrl
+                        // matches on both together, not url alone — a different item selection
+                        // from the same gallery post is never treated as the same download) and
+                        // relabels accordingly, so forceDuplicate here is just that same
+                        // already-shown confirmation carried through, same reasoning as
+                        // DownloadPreviewSheet/LoadingSheet's own Download buttons.
                         downloadJob = scope.launch {
-                            val result = DownloadDispatcher.enqueueDownload(
+                            DownloadDispatcher.enqueueDownload(
                                 context, downloadUrl, "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}",
-                                itemFilter, totalItems, videoQuality,
+                                itemFilter, totalItems, videoQuality, forceDuplicate = forceDuplicate,
                             )
-                            Toast.makeText(
-                                context,
-                                if (result is EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
                         }
                         visible = false
                     },

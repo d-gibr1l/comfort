@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlin.math.ceil
+import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
@@ -47,7 +48,7 @@ private enum class ListingState { LOADING, LOADED, UNAVAILABLE, ERROR }
 fun SharePickerScreen(
     url: String,
     onDismiss: () -> Unit,
-    onDownload: (url: String, itemFilter: String?, totalItems: Int, videoQuality: VideoQuality?) -> Unit,
+    onDownload: (url: String, itemFilter: String?, totalItems: Int, videoQuality: VideoQuality?, forceDuplicate: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onHeightChange: (Dp) -> Unit = {},
     // ShareActivity already runs this exact listing pass once itself, to decide whether this
@@ -74,6 +75,23 @@ fun SharePickerScreen(
     // item's thumbnail and the quality picker strip, since there's nothing to pick a quality for
     // in an all-image gallery.
     val hasVideoItems = remember(items) { items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true } }
+
+    // Mirrors the Download button's own onClick computation below exactly (null means "the whole
+    // gallery," matching what a plain shared link with no selection at all would enqueue as) —
+    // computed here too so the duplicate check and the button label agree on exactly what
+    // download this selection actually represents.
+    val itemFilter = if (selectedNums.isEmpty() || selectedNums.size == items.size) null
+        else "num in {${selectedNums.sorted().joinToString(",")}}"
+
+    // Re-checked on every selection change, not just once — DownloadDao.findActiveOrFinishedByUrl
+    // now matches on (url, itemFilter) together (see its own doc comment), so switching which
+    // items are selected can genuinely flip this: a previously-downloaded 3-item subset of a
+    // 10-item gallery is a real duplicate only while that same subset (or "whole gallery," if
+    // itemFilter is null on both sides) is what's currently selected.
+    var isDuplicate by remember { mutableStateOf(false) }
+    LaunchedEffect(url, itemFilter) {
+        isDuplicate = DownloadDispatcher.isDuplicate(context, url, itemFilter)
+    }
 
     LaunchedEffect(hasVideoItems) {
         if (hasVideoItems && selectedQuality == null) {
@@ -148,7 +166,10 @@ fun SharePickerScreen(
 
     LaunchedEffect(state) {
         if (state == ListingState.UNAVAILABLE) {
-            onDownload(url, null, 0, null)
+            // No picker ever shown for this case (listing genuinely couldn't be previewed) — same
+            // "no button, so no confirmation to already have given" reasoning as MultiLinkHandler,
+            // not forced: a duplicate here still just folds into the normal skip-and-record.
+            onDownload(url, null, 0, null, false)
         }
     }
 
@@ -198,12 +219,14 @@ fun SharePickerScreen(
                     Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         Button(
                             onClick = {
-                                val filter = if (selectedNums.size == items.size) null
-                                    else "num in {${selectedNums.sorted().joinToString(",")}}"
-                                // The --filter above (when set) restricts the download to exactly
-                                // these items, so this count is exact regardless of whether the
-                                // picker's own listing got truncated at GalleryDlListing.MAX_ITEMS.
-                                onDownload(url, filter, selectedNums.size, if (hasVideoItems) selectedQuality else null)
+                                // itemFilter (hoisted above, shared with the isDuplicate check)
+                                // restricts the download to exactly these items, so this count is
+                                // exact regardless of whether the picker's own listing got
+                                // truncated at GalleryDlListing.MAX_ITEMS. forceDuplicate = true:
+                                // this button already said "Redownload" when isDuplicate was true,
+                                // so tapping it is the confirmation — same reasoning
+                                // DownloadPreviewSheet's own Download button already uses.
+                                onDownload(url, itemFilter, selectedNums.size, if (hasVideoItems) selectedQuality else null, isDuplicate)
                             },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = MaterialTheme.shapes.medium,
@@ -211,7 +234,7 @@ fun SharePickerScreen(
                         ) {
                             Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Download ${selectedNums.size}")
+                            Text(if (isDuplicate) "Redownload ${selectedNums.size}" else "Download ${selectedNums.size}")
                         }
                     }
                 }
@@ -304,7 +327,12 @@ fun SharePickerScreen(
                             Spacer(Modifier.height(10.dp))
                         }
                         OutlinedButton(
-                            onClick = { onDownload(url, null, 0, null) },
+                            // Same "no confirmed duplicate-aware button" reasoning as the
+                            // UNAVAILABLE branch above — a genuine listing failure means there was
+                            // never a real isDuplicate check to have shown the user in the first
+                            // place, so this still just folds into the normal skip-and-record
+                            // rather than forcing through.
+                            onClick = { onDownload(url, null, 0, null, false) },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = MaterialTheme.shapes.medium,
                         ) {

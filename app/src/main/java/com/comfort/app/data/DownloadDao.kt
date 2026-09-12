@@ -112,12 +112,26 @@ interface DownloadDao {
     suspend fun getById(id: String): DownloadEntity?
 
     /** Used by "Prevent duplicate downloads" (Settings > Downloads) — an existing entry for the
-     * exact same URL that's still meaningful to the user: actively queued/running/paused, or
-     * already finished. CANCELLED/DELETED/ERRORED rows don't count as a duplicate — those
-     * represent a download the user explicitly gave up on or that never produced anything, so a
-     * fresh attempt at the same URL is a deliberate retry, not an accidental re-submission. */
-    @Query("SELECT * FROM downloads WHERE url = :url AND status IN ('QUEUED', 'SCHEDULED', 'RUNNING', 'PAUSED', 'FINISHED') LIMIT 1")
-    suspend fun findActiveOrFinishedByUrl(url: String): DownloadEntity?
+     * exact same URL *and item selection* that's still meaningful to the user: actively queued/
+     * running/paused, or already finished. CANCELLED/DELETED/ERRORED rows don't count as a
+     * duplicate — those represent a download the user explicitly gave up on or that never
+     * produced anything, so a fresh attempt at the same URL is a deliberate retry, not an
+     * accidental re-submission.
+     *
+     * [itemFilter] (SharePickerScreen's own `"num in {...}"` string, null for "the whole gallery")
+     * matters here, not just [url]: without it, picking a *different* subset of items from the
+     * same multi-item gallery post than a previous download used would be wrongly flagged as a
+     * duplicate of that unrelated selection and silently skipped — a real correctness bug, not
+     * just a missing label, since it could block genuinely new content the user explicitly asked
+     * for. `itemFilter IS :itemFilter` (not `=`) is SQLite's own null-safe equality — true when
+     * both sides are null (two "whole gallery" downloads) as well as when both are the same
+     * non-null string, false for anything else (including one null, one not) — exactly the
+     * "same selection" semantics this needs. Every caller downloading a single, non-gallery url
+     * (DownloadPreviewSheet, Instant Share, a plain shared link) always has itemFilter null on
+     * both sides here regardless, so this is a strict refinement for them, not a behavior change —
+     * only SharePickerScreen's own partial-selection case is actually affected. */
+    @Query("SELECT * FROM downloads WHERE url = :url AND itemFilter IS :itemFilter AND status IN ('QUEUED', 'SCHEDULED', 'RUNNING', 'PAUSED', 'FINISHED') LIMIT 1")
+    suspend fun findActiveOrFinishedByUrl(url: String, itemFilter: String? = null): DownloadEntity?
 
     /** One-shot (non-Flow) snapshot of everything still waiting to start — used to re-submit
      * their WorkManager jobs when a setting that affects delay (like the schedule window)

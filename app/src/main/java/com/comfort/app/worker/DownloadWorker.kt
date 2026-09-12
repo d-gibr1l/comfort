@@ -561,6 +561,11 @@ class DownloadWorker(
                 // the separate video/audio streams those URLs point to into one playable file.
                 val jsRuntimePath = QuickJsRuntime.getExecutablePath(applicationContext).orEmpty()
                 val ffmpegPath = FfmpegRuntime.getExecutablePath(applicationContext).orEmpty()
+                // Empty on arm64-v8a/x86_64 (that ABI's ffmpeg is fully static, nothing to
+                // resolve) — non-empty only on armeabi-v7a, where it points yt_dlp_wrapper.py at
+                // ffmpeg's own unpacked shared-library dependencies (LD_LIBRARY_PATH), the same
+                // mechanism aria2LibDir below already uses for aria2c.
+                val ffmpegLibDir = FfmpegRuntime.ensureProvisioned(applicationContext)?.absolutePath.orEmpty()
 
                 // A per-download override the share-sheet picker set (only offered when its
                 // listing found a video item) takes priority over the global Settings default —
@@ -653,6 +658,7 @@ class DownloadWorker(
                             if (impersonate) "1" else "0",
                             aria2Path,
                             aria2LibDir,
+                            ffmpegLibDir,
                         ),
                         actualCallback,
                     )

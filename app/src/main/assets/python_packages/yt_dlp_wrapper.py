@@ -255,7 +255,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
-             impersonate=False, aria2_path=None, aria2_lib_dir=None):
+             impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -589,6 +589,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         ydl_opts["noplaylist"] = True
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
+        if ffmpeg_lib_dir:
+            # armeabi-v7a only (FfmpegRuntime.kt's own doc comment) — that build isn't statically
+            # linked the way the other two ABIs' ffmpeg is, so its own dynamic linker needs
+            # LD_LIBRARY_PATH pointed at its unzipped dependency bundle before it runs, same
+            # mechanism as aria2_lib_dir above (os.environ is inherited by whatever subprocess
+            # yt-dlp itself spawns ffmpeg as — FFmpegFD/FFmpegPostProcessor, later in this same
+            # process). Appended, not assigned outright — aria2_lib_dir may have already set this
+            # same variable above if aria2 is also enabled, and both entries need to survive.
+            existing = os.environ.get("LD_LIBRARY_PATH")
+            os.environ["LD_LIBRARY_PATH"] = f"{ffmpeg_lib_dir}:{existing}" if existing else ffmpeg_lib_dir
         # FFmpegFD.available() (checked specifically for a partial/trimmed download — see
         # clip_range below) instantiates FFmpegPostProcessor() with no downloader at all, so it
         # never sees ydl_opts["ffmpeg_location"] and reports ffmpeg missing even though it's
@@ -920,5 +930,6 @@ if __name__ == "__main__":
         impersonate=_b(a[42]) if len(a) > 42 else False,
         aria2_path=(_s(a[43]) if len(a) > 43 else None),
         aria2_lib_dir=(_s(a[44]) if len(a) > 44 else None),
+        ffmpeg_lib_dir=(_s(a[45]) if len(a) > 45 else None),
     )
     print(f"[__status__] {status}", flush=True)
