@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import re
@@ -6,6 +7,17 @@ import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
+
+# curl_cffi is the only impersonate backend this bundled yt-dlp ships with (see
+# PythonRuntime.kt's own comment on where it comes from) — and it's only bundled for the
+# arm64-v8a Python runtime, not armeabi-v7a or x86_64 (no upstream build available for those
+# ABIs). Setting ydl_opts["impersonate"] with zero backends available doesn't just skip
+# impersonation quietly — YoutubeDL.__init__ hard-raises 'Impersonate target "" is not
+# available' before a single request is attempted, killing the whole download outright
+# (reproduced live on a 32-bit-only device). Checking importability up front lets a Reddit
+# share link at least fall through to a normal, non-impersonated request on those ABIs —
+# same as any other yt-dlp error, instead of a guaranteed hard crash.
+_IMPERSONATE_AVAILABLE = importlib.util.find_spec("curl_cffi") is not None
 
 class _Cancelled(Exception):
     pass
@@ -504,7 +516,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 headers[name] = value
         if headers:
             ydl_opts["http_headers"] = headers
-    if impersonate or _REDDIT_SHARE_LINK_RE.match(url):
+    if (impersonate or _REDDIT_SHARE_LINK_RE.match(url)) and _IMPERSONATE_AVAILABLE:
         # An empty ImpersonateTarget() (rather than a specific browser/version string) asks yt-dlp
         # for its own default target — the first one whose backend is actually available in this
         # bundled environment (see _REDDIT_SHARE_LINK_RE's own comment for why this is needed at
@@ -799,7 +811,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         # extracts the same Reel cleanly. Playlists/multi-item sources still expand into "entries"
         # normally either way — this only affects *which* code path a single item takes.
     }
-    if _REDDIT_SHARE_LINK_RE.match(url):
+    if _REDDIT_SHARE_LINK_RE.match(url) and _IMPERSONATE_AVAILABLE:
         ydl_opts['impersonate'] = ImpersonateTarget()
     if cookies_path:
         ydl_opts["cookiefile"] = cookies_path
