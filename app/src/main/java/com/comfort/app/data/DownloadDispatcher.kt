@@ -92,18 +92,20 @@ object DownloadDispatcher {
         File(context.cacheDir, "gallery-dl-staging/$id").deleteRecursively()
     }
 
-    /** True if [url] would currently be treated as a duplicate by [enqueueDownload] — "Prevent
-     * duplicate downloads" is on AND a matching active/finished download already exists. Screens
-     * that show a real "Download" button before actually enqueuing (DownloadPreviewSheet,
-     * ShareActivity's LoadingSheet) call this ahead of time to relabel it "Redownload" instead of
-     * enqueuing first and finding out only via EnqueueResult.Duplicate afterward — replaces the
+    /** True if [url] (and, for SharePickerScreen's own multi-item picker, this exact [itemFilter]
+     * selection — see findActiveOrFinishedByUrl's own doc comment for why that matters, not just
+     * url) would currently be treated as a duplicate by [enqueueDownload] — "Prevent duplicate
+     * downloads" is on AND a matching active/finished download already exists. Screens that show
+     * a real "Download" button before actually enqueuing (DownloadPreviewSheet, ShareActivity's
+     * LoadingSheet, SharePickerScreen) call this ahead of time to relabel it "Redownload" instead
+     * of enqueuing first and finding out only via EnqueueResult.Duplicate afterward — replaces the
      * old flow where a duplicate was only discovered post-hoc, surfaced through a Snackbar with
      * its own separate "Redownload" action to confirm. Once the button itself already says
      * "Redownload," tapping it is the confirmation; callers pass forceDuplicate = true straight
      * through rather than needing a second confirmation step here. */
-    suspend fun isDuplicate(context: Context, url: String): Boolean {
+    suspend fun isDuplicate(context: Context, url: String, itemFilter: String? = null): Boolean {
         if (!GalleryDlPreferences.isPreventDuplicateDownloads(context)) return false
-        return AppDatabase.getDatabase(context).downloadDao().findActiveOrFinishedByUrl(url) != null
+        return AppDatabase.getDatabase(context).downloadDao().findActiveOrFinishedByUrl(url, itemFilter) != null
     }
 
     suspend fun enqueueDownload(
@@ -129,7 +131,7 @@ object DownloadDispatcher {
         // in duplicate_attempts (see DuplicateAttempt's own doc comment) rather than creating a
         // redundant second downloads row for the same URL.
         if (!forceDuplicate && GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
-            dao.findActiveOrFinishedByUrl(url)?.let { existing ->
+            dao.findActiveOrFinishedByUrl(url, itemFilter)?.let { existing ->
                 dao.insertDuplicateAttempt(
                     DuplicateAttempt(
                         id = UUID.randomUUID().toString(),
