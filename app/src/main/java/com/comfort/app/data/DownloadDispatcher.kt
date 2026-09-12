@@ -204,6 +204,20 @@ object DownloadDispatcher {
         // same download concurrently (see the lock's own doc comment above).
         cancelWorkManagerJob(context, dao.getById(id)?.workRequestId)
 
+        // Every dispatch path funnels through here — retryDownload/retryAll/startNow/
+        // resumeDownload used to call straight through to WorkManager regardless of this,
+        // silently undoing "Pause All" the moment the user retried, started-now, or resumed an
+        // already-existing row (reproduced live: only a brand-new download via enqueueDownload's
+        // own separate check actually stayed paused). Gating once here, rather than adding the
+        // same check to every individual caller, is what makes "nothing downloads while paused"
+        // actually hold for every entry point instead of just the one enqueueDownload guards.
+        // suspendForSchedule/rescheduleQueuedDownloads/restartRunningDownloads/repairIfJobDead
+        // already bail before ever reaching here while paused, so this is a no-op for them.
+        if (GalleryDlPreferences.isGloballyPaused(context)) {
+            dao.updateStatus(id, DownloadStatus.PAUSED)
+            return@withDownloadLock
+        }
+
         val networkType = if (GalleryDlPreferences.isWifiOnly(context)) NetworkType.UNMETERED else NetworkType.CONNECTED
         val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
         // Imported from YTDLnis's own "Download Delay" setting — a flat pause applied to every
