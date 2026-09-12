@@ -325,7 +325,12 @@ fun QueueScreen(
             // short of it.
             val filterListState = rememberLazyListState()
             val filterNudgePx = with(LocalDensity.current) { 1000.dp.toPx() }
-            LaunchedEffect(Unit) {
+            // Keyed on reducedMotion (not Unit) so toggling it mid-delay restarts this effect with
+            // the current value instead of running out the rest of the delay against whatever
+            // reducedMotion happened to read when the effect first started — that stale captured
+            // value, not a live re-read, is what the check below sees since it's a plain Boolean,
+            // not a State, by the time it's used here.
+            LaunchedEffect(reducedMotion) {
                 delay(500)
                 if (!reducedMotion && filterListState.canScrollForward) {
                     filterListState.animateScrollBy(filterNudgePx, animationSpec = tween(450))
