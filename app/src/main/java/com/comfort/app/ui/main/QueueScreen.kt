@@ -225,7 +225,13 @@ fun QueueScreen(
                     icon = { Icon(FeatherIcons.RefreshCw, contentDescription = null) },
                     text = { Text("Retry All") },
                 )
-            } else if (hasActiveDownload || hasPausedDownload) {
+            } else if (hasActiveDownload || hasPausedDownload || isGloballyPaused) {
+                // isGloballyPaused on its own (queue otherwise empty) still needs this FAB shown —
+                // it's the only surface anywhere in the app for isGloballyPaused/setGloballyPaused.
+                // Without it, pausing everything and then clearing the queue (cancel/delete every
+                // item) hid the only control that could flip it back off, leaving every download
+                // added afterward silently stuck PAUSED until the queue happened to gain a
+                // RUNNING/PAUSED item again on its own.
                 ExtendedFloatingActionButton(
                     onClick = { if (showResumeAction) viewModel.resumeAll() else viewModel.pauseAll() },
                     icon = {
