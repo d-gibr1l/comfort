@@ -32,10 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -226,6 +228,10 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
 
 @Composable
 private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    // Compose's own Switch (unlike the platform's View-based SwitchCompat) never calls
+    // performHapticFeedback internally — see IconToggleRow's own comment in MoreScreen.kt, where
+    // this same gap was found and fixed identically.
+    val haptics = LocalHapticFeedback.current
     Row(
         modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)).padding(vertical = 14.dp, horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -237,7 +243,13 @@ private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, on
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+                onCheckedChange(it)
+            },
+        )
     }
 }
 
