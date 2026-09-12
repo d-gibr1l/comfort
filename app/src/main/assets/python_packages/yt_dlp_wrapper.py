@@ -40,13 +40,97 @@ _FRAGMENT_SUFFIX_RE = re.compile(r"\.f[A-Za-z0-9][A-Za-z0-9_-]*\.[^./\\]+$")
 # A prior fix resolved the redirect in Kotlin first with a naked HttpURLConnection and a spoofed
 # User-Agent header — but a spoofed *header* with the wrong TLS fingerprint behind it is exactly
 # what a WAF like this one is designed to catch, so that "fix" was tripping the same block it was
-# meant to avoid. curl_cffi (bundled specifically for this — see PythonRuntime.kt's own comments on
-# why Chaquopy's interpreter was replaced) genuinely spoofs a real browser's TLS handshake, not just
-# its headers, but yt-dlp only routes a request through it when something asks for impersonation —
-# the generic extractor doesn't do that on its own. Asking for it only for this one shortlink shape
-# (rather than every download) keeps the change scoped to the actual failure instead of impersonating
-# a browser for sites that were already working fine without it.
+# meant to avoid.
+#
+# curl_cffi (yt-dlp's --impersonate backend) genuinely spoofs a real browser's TLS handshake, and
+# was this fix's first approach — but it's only bundled for arm64-v8a (its cffi dependency needs a
+# Python-version-locked native module nobody has built for armeabi-v7a/x86_64), so it left this
+# exact WAF block unresolved on every other device, crashing outright until _IMPERSONATE_AVAILABLE
+# was added as a stopgap (see its own comment above). tls-client (github.com/bogdanfinn/tls-client)
+# does the same real TLS-fingerprint spoofing but ships as a plain Go binary with zero Python
+# version coupling — see TlsClientRuntime.kt's own comment on why the exact same source
+# cross-compiles cleanly for all three ABIs. _resolve_reddit_share_link below uses it for exactly
+# one thing: following this one redirect past the WAF, then handing the real, resolved /comments/...
+# URL to yt-dlp — which needs no impersonation at all once it's not being asked to resolve the
+# blocked short link itself. curl_cffi/_IMPERSONATE_AVAILABLE stay exactly as they were for the
+# general "Impersonate a browser" toggle and TikTok's bot-detection bypass — unrelated to this.
 _REDDIT_SHARE_LINK_RE = re.compile(r"^https?://(www\.)?reddit\.com/r/[^/]+/s/[A-Za-z0-9]+/?")
+
+def _resolve_reddit_share_link(url, tls_client_path):
+    """Resolves a Reddit share link's redirect via tls-client's own request() export — a real TLS
+    handshake, not just a spoofed header, so it gets past the WAF a plain request hits (see
+    _REDDIT_SHARE_LINK_RE's own comment). Returns the resolved URL (the real /comments/... post) on
+    success, or the original `url` unchanged on anything else: no match, no tls_client_path (this
+    ABI's build missing or failed to bundle — shouldn't happen, but never a reason to hard-fail a
+    download over), a load/call/JSON/network failure, or a response with no usable redirect target.
+    Every failure path here just means the *old* behavior (yt-dlp's generic extractor hitting the
+    same WAF block on its own) — never a new, different way to break.
+
+    Two non-obvious steps, both confirmed live on-device before landing this:
+    - Connects to Reddit's own resolved IP instead of letting tls-client's Go runtime resolve the
+      hostname itself — Go's DNS resolver doesn't work reliably on Android at all (reproduced live:
+      even a plain https://example.com request from this exact bundled binary times out with "dial
+      tcp: lookup example.com: i/o timeout"), while Python's own socket.gethostbyname(), going
+      through bionic's real resolver, works fine — every other network call in this app already
+      depends on that same resolver. requestHostOverride/serverNameOverwrite keep the real hostname
+      in the Host header and the TLS SNI/certificate check, so the server and cert validation still
+      see "www.reddit.com" exactly as normal — only the actual TCP connection target changes.
+    - Uses followRedirects=False and reads the Location header directly, rather than letting
+      tls-client follow the redirect itself — the redirect target is `www.reddit.com` again (a
+      literal hostname, not our resolved IP), so a second, internally-followed request would hit
+      the exact same broken DNS resolution this whole function exists to route around. Reading
+      Location directly needs only the one IP-literal request, and yt-dlp's own Reddit extractor
+      already handles the resulting /comments/... URL natively — no second fetch of anything
+      through tls-client is needed at all."""
+    if not tls_client_path or not _REDDIT_SHARE_LINK_RE.match(url):
+        return url
+    try:
+        import ctypes
+        import socket
+        from urllib.parse import urljoin, urlsplit, urlunsplit
+
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        ip = socket.gethostbyname(host)
+        netloc = ip if parsed.port is None else f"{ip}:{parsed.port}"
+        ip_url = urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+
+        lib = ctypes.CDLL(tls_client_path)
+        lib.request.argtypes = [ctypes.c_char_p]
+        lib.request.restype = ctypes.c_char_p
+        lib.freeMemory.argtypes = [ctypes.c_char_p]
+        payload = {
+            "tlsClientIdentifier": "chrome_146",
+            "followRedirects": False,
+            "timeoutSeconds": 20,
+            "requestUrl": ip_url,
+            "requestHostOverride": host,
+            "serverNameOverwrite": host,
+            "requestMethod": "GET",
+            "headers": {
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+                "host": host,
+            },
+        }
+        raw = lib.request(json.dumps(payload).encode("utf-8"))
+        response = json.loads(ctypes.string_at(raw).decode("utf-8"))
+        response_id = response.get("id")
+        try:
+            headers = response.get("headers") or {}
+            location = next(
+                (v[0] if isinstance(v, list) else v for k, v in headers.items() if k.lower() == "location"),
+                None,
+            )
+            return urljoin(url, location) if location else url
+        finally:
+            # Every response allocates memory on the Go side that's only ever freed by this call —
+            # skipping it on an early return/exception would leak it for the life of this process.
+            if response_id:
+                lib.freeMemory(response_id.encode("utf-8"))
+    except Exception:
+        return url
 
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
@@ -284,13 +368,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              format_sort_extra=None, verbose=False, embed_chapters=False, save_subtitle_files=False,
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
-             impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None):
+             impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
+             tls_client_path=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
     dict and reports progress through callbacks, so it's self-contained per call. Every finished
     file's absolute path is sent to `callback`, matching how DownloadWorker's actualCallback
     already expects one path per line from gallery_dl_wrapper.download()."""
+    # Resolved before anything else in this function reads `url` (nothing does until the
+    # impersonate check further down) — see _resolve_reddit_share_link's own doc comment.
+    url = _resolve_reddit_share_link(url, tls_client_path)
 
     # DownloadWorker throttles nothing on its own end, so a raw per-chunk progress_hook (which
     # fires dozens of times a second) would otherwise flood the DB with writes — this closure
@@ -533,23 +621,23 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 headers[name] = value
         if headers:
             ydl_opts["http_headers"] = headers
-    if (impersonate or _REDDIT_SHARE_LINK_RE.match(url)) and _IMPERSONATE_AVAILABLE:
+    if impersonate and _IMPERSONATE_AVAILABLE:
         # An empty ImpersonateTarget() (rather than a specific browser/version string) asks yt-dlp
         # for its own default target — the first one whose backend is actually available in this
-        # bundled environment (see _REDDIT_SHARE_LINK_RE's own comment for why this is needed at
-        # all). YoutubeDL.__init__'s own availability check (self.params.get('impersonate') passed
-        # straight to _impersonate_target_available) skips the True/''-to-ImpersonateTarget()
-        # normalization that _parse_impersonate_targets does elsewhere in this yt-dlp version —
-        # passing the bare `True` the CLI's --impersonate accepts hits an `assert
-        # isinstance(target, ImpersonateTarget)` in is_supported_target() instead (reproduced live:
-        # AssertionError with an empty message, right out of YoutubeDL(ydl_opts) construction).
-        # Constructing the real object ourselves sidesteps that.
+        # bundled environment. YoutubeDL.__init__'s own availability check
+        # (self.params.get('impersonate') passed straight to _impersonate_target_available) skips
+        # the True/''-to-ImpersonateTarget() normalization that _parse_impersonate_targets does
+        # elsewhere in this yt-dlp version — passing the bare `True` the CLI's --impersonate
+        # accepts hits an `assert isinstance(target, ImpersonateTarget)` in is_supported_target()
+        # instead (reproduced live: AssertionError with an empty message, right out of
+        # YoutubeDL(ydl_opts) construction). Constructing the real object ourselves sidesteps that.
         #
-        # The Reddit short-link case above is always on regardless of the impersonate param — it's
-        # a targeted fix for one specific, reproduced WAF block, not a general-purpose toggle;
-        # `impersonate` (Settings > Advanced) is the opt-in "try this everywhere" version for other
-        # sites hitting bot detection, off by default so a site that already works fine doesn't pay
-        # curl_cffi's overhead or risk a TLS profile going stale for no reason.
+        # Reddit short links no longer need this at all — _resolve_reddit_share_link (called at
+        # the top of this function) hands yt-dlp the real, already-resolved /comments/... URL via
+        # tls-client instead, so this stays purely the opt-in "try this everywhere" toggle
+        # (Settings > Advanced) for other sites hitting bot detection, off by default so a site
+        # that already works fine doesn't pay curl_cffi's overhead or risk a TLS profile going
+        # stale for no reason.
         ydl_opts["impersonate"] = ImpersonateTarget()
     if retries:
         # "retries" alone only covers whole-request failures (extraction, a plain single-file
@@ -787,7 +875,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             callback(f"[error] {e}")
         return f"Error: {e}"
 
-def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls_client_path=None):
     """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
     item picker's preview, specifically to get a *real*, directly fetchable thumbnail image URL
     for video items. gallery-dl's own listing gives every video item an internal "ytdl:"-prefixed
@@ -804,6 +892,9 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
     don't share an item-numbering scheme). {"error": "..."} on failure — callers fall back to
     treating this the same as "nothing usable came back" rather than crashing the whole listing
     over a preview-only enrichment step."""
+    # Same reasoning as download()'s own call to this — a Reddit share link's listing pass hits
+    # the exact same WAF block resolving it would.
+    url = _resolve_reddit_share_link(url, tls_client_path)
     ydl_opts = {
         "quiet": True,
         # "quiet" alone only suppresses yt-dlp's normal progress/info output — WARNING/ERROR lines
@@ -828,8 +919,6 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         # extracts the same Reel cleanly. Playlists/multi-item sources still expand into "entries"
         # normally either way — this only affects *which* code path a single item takes.
     }
-    if _REDDIT_SHARE_LINK_RE.match(url) and _IMPERSONATE_AVAILABLE:
-        ydl_opts['impersonate'] = ImpersonateTarget()
     if cookies_path:
         ydl_opts["cookiefile"] = cookies_path
     if js_runtime_path:
@@ -916,7 +1005,10 @@ if __name__ == "__main__":
 
     if _sys.argv[1] == "list":
         a = _sys.argv[2:]
-        print(list_info(url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3])), flush=True)
+        print(list_info(
+            url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3]),
+            tls_client_path=(_s(a[4]) if len(a) > 4 else None),
+        ), flush=True)
         _sys.exit(0)
 
     a = _sys.argv[2:]
@@ -960,5 +1052,6 @@ if __name__ == "__main__":
         aria2_path=(_s(a[43]) if len(a) > 43 else None),
         aria2_lib_dir=(_s(a[44]) if len(a) > 44 else None),
         ffmpeg_lib_dir=(_s(a[45]) if len(a) > 45 else None),
+        tls_client_path=(_s(a[46]) if len(a) > 46 else None),
     )
     print(f"[__status__] {status}", flush=True)
