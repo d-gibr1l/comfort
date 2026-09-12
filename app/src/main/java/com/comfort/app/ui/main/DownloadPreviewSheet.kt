@@ -83,6 +83,7 @@ private enum class PreviewScreen { MAIN, COMMANDS, TRIM, TEMPLATES, VIEW_TEMPLAT
  * idea of what "discard" means. */
 private data class OverlaySnapshot(
     val segments: List<TrimSegment>,
+    val segmentsEdited: Boolean,
     val commands: List<String>,
     val filenameTemplate: String?,
 )
@@ -117,7 +118,11 @@ private fun parseTimestampToMs(value: String): Long? {
     val v = value.trim()
     if (v.isEmpty()) return null
     return try {
-        val parts = v.split(":").map { it.toFloatOrNull() ?: 0f }
+        // toFloatOrNull() returning null (a genuinely non-numeric part, e.g. "hh:mm" typed
+        // literally) must fail the whole parse — silently coercing it to 0f used to make any
+        // garbage text parse "successfully" as 00:00.000 and get applied to the segment as if it
+        // were a real, deliberate edit.
+        val parts = v.split(":").map { it.toFloatOrNull() ?: return null }
         var seconds = 0f
         for (part in parts) {
             seconds = seconds * 60 + part
@@ -136,10 +141,25 @@ private fun formatTimestamp(ms: Long): String {
 }
 
 /** The "start-end" (or comma-separated multi-range) string DownloadWorker hands to
- * yt_dlp_wrapper.py. Null when the segments cover everything from zero, i.e. nothing to trim. */
-private fun List<TrimSegment>.toClipRange(): String? {
+ * yt_dlp_wrapper.py. Null when the segments cover everything from zero, i.e. nothing to trim.
+ *
+ * [realDurationMs] clamps every segment against the video's actual known length, regardless of
+ * which UI path (Add a segment, Set Start/End, manual typing) let a boundary run past it — this
+ * is the one place every segment funnels through before reaching the download, so it's also the
+ * one place that has to catch an out-of-range value no matter how it was created. Without this, a
+ * start past the real end of the file reached yt_dlp_wrapper.py's _LocalTrimPP, whose ffmpeg build
+ * (stream-copy only, no encoders) wrote an empty output for that range — and _LocalTrimPP.run()
+ * replaced the already-fully-downloaded file with it unconditionally, with no error surfaced.
+ * Segments that clamp down to zero-or-negative length are dropped rather than sent through at all. */
+private fun List<TrimSegment>.toClipRange(realDurationMs: Long?): String? {
     if (isEmpty()) return null
-    return joinToString(",") { "${formatTimestamp(it.startMs)}-${formatTimestamp(it.endMs)}" }
+    val cap = realDurationMs?.takeIf { it > 0L }
+    val ranges = mapNotNull { segment ->
+        val start = segment.startMs.coerceAtLeast(0L).let { if (cap != null) it.coerceAtMost(cap) else it }
+        val end = segment.endMs.let { if (cap != null) it.coerceAtMost(cap) else it }
+        if (end <= start) null else "${formatTimestamp(start)}-${formatTimestamp(end)}"
+    }
+    return ranges.joinToString(",").ifEmpty { null }
 }
 
 /**
@@ -167,6 +187,13 @@ fun DownloadPreviewSheet(
     var saveThumbnail by remember { mutableStateOf(false) }
     var commands by remember { mutableStateOf<List<String>>(emptyList()) }
     var segments by remember { mutableStateOf<List<TrimSegment>>(emptyList()) }
+    // False for the default segment onOpenTrim below seeds just to give the Trim screen something
+    // to render — only flips true once the user actually touches Set Start/Set End, a manual
+    // timestamp, or Add/Delete (see the TrimVideoScreen call site's own onSegmentsChange wrapper).
+    // Gates both MAIN's "trimmed" chip state and the real clipRange sent to the download itself:
+    // without this, opening "Trim Video" and tapping Done with zero edits silently clipped every
+    // download to the untouched default's first 30 seconds — reproduced live.
+    var segmentsEdited by remember { mutableStateOf(false) }
     var filenameTemplate by remember { mutableStateOf<String?>(null) }
 
     // Taken once, the moment MAIN opens a sub-screen (openOverlay below) — null again means
@@ -182,7 +209,7 @@ fun DownloadPreviewSheet(
     // true before this visit, not after.
     fun openOverlay(target: PreviewScreen) {
         if (overlaySnapshot == null) {
-            overlaySnapshot = OverlaySnapshot(segments, commands, filenameTemplate)
+            overlaySnapshot = OverlaySnapshot(segments, segmentsEdited, commands, filenameTemplate)
         }
         screen = target
     }
@@ -199,6 +226,7 @@ fun DownloadPreviewSheet(
     fun revertOverlay() {
         overlaySnapshot?.let {
             segments = it.segments
+            segmentsEdited = it.segmentsEdited
             commands = it.commands
             filenameTemplate = it.filenameTemplate
         }
@@ -318,6 +346,8 @@ fun DownloadPreviewSheet(
             onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
             segments = segments,
             onSegmentsChange = { segments = it },
+            segmentsEdited = segmentsEdited,
+            onSegmentsEdited = { segmentsEdited = true },
             commands = commands,
             onCommandsChange = { commands = it },
             filenameTemplate = filenameTemplate,
@@ -356,6 +386,8 @@ private fun PreviewSheetOverlayHost(
     onToggleSaveThumbnail: () -> Unit,
     segments: List<TrimSegment>,
     onSegmentsChange: (List<TrimSegment>) -> Unit,
+    segmentsEdited: Boolean,
+    onSegmentsEdited: () -> Unit,
     commands: List<String>,
     onCommandsChange: (List<String>) -> Unit,
     filenameTemplate: String?,
@@ -387,7 +419,7 @@ private fun PreviewSheetOverlayHost(
             onToggleFormat = onToggleFormat,
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = onToggleSaveThumbnail,
-            trimmed = segments.isNotEmpty(),
+            trimmed = segmentsEdited,
             commandCount = commands.size,
             filenameTemplate = filenameTemplate,
             onCopyLink = { clipboard.setText(AnnotatedString(url)) },
@@ -411,7 +443,7 @@ private fun PreviewSheetOverlayHost(
                             outputFormat = outputFormat,
                             saveThumbnail = saveThumbnail,
                             extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
-                            clipRange = segments.toClipRange(),
+                            clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
                             filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
                         ),
                     )
@@ -517,7 +549,12 @@ private fun PreviewSheetOverlayHost(
                                     quality = quality,
                                     outputFormat = outputFormat,
                                     saveThumbnail = saveThumbnail,
-                                    segments = segments,
+                                    // Same gate as the real download's clipRange below — showing a
+                                    // --download-sections flag here for a trim that was never
+                                    // actually confirmed would be a command that doesn't match what
+                                    // downloading for real actually does.
+                                    segments = if (segmentsEdited) segments else emptyList(),
+                                    durationMs = previewDurationMs,
                                     filenameTemplate = filenameTemplate,
                                     commands = commands,
                                     onCommandsChange = onCommandsChange,
@@ -528,7 +565,8 @@ private fun PreviewSheetOverlayHost(
                                             quality = quality,
                                             outputFormat = outputFormat,
                                             saveThumbnail = saveThumbnail,
-                                            segments = segments,
+                                            segments = if (segmentsEdited) segments else emptyList(),
+                                            durationMs = previewDurationMs,
                                             filenameTemplate = filenameTemplate,
                                             extraCommands = commands,
                                         )))
@@ -538,7 +576,15 @@ private fun PreviewSheetOverlayHost(
                                 )
                                 PreviewScreen.TRIM -> TrimVideoScreen(
                                     segments = segments,
-                                    onSegmentsChange = onSegmentsChange,
+                                    onSegmentsChange = {
+                                        // The only place segments actually change once TrimVideoScreen
+                                        // is showing — marking edited here (rather than in
+                                        // onSegmentsChange itself) leaves onOpenTrim's initial default-
+                                        // segment seed, which runs before this screen ever composes,
+                                        // correctly NOT counted as a real edit.
+                                        onSegmentsEdited()
+                                        onSegmentsChange(it)
+                                    },
                                     thumbnail = previewThumbnail,
                                     pageUrl = url,
                                     streamUrls = previewStreamUrls,
@@ -891,6 +937,7 @@ private fun buildPreviewCommand(
     outputFormat: OutputFormat,
     saveThumbnail: Boolean,
     segments: List<TrimSegment>,
+    durationMs: Long?,
     filenameTemplate: String?,
     extraCommands: List<String>,
 ): String {
@@ -957,7 +1004,7 @@ private fun buildPreviewCommand(
     // own CLI-equivalent of that same callable, so shown here it's still a command a user could
     // actually run to get the identical result — just reusing the real formatter now instead of a
     // separate H:MM:SS one that silently rounded away everything sub-second.
-    segments.toClipRange()?.let { clip -> parts += "--download-sections \"*$clip\"" }
+    segments.toClipRange(durationMs)?.let { clip -> parts += "--download-sections \"*$clip\"" }
 
     // ── Filename template ─────────────────────────────────────────────────────
     filenameTemplate?.takeIf { it.isNotBlank() }?.let { parts += "-o \"$it\"" }
@@ -982,6 +1029,7 @@ private fun ExtraCommandsScreen(
     outputFormat: OutputFormat,
     saveThumbnail: Boolean,
     segments: List<TrimSegment>,
+    durationMs: Long?,
     filenameTemplate: String?,
     commands: List<String>,
     onCommandsChange: (List<String>) -> Unit,
@@ -1013,6 +1061,7 @@ private fun ExtraCommandsScreen(
             outputFormat = outputFormat,
             saveThumbnail = saveThumbnail,
             segments = segments,
+            durationMs = durationMs,
             filenameTemplate = filenameTemplate,
             extraCommands = commands,
         )
@@ -1246,10 +1295,18 @@ private fun TrimVideoScreen(
         // last 9 minutes go completely unreachable. NOMINAL_DURATION_MS now only covers the case
         // this was originally written for: no stream/duration resolved at all (see its own doc
         // comment) — there's nothing real to range against yet, so it's the one honest fallback.
-        // Still widens past whatever length is used here if a typed/dragged end or the playhead
-        // itself goes further, exactly as before.
-        val effectiveDurationMs = durationMs?.takeIf { it > 0L } ?: NOMINAL_DURATION_MS
-        val maxSliderMs = maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
+        val realDurationMs = durationMs?.takeIf { it > 0L }
+        val effectiveDurationMs = realDurationMs ?: NOMINAL_DURATION_MS
+        // Hard-capped at the real duration once it's known, rather than still widening for
+        // whatever a segment's own endMs/the playhead reach (the old behavior) — that ratchet let
+        // Set Start/Add a segment push a boundary arbitrarily far past the actual video, which
+        // yt_dlp_wrapper.py's _LocalTrimPP then trimmed with no validation, silently replacing an
+        // already-finished download with an empty file (reproduced live). toClipRange() clamps
+        // again right before a download actually starts as the last line of defense regardless of
+        // how a segment got here, but keeping the slider itself from ever going further than the
+        // real video exists is what stops the bogus value from being created in the first place.
+        val maxSliderMs = realDurationMs?.toFloat()
+            ?: maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
         Slider(
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
@@ -1262,10 +1319,32 @@ private fun TrimVideoScreen(
                 )
             },
             track = { state ->
-                SliderDefaults.Track(
-                    sliderState = state,
-                    trackCornerSize = 8.dp,
-                )
+                // The stock track only ever shows the single playhead position — nothing about the
+                // active segment's own [start, end] span was visible anywhere on it, so the
+                // "length" the user was trimming to had no representation except the numeric Start/
+                // End fields below. This overlay draws that span as a highlighted band, proportional
+                // to maxSliderMs, on top of the default M3 track.
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    SliderDefaults.Track(
+                        sliderState = state,
+                        trackCornerSize = 8.dp,
+                    )
+                    val segStartMs = active?.startMs?.toFloat() ?: 0f
+                    val segEndMs = active?.endMs?.toFloat() ?: 0f
+                    if (maxSliderMs > 0f && segEndMs > segStartMs) {
+                        val startFrac = (segStartMs / maxSliderMs).coerceIn(0f, 1f)
+                        val endFrac = (segEndMs / maxSliderMs).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .offset(x = maxWidth * startFrac)
+                                .width(maxWidth * (endFrac - startFrac))
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
+                        )
+                    }
+                }
             },
         )
 
@@ -1417,11 +1496,16 @@ private fun TrimVideoScreen(
                 PreviewChip(
                     label = "Add a segment",
                     onClick = {
-                        val start = segments.maxOfOrNull { it.endMs } ?: 0L
-                        val segment = TrimSegment(
-                            startMs = start,
-                            endMs = start + DEFAULT_SEGMENT_LENGTH_MS,
-                        )
+                        // Clamped against the real duration once it's known — repeatedly tapping
+                        // this used to keep stacking 30s blocks past the actual end of the video
+                        // with nothing to stop it (see maxSliderMs's own doc comment above for the
+                        // consequence once that reaches _LocalTrimPP).
+                        val rawStart = segments.maxOfOrNull { it.endMs } ?: 0L
+                        val start = realDurationMs?.let { d -> rawStart.coerceIn(0L, (d - 1000L).coerceAtLeast(0L)) }
+                            ?: rawStart
+                        val end = realDurationMs?.let { d -> (start + DEFAULT_SEGMENT_LENGTH_MS).coerceAtMost(d) }
+                            ?: (start + DEFAULT_SEGMENT_LENGTH_MS)
+                        val segment = TrimSegment(startMs = start, endMs = end)
                         onSegmentsChange(segments + segment)
                         activeId = segment.id
                         playheadMs = segment.startMs
