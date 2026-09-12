@@ -908,8 +908,18 @@ private fun HistoryGridItem(
                         onTap()
                     } else if (hasThumbnail) {
                         val uri = Uri.parse(item.thumbnailPath)
+                        // thumbnailPath is the real saved file's own MediaStore URI (see
+                        // DownloadWorker.kt's setThumbnail call) — for a video download that's a
+                        // video/* file, not an image, so a hardcoded "image/*" here sent every
+                        // video open request under the wrong type. Android's "Always" default-app
+                        // preference is stored per resolved type, so a video's "Always open with
+                        // Google Photos" choice (recorded against video/*) never matched this
+                        // screen's requests and the chooser reappeared on every tap (reproduced
+                        // live on a Samsung A03 Core). Querying the real type from the content
+                        // resolver fixes it for images and videos alike.
+                        val realType = context.contentResolver.getType(uri) ?: "*/*"
                         val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "image/*")
+                            setDataAndType(uri, realType)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                         runCatching { context.startActivity(intent) }
@@ -1053,8 +1063,18 @@ private fun HistoryRow(
                         onTap()
                     } else if (hasThumbnail) {
                         val uri = Uri.parse(item.thumbnailPath)
+                        // thumbnailPath is the real saved file's own MediaStore URI (see
+                        // DownloadWorker.kt's setThumbnail call) — for a video download that's a
+                        // video/* file, not an image, so a hardcoded "image/*" here sent every
+                        // video open request under the wrong type. Android's "Always" default-app
+                        // preference is stored per resolved type, so a video's "Always open with
+                        // Google Photos" choice (recorded against video/*) never matched this
+                        // screen's requests and the chooser reappeared on every tap (reproduced
+                        // live on a Samsung A03 Core). Querying the real type from the content
+                        // resolver fixes it for images and videos alike.
+                        val realType = context.contentResolver.getType(uri) ?: "*/*"
                         val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, "image/*")
+                            setDataAndType(uri, realType)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                         runCatching { context.startActivity(intent) }
