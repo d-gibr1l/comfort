@@ -14,6 +14,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -157,6 +161,20 @@ fun QueueScreen(
     // The "Add cookies" error-card action opens this for the failing item's own site, then
     // retries that same download once cookies are extracted.
     var cookieLoginTarget by remember { mutableStateOf<Pair<String, String>?>(null) } // (loginUrl, downloadId)
+    // Holds just the id, not a captured DownloadEntity snapshot — resolving it live against
+    // queueItems below means the open sheet always reflects this download's current error instead
+    // of freezing whatever errorMessage/erroredAt it had at the moment the sheet was opened (e.g.
+    // an auto-retry re-erroring with different text while the sheet is still up). Also means the
+    // sheet auto-dismisses if the row disappears entirely (deleted, or moved out of ERRORED).
+    var errorSheetItemId by remember { mutableStateOf<String?>(null) }
+    val errorSheetItem = errorSheetItemId?.let { id -> queueItems.find { it.id == id } }
+    errorSheetItem?.let { item ->
+        ErrorDetailsSheet(
+            item = item,
+            onDismiss = { errorSheetItemId = null }
+        )
+    }
+    
     cookieLoginTarget?.let { (loginUrl, downloadId) ->
         CookieLoginDialog(
             loginUrl = loginUrl,
@@ -441,6 +459,7 @@ fun QueueScreen(
                                         val host = runCatching { URI(item.url).host }.getOrNull()
                                         if (host != null) cookieLoginTarget = "https://$host" to item.id
                                     },
+                                    onShowError = { errorSheetItemId = item.id },
                                     selectionMode = selectionMode,
                                     selected = isSelected,
                                     onToggleSelect = { toggleSelected(item.id) },
@@ -719,6 +738,7 @@ fun QueueItemCard(
     onRetry: () -> Unit,
     onStartNow: () -> Unit = {},
     onAddCookies: () -> Unit = {},
+    onShowError: () -> Unit = {},
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onToggleSelect: () -> Unit = {},
@@ -1021,6 +1041,9 @@ fun QueueItemCard(
                             }
                         }
                         DownloadStatus.ERRORED -> {
+                            IconButton(onClick = onShowError) {
+                                Icon(FeatherIcons.Info, contentDescription = "Error details")
+                            }
                             if (isCookieRelatedError(item.errorMessage)) {
                                 TextButton(onClick = onAddCookies) {
                                     Icon(FeatherIcons.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1056,6 +1079,62 @@ fun QueueItemCard(
                         else -> {}
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ErrorDetailsSheet(
+    item: com.comfort.app.data.DownloadEntity,
+    onDismiss: () -> Unit,
+) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Icon(
+                    FeatherIcons.AlertTriangle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(22.dp).padding(top = 2.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text("Error details", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                item.errorMessage ?: "Unknown error",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val clipData = android.content.ClipData.newPlainText("Error message", item.errorMessage ?: "")
+                            clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clipData))
+                            android.widget.Toast.makeText(context, "Error copied", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) { Text("Copy") }
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) { Text("Done") }
             }
         }
     }
