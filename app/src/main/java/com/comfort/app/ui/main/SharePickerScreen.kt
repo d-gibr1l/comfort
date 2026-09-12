@@ -104,7 +104,7 @@ fun SharePickerScreen(
     // comfortable fraction of the screen — beyond that the grid scrolls internally instead.
     val configuration = LocalConfiguration.current
     LaunchedEffect(state, items.size, hasVideoItems, configuration.screenWidthDp, configuration.screenHeightDp) {
-        val topBarHeight = 64.dp
+        val topBarHeight = 84.dp
         val bottomBarHeight = 84.dp
         // The quality picker strip (section label + a row of chips) only renders when the
         // listing actually contains a video — has to be accounted for here too, or the sheet
@@ -177,7 +177,20 @@ fun SharePickerScreen(
         modifier = modifier,
         containerColor = Color.Transparent,
         topBar = {
-            TopAppBar(
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // A drag-handle-style bar so the picker reads visually as a standard M3 bottom sheet
+                Box(
+                    modifier = Modifier
+                        .padding(top = 12.dp, bottom = 4.dp)
+                        .width(32.dp)
+                        .height(4.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                )
+                TopAppBar(
                 // TopAppBar reserves top system-bar inset padding by default, assuming it sits at
                 // the physical top of the screen — this one floats inside a bottom sheet well
                 // below the real status bar, so that reserved padding was pure dead space above
@@ -212,6 +225,7 @@ fun SharePickerScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 )
             )
+            }
         },
         bottomBar = {
             if (state == ListingState.LOADED) {

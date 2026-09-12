@@ -41,16 +41,14 @@ android {
             // reports armeabi-v7a there with no arm64-v8a at all, so without this split the app
             // installed and ran (no native-code dependency in the Kotlin/Compose UI) but every
             // native-backed feature silently had nothing to load, surfacing as PythonRuntime's
-            // graceful "Failed to provision the Python runtime" rather than a crash. Only
-            // jniLibs/armeabi-v7a/lib{python,qjs,aria2c}* exist for this ABI so far (all three
-            // follow the same zip.so-or-plain-binary shape already used for arm64-v8a/x86_64) —
-            // libffmpeg.so for this ABI (from the same ytdlnis-packages source as libpython.so/
-            // libqjs.so here) uses a different, dynamically-linked-plus-zip.so-deps shape than the
-            // fully static single-binary libffmpeg.so already bundled for the other two ABIs, so it
-            // wasn't dropped in here — FfmpegRuntime.getExecutablePath() already documents and
-            // handles a missing-for-this-ABI binary as a real, non-crashing case (yt-dlp just can't
-            // mux separate video+audio streams on this ABI yet), so this is a real but scoped-out
-            // follow-up, not a regression.
+            // graceful "Failed to provision the Python runtime" rather than a crash. All four
+            // native components (python/qjs/aria2c/ffmpeg) now exist for this ABI —
+            // jniLibs/armeabi-v7a/lib{python,qjs,aria2c,ffmpeg}*, all from the same
+            // ytdlnis-packages source. ffmpeg's own build for this ABI is dynamically linked
+            // (unlike the fully-static single-binary bundled for arm64-v8a/x86_64), so it also
+            // ships libffmpeg.zip.so — its actual shared-library dependencies, provisioned the
+            // same zip.so-unpacking way PythonRuntime/Aria2Runtime already provision their own
+            // (see FfmpegRuntime.ensureProvisioned).
             include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true
         }
@@ -58,9 +56,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
             
         }
     }

@@ -46,6 +46,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.EnqueueResult
 import com.comfort.app.data.GalleryDlPreferences
@@ -195,7 +200,13 @@ class ShareActivity : ComponentActivity() {
         setIntent(intent)
         val urls = parseUrls(intent)
         if (urls.isEmpty()) {
-            finish()
+            // Only close if nothing else is in flight — a URL-less intent (e.g. sharing a photo
+            // with no link right after a real share) used to call finish() unconditionally here,
+            // which tears down this Activity's composition and cancels whatever coroutine a
+            // still-in-progress previous share (ShareRouter/InstantShareHandler/MultiLinkHandler)
+            // was mid-suspend in — including its own enqueueDownload() call, silently dropping
+            // that earlier, valid download. Only finish when there's genuinely nothing to protect.
+            if (sharedUrls.isEmpty()) finish()
             return
         }
         sharedUrls = urls
@@ -346,14 +357,29 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                 .fillMaxSize()
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { visible = false }
         )
+        var dragOffsetPx by remember { mutableStateOf(0f) }
         AnimatedVisibility(
             visible = visible,
             enter = slideInVertically(tween(SHEET_ANIM_MS), initialOffsetY = { it }),
             exit = slideOutVertically(tween(SHEET_ANIM_MS), targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dragOffsetPx.roundToInt()) },
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().height(280.dp),
+                modifier = Modifier.fillMaxWidth().height(280.dp).pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                        },
+                        onDragEnd = {
+                            if (dragOffsetPx > 300f) {
+                                visible = false
+                            } else {
+                                dragOffsetPx = 0f
+                            }
+                        }
+                    )
+                },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 color = MaterialTheme.colorScheme.surface,
             ) {
@@ -437,14 +463,29 @@ private fun SharePickerSheet(
         var sheetHeight by remember { mutableStateOf(280.dp) }
         val animatedHeight by animateDpAsState(targetValue = sheetHeight, label = "sheetHeight")
 
+        var dragOffsetPx by remember { mutableStateOf(0f) }
         AnimatedVisibility(
             visible = visible,
             enter = slideInVertically(tween(SHEET_ANIM_MS), initialOffsetY = { it }),
             exit = slideOutVertically(tween(SHEET_ANIM_MS), targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dragOffsetPx.roundToInt()) },
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().height(animatedHeight),
+                modifier = Modifier.fillMaxWidth().height(animatedHeight).pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                        },
+                        onDragEnd = {
+                            if (dragOffsetPx > 300f) {
+                                visible = false
+                            } else {
+                                dragOffsetPx = 0f
+                            }
+                        }
+                    )
+                },
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 color = MaterialTheme.colorScheme.surface,
             ) {

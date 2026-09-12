@@ -49,12 +49,16 @@ class MainActivity : ComponentActivity() {
   // trigger recomposition, the standard way to thread an Activity-level Intent into Compose state.
   private val openQueueSignal = mutableIntStateOf(0)
 
-  override fun onNewIntent(intent: Intent) {
-    super.onNewIntent(intent)
-    setIntent(intent)
+  private fun consumeOpenQueueExtra(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
       openQueueSignal.intValue++
     }
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    consumeOpenQueueExtra(intent)
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,9 +70,7 @@ class MainActivity : ComponentActivity() {
 
     // Cold start (app wasn't running) carries the extra on this initial Intent instead of
     // reaching onNewIntent, which only fires for an already-running singleTask instance.
-    if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
-      openQueueSignal.intValue++
-    }
+    consumeOpenQueueExtra(intent)
 
     // The androidx compat SplashScreen dismisses as soon as the first frame is drawn — for a
     // lightweight Compose screen like this one that can happen well before the 700ms staggered

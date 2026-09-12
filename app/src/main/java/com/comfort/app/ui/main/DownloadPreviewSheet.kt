@@ -671,7 +671,6 @@ private fun MainPreviewScreen(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
             .padding(bottom = 24.dp)
             // contentWindowInsets = 0 on the sheet means nothing pads this above the nav bar for
             // us anymore — this keeps the Download button clear of it while the sheet's own
@@ -680,7 +679,7 @@ private fun MainPreviewScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -692,11 +691,12 @@ private fun MainPreviewScreen(
             }
         }
 
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Spacer(modifier = Modifier.width(12.dp))
             val total = VideoQuality.entries.size
             VideoQuality.entries.forEachIndexed { index, option ->
                 val segmentedShape = when (index) {
@@ -721,6 +721,7 @@ private fun MainPreviewScreen(
                     onClick = { onQualityChange(option) },
                 )
             }
+            Spacer(modifier = Modifier.width(12.dp))
         }
 
         // The preview card: an inset image box (not edge-to-edge — the card's own background
@@ -728,7 +729,7 @@ private fun MainPreviewScreen(
         // same padded column. The loading indicator sits layered over the image box while the
         // listing pass is still resolving it.
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             shape = RoundedCornerShape(12.dp),
         ) {
@@ -812,11 +813,12 @@ private fun MainPreviewScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+                Spacer(modifier = Modifier.width(12.dp))
                 PreviewChip(
                     label = "Save thumbnail",
                     selected = saveThumbnail,
@@ -831,13 +833,15 @@ private fun MainPreviewScreen(
                     shape = lastShape,
                     onClick = onOpenCommands,
                 )
+                Spacer(modifier = Modifier.width(12.dp))
             }
 
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+                Spacer(modifier = Modifier.width(12.dp))
                 PreviewChip(
                     label = "Trim Video",
                     selected = trimmed,
@@ -858,6 +862,7 @@ private fun MainPreviewScreen(
                     shape = lastShape,
                     onClick = onOpenTemplates,
                 )
+                Spacer(modifier = Modifier.width(12.dp))
             }
         }
 
@@ -1182,7 +1187,6 @@ private fun TrimVideoScreen(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -1484,7 +1488,7 @@ private fun FilenameTemplatesScreen(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

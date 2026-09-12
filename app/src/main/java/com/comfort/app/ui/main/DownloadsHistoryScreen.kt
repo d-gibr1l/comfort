@@ -46,6 +46,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import com.comfort.app.theme.FavoriteGold
 import com.comfort.app.theme.SuccessGreen40
@@ -322,9 +324,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 Text(
                                     "Library",
                                     style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
-                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.Bold,                                    fontSize = 36.sp,
                                 )
                                 Text(
                                     if (showDuplicatesOnly) {
@@ -570,28 +570,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         if (selectionMode) {
                             row()
                         } else {
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value != SwipeToDismissBoxValue.Settled) {
-                                        requestDelete(setOf(item.id))
-                                    }
-                                    true
-                                },
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                backgroundContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(MaterialTheme.colorScheme.errorContainer)
-                                            .padding(horizontal = 24.dp),
-                                        contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
-                                    ) {
-                                        Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
-                                    }
-                                },
-                            ) {
+                            SwipeToDeleteCard(onDelete = { requestDelete(setOf(item.id)) }) {
                                 row()
                             }
                         }
@@ -687,6 +666,48 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     }
 }
 
+/** Shared swipe-to-delete wrapper for both HistoryRow's own list and DuplicatesList below —
+ * [modifier] and [shape] describe the card's own footprint (edge-to-edge for HistoryRow's plain
+ * rows, a margined rounded pill for Duplicates' cards) and are applied to the reveal background
+ * exactly once, from the same values the caller gives [content] itself, rather than each call site
+ * hand-copying its card's own margin/shape into a second, separate background Box. That hand-copy
+ * was exactly what caused Duplicates' cards to show a permanent colored halo at rest: its
+ * background didn't match the rounded, margined Surface it sat behind. */
+@Composable
+private fun SwipeToDeleteCard(
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape = RectangleShape,
+    content: @Composable () -> Unit,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) {
+                onDelete()
+            }
+            true
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        backgroundContent = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
+            ) {
+                Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        },
+    ) {
+        content()
+    }
+}
+
 /** Library's "Duplicates" filter content — a plain audit log, not the rich gallery grid/list the
  * rest of this screen renders, since a duplicate attempt was never actually downloaded (no
  * progress, no size, no favorite/delete state — just "you tried this link and already had it").
@@ -725,41 +746,18 @@ private fun DuplicatesList(
                 exit = ExitTransition.None,
                 modifier = Modifier.animateItem(),
             ) {
-            // Same swipe-to-delete pattern as the real download rows above (HistoryRow) — no
-            // confirmation, matching the existing Dismiss (X) button below, which already removes
-            // an attempt with no confirmation either.
-            val dismissState = rememberSwipeToDismissBoxState(
-                confirmValueChange = { value ->
-                    if (value != SwipeToDismissBoxValue.Settled) {
-                        onDismiss(attempt.id)
-                    }
-                    true
-                },
-            )
-            SwipeToDismissBox(
-                state = dismissState,
-                backgroundContent = {
-                    // Matches the card's own Surface shape/margin below (fillMaxWidth + vertical
-                    // padding + rounded shape), not a plain edge-to-edge rectangle like HistoryRow's
-                    // own version of this same background — this card is a rounded, margin-inset
-                    // pill rather than an edge-to-edge row, so a rectangular background peeked out
-                    // at the corners and in the vertical gaps between cards even at rest, reading as
-                    // a permanent colored halo around every card instead of a swipe reveal.
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.errorContainer)
-                            .padding(horizontal = 24.dp),
-                        contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
-                    ) {
-                        Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
-                    }
-                },
+            // Same shared swipe-to-delete wrapper as the real download rows above (HistoryRow) —
+            // no confirmation, matching the existing Dismiss (X) button below, which already
+            // removes an attempt with no confirmation either. modifier/shape here are the single
+            // source both the reveal background and this card's own Surface derive from, so they
+            // can't drift out of sync the way two hand-copied literals could.
+            SwipeToDeleteCard(
+                onDelete = { onDismiss(attempt.id) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                shape = MaterialTheme.shapes.medium,
             ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {

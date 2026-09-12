@@ -168,9 +168,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // Settings section/About page, rather than silently swallowing the failure.
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
             statuses = statuses.map { status ->
-                val wheelUrl = status.wheelUrl
-                if (status.updateAvailable && wheelUrl != null) {
-                    val result = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                if (status.updateAvailable && status.artifactUrl != null) {
+                    val result = EngineUpdater.update(context, status)
                     result.getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
                 } else {
                     status
