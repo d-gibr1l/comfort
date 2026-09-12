@@ -17,10 +17,25 @@ import java.io.File
  * bogdanfinn/tls-client's own build script already uses for plain Linux ARM targets, just pointed
  * at the NDK's clang instead).
  *
- * Deliberately not wired in as a general yt-dlp impersonate backend (that would need a real
- * yt_dlp.networking.common.RequestHandler implementing its full interface — streaming, cookies,
- * proxies, timeouts) — this is a narrow, self-contained fix for one specific failure, used via a
- * plain ctypes call in yt_dlp_wrapper.py's own _resolve_reddit_share_link.
+ * Deliberately not wired in as a general yt-dlp impersonate backend (replacing/joining curl_cffi
+ * for the "Impersonate a browser" toggle or TikTok's bypass) — considered and rejected, not just
+ * never attempted. That would need a real yt_dlp.networking.common.RequestHandler (mirroring
+ * curl_cffi's own CurlCFFIRH), whose _send() must return a Response wrapping a file-like reader
+ * yt-dlp's downloader pulls in chunks *while the transfer is still in flight* — that incremental
+ * pull is what actually drives live progress %/speed, --limit-rate throttling, and a responsive
+ * Pause/Cancel (the read loop is where cancellation gets noticed). tls-client's cffi API
+ * (cffi_src/factory.go's readAllBodyWithStreamToFile) has no equivalent: its only file-output mode
+ * is a single call that blocks until the *entire* file is already written to disk before
+ * returning anything to the caller. A backend built on that would either freeze yt-dlp's own
+ * downloader inside one opaque call per file (no live progress, no rate limit, Pause/Cancel only
+ * taking effect after the whole file already finished) or fake incremental reads by serving bytes
+ * back out of the now-fully-downloaded temp file — the progress bar would just jump straight to
+ * 100% the instant that invisible, unthrottleable transfer finishes. Not worth trading that away
+ * for a second backend option whose only real draw (working on armeabi-v7a/x86_64) doesn't even
+ * apply to what currently needs general impersonation. So this stays a narrow, self-contained fix
+ * for one specific failure, used via a plain ctypes call in yt_dlp_wrapper.py's own
+ * _resolve_reddit_share_link — a single small request whose *reply* (a redirect Location header)
+ * is read all at once, never a multi-hundred-MB video body pulled incrementally.
  *
  * Unlike FfmpegRuntime/Aria2Runtime/PythonRuntime, this needs no `.zip.so` provisioning step at
  * all — a Go c-shared build statically links its own runtime and the whole tls-client dependency
