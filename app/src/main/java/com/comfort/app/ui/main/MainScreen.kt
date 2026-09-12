@@ -251,12 +251,19 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             activeDownloadsCount = activeDownloadsCount,
             hasEngineUpdate = EngineUpdateSignal.hasUpdate || AppUpdateSignal.hasUpdate,
             onSelect = { index ->
-                // Tapping the already-selected Library tab again jumps to the Queue, matching
-                // the "tap again for more" pattern used elsewhere in the app.
-                if (index == 1 && selectedTab == 1) {
-                    showQueueScreen = true
-                } else {
-                    selectedTab = index
+                when {
+                    // Tapping the already-selected Library tab again jumps to the Queue, matching
+                    // the "tap again for more" pattern used elsewhere in the app.
+                    index == 1 && selectedTab == 1 -> showQueueScreen = true
+                    // Tapping the already-selected Settings tab again backs all the way out to the
+                    // main Settings list, instead of leaving whatever subpage was open in place —
+                    // selectedTab is already 2 here, so a bare `selectedTab = index` wouldn't have
+                    // changed anything.
+                    index == 2 && selectedTab == 2 -> {
+                        settingsRoute = SettingsRoute.ROOT
+                        settingsHighlightKey = null
+                    }
+                    else -> selectedTab = index
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter),
