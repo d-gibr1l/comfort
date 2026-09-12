@@ -544,6 +544,11 @@ object DownloadDispatcher {
 
         val startMin = GalleryDlPreferences.getScheduleStartMinutes(context)
         val endMin = GalleryDlPreferences.getScheduleEndMinutes(context)
+        // Identical Start/End would otherwise fall into the non-wrapping branch below and read as
+        // "open" only during that exact one minute of the day, closed the other 1439 — surprising
+        // for a value nobody would deliberately pick to mean "almost never download." Treating it
+        // as no restriction is the reading that can't ever silently starve every download.
+        if (startMin == endMin) return 0L
         val now = Calendar.getInstance()
         val nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
 

@@ -178,6 +178,20 @@ class DownloadWorker(
             try {
             return withContext(Dispatchers.IO) {
                 try {
+                // Re-checked fresh here, not the `entity` snapshot fetched before this worker ever
+                // waited at the concurrency gate above — a Pause/Cancel tapped while this worker
+                // was blocked there already wrote PAUSED/CANCELLED and requested this exact job's
+                // own cancellation, but per this file's other cancellation-race comments, that's
+                // only noticed at this coroutine's own next suspension point, not synchronously.
+                // An unconditional RUNNING write here would silently overwrite that already-
+                // recorded pause/cancel the instant the gate lets this worker through, before its
+                // own cancellation ever catches up — showing "Downloading..." for a download the
+                // user just explicitly stopped.
+                val freshStatus = dao.getById(downloadId)?.status
+                if (freshStatus == DownloadStatus.PAUSED || freshStatus == DownloadStatus.CANCELLED) {
+                    DownloadNotifications.cancel(applicationContext, downloadId)
+                    return@withContext Result.success()
+                }
                 dao.updateStatus(downloadId, DownloadStatus.RUNNING)
                 val startTime = System.currentTimeMillis()
                 dao.setStartTime(downloadId, startTime)
