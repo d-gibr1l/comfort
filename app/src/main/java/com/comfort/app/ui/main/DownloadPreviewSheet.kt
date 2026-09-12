@@ -1307,6 +1307,31 @@ private fun TrimVideoScreen(
         // real video exists is what stops the bogus value from being created in the first place.
         val maxSliderMs = realDurationMs?.toFloat()
             ?: maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
+
+        // A floating readout that tracks the thumb horizontally while the user is actively
+        // dragging it — the video preview box already shows a live timestamp when there's no
+        // playable stream (or ExoPlayer's own controller otherwise), but neither one is anchored
+        // to the Slider itself, so a drag on a long video gave no feedback for exactly where the
+        // thumb currently sits until the user let go. BiasAlignment's horizontal bias (-1 at the
+        // far left, 0 centered, +1 at the far right) maps directly from the drag fraction without
+        // needing to measure the bubble's own width to center it.
+        Box(Modifier.fillMaxWidth().height(28.dp)) {
+            if (isDraggingSlider && maxSliderMs > 0f) {
+                val dragFrac = (playheadMs.toFloat() / maxSliderMs).coerceIn(0f, 1f)
+                Surface(
+                    modifier = Modifier.align(androidx.compose.ui.BiasAlignment(dragFrac * 2f - 1f, 0f)),
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    Text(
+                        formatTimestamp(playheadMs),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        }
         Slider(
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
