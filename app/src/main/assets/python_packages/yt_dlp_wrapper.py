@@ -6,6 +6,7 @@ import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
 # curl_cffi is the only impersonate backend this bundled yt-dlp ships with (see
@@ -215,6 +216,22 @@ class _LocalTrimPP(FFmpegPostProcessor):
                 os.remove(concat_list_path)
                 for seg_path in segment_paths:
                     os.remove(seg_path)
+
+            # A start past the real end of the file (the Kotlin side clamps against the known
+            # duration now, but an older/cached UI, a manually-typed range, or a duration that
+            # simply wasn't known yet when the range was set could still send one here) makes an
+            # input-side "-ss" land at EOF immediately — ffmpeg's stream-copy-only build then
+            # writes a valid but empty container and still exits 0, not an error. Without this
+            # check, os.replace() below would silently swap the already-fully-downloaded original
+            # out for that empty file, with the run reported as a plain success. Raising here
+            # instead routes it through the same except block below, which discards the segments
+            # and lets the real error surface — leaving `filepath` (os.replace never runs) as the
+            # untrimmed, still-complete original.
+            if os.path.getsize(trimmed_path) == 0:
+                raise PostProcessingError(
+                    "Trim produced an empty file — the requested range is likely past the end of "
+                    "the actual video"
+                )
 
             # Same path the file already had — nothing downstream (this module's own
             # postprocessor_hook, DownloadWorker's file-move logic on the Kotlin side) needs to
