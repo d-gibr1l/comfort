@@ -93,9 +93,19 @@ private val MIGRATION_13_14 = object : Migration(13, 14) {
     }
 }
 
+// Adds the (status, erroredAt) index DownloadEntity.kt now declares — see its own doc comment on
+// why. Should have shipped in the same migration as the erroredAt column itself (MIGRATION_13_14
+// above); a separate version bump is the only way to add it after the fact without breaking
+// anyone already on schema 14.
+private val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_status_erroredAt` ON `downloads` (`status`, `erroredAt`)")
+    }
+}
+
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 14,
+    version = 15,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -111,6 +121,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
+                        MIGRATION_14_15,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

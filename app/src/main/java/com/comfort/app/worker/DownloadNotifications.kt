@@ -114,8 +114,18 @@ object DownloadNotifications {
      * notifications describe. FLAG_ACTIVITY_NEW_TASK reuses MainActivity's existing singleTask
      * instance (delivered via onNewIntent) rather than starting a second one when the app's
      * already open. Request code shared across every call (not per-download, unlike
-     * [actionPendingIntent]) is intentional: they'd all resolve to the same destination anyway. */
+     * [actionPendingIntent]) is intentional: they'd all resolve to the same destination anyway.
+     *
+     * Cached (not rebuilt per call) — [progressNotification] runs via `updateProgress`, which
+     * DownloadWorker calls up to ~10 times a second while a download is RUNNING (see
+     * FOREGROUND_SERVICE_NOTIFICATION_ID's own doc comment on that cadence); every caller always
+     * passes `applicationContext`, a process-wide singleton, so the resulting PendingIntent is
+     * identical on every call and only needs building once. */
+    @Volatile
+    private var cachedOpenQueuePendingIntent: PendingIntent? = null
+
     private fun openQueuePendingIntent(context: Context): PendingIntent {
+        cachedOpenQueuePendingIntent?.let { return it }
         val intent = Intent(context, MainActivity::class.java).apply {
             putExtra(MainActivity.EXTRA_OPEN_QUEUE, true)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -123,7 +133,7 @@ object DownloadNotifications {
         return PendingIntent.getActivity(
             context, "open_queue".hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        ).also { cachedOpenQueuePendingIntent = it }
     }
 
     private fun actionPendingIntent(context: Context, action: String, downloadId: String): PendingIntent {

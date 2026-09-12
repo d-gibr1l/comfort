@@ -108,9 +108,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
         ) {
             Text("Appearance", 
-                fontWeight = FontWeight.Bold,
-                fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
-                fontSize = 36.sp
+                fontWeight = FontWeight.Bold,                fontSize = 36.sp
             )
             Spacer(Modifier.height(28.dp))
 

@@ -48,6 +48,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.comfort.app.data.DownloadDispatcher
+import com.comfort.app.data.EngineUpdateChannel
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
@@ -271,9 +272,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                     // TopAppBar's default title inset falls a little short of that on its own.
                     Box(modifier = Modifier.height(72.dp).padding(start = 4.dp), contentAlignment = Alignment.BottomStart) {
                         Text("Settings",
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
-                            fontSize = 36.sp
+                            fontWeight = FontWeight.Bold,                            fontSize = 36.sp
                         )
                     }
                 },
@@ -564,9 +563,7 @@ private fun SettingsSubScaffold(
                 title = { 
                     Text(
                         title, 
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(com.comfort.app.R.font.google_sans_bold)),
-                        fontSize = 36.sp
+                        fontWeight = FontWeight.Bold,                        fontSize = 36.sp
                     ) 
                 },
                 navigationIcon = {
@@ -3028,9 +3025,8 @@ private fun QuickEngineUpdateSection() {
         // it's enabled.
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
             result = result.map { status ->
-                val wheelUrl = status.wheelUrl
-                if (status.updateAvailable && wheelUrl != null) {
-                    val update = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                if (status.updateAvailable && status.artifactUrl != null) {
+                    val update = EngineUpdater.update(context, status)
                     update.getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
                 } else {
                     status
@@ -3053,11 +3049,11 @@ private fun QuickEngineUpdateSection() {
                 status = status,
                 updating = updatingEngine == status.engine.packageDirName,
                 onUpdate = {
-                    val wheelUrl = status.wheelUrl ?: return@EngineUpdateRow
+                    if (status.artifactUrl == null) return@EngineUpdateRow
                     updatingEngine = status.engine.packageDirName
                     errorText = null
                     scope.launch {
-                        val result = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                        val result = EngineUpdater.update(context, status)
                         updatingEngine = null
                         result.onSuccess { newVersion ->
                             val updated = statuses.orEmpty().map {
@@ -3096,6 +3092,8 @@ private fun EnginesSection() {
     var updatingEngine by remember { mutableStateOf<String?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var autoUpdate by remember { mutableStateOf(GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) }
+    var ytDlpChannel by remember { mutableStateOf(GalleryDlPreferences.getYtDlpUpdateChannel(context)) }
+    var galleryDlChannel by remember { mutableStateOf(GalleryDlPreferences.getGalleryDlUpdateChannel(context)) }
 
     fun runCheck() {
         checking = true
@@ -3115,7 +3113,11 @@ private fun EnginesSection() {
         }
     }
 
-    LaunchedEffect(Unit) { runCheck() }
+    // Re-checks whenever a channel picker below flips — EngineUpdater.checkAll() reads the
+    // channel preference itself, so switching from Stable to Nightly/Master needs a fresh check
+    // against that new source before the row/button below reflect it, same as opening this screen
+    // for the first time does.
+    LaunchedEffect(ytDlpChannel, galleryDlChannel) { runCheck() }
 
     SettingsSection(title = "Engines", icon = FeatherIcons.RefreshCw) {
         IconToggleRow(
@@ -3141,15 +3143,29 @@ private fun EnginesSection() {
             }
         } else {
             currentStatuses.forEachIndexed { index, status ->
+                EngineChannelPicker(
+                    engine = status.engine,
+                    channel = if (status.engine == EngineUpdater.YT_DLP) ytDlpChannel else galleryDlChannel,
+                    onChannelChange = { newChannel ->
+                        if (status.engine == EngineUpdater.YT_DLP) {
+                            ytDlpChannel = newChannel
+                            GalleryDlPreferences.setYtDlpUpdateChannel(context, newChannel)
+                        } else {
+                            galleryDlChannel = newChannel
+                            GalleryDlPreferences.setGalleryDlUpdateChannel(context, newChannel)
+                        }
+                    },
+                )
+                Spacer(Modifier.height(8.dp))
                 EngineUpdateRow(
                     status = status,
                     updating = updatingEngine == status.engine.packageDirName,
                     onUpdate = {
-                        val wheelUrl = status.wheelUrl ?: return@EngineUpdateRow
+                        if (status.artifactUrl == null) return@EngineUpdateRow
                         updatingEngine = status.engine.packageDirName
                         errorText = null
                         scope.launch {
-                            val result = EngineUpdater.update(context, status.engine, wheelUrl, status.sha256)
+                            val result = EngineUpdater.update(context, status)
                             updatingEngine = null
                             result.onSuccess { newVersion ->
                                 val updated = currentStatuses.map {
@@ -3213,6 +3229,45 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** Same 2-option Surface-chip-row picker as ProcessingSettingsScreen's own Output format picker
+ * (see that screen's own comment on the pattern) — one per engine, its label for the non-Stable
+ * option differing per engine (see EngineUpdater's own doc comment on why gallery-dl's is "Master"
+ * rather than "Nightly": it has no nightly build, only its live Master branch source). */
+@Composable
+private fun EngineChannelPicker(
+    engine: EngineUpdater.EngineInfo,
+    channel: EngineUpdateChannel,
+    onChannelChange: (EngineUpdateChannel) -> Unit,
+) {
+    val bleedingEdgeLabel = if (engine == EngineUpdater.YT_DLP) "Nightly" else "Master"
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf(
+            EngineUpdateChannel.STABLE to "Stable",
+            EngineUpdateChannel.BLEEDING_EDGE to bleedingEdgeLabel,
+        ).forEach { (value, label) ->
+            val selected = channel == value
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.medium,
+                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                onClick = { onChannelChange(value) },
+            ) {
+                Box(modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }

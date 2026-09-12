@@ -33,6 +33,20 @@ enum class OutputFormat(val label: String, val extension: String) {
     MP4("MP4", "mp4"),
 }
 
+/** Which upstream source EngineUpdater checks/installs an engine from. Applies independently per
+ * engine (yt-dlp and gallery-dl each have their own stored channel) since what "the bleeding-edge
+ * option" even means differs between them — see EngineUpdater's own fetchLatestYtDlpNightly/
+ * fetchLatestGalleryDlMaster doc comments for the actual mechanics of each. */
+enum class EngineUpdateChannel {
+    // The official tagged/versioned release — PyPI for both engines, same source `pip install
+    // --upgrade` itself resolves against.
+    STABLE,
+    // yt-dlp: yt-dlp/yt-dlp-nightly-builds' own dated GitHub Releases, rebuilt from master
+    // roughly daily. gallery-dl: its live, unreleased Master branch source directly (gallery-dl
+    // has no separate nightly build — this is the closest equivalent).
+    BLEEDING_EDGE,
+}
+
 object GalleryDlPreferences {
     const val PREFS_NAME = "GalleryDlPrefs"
     const val KEY_COOKIES = "cookies"
@@ -69,6 +83,8 @@ object GalleryDlPreferences {
     const val KEY_OUTPUT_FORMAT = "output_format"
     const val KEY_NETWORK_RETRIES = "network_retries"
     const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
+    const val KEY_YTDLP_UPDATE_CHANNEL = "ytdlp_update_channel"
+    const val KEY_GALLERYDL_UPDATE_CHANNEL = "gallerydl_update_channel"
     const val KEY_FORCE_IPV4 = "force_ipv4"
     const val KEY_CONCURRENT_FRAGMENTS = "concurrent_fragments"
     const val KEY_NO_CHECK_CERTIFICATES = "no_check_certificates"
@@ -538,6 +554,24 @@ object GalleryDlPreferences {
 
     fun setOutputFormat(context: Context, format: OutputFormat) {
         prefs(context).edit().putString(KEY_OUTPUT_FORMAT, format.name).apply()
+    }
+
+    fun getYtDlpUpdateChannel(context: Context): EngineUpdateChannel {
+        val stored = prefs(context).getString(KEY_YTDLP_UPDATE_CHANNEL, EngineUpdateChannel.STABLE.name)
+        return runCatching { EngineUpdateChannel.valueOf(stored ?: EngineUpdateChannel.STABLE.name) }.getOrDefault(EngineUpdateChannel.STABLE)
+    }
+
+    fun setYtDlpUpdateChannel(context: Context, channel: EngineUpdateChannel) {
+        prefs(context).edit().putString(KEY_YTDLP_UPDATE_CHANNEL, channel.name).apply()
+    }
+
+    fun getGalleryDlUpdateChannel(context: Context): EngineUpdateChannel {
+        val stored = prefs(context).getString(KEY_GALLERYDL_UPDATE_CHANNEL, EngineUpdateChannel.STABLE.name)
+        return runCatching { EngineUpdateChannel.valueOf(stored ?: EngineUpdateChannel.STABLE.name) }.getOrDefault(EngineUpdateChannel.STABLE)
+    }
+
+    fun setGalleryDlUpdateChannel(context: Context, channel: EngineUpdateChannel) {
+        prefs(context).edit().putString(KEY_GALLERYDL_UPDATE_CHANNEL, channel.name).apply()
     }
 
     /** How many times a failed request (extraction, or an individual file/fragment fetch) gets

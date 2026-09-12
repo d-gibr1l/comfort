@@ -15,14 +15,23 @@ enum class DownloadStatus {
 // Without an index matching a query's own status/order columns, that re-run is a full table scan
 // *and* a full sort (SQLite's own "Filesort") over the whole downloads table, up to ~10 times a
 // second, entirely on a background thread but still real, silent CPU churn that compounds as
-// history grows. These two match getHistoryFlow/getDeletedFlow's own WHERE status = ...
-// ORDER BY dateAdded shape, and getQueueFlow's WHERE status NOT IN (...) ORDER BY queueOrder,
-// dateAdded shape, respectively — see MIGRATION_9_10 in AppDatabase.kt for the matching migration.
+// history grows. These match getHistoryFlow/getDeletedFlow's own WHERE status = ... ORDER BY
+// dateAdded shape, and getQueueFlow's WHERE status NOT IN (...) ORDER BY queueOrder, dateAdded
+// shape, respectively — see MIGRATION_9_10 in AppDatabase.kt for the matching migration.
+// The third covers getQueueFlow's ERRORED branch, sorted by erroredAt instead of queueOrder (see
+// MIGRATION_14_15) — added alongside the erroredAt column itself. Note this still doesn't let
+// SQLite skip the sort step entirely: getQueueFlow's ORDER BY is a CASE expression picking between
+// two different columns depending on status, and an index can only avoid sorting when ORDER BY is
+// directly by indexed column(s), never through a CASE — so this index speeds up the WHERE status
+// filtering into that branch, not the final sort. A real index-served sort would need a single
+// persisted sort-key column instead, which is more machinery than this table's realistic size
+// (a personal downloader's own queue, not a server-scale table) currently justifies.
 @Entity(
     tableName = "downloads",
     indices = [
         Index(value = ["status", "dateAdded"]),
         Index(value = ["status", "queueOrder", "dateAdded"]),
+        Index(value = ["status", "erroredAt"]),
     ],
 )
 data class DownloadEntity(
