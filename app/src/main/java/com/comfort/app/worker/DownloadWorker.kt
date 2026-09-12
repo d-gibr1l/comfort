@@ -729,14 +729,28 @@ class DownloadWorker(
 
                 stagingDir.deleteRecursively()
 
-                if (isStopped) {
+                // Superseded, not just stopped: some other reschedule already moved this row onto a
+                // *new* WorkManager job before this one's own cancellation was actually observed —
+                // suspendForSchedule() (called from this same actualCallback above when the
+                // schedule window closes mid-download) cancels this worker's own job and writes a
+                // fresh workRequestId + SCHEDULED status, but that cancellation is only "noticed at
+                // its own next suspension point" (see its call site's doc comment above), not
+                // synchronous. If gallery-dl/yt-dlp finishes its last file in that exact window,
+                // execution reaches here with isStopped still false, and without this check the
+                // code below would overwrite the newer job's SCHEDULED status with FINISHED/ERRORED
+                // — while that newer job is still separately armed to run this same download again
+                // later, sometimes flipping an already-finished download back to ERRORED once it
+                // finds nothing new via the download-archive. Comparing this worker's own [id]
+                // against the row's current workRequestId is a general check, not specific to the
+                // schedule case — it's true for a plain pause/cancel racing the same way too.
+                if (isStopped || dao.getById(downloadId)?.workRequestId != id.toString()) {
                     // Defensive fallback only now — a genuine Pause/Cancel mid-download normally
                     // throws CancellationException straight out of runGalleryDl()/runYtDlp() these
                     // days (PythonRuntime kills the subprocess the moment this coroutine's Job is
                     // cancelled, which is what isStopped flipping true actually means; see its own
                     // doc comment), caught by the outer catch block below instead of reaching here.
-                    // Leave whatever status pauseDownload()/cancelDownload() already set instead of
-                    // overwriting it either way.
+                    // Leave whatever status pauseDownload()/cancelDownload()/suspendForSchedule()
+                    // already set instead of overwriting it either way.
                     // Result.success() — see the isStopped branch above for why.
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
