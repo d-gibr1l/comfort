@@ -56,7 +56,8 @@
             android:exported="true"
             android:theme="@style/Theme.GalleryDL.Transparent"
             android:excludeFromRecents="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:taskAffinity="">
             <!-- singleTask: at most one instance of this Activity ever exists — a share arriving
                  while one's already open reuses it (delivered via onNewIntent, see its own doc
                  comment in ShareActivity.kt) instead of creating another one on top. Without this,
@@ -65,7 +66,22 @@
                  single instance that doesn't (reproduced live: one left open from Library >
                  Duplicates confirmation-sheet testing) then just sits there forever, its own
                  translucent/dimmed window compositing on top of whatever the user does next in a
-                 completely different app. -->
+                 completely different app.
+
+                 taskAffinity="" (empty, Android's own documented way to mean "no affinity with
+                 any task") has to come with it — without it, this Activity defaults to sharing
+                 MainActivity's own affinity, and singleTask's "bring the affinity-matching task
+                 forward if one already exists" behavior then brings *that whole task* to the
+                 foreground first whenever Comfort already has one backgrounded (a normal app open
+                 earlier, sent to background) — visibly flashing the main app open for a moment
+                 before this Activity's own window ends up on top of it. Reproduced live exactly
+                 as reported ("sometimes... it opens Comfort before it opens the preview sheet") —
+                 a real regression singleTask introduced (the old default launchMode always
+                 launched into the *calling* app's own task, never touching Comfort's). Giving
+                 this its own affinity means singleTask never has another task to go bring
+                 forward — there's never anything to flash. excludeFromRecents above already keeps
+                 that separate task out of the recent-apps list, so nothing user-visible changes
+                 about how this is presented, only the flash going away. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
