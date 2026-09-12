@@ -16,6 +16,7 @@ import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.Aria2Runtime
 import com.comfort.app.util.FfmpegRuntime
+import com.comfort.app.util.TlsClientRuntime
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.MediaStoreHelper
 import com.comfort.app.util.PythonRuntime
@@ -636,6 +637,7 @@ class DownloadWorker(
                 } else {
                     ""
                 }
+                val tlsClientPath = TlsClientRuntime.getLibraryPath(applicationContext).orEmpty()
 
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
@@ -673,6 +675,7 @@ class DownloadWorker(
                             aria2Path,
                             aria2LibDir,
                             ffmpegLibDir,
+                            tlsClientPath,
                         ),
                         actualCallback,
                     )

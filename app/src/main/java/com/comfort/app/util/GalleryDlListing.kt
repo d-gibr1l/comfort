@@ -361,6 +361,10 @@ object GalleryDlListing {
         // straight to the UNAVAILABLE/instant-whole-download fallback (reproduced live: the
         // picker sheet flashed and closed in under a second instead of showing anything).
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
+        // See yt_dlp_wrapper.py's own _resolve_reddit_share_link — the same redirect-resolution
+        // fix the real download() call gets, needed here too since a Reddit share link's listing
+        // pass hits the exact same WAF block resolving it would.
+        val tlsClientArg = TlsClientRuntime.getLibraryPath(context).orEmpty()
 
         // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
         // prints (see yt_dlp_wrapper.py) — but PythonRuntime.run() merges the subprocess's stderr
@@ -376,7 +380,7 @@ object GalleryDlListing {
         // does.
         val lines = mutableListOf<String>()
         val lastLine = runCatching {
-            PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
+            PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, tlsClientArg)) { line ->
                 lines.add(line)
             }
             lines.lastOrNull { it.isNotBlank() }
