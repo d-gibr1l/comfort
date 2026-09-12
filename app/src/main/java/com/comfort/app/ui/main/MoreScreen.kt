@@ -3143,8 +3143,8 @@ private fun EnginesSection() {
             }
         } else {
             currentStatuses.forEachIndexed { index, status ->
-                EngineChannelPicker(
-                    engine = status.engine,
+                EngineCard(
+                    status = status,
                     channel = if (status.engine == EngineUpdater.YT_DLP) ytDlpChannel else galleryDlChannel,
                     onChannelChange = { newChannel ->
                         if (status.engine == EngineUpdater.YT_DLP) {
@@ -3155,13 +3155,9 @@ private fun EnginesSection() {
                             GalleryDlPreferences.setGalleryDlUpdateChannel(context, newChannel)
                         }
                     },
-                )
-                Spacer(Modifier.height(8.dp))
-                EngineUpdateRow(
-                    status = status,
                     updating = updatingEngine == status.engine.packageDirName,
                     onUpdate = {
-                        if (status.artifactUrl == null) return@EngineUpdateRow
+                        if (status.artifactUrl == null) return@EngineCard
                         updatingEngine = status.engine.packageDirName
                         errorText = null
                         scope.launch {
@@ -3202,6 +3198,10 @@ private fun EnginesSection() {
     }
 }
 
+/** Plain single-row status, no card/channel-picker — used only by QuickEngineUpdateSection's
+ * compact "Updates available" notice elsewhere in Settings, which lists just the outdated engines
+ * with nothing else to configure. EngineCard below is the richer version for the About page's own
+ * Engines section, which needs the channel picker too. */
 @Composable
 private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boolean, onUpdate: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -3229,6 +3229,75 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** One engine's own card inside the Engines section — previously a single flat row shared by both
+ * engines with the channel picker chips stacked loosely above it, easy to misread as one control
+ * block rather than two separate engines. Giving each its own icon+name+version header (plus the
+ * channel picker underneath, now clearly scoped to *this* card) makes the yt-dlp/gallery-dl split
+ * visually obvious at a glance instead of requiring reading the row text to tell them apart. */
+@Composable
+private fun EngineCard(
+    status: EngineUpdater.VersionStatus,
+    channel: EngineUpdateChannel,
+    onChannelChange: (EngineUpdateChannel) -> Unit,
+    updating: Boolean,
+    onUpdate: () -> Unit,
+) {
+    val icon = if (status.engine == EngineUpdater.YT_DLP) FeatherIcons.Terminal else FeatherIcons.Image
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(17.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        status.installedVersion?.let { "v$it" } ?: "Version unknown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                when {
+                    updating -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    status.updateAvailable -> Button(
+                        onClick = onUpdate,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    ) { Text("Update to ${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
+                    status.latestVersion != null -> Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = SuccessGreen40.copy(alpha = 0.15f),
+                    ) {
+                        Text(
+                            "Up to date",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SuccessGreen40,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                    else -> Text(
+                        "Couldn't check",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            EngineChannelPicker(engine = status.engine, channel = channel, onChannelChange = onChannelChange)
         }
     }
 }
