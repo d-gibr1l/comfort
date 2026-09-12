@@ -1239,7 +1239,11 @@ private fun TrimVideoScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Trim video", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Trim video",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(start = 16.dp),
+        )
 
         Surface(
             modifier = Modifier.fillMaxWidth().height(176.dp),
@@ -1315,7 +1319,7 @@ private fun TrimVideoScreen(
         // thumb currently sits until the user let go. BiasAlignment's horizontal bias (-1 at the
         // far left, 0 centered, +1 at the far right) maps directly from the drag fraction without
         // needing to measure the bubble's own width to center it.
-        Box(Modifier.fillMaxWidth().height(28.dp)) {
+        Box(Modifier.fillMaxWidth().height(40.dp)) {
             if (isDraggingSlider && maxSliderMs > 0f) {
                 val dragFrac = (playheadMs.toFloat() / maxSliderMs).coerceIn(0f, 1f)
                 Surface(
@@ -1325,9 +1329,9 @@ private fun TrimVideoScreen(
                 ) {
                     Text(
                         formatTimestamp(playheadMs),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
             }
