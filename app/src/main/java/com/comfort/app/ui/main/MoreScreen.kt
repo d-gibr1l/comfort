@@ -34,6 +34,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -3397,6 +3399,11 @@ private fun IconToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    // Compose's own Switch (unlike the platform's View-based SwitchCompat) doesn't call
+    // performHapticFeedback internally at all — checked directly against this app's bundled
+    // material3 1.5.0-alpha18 SwitchKt.class, no HapticFeedback reference anywhere in it. Every
+    // toggle in Settings felt inert on tap without this.
+    val haptics = LocalHapticFeedback.current
     Row(
         modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)).padding(4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -3419,7 +3426,10 @@ private fun IconToggleRow(
         Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = {
+                haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+                onCheckedChange(it)
+            },
             // Default unchecked thumb color reads as near-invisible against the unchecked track
             // in this theme — an off toggle looked like a flat, dead pill rather than a working
             // control resting in its off position. onSurfaceVariant/surfaceVariant is M3's own
