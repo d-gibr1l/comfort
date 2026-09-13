@@ -300,6 +300,102 @@ def _fix_impersonate_availability_check(ydl):
 
     ydl.urlopen = _urlopen_with_impersonate_fallback
 
+_EXTERNAL_DOWNLOADER_PROGRESS_PATCHED = False
+
+def _patch_external_downloader_progress():
+    """aria2c (see the aria2_path branch above) is invoked through yt-dlp's own ExternalFD, which
+    shells the whole transfer out to one blocking subprocess call and only calls _hook_progress
+    once, after that subprocess has already exited (see downloader/external.py's real_download:
+    a single status='finished' dict built from the completed file's own size on disk — no
+    status='downloading' event is ever fired while the subprocess is still running). This app's
+    own progress_hook (above) only knows how to turn "downloading" events into the [size]/
+    [progress] lines DownloadWorker.kt parses for the live progress bar/byte count — so with
+    aria2c on, those lines never appear at all, even though the file is visibly growing on disk
+    the whole time. (DownloadWorker.kt's speed figure keeps working regardless, since it's
+    computed separately, once, from total elapsed time when the finished file callback lands —
+    which is what made this look like only speed survived rather than everything breaking.)
+
+    Patched by wrapping ExternalFD.real_download with a background thread that polls the same
+    tmpfilename real_download itself already writes to (aria2c has `--file-allocation=none`, so
+    its output file grows incrementally in place rather than being preallocated), feeding each
+    growth into self._hook_progress as a synthetic "downloading" event — same shape yt-dlp's own
+    native downloader produces, so progress_hook above (and everything downstream of it) can't
+    tell the difference. Applied once per process (this script is invoked fresh per download, but
+    the guard costs nothing and avoids double-wrapping if that ever changes)."""
+    global _EXTERNAL_DOWNLOADER_PROGRESS_PATCHED
+    if _EXTERNAL_DOWNLOADER_PROGRESS_PATCHED:
+        return
+    _EXTERNAL_DOWNLOADER_PROGRESS_PATCHED = True
+
+    import threading
+    import urllib.request
+    from yt_dlp.downloader.external import ExternalFD
+
+    def _probe_total_bytes(info_dict):
+        # info_dict["filesize"/"filesize_approx"] is the extractor's own upfront estimate — often
+        # simply absent for a DASH manifest that doesn't advertise size (reproduced live: an
+        # Instagram reel's video format had neither). The native (non-aria2c) downloader never
+        # needed this fallback because it makes the real HTTP request itself and reads Content-
+        # Length straight off that live response; aria2c makes that same request but, being an
+        # opaque external subprocess yt-dlp only waits on, never reports what it saw back. A quick
+        # HEAD (falling back to a 1-byte ranged GET for a CDN that rejects HEAD) recovers the same
+        # number directly, best-effort — total size just stays unknown (matching pre-fix behavior,
+        # not a regression) if even that fails.
+        url = info_dict.get("url")
+        if not url:
+            return None
+        headers = dict(info_dict.get("http_headers") or {})
+        for method, extra_headers in (("HEAD", {}), ("GET", {"Range": "bytes=0-0"})):
+            try:
+                req = urllib.request.Request(url, method=method, headers={**headers, **extra_headers})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    if method == "GET":
+                        content_range = resp.headers.get("Content-Range")
+                        if content_range and "/" in content_range:
+                            total = content_range.rsplit("/", 1)[-1]
+                            return int(total) if total.isdigit() else None
+                    length = resp.headers.get("Content-Length")
+                    if length and length.isdigit():
+                        return int(length)
+            except Exception:
+                continue
+        return None
+
+    _orig_real_download = ExternalFD.real_download
+
+    def _real_download_with_polling(self, filename, info_dict):
+        tmpfilename = self.temp_name(filename)
+        total_bytes = (info_dict.get("filesize") or info_dict.get("filesize_approx")
+                       or _probe_total_bytes(info_dict))
+        stop_event = threading.Event()
+
+        def _poll():
+            last_size = 0
+            while not stop_event.wait(1.0):
+                try:
+                    size = os.path.getsize(tmpfilename)
+                except OSError:
+                    continue
+                if size > last_size:
+                    last_size = size
+                    self._hook_progress({
+                        "status": "downloading",
+                        "downloaded_bytes": size,
+                        "total_bytes": total_bytes,
+                        "filename": filename,
+                        "elapsed": 0,
+                    }, info_dict)
+
+        poll_thread = threading.Thread(target=_poll, daemon=True)
+        poll_thread.start()
+        try:
+            return _orig_real_download(self, filename, info_dict)
+        finally:
+            stop_event.set()
+            poll_thread.join(timeout=2)
+
+    ExternalFD.real_download = _real_download_with_polling
+
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
     integer. Shared by the Speed limit field (bytes-per-second, for yt-dlp's "ratelimit" opt) and
@@ -777,6 +873,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
         if os.path.exists(cacert_path):
             ydl_opts["external_downloader_args"] = {"aria2c": [f"--ca-certificate={cacert_path}"]}
+        _patch_external_downloader_progress()
     if custom_headers:
         # "Header-Name: value" lines, one per header — merged into (not replacing) yt-dlp's own
         # default request headers, the same override-specific-headers behavior --add-header has on
