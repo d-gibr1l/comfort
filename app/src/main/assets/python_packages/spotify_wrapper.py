@@ -31,6 +31,7 @@ import json
 import os
 import re
 import ssl
+import urllib.parse
 import urllib.request
 
 import yt_dlp
@@ -155,17 +156,32 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
 
 
 def _resolve_youtube_match(artist, title, js_runtime_path):
-    """Top result of a plain YouTube search for "<artist> <title> audio" — yt-dlp's own
-    "ytsearchN:" pseudo-URL extraction, same extractor this app already bundles and uses for every
-    other yt-dlp download. Returns a real, directly downloadable webpage_url, or None if nothing
-    resolved."""
-    ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
+    """Top hit of a YouTube Music "songs" search for "<artist> <title>" — yt-dlp's own
+    YoutubeMusicSearchURLIE (extractor/youtube/_search.py), invoked via the real
+    music.youtube.com/search URL it matches (this extractor has no "ytmsearchN:" pseudo-URL
+    shorthand the way plain YoutubeSearchIE has "ytsearchN:" — confirmed by reading its source,
+    it only defines _VALID_URL, not _SEARCH_KEY). The "sp=" param is YouTube Music's own encoded
+    filter for the "songs" section specifically (see the extractor's own _SECTIONS map) — this
+    resolves to the actual studio-audio "Artist - Topic" upload nearly every Spotify-catalog
+    track has on YouTube Music, rather than a plain YouTube search's mix of official/lyric-video/
+    fan uploads (often longer, re-encoded, or with intro/outro content not on the studio track).
+    extract_flat + playlist_items="1" keeps this to resolving just the top hit's URL, instead of
+    fully extracting every result on the page. Returns a real, directly downloadable webpage_url,
+    or None if nothing resolved."""
+    ydl_opts = {
+        "quiet": True, "no_warnings": True, "skip_download": True,
+        "extract_flat": "in_playlist", "playlist_items": "1",
+    }
     if js_runtime_path:
         ydl_opts["js_runtimes"] = {"quickjs": {"path": js_runtime_path}}
-    query = f"ytsearch1:{artist} {title} audio"
+    query_string = urllib.parse.urlencode({
+        "q": f"{artist} {title}",
+        "sp": "EgWKAQIIAWoKEAoQAxAEEAkQBQ==",
+    })
+    url = f"https://music.youtube.com/search?{query_string}"
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(query, download=False)
+            info = ydl.extract_info(url, download=False)
     except Exception:
         return None
     if not info:
