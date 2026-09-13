@@ -5,6 +5,7 @@ import re
 import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
+from yt_dlp.postprocessor.common import PostProcessor
 from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
@@ -625,6 +626,38 @@ class _LocalTrimPP(FFmpegPostProcessor):
 
         return [], info
 
+class _FinalFilePP(PostProcessor):
+    """Reports the download's real final file to `callback` once every other requested
+    postprocessor (whichever combination of ExtractAudio/EmbedThumbnail/Metadata/EmbedSubtitle/
+    LocalTrim custom_pp_keys ends up representing) has actually finished — added last, after
+    _LocalTrimPP itself, so it's genuinely the last thing to run.
+
+    This exists because postprocessor_hook (yt-dlp's own progress_hooks-style mechanism for
+    postprocessors) can't be trusted for this: PostProcessorMetaClass.run_wrapper (postprocessor/
+    common.py) snapshots info_dict *before* calling the postprocessor's own run(), then fires the
+    'finished' hook event with that same pre-run snapshot — so for any postprocessor that renames
+    its own output (ExtractAudio: source.mp4 -> source.m4a; the others all modify their file in
+    place, which is why this went unnoticed until audio-only downloads existed), the 'finished'
+    event always reports the *previous*, about-to-be-deleted filename. Reproduced live: a YouTube
+    Music audio-only download reported the original .mp4 — which yt-dlp's own cleanup deletes
+    immediately after producing the real .m4a — leaving DownloadWorker nothing to find on disk
+    ("No downloadable content found at this link", despite the .m4a existing the whole time).
+
+    A real PostProcessor's own run() has no such snapshot problem: by the time THIS one's run()
+    is called, every prior postprocessor in the chain has already returned its own updated info
+    dict (see YoutubeDL.run_pp/run_all_pps, which thread the return value from each postprocessor
+    into the next) — so info['filepath'] here is always the true, currently-real final path."""
+
+    def __init__(self, downloader, callback):
+        super().__init__(downloader)
+        self._callback = callback
+
+    def run(self, info):
+        filepath = info.get("filepath")
+        if filepath:
+            self._callback(os.path.abspath(filepath))
+        return [], info
+
 class _Logger:
     """Routes yt-dlp's own log messages through the same per-line callback DownloadWorker
     already uses for gallery-dl, instead of yt-dlp's default of printing to stdout — this module
@@ -776,33 +809,27 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             return
         if status != "finished" or not callback:
             return
-        if custom_pp_keys:
-            # A further postprocessor (tracked above) will produce the real final file — reported
-            # from postprocessor_hook below once it completes, not here.
+        if ffmpeg_path:
+            # Whenever ffmpeg is available, *some* postprocessor always runs after the raw
+            # download finishes — at minimum MetadataParser (always registered below), possibly
+            # also a Merger (bestvideo+bestaudio), ExtractAudio, EmbedThumbnail, Metadata,
+            # EmbedSubtitle and/or LocalTrim depending on what was requested. _FinalFilePP (always
+            # added last — see its own doc comment for exactly why postprocessor_hook can't do
+            # this reliably) reports the real final file once that whole chain has actually
+            # finished; reporting the bare downloaded file here too would either be a harmless
+            # duplicate (nothing renamed it) or, worse, a stale path a later postprocessor is
+            # about to delete (exactly what ExtractAudio does to produce its own differently-named
+            # output) — so this is always left to _FinalFilePP instead whenever ffmpeg exists.
             return
         filename = d.get("filename") or (d.get("info_dict") or {}).get("filepath")
         if not filename:
             return
         if _FRAGMENT_SUFFIX_RE.search(filename):
-            # This is a pre-merge fragment, not the real final file — ffmpeg still needs to read
-            # it to produce the merged output (reported separately below, by postprocessor_hook).
-            # DownloadWorker's callback moves/deletes whatever path it's given as soon as it sees
-            # it, asynchronously and concurrently with this synchronous download() call; reporting
-            # a fragment here would race that move against ffmpeg's own read of the same file.
+            # This is a pre-merge fragment, not the real final file — but this branch only runs
+            # at all when ffmpeg_path is falsy, meaning no Merger can exist to consume it either;
+            # kept as a defensive no-op rather than reporting a fragment DownloadWorker can't use.
             return
         callback(os.path.abspath(filename))
-
-    def postprocessor_hook(d):
-        if d.get("status") != "finished" or not callback:
-            return
-        pp_name = d.get("postprocessor")
-        is_final = pp_name == custom_pp_keys[-1] if custom_pp_keys else pp_name == "Merger"
-        if not is_final:
-            return
-        info = d.get("info_dict") or {}
-        filename = info.get("filepath") or info.get("_filename")
-        if filename:
-            callback(os.path.abspath(filename))
 
     # "bestvideo+bestaudio" (yt-dlp's own default) needs ffmpeg to mux the separately-fetched
     # streams together — without the bundled ffmpeg binary (see FfmpegRuntime.kt) that would abort
@@ -830,7 +857,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         "outtmpl": os.path.join(download_dir, outtmpl),
         "format": chosen_format,
         "progress_hooks": [progress_hook],
-        "postprocessor_hooks": [postprocessor_hook],
         "logger": _Logger(callback),
         "noprogress": True,
         "quiet": True,
@@ -1178,6 +1204,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # registered via ydl_opts at that same stage — see _LocalTrimPP's own doc comment
                 # for why running last is what we want here anyway.
                 ydl.add_post_processor(_LocalTrimPP(ydl, clip_ranges), when="post_process")
+            if ffmpeg_path and callback:
+                # See _FinalFilePP's own doc comment for why this (not postprocessor_hooks) is
+                # what reports the real final file whenever any postprocessing could happen —
+                # added last, after _LocalTrimPP above, so it always runs genuinely last.
+                ydl.add_post_processor(_FinalFilePP(ydl, callback), when="post_process")
             ydl.download([url])
         return "Done"
     except _Cancelled:
