@@ -108,6 +108,13 @@ private object DownloadConcurrencyGate {
     }
 }
 
+/** Extensions this app's own yt-dlp wrapper can actually produce for an audio-only download (see
+ * yt_dlp_wrapper.py's own ACODECS-driven preferredcodec="best" comment) plus the handful of other
+ * common audio containers gallery-dl/yt-dlp might hand back unmodified — used to decide whether a
+ * saved file's *own* content Uri is worth trying MediaMetadataRetriever's embedded-artwork
+ * extraction on at all, rather than wasting a MediaMetadataRetriever pass on every video/image. */
+private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "opus", "ogg", "flac", "wav", "alac", "wma")
+
 class DownloadWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -498,10 +505,28 @@ class DownloadWorker(
                                         val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
                                         val speedMbs = (totalBytes / (1024f * 1024f)) / elapsedSeconds
                                         dao.updateLiveProgress(downloadId, count, speedMbs)
-                                        if (singleItemDownload) {
-                                            dao.setThumbnail(downloadId, savedUri.toString())
+                                        // savedUri (the audio file's own content Uri) has no frame
+                                        // Coil can decode as an image, unlike video — pull the
+                                        // embedded cover art out to its own file instead when
+                                        // there is one (see extractAudioArtworkUri's own doc
+                                        // comment). Only when that actually produces a separate
+                                        // image does thumbnailPath stop being "the same Uri as the
+                                        // real file" — so only then does mediaUri need to carry the
+                                        // real file's own Uri separately (see its own doc comment
+                                        // on DownloadEntity) for the Library screen's tap-to-open
+                                        // to still open/play the real file instead of the cover art.
+                                        val artworkUri = if (candidate.extension.lowercase() in AUDIO_EXTENSIONS) {
+                                            MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId)
                                         } else {
-                                            dao.setThumbnailIfAbsent(downloadId, savedUri.toString())
+                                            null
+                                        }
+                                        val thumbnailUri = artworkUri ?: savedUri
+                                        if (singleItemDownload) {
+                                            dao.setThumbnail(downloadId, thumbnailUri.toString())
+                                            if (artworkUri != null) dao.setMediaUri(downloadId, savedUri.toString())
+                                        } else {
+                                            dao.setThumbnailIfAbsent(downloadId, thumbnailUri.toString())
+                                            if (artworkUri != null) dao.setMediaUriIfAbsent(downloadId, savedUri.toString())
                                         }
                                         dao.addBytes(downloadId, fileSize)
                                         if (hasPlaceholderTitle) {

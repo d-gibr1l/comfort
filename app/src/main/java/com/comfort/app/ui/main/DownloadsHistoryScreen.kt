@@ -905,7 +905,11 @@ private fun HistoryGridItem(
                     if (selectionMode) {
                         onTap()
                     } else if (hasThumbnail) {
-                        val uri = Uri.parse(item.thumbnailPath)
+                        // mediaUri is only ever set when thumbnailPath got pointed at a separate
+                        // extracted image instead of the real file (audio downloads — see
+                        // DownloadEntity.mediaUri's own doc comment); everything else still opens
+                        // thumbnailPath itself, same as before mediaUri existed.
+                        val uri = Uri.parse(item.mediaUri ?: item.thumbnailPath)
                         // thumbnailPath is the real saved file's own MediaStore URI (see
                         // DownloadWorker.kt's setThumbnail call) — for a video download that's a
                         // video/* file, not an image, so a hardcoded "image/*" here sent every
@@ -1060,7 +1064,11 @@ private fun HistoryRow(
                     if (selectionMode) {
                         onTap()
                     } else if (hasThumbnail) {
-                        val uri = Uri.parse(item.thumbnailPath)
+                        // mediaUri is only ever set when thumbnailPath got pointed at a separate
+                        // extracted image instead of the real file (audio downloads — see
+                        // DownloadEntity.mediaUri's own doc comment); everything else still opens
+                        // thumbnailPath itself, same as before mediaUri existed.
+                        val uri = Uri.parse(item.mediaUri ?: item.thumbnailPath)
                         // thumbnailPath is the real saved file's own MediaStore URI (see
                         // DownloadWorker.kt's setThumbnail call) — for a video download that's a
                         // video/* file, not an image, so a hardcoded "image/*" here sent every

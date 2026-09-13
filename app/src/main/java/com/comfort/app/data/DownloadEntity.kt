@@ -104,6 +104,16 @@ data class DownloadEntity(
     // queueOrder/dateAdded order regardless of which one actually just happened. Null for anything
     // that has never errored.
     val erroredAt: Long? = null,
+    // The real saved media file's own content Uri — distinct from thumbnailPath, which for an
+    // audio download now holds a standalone extracted-cover-art image instead (see
+    // MediaStoreHelper.extractAudioArtworkUri's own doc comment: Coil can't decode a video frame
+    // OR embedded audio artwork straight out of an audio file's Uri the way it can for video, so
+    // thumbnailPath had to stop being "the same Uri, dual-purposed as both display image and
+    // open/play target" for audio specifically). Null for video/image downloads, where
+    // thumbnailPath is still exactly that same saved file's own Uri and doubles as both, same as
+    // before this field existed — the Library screen's own tap-to-open falls back to
+    // thumbnailPath whenever this is null, so that behavior is unchanged.
+    val mediaUri: String? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

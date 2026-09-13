@@ -92,6 +92,36 @@ object MediaStoreHelper {
         return saveToMediaStore(context, sourceFile, mimeType)
     }
 
+    /** Pulls the cover art embedded in an audio file's own metadata (ID3/MP4 "covr" atom/etc,
+     * whatever mutagen wrote via yt_dlp_wrapper.py's EmbedThumbnail postprocessor) out to a
+     * standalone cached image file, and returns a URI for it — or null if the file has no
+     * embedded art, or isn't readable as media at all.
+     *
+     * Needed because DownloadWorker.kt's own thumbnail display just hands a download's saved
+     * MediaStore Uri straight to Coil's AsyncImage: that works for a video Uri (Coil/Android can
+     * pull a frame straight from it) but an audio Uri has no frame to pull — Coil has
+     * nothing built in for "decode this MP4/M4A container's embedded album art as the image",
+     * so it silently renders nothing. MediaMetadataRetriever.getEmbeddedPicture() is the standard
+     * Android API for exactly this extraction; FileProvider (already declared in the manifest,
+     * exposing all of cacheDir — see file_paths.xml) turns the resulting cache file back into a
+     * content:// Uri so both Coil (in-process) and the Library screen's own share/open intents
+     * (out-of-process) can read it the same way any other thumbnailPath already works. */
+    fun extractAudioArtworkUri(context: Context, savedUri: Uri, downloadId: String): Uri? {
+        val retriever = android.media.MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, savedUri)
+            val art = retriever.embeddedPicture ?: return null
+            val dir = File(context.cacheDir, "audio_art").apply { mkdirs() }
+            val file = File(dir, "$downloadId.jpg")
+            file.writeBytes(art)
+            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        } catch (e: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
     private fun saveToCustomTree(context: Context, treeUri: Uri, sourceFile: File, mimeType: String): Uri? {
         val dir = DocumentFile.fromTreeUri(context, treeUri) ?: return null
         if (!dir.canWrite()) return null

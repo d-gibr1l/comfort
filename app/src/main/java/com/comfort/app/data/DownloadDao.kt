@@ -96,6 +96,16 @@ interface DownloadDao {
     @Query("UPDATE downloads SET thumbnailPath = :thumbnailUri WHERE id = :id")
     suspend fun setThumbnail(id: String, thumbnailUri: String)
 
+    // See DownloadEntity.mediaUri's own doc comment — set alongside setThumbnail/
+    // setThumbnailIfAbsent only when thumbnailPath just got pointed at a standalone extracted
+    // image instead of the real saved file (audio downloads), so the Library screen's tap-to-open
+    // still has the real file's own Uri to open/play, not the cover art image.
+    @Query("UPDATE downloads SET mediaUri = :uri WHERE id = :id")
+    suspend fun setMediaUri(id: String, uri: String)
+
+    @Query("UPDATE downloads SET mediaUri = :uri WHERE id = :id AND mediaUri IS NULL")
+    suspend fun setMediaUriIfAbsent(id: String, uri: String)
+
     @Query("UPDATE downloads SET totalBytes = totalBytes + :bytes WHERE id = :id")
     suspend fun addBytes(id: String, bytes: Long)
 
