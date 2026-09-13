@@ -327,9 +327,24 @@ def _patch_external_downloader_progress():
         return
     _EXTERNAL_DOWNLOADER_PROGRESS_PATCHED = True
 
+    import ssl
     import threading
     import urllib.request
     from yt_dlp.downloader.external import ExternalFD
+
+    # Same cacert.pem already bundled for aria2c's own --ca-certificate (see the aria2_path
+    # branch above) — this embedded Python build has no system CA trust store wired into its
+    # default SSL context (confirmed live: a plain urllib.request.urlopen() call here failed
+    # every single time with "unable to get local issuer certificate", the exact same class of
+    # error aria2c's own GnuTLS stack hit before it got this same file), so a bare urlopen() call
+    # needs an explicit context pointed at it just like aria2c needed an explicit flag.
+    _probe_ssl_context = None
+    _cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+    if os.path.exists(_cacert_path):
+        try:
+            _probe_ssl_context = ssl.create_default_context(cafile=_cacert_path)
+        except Exception:
+            _probe_ssl_context = None
 
     def _probe_total_bytes(info_dict):
         # info_dict["filesize"/"filesize_approx"] is the extractor's own upfront estimate — often
@@ -348,7 +363,7 @@ def _patch_external_downloader_progress():
         for method, extra_headers in (("HEAD", {}), ("GET", {"Range": "bytes=0-0"})):
             try:
                 req = urllib.request.Request(url, method=method, headers={**headers, **extra_headers})
-                with urllib.request.urlopen(req, timeout=10) as resp:
+                with urllib.request.urlopen(req, timeout=10, context=_probe_ssl_context) as resp:
                     if method == "GET":
                         content_range = resp.headers.get("Content-Range")
                         if content_range and "/" in content_range:
@@ -370,12 +385,25 @@ def _patch_external_downloader_progress():
         stop_event = threading.Event()
 
         def _poll():
+            # -x16/-s16 (see the aria2c command line built above) is a genuinely segmented
+            # download: up to 16 connections each write to their own byte offset in the same
+            # output file concurrently, which needs the file seekable out to its full logical
+            # length from early on — so os.path.getsize() (the highest offset anything has ever
+            # written to, i.e. a sparse file's logical length) jumps toward the full size the
+            # moment the *last* segment (writing near the end of the file) starts, however little
+            # data any segment has actually transferred yet. Reproduced live: progress showing
+            # ~100% within a second of a download starting. os.stat().st_blocks counts actual
+            # disk blocks allocated — sparse holes that were seeked-over but never written don't
+            # consume blocks — so multiplying by the POSIX-standard 512-byte block size recovers
+            # real bytes-on-disk regardless of which segment wrote them or in what order.
             last_size = 0
             while not stop_event.wait(1.0):
                 try:
-                    size = os.path.getsize(tmpfilename)
+                    size = os.stat(tmpfilename).st_blocks * 512
                 except OSError:
                     continue
+                if total_bytes:
+                    size = min(size, total_bytes)
                 if size > last_size:
                     last_size = size
                     self._hook_progress({
