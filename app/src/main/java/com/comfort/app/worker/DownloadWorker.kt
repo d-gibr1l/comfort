@@ -233,6 +233,20 @@ class DownloadWorker(
                     }
                     hasVideoItem = listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
                 }
+                // Spotify album/playlist links need the same upfront item count a gallery-dl
+                // gallery gets (a track link's own listing is always exactly 1, so this is a
+                // no-op for that case) — spotify_wrapper.py's own download() call below reports
+                // each track's real final file the same way a multi-item gallery-dl download
+                // already does, so this is the only Spotify-specific wiring the multi-item case
+                // actually needs; everything downstream (item counting, progress %) is engine-
+                // agnostic already.
+                if (engine == DownloadEngine.SPOTIFY && (entity?.totalItems ?: 0) <= 0) {
+                    val listed = GalleryDlListing.listItems(applicationContext, url).items
+                    if (listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
+                        dao.setTotalItems(downloadId, listed.size)
+                        totalItemsRef.set(listed.size)
+                    }
+                }
                 if (isStopped) {
                     // Result.success(), not failure() — this WorkRequest only shares a WorkManager
                     // "queue" name with unrelated downloads to cap concurrency (see
@@ -413,6 +427,21 @@ class DownloadWorker(
                                 if (title.isNotBlank()) dao.updateTitle(downloadId, title)
                             }
                         }
+                        // yt-dlp's own info_dict metadata (yt_dlp_wrapper.py's progress_hook) or
+                        // Spotify's own scraped metadata (spotify_wrapper.py) — see
+                        // DownloadEntity.artist/album/track's own doc comments.
+                        line.startsWith("[artist] ") -> {
+                            val artist = line.removePrefix("[artist] ").trim()
+                            if (artist.isNotBlank()) dao.setArtistIfAbsent(downloadId, artist)
+                        }
+                        line.startsWith("[album] ") -> {
+                            val album = line.removePrefix("[album] ").trim()
+                            if (album.isNotBlank()) dao.setAlbumIfAbsent(downloadId, album)
+                        }
+                        line.startsWith("[track] ") -> {
+                            val track = line.removePrefix("[track] ").trim()
+                            if (track.isNotBlank()) dao.setTrackIfAbsent(downloadId, track)
+                        }
                         // yt-dlp's own "[error] ERROR: ..." lines, gallery-dl's own
                         // "[extractor_name][error] ..." lines (different shape — its logger name
                         // comes first, confirmed live: "[instagram][error] HTTP redirect to login
@@ -492,7 +521,26 @@ class DownloadWorker(
                                         return@actualCallback
                                     }
                                     val fileSize = candidate.length()
-                                    val savedUri = MediaStoreHelper.saveMediaToGallery(applicationContext, candidate)
+                                    // Extension-derived, except for Spotify: its own ffmpeg
+                                    // compatibility fix (yt_dlp_wrapper.py's ACODECS remap,
+                                    // needed because this app's stripped ffmpeg build has no
+                                    // ogg/opus muxer) makes an opus/vorbis extraction land as
+                                    // a bare .webm file — a container AUDIO_EXTENSIONS can't
+                                    // list on its own without misclassifying real webm video
+                                    // downloads as audio. Every Spotify download is audio by
+                                    // definition (see VideoSiteRouter/runSpotify), so that
+                                    // engine check covers the gap without broadening the
+                                    // general-purpose extension set. Computed before
+                                    // saveMediaToGallery (not after, like the rest of this
+                                    // block) so it can override that "webm" extension's own
+                                    // default video/webm MIME guess — without this, a Spotify
+                                    // track saved as .webm lands in Movies/Comfort as a
+                                    // "video", not Music/Comfort as audio.
+                                    val isAudioFile = candidate.extension.lowercase() in AUDIO_EXTENSIONS ||
+                                        engine == DownloadEngine.SPOTIFY
+                                    val savedUri = MediaStoreHelper.saveMediaToGallery(
+                                        applicationContext, candidate, forceAudioMime = isAudioFile,
+                                    )
                                     if (savedUri != null) {
                                         candidate.delete()
                                         val count = savedCount.incrementAndGet()
@@ -515,7 +563,14 @@ class DownloadWorker(
                                         // real file's own Uri separately (see its own doc comment
                                         // on DownloadEntity) for the Library screen's tap-to-open
                                         // to still open/play the real file instead of the cover art.
-                                        val artworkUri = if (candidate.extension.lowercase() in AUDIO_EXTENSIONS) {
+                                        // isAudioFile computed above, before saveMediaToGallery.
+                                        // Independent of the [artist]/[album]/[track] lines —
+                                        // this is extension-derived and always correct for a
+                                        // given file, so it's set unconditionally (not IfAbsent)
+                                        // every time a file for this download lands, regardless
+                                        // of whether any metadata line ever fired.
+                                        if (isAudioFile) dao.setIsAudio(downloadId, true)
+                                        val artworkUri = if (isAudioFile) {
                                             MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId)
                                         } else {
                                             null
@@ -705,8 +760,37 @@ class DownloadWorker(
                         actualCallback,
                     )
 
+                // Always audio-only (Spotify links have no video concept at all — see
+                // VideoSiteRouter's own doc comment on why this is its own dedicated engine) —
+                // no quality/subtitle/playlist-filter options apply, so this passes a much
+                // smaller argv than runYtDlp's own. spotify_wrapper.py delegates the actual
+                // per-track download to yt_dlp_wrapper.py's own download() internally, which is
+                // where ffmpeg/aria2c/js-runtime actually get used.
+                suspend fun runSpotify(): Int =
+                    PythonRuntime.run(
+                        applicationContext, "spotify_wrapper.py",
+                        listOf(
+                            // filenameFormat deliberately NOT passed through — it's gallery-dl's
+                            // own "{keyword}" template syntax (see runYtDlp's own identical "",
+                            // "" for the same reason), meaningless to yt_dlp_wrapper.py's own
+                            // outtmpl and reproduced live as a literal, unsubstituted "{uploader|
+                            // category} - {title|category} [{filename}].{extension}" filename that
+                            // failed ffmpeg outright ("Invalid argument") the first time this was
+                            // tried without this fix.
+                            "download", url, stagingDir.absolutePath, cookiesArg,
+                            "", ytDlpArchivePath, jsRuntimePath,
+                            ffmpegPath, ffmpegLibDir, aria2Path, aria2LibDir,
+                            if (restrictFilenames) "1" else "0",
+                            if (trimFilenames) "1" else "0",
+                            if (verboseLogging) "1" else "0",
+                            tlsClientPath,
+                        ),
+                        actualCallback,
+                    )
+
                 when (engine) {
                     DownloadEngine.YT_DLP -> runYtDlp()
+                    DownloadEngine.SPOTIFY -> runSpotify()
                     DownloadEngine.GALLERY_DL -> {
                         // Always excluded, not just when hasVideoItem's own listing pass happened
                         // to succeed: gallery-dl has its own *unconfigured* internal yt-dlp

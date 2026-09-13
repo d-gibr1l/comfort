@@ -111,9 +111,23 @@ private val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+// Adds isAudio (set once the final saved file's extension is a known audio format — see
+// DownloadWorker's AUDIO_EXTENSIONS check) plus artist/album/track (real metadata captured from
+// yt-dlp's info_dict or Spotify's own scraped metadata when available — see yt_dlp_wrapper.py's
+// progress_hook, spotify_wrapper.py, and DownloadEntity's own doc comments on each). All
+// nullable/defaulted so gallery-dl and non-audio yt-dlp downloads are simply never touched.
+private val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN isAudio INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN artist TEXT")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN album TEXT")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN track TEXT")
+    }
+}
+
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 16,
+    version = 17,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -129,7 +143,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
-                        MIGRATION_14_15, MIGRATION_15_16,
+                        MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

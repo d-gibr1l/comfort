@@ -98,6 +98,7 @@ object GalleryDlListing {
             // yt_dlp_wrapper.py's list_info() doc comment). yt-dlp's own extractor already resolves
             // a real thumbnail as part of normal metadata extraction.
             DownloadEngine.YT_DLP -> listViaYtDlp(context, url)
+            DownloadEngine.SPOTIFY -> listViaSpotify(context, url)
             DownloadEngine.GALLERY_DL -> {
                 val result = listViaGalleryDl(context, url)
                 when {
@@ -274,6 +275,57 @@ object GalleryDlListing {
         return ListingResult(listOf(entryToGalleryItem(info, 1, listIndex = 0)))
     }
 
+    /** Same shape as listViaYtDlp above — spotify_wrapper.py's list_info() returns the identical
+     * JSON contract (see its own doc comment) specifically so this reuse needs no changes. The
+     * only difference: items get a synthetic ".m4a" filename instead of ".mp4", so
+     * VideoSiteRouter.isVideoFilename() correctly reports these as *not* video — Spotify links are
+     * always audio, so the preview sheet's quality/resolution picker should never show for one. */
+    private suspend fun listViaSpotify(context: Context, url: String): ListingResult {
+        val info = runSpotifyListInfo(context, url)
+            ?: return ListingResult(emptyList(), errorMessage = "Couldn't check this Spotify link — the download may still work, but its content couldn't be previewed.")
+        val entries = info.optJSONArray("entries")
+        if (entries != null) {
+            val items = mutableListOf<GalleryItem>()
+            for (i in 0 until entries.length()) {
+                if (items.size >= MAX_ITEMS) break
+                val entry = entries.optJSONObject(i) ?: continue
+                items.add(spotifyEntryToGalleryItem(entry, items.size + 1, listIndex = items.size))
+            }
+            return ListingResult(items)
+        }
+        val error = info.optString("error", "").takeIf { it.isNotBlank() }
+        if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error))
+        return ListingResult(listOf(spotifyEntryToGalleryItem(info, 1, listIndex = 0)))
+    }
+
+    private fun spotifyEntryToGalleryItem(entry: JSONObject, num: Int, listIndex: Int): GalleryItem {
+        val thumbnail = entry.optString("thumbnail", "").ifBlank { null } ?: ""
+        val title = entry.optString("title", "").trim().ifBlank { null }
+            ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
+        return GalleryItem(num, thumbnail, "$num.m4a", title, listIndex = listIndex)
+    }
+
+    private suspend fun runSpotifyListInfo(context: Context, url: String): JSONObject? {
+        val cookiesPath = context.filesDir.resolve("cookies.txt")
+        val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
+        val extraArgs = GalleryDlPreferences.getExtraArgs(context)
+        val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
+        val tlsClientArg = TlsClientRuntime.getLibraryPath(context).orEmpty()
+
+        val lines = mutableListOf<String>()
+        val lastLine = runCatching {
+            PythonRuntime.run(context, "spotify_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, tlsClientArg)) { line ->
+                lines.add(line)
+            }
+            lines.lastOrNull { it.isNotBlank() }
+        }.getOrNull() ?: return null
+
+        return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
+            android.util.Log.w("GalleryDlListing", "Failed to parse Spotify JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
+            null
+        }
+    }
+
     private fun entryToGalleryItem(entry: JSONObject, num: Int, listIndex: Int): GalleryItem {
         val thumbnail = entry.optString("thumbnail", "").ifBlank { null } ?: ""
         val title = entry.optString("title", "").trim().ifBlank { null }
@@ -318,7 +370,10 @@ object GalleryDlListing {
      * link, a login-gated post, no network): the sheet just shows its placeholder card and the
      * download itself still goes ahead, since a preview failing is not a reason to block it. */
     suspend fun fetchPreviewInfo(context: Context, url: String): PreviewInfo? = withContext(Dispatchers.IO) {
-        val json = runYtDlpListInfo(context, url) ?: return@withContext null
+        val json = when (VideoSiteRouter.classify(url)) {
+            DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url)
+            else -> runYtDlpListInfo(context, url)
+        } ?: return@withContext null
         // A multi-item source comes back as {"entries": [...]} — the sheet previews one download,
         // so the first entry that actually resolved stands in for it.
         val entry = json.optJSONArray("entries")?.let { entries ->

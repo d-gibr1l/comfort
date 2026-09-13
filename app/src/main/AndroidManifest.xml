@@ -104,6 +104,7 @@
                 <data android:scheme="https" android:host="www.instagram.com" />
                 <data android:scheme="https" android:host="pixiv.net" />
                 <data android:scheme="https" android:host="www.pixiv.net" />
+                <data android:scheme="https" android:host="open.spotify.com" />
             </intent-filter>
         </activity>
 

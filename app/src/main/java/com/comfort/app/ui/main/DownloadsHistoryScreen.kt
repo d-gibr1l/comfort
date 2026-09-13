@@ -112,6 +112,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     var favoritesOnly by remember { mutableStateOf(false) }
     var showDeletedOnly by remember { mutableStateOf(false) }
     var showDuplicatesOnly by remember { mutableStateOf(false) }
+    var audioOnly by remember { mutableStateOf(false) }
     val duplicateAttempts by viewModel.duplicateAttemptsFlow.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
@@ -194,6 +195,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
 
     val visibleItems = (if (showDeletedOnly) deletedItems else historyItems)
         .let { if (favoritesOnly) it.filter { item -> item.isFavorite } else it }
+        .let { if (audioOnly) it.filter { item -> item.isAudio } else it }
         .let { list ->
             if (searchQuery.isBlank()) list
             else list.filter {
@@ -422,7 +424,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 active = favoritesOnly,
                                 onClick = {
                                     favoritesOnly = !favoritesOnly
-                                    if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false }
+                                    if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false }
                                 },
                             )
                             LibraryToolbarChip(
@@ -431,7 +433,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 active = showDeletedOnly,
                                 onClick = {
                                     showDeletedOnly = !showDeletedOnly
-                                    if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false }
+                                    if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false; audioOnly = false }
                                 },
                             )
                             LibraryToolbarChip(
@@ -441,7 +443,16 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 count = duplicateAttempts.size,
                                 onClick = {
                                     showDuplicatesOnly = !showDuplicatesOnly
-                                    if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false }
+                                    if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false; audioOnly = false }
+                                },
+                            )
+                            LibraryToolbarChip(
+                                icon = FeatherIcons.Music,
+                                label = "Audio",
+                                active = audioOnly,
+                                onClick = {
+                                    audioOnly = !audioOnly
+                                    if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
                                 },
                             )
                             LibraryToolbarChip(
@@ -1176,8 +1187,17 @@ private fun HistoryRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val domain = remember(item.url) { runCatching { URI(item.url).host?.removePrefix("www.") }.getOrNull() ?: "Unknown" }
+            // Real artist/album beats the domain for an audio download whenever it's known —
+            // that's the actual point of capturing this metadata at all (see DownloadEntity's
+            // own doc comments on artist/album). Falls back to the domain exactly like before
+            // for anything else, including an audio download whose source never reported one.
+            val subtitleText = if (item.isAudio && item.artist != null) {
+                if (item.album != null) "${item.artist} — ${item.album}" else item.artist
+            } else {
+                domain
+            }
             Text(
-                text = domain,
+                text = subtitleText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

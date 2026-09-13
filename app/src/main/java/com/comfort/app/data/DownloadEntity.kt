@@ -114,6 +114,30 @@ data class DownloadEntity(
     // before this field existed — the Library screen's own tap-to-open falls back to
     // thumbnailPath whenever this is null, so that behavior is unchanged.
     val mediaUri: String? = null,
+    // True once a downloaded file's final extension is a known audio format (see
+    // DownloadWorker's own AUDIO_EXTENSIONS check, the one place that reliably knows the real
+    // final extension for ANY engine/site — a gallery-dl image download or a yt-dlp video
+    // download never sets this). Drives the Library screen's "Audio" filter chip and the
+    // artist/album subtitle fallback — never inferred from url/title, only from the real saved
+    // file.
+    @ColumnInfo(defaultValue = "0")
+    val isAudio: Boolean = false,
+    // Real track artist, distinct from the uploader/channel-derived `title` field above — only
+    // ever populated for yt-dlp-routed downloads whose info_dict actually carries an `artist`
+    // field (YouTube Music releases; falls back to uploader/channel/creator otherwise — see
+    // yt_dlp_wrapper.py's progress_hook), or for Spotify-routed downloads, whose own scraped
+    // metadata is more authoritative and takes priority. Null for gallery-dl downloads and any
+    // yt-dlp download whose extractor never reports one.
+    val artist: String? = null,
+    // Real album name — populated for YouTube Music releases, Spotify album/playlist downloads
+    // (which know their own containing album), and otherwise usually null (a single Spotify
+    // track link's own metadata doesn't expose album name; a plain YouTube video essentially
+    // never does either). The Library card falls back to showing artist alone when this is null
+    // but artist isn't.
+    val album: String? = null,
+    // Track/album position (e.g. "3"), if the source reports one. Not currently surfaced in the
+    // UI — captured now so it's available without another migration once/if it is.
+    val track: String? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

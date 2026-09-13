@@ -37,9 +37,9 @@ object MediaStoreHelper {
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if
      * one is set, otherwise the public Pictures/gallery-dl gallery folder — and returns its
      * content Uri. */
-    fun saveMediaToGallery(context: Context, sourceFile: File): Uri? {
+    fun saveMediaToGallery(context: Context, sourceFile: File, forceAudioMime: Boolean = false): Uri? {
         val ext = sourceFile.name.substringAfterLast('.', "").lowercase()
-        val mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+        var mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
             ?: URLConnection.guessContentTypeFromName(sourceFile.name)
             ?: when (ext) {
                 "mp4", "m4v" -> "video/mp4"
@@ -60,6 +60,18 @@ object MediaStoreHelper {
                 // catch whatever this still doesn't recognize, rather than silently mislabeling it.
                 else -> "application/octet-stream"
             }
+        // Overrides a video/* guess for a file the caller already knows is audio-only —
+        // needed for Spotify's own opus/vorbis-sourced tracks, which this app's stripped
+        // ffmpeg build can only remux into a bare .webm container (see yt_dlp_wrapper.py's
+        // ACODECS remap and DownloadWorker.kt's own isAudioFile comment). Without this, such
+        // a track's real MIME guess ("video/webm", MimeTypeMap's own mapping for the
+        // extension) would file it under Movies/Comfort as a "video" instead of
+        // Music/Comfort — extension-only detection can't tell an audio-only webm apart from
+        // a real video one, so the caller's own already-established audio/video knowledge
+        // is trusted here instead.
+        if (forceAudioMime && mimeType.startsWith("video/")) {
+            mimeType = "audio/webm"
+        }
         // Kept honest here (a real .mkv file reported as "video/x-matroska", not lied about) —
         // saveToMediaStore() itself falls back to "video/mp4" only if MediaStore actually rejects
         // the real type, rather than always lying about it. The previous unconditional override
@@ -185,7 +197,18 @@ object MediaStoreHelper {
             // and only fall back to lying about the type if that actually fails, keeping the
             // original fix's safety net for whatever device/OS combination still needs it.
             insertIntoMediaStore(context, sourceFile, mimeType)
-                ?: if (mimeType == "video/x-matroska") insertIntoMediaStore(context, sourceFile, "video/mp4") else null
+                ?: when (mimeType) {
+                    "video/x-matroska" -> insertIntoMediaStore(context, sourceFile, "video/mp4")
+                    // "audio/webm" isn't a MIME MediaStore's Audio collection reliably accepts on
+                    // every device (reproduced live: a Spotify opus/webm track's insert came back
+                    // null, silently — see insertIntoMediaStore's own runCatching — turning a
+                    // previously-working download into "No downloadable content found at this
+                    // link"). Falling back to the plain, always-accepted "video/webm" guess trades
+                    // away the Music-folder placement this override exists for, but a download
+                    // that succeeds into the wrong folder beats one that fails outright.
+                    "audio/webm" -> insertIntoMediaStore(context, sourceFile, "video/webm")
+                    else -> null
+                }
         } else {
             // Pre-scoped-storage devices (API 24-28): write straight into the public dir, then index it.
             val (collection, relativeDir) = collectionFor(mimeType)
