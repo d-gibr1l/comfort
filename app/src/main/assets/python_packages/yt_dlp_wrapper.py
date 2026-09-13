@@ -425,6 +425,45 @@ def _patch_external_downloader_progress():
 
     ExternalFD.real_download = _real_download_with_polling
 
+_EMBED_THUMBNAIL_PATCHED = False
+
+def _patch_embed_thumbnail_fallback():
+    """EmbedThumbnailPP only accepts jpg/png (or any format at all, for mkv/mka) straight from
+    the extractor; anything else — YouTube's own thumbnails are commonly .webp — gets run through
+    FFmpegThumbnailsConvertorPP.convert_thumbnail(..., 'png') first (see its own call site in
+    embedthumbnail.py's run()). That conversion needs both a real PNG encoder and yt-dlp's
+    "image2" output muxer, and this bundled ffmpeg has neither: --enable-muxer above never
+    includes image2/png (only 'mp4,ipod,matroska,webm,adts,wav,mp3' — see the aria2_path branch's
+    own sibling comment on this same build's --disable-encoders for the parallel audio-side
+    story), so the conversion always fails. Reproduced live: enabling "Embed thumbnail" for an
+    audio-only YouTube Music download failed the *entire* download with "Postprocessing: Error
+    splitting the argument list: Option not found" over a cosmetic, non-essential step — the
+    actual audio had already downloaded and extracted successfully by that point.
+
+    Patched by wrapping EmbedThumbnailPP.run to catch exactly this and degrade to "no thumbnail
+    embedded" instead of failing the whole download — mirroring the same "a real capability gap
+    in this stripped ffmpeg build shouldn't sink an otherwise-successful transfer" philosophy as
+    the audio-codec and impersonate-fallback fixes elsewhere in this file. A real, unrelated
+    embedding failure (corrupt thumbnail, disk full, ...) still surfaces via the debug callback
+    line, just no longer fatally."""
+    global _EMBED_THUMBNAIL_PATCHED
+    if _EMBED_THUMBNAIL_PATCHED:
+        return
+    _EMBED_THUMBNAIL_PATCHED = True
+
+    from yt_dlp.postprocessor.embedthumbnail import EmbedThumbnailPP
+
+    _orig_run = EmbedThumbnailPP.run
+
+    def _run_with_fallback(self, info):
+        try:
+            return _orig_run(self, info)
+        except Exception as e:
+            self.to_screen(f"Not embedding thumbnail; {e}")
+            return [], info
+
+    EmbedThumbnailPP.run = _run_with_fallback
+
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
     integer. Shared by the Speed limit field (bytes-per-second, for yt-dlp's "ratelimit" opt) and
@@ -739,6 +778,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             custom_pp_keys.append("ExtractAudio")
         if embed_thumbnail:
             custom_pp_keys.append("EmbedThumbnail")
+            _patch_embed_thumbnail_fallback()
         if embed_metadata:
             custom_pp_keys.append("Metadata")
         if download_subtitles and not audio_only:
