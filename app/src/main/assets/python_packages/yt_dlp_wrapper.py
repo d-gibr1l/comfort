@@ -142,8 +142,8 @@ def _header_value(headers, name):
             return value[0] if isinstance(value, list) and value else value
     return None
 
-from yt_dlp.networking.common import Response, register_preference, register_rh
-from yt_dlp.networking.exceptions import HTTPError, TransportError, UnsupportedRequest
+from yt_dlp.networking.common import Request, Response, register_preference, register_rh
+from yt_dlp.networking.exceptions import HTTPError, RequestError, TransportError, UnsupportedRequest
 from yt_dlp.networking.impersonate import ImpersonateRequestHandler
 
 @register_rh
@@ -250,6 +250,55 @@ def _tls_client_preference(rh, request):
     if request.extensions.get("impersonate") or rh.impersonate:
         return 1001
     return 0
+
+def _fix_impersonate_availability_check(ydl):
+    """Extractors decide whether to *request* impersonation at all by first asking yt-dlp
+    "is impersonation available in general" (YoutubeDL._impersonate_target_available, called with
+    no host/URL in scope — see instagram.py's own _can_impersonate property, which every one of
+    its impersonated requests is gated behind, and _request_webpage's own _parse_impersonate_targets
+    call, which every "impersonate=True" extractor kwarg funnels through, Reddit's included). That
+    check just asks every registered ImpersonateRequestHandler "can you EVER serve a chrome
+    target", with no awareness that TlsClientRH's answer to that is only true for reddit.com
+    (enforced separately, in _validate, which this check never calls). Reproduced live on a
+    non-arm64 device (no curl_cffi, so before TlsClientRH existed, nothing answered "yes" and
+    Instagram correctly skipped impersonation): once TlsClientRH is registered, the generic check
+    now answers "yes" everywhere TlsClientRH's .so is bundled (every ABI), so Instagram believes
+    impersonation is available, requests it for its instagram.com calls, TlsClientRH._validate
+    then rejects those on the real dispatch (wrong host), no other handler exists to pick up the
+    slack on non-arm64, and the request fails with yt-dlp's own "Impersonate target ... is not
+    available" error.
+
+    Excluding TlsClientRH from the availability check itself (the first thing tried here) is
+    wrong, not just narrow: Reddit's own impersonate=True call goes through this exact same
+    check, and on the very ABIs TlsClientRH exists to support (armeabi-v7a/x86_64, no curl_cffi),
+    excluding it would make Reddit's own request believe impersonation isn't available either —
+    reintroducing the WAF block TlsClientRH was built to fix, on the ABIs that need it most.
+
+    Fixed one layer down instead: let the availability check keep answering honestly (TlsClientRH
+    really can impersonate chrome, just not for arbitrary hosts), and catch the resulting failure
+    only when it actually happens — at dispatch, when TlsClientRH._validate rejects the concrete
+    non-reddit URL and no other handler picks it up. That surfaces as YoutubeDL.urlopen's own
+    "Impersonate target ... is not available" RequestError; caught here and silently retried once
+    with the impersonate extension stripped, so a non-reddit request degrades to a plain
+    unimpersonated one — exactly the graceful behavior every extractor already falls back to when
+    _parse_impersonate_targets finds nothing available up front (see extractor/common.py's
+    _request_webpage) — rather than hard-failing the whole download."""
+    _orig_urlopen = ydl.urlopen
+
+    def _urlopen_with_impersonate_fallback(req):
+        try:
+            return _orig_urlopen(req)
+        except RequestError as e:
+            if "requires browser impersonation" not in str(e):
+                raise
+            request = Request(req) if isinstance(req, str) else req
+            if not request.extensions.get("impersonate"):
+                raise
+            fallback_request = request.copy()
+            fallback_request.extensions.pop("impersonate", None)
+            return _orig_urlopen(fallback_request)
+
+    ydl.urlopen = _urlopen_with_impersonate_fallback
 
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
@@ -980,6 +1029,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            _fix_impersonate_availability_check(ydl)
             if clip_ranges and ffmpeg_path:
                 # Added directly rather than through ydl_opts["postprocessors"] (a list of plain
                 # {"key": ...} dicts yt-dlp itself resolves to stock Ffmpeg*PP classes) since
@@ -1098,6 +1148,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            _fix_impersonate_availability_check(ydl)
             info = ydl.extract_info(url, download=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
