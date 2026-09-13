@@ -440,22 +440,75 @@ def _patch_embed_thumbnail_fallback():
     splitting the argument list: Option not found" over a cosmetic, non-essential step — the
     actual audio had already downloaded and extracted successfully by that point.
 
-    Patched by wrapping EmbedThumbnailPP.run to catch exactly this and degrade to "no thumbnail
-    embedded" instead of failing the whole download — mirroring the same "a real capability gap
-    in this stripped ffmpeg build shouldn't sink an otherwise-successful transfer" philosophy as
-    the audio-codec and impersonate-fallback fixes elsewhere in this file. A real, unrelated
-    embedding failure (corrupt thumbnail, disk full, ...) still surfaces via the debug callback
-    line, just no longer fatally."""
+    Fixed two ways, layered:
+
+    1. For YouTube specifically, avoid ever needing the conversion at all. Its own extractor
+       (extractor/youtube/_video.py) generates a plain .jpg sibling for *every* .webp thumbnail
+       candidate at the same name/resolution — `for name in thumbnail_names for ext in ('webp',
+       'jpg')` — and ranks the webp one only one preference point higher, which is why it's
+       normally the one picked and downloaded. Swapping "/vi_webp/"->"/vi/" and ".webp"->".jpg"
+       in the chosen thumbnail's URL isn't a guessed pattern — it's the exact same URL yt-dlp's
+       own extractor would have generated had it ranked jpg first. Fetching that instead lets
+       mutagen (embedthumbnail.py's own primary, ffmpeg-free path for m4a/mp4) embed a real
+       thumbnail directly, no conversion needed.
+
+    2. Everywhere else (a site whose thumbnail is some other non-jpg/png format, or the jpg
+       fetch above fails for any reason), fall back to catching the failure and degrading to "no
+       thumbnail embedded" instead of failing the whole download — the same "a real capability
+       gap in this stripped ffmpeg build shouldn't sink an otherwise-successful transfer"
+       philosophy as the audio-codec and impersonate-fallback fixes elsewhere in this file. A
+       genuinely unrelated embedding failure (corrupt thumbnail, disk full, ...) still surfaces
+       via the debug callback line, just no longer fatally."""
     global _EMBED_THUMBNAIL_PATCHED
     if _EMBED_THUMBNAIL_PATCHED:
         return
     _EMBED_THUMBNAIL_PATCHED = True
 
+    import ssl
+    import urllib.request
     from yt_dlp.postprocessor.embedthumbnail import EmbedThumbnailPP
+
+    # Same reasoning as the aria2c size-probe's own SSL context (see _patch_external_downloader_
+    # progress): this embedded Python's default SSL context has no CA trust store wired in.
+    _cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+    _ssl_context = None
+    if os.path.exists(_cacert_path):
+        try:
+            _ssl_context = ssl.create_default_context(cafile=_cacert_path)
+        except Exception:
+            _ssl_context = None
+
+    def _prefer_jpg_thumbnail(info):
+        thumbnails = info.get("thumbnails") or []
+        idx = next((-i for i, t in enumerate(thumbnails[::-1], 1) if t.get("filepath")), None)
+        if idx is None:
+            return
+        entry = thumbnails[idx]
+        filepath = entry.get("filepath") or ""
+        if os.path.splitext(filepath)[1].lower() in (".jpg", ".jpeg", ".png"):
+            return
+        url = entry.get("url") or ""
+        jpg_url = url.replace("/vi_webp/", "/vi/").replace(".webp", ".jpg")
+        if jpg_url == url:
+            return
+        jpg_path = os.path.splitext(filepath)[0] + ".jpg"
+        try:
+            req = urllib.request.Request(jpg_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15, context=_ssl_context) as resp:
+                data = resp.read()
+            if not data:
+                return
+            with open(jpg_path, "wb") as f:
+                f.write(data)
+        except Exception:
+            return
+        entry["filepath"] = jpg_path
+        entry["url"] = jpg_url
 
     _orig_run = EmbedThumbnailPP.run
 
     def _run_with_fallback(self, info):
+        _prefer_jpg_thumbnail(info)
         try:
             return _orig_run(self, info)
         except Exception as e:
@@ -776,7 +829,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     if ffmpeg_path:
         if audio_only:
             custom_pp_keys.append("ExtractAudio")
-        if embed_thumbnail:
+        # Cover art is worth embedding into an audio file regardless of the general "Embed
+        # thumbnail" setting (which is really about *video* files) — an audio-only download with
+        # no cover art at all looks broken in most music players, whereas video thumbnails are
+        # much more optional (the video frame itself is the "thumbnail"). audio_only's own
+        # ExtractAudio entry is appended just above, so this stays in the same relative order —
+        # EmbedThumbnail needs to run *after* ExtractAudio so info['ext'] is already 'm4a' by the
+        # time it runs, which is what lets it use mutagen's ffmpeg-free embed path at all.
+        if embed_thumbnail or audio_only:
             custom_pp_keys.append("EmbedThumbnail")
             _patch_embed_thumbnail_fallback()
         if embed_metadata:
@@ -1149,7 +1209,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # audio codec maps to (Reddit/Instagram's aac/opus -> .m4a/.opus, not always .mp3),
             # which is the expected, documented behavior of --audio-format best itself.
             postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "best"})
-        if embed_thumbnail:
+        if embed_thumbnail or audio_only:
             ydl_opts["writethumbnail"] = True
             postprocessors.append({"key": "EmbedThumbnail"})
         if embed_metadata or embed_chapters:
