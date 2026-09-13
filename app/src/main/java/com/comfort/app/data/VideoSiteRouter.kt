@@ -2,7 +2,7 @@ package com.comfort.app.data
 
 import java.net.URI
 
-enum class DownloadEngine { GALLERY_DL, YT_DLP }
+enum class DownloadEngine { GALLERY_DL, YT_DLP, SPOTIFY }
 
 /** Decides which engine a URL's *primary* pass should go through. Sites that only ever post
  * video skip gallery-dl entirely (it can't extract them at all); everything else goes through
@@ -30,15 +30,27 @@ object VideoSiteRouter {
         "dailymotion.com",
     )
 
+    // Spotify itself never hosts downloadable audio (its streams are DRM'd) — this app's own
+    // spotify_wrapper.py instead scrapes Spotify's public embed pages for real metadata (no API
+    // credentials needed — see the plan this was built from) and searches/downloads the matching
+    // track from YouTube via the already-bundled yt-dlp. Neither gallery-dl nor plain yt-dlp can
+    // do anything with a Spotify URL at all, so this is checked unconditionally, same spirit as
+    // videoOnlyHosts below but its own dedicated engine rather than reusing YT_DLP.
+    private val spotifyHosts = setOf("open.spotify.com", "spotify.com", "spotify.link")
+
     fun classify(url: String): DownloadEngine {
         val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
             ?: return DownloadEngine.GALLERY_DL
-            
+
+        if (spotifyHosts.any { host == it || host.endsWith(".$it") }) {
+            return DownloadEngine.SPOTIFY
+        }
+
         // Instagram reels are always videos and handle much better in yt-dlp immediately
         if ((host == "instagram.com" || host.endsWith(".instagram.com")) && url.contains("/reel/")) {
             return DownloadEngine.YT_DLP
         }
-        
+
         return if (videoOnlyHosts.any { host == it || host.endsWith(".$it") }) {
             DownloadEngine.YT_DLP
         } else {

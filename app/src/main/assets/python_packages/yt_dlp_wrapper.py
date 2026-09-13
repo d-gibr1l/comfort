@@ -517,6 +517,64 @@ def _patch_embed_thumbnail_fallback():
 
     EmbedThumbnailPP.run = _run_with_fallback
 
+_FFMPEG_AUDIO_COPY_PATCHED = False
+
+def _patch_ffmpeg_audio_copy_for_stripped_build():
+    """Two separate incompatibilities between FFmpegExtractAudioPP's "best"-codec/copy-only path
+    (see that fix's own doc comment just above) and this app's own stripped ffmpeg build
+    (--disable-encoders/--disable-decoders, and a narrow --enable-muxer list of just
+    'mp4,ipod,matroska,webm,adts,wav,mp3' — confirmed directly from this build's own `-version`
+    configure string), both reproduced live extracting audio from a source whose native codec is
+    opus (a common YouTube bestaudio format, not just aac/m4a):
+
+    1. yt_dlp's own ACODECS table (postprocessor/ffmpeg.py) maps a copy-only opus/vorbis
+       extraction to a bare ".opus"/".ogg" extension — but that build's --enable-muxer list has
+       no ogg/opus muxer at all, so writing to that extension can never work here, copy-only or
+       not. WebM *is* in the muxer list and is itself a fully valid, standard container for
+       Opus/Vorbis audio, so remapping just the extension keeps this a pure remux (still
+       "-acodec copy", no real encode) into a container this build can actually write.
+
+    2. FFmpegPostProcessor.real_run_ffmpeg (same file) separately, unconditionally appends
+       "-movflags", "+faststart" to every output file's own args (see its own make_args() nested
+       helper) — a flag only the MP4 muxer understands. A full desktop ffmpeg build just warns
+       and ignores an option a muxer doesn't recognize; this stripped build turns that into a
+       hard "Invalid argument" failure instead — so even after the extension fix above, a webm
+       output still needs this flag stripped to actually succeed.
+
+    Fixed with two small, narrowly-targeted patches: remapping ACODECS's own opus/vorbis
+    extensions to "webm" (keeping their real encoder/opts entries untouched — irrelevant anyway
+    once the "best"/copy-only branch overrides acodec to "copy" regardless), and wrapping
+    Popen.run (yt_dlp.utils.Popen, the one point every ffmpeg invocation funnels through) to
+    strip a literal "-movflags"/"+faststart" pair whenever the command's own output path isn't an
+    mp4-family extension the flag actually applies to. Neither touches a real mp4/m4a output,
+    where both the original extension and the flag are correct and unaffected."""
+    global _FFMPEG_AUDIO_COPY_PATCHED
+    if _FFMPEG_AUDIO_COPY_PATCHED:
+        return
+    _FFMPEG_AUDIO_COPY_PATCHED = True
+
+    from yt_dlp.postprocessor.ffmpeg import ACODECS
+    from yt_dlp.utils import Popen
+
+    for _codec in ("opus", "vorbis"):
+        _ext, _encoder, _opts = ACODECS[_codec]
+        ACODECS[_codec] = ("webm", _encoder, _opts)
+
+    _orig_run = Popen.run.__func__
+
+    def _run_without_bad_movflags(cls, *args, **kwargs):
+        cmd = args[0] if args else None
+        if isinstance(cmd, list) and "-movflags" in cmd:
+            idx = cmd.index("-movflags")
+            if idx + 1 < len(cmd) and cmd[idx + 1] == "+faststart":
+                out_path = str(cmd[-1]) if cmd else ""
+                if not out_path.lower().endswith((".mp4", ".m4a", ".m4v", ".mov")):
+                    cmd = cmd[:idx] + cmd[idx + 2:]
+                    args = (cmd, *args[1:])
+        return _orig_run(cls, *args, **kwargs)
+
+    Popen.run = classmethod(_run_without_bad_movflags)
+
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
     integer. Shared by the Speed limit field (bytes-per-second, for yt-dlp's "ratelimit" opt) and
@@ -877,6 +935,23 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                     if thumbnail:
                         reported_thumbnail[0] = True
                         callback(f"[thumbnail] {thumbnail}")
+                # Real track metadata, distinct from the uploader/caption-based [title] line
+                # above — "artist" is only ever populated by extractors that genuinely carry
+                # music metadata (YouTube Music releases); a plain YouTube video's info_dict
+                # simply has no "artist" key, so this falls back to the same poster (uploader/
+                # channel/creator) [title] already uses rather than ever sending "Unknown" —
+                # DownloadWorker's own AUDIO_EXTENSIONS check is what actually decides whether
+                # this download counts as audio at all, not whether this metadata happens to
+                # exist.
+                artist = info.get("artist") or poster
+                album = info.get("album")
+                track = info.get("track")
+                if artist:
+                    callback(f"[artist] {artist[:200]}")
+                if album:
+                    callback(f"[album] {album[:200]}")
+                if track:
+                    callback(f"[track] {track[:200]}")
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
             if total and not reported_size[0]:
                 # Sent once, as soon as it's known — before any bytes have actually moved — so the
@@ -1209,6 +1284,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # audio codec maps to (Reddit/Instagram's aac/opus -> .m4a/.opus, not always .mp3),
             # which is the expected, documented behavior of --audio-format best itself.
             postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "best"})
+            _patch_ffmpeg_audio_copy_for_stripped_build()
         if embed_thumbnail or audio_only:
             ydl_opts["writethumbnail"] = True
             postprocessors.append({"key": "EmbedThumbnail"})

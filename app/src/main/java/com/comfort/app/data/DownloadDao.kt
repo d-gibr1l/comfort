@@ -106,6 +106,24 @@ interface DownloadDao {
     @Query("UPDATE downloads SET mediaUri = :uri WHERE id = :id AND mediaUri IS NULL")
     suspend fun setMediaUriIfAbsent(id: String, uri: String)
 
+    @Query("UPDATE downloads SET isAudio = :isAudio WHERE id = :id")
+    suspend fun setIsAudio(id: String, isAudio: Boolean)
+
+    // *IfAbsent only, deliberately no unconditional variant: artist/album/track are one-shot
+    // metadata about the single extraction running for this download (yt-dlp's info_dict, or
+    // Spotify's own scraped metadata when routed through spotify_wrapper.py) — there's no
+    // per-item "which one should win" ambiguity the way thumbnail has for a multi-item gallery,
+    // so IfAbsent alone is enough, and it also means a retry/resume never clobbers a value a
+    // first attempt already captured with a possibly lower-confidence later guess.
+    @Query("UPDATE downloads SET artist = :artist WHERE id = :id AND artist IS NULL")
+    suspend fun setArtistIfAbsent(id: String, artist: String)
+
+    @Query("UPDATE downloads SET album = :album WHERE id = :id AND album IS NULL")
+    suspend fun setAlbumIfAbsent(id: String, album: String)
+
+    @Query("UPDATE downloads SET track = :track WHERE id = :id AND track IS NULL")
+    suspend fun setTrackIfAbsent(id: String, track: String)
+
     @Query("UPDATE downloads SET totalBytes = totalBytes + :bytes WHERE id = :id")
     suspend fun addBytes(id: String, bytes: Long)
 
