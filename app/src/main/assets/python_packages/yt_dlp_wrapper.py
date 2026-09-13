@@ -943,7 +943,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             )],
         })
         if audio_only:
-            postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "5"})
+            # "mp3" (yt-dlp's own CLI default) forces FFmpegExtractAudioPP into a real transcode
+            # for any source not already literally mp3 — this bundled ffmpeg build is compiled
+            # with --disable-encoders (see _LocalTrimPP's own doc comment: stream-copy only, same
+            # reason), so that transcode always failed with "Encoder not found", on every source,
+            # regardless of quality/codec. "best" (yt-dlp's own --audio-format best) tells
+            # FFmpegExtractAudioPP to keep the source's native audio codec and only remux the
+            # container via "-acodec copy" (see its run() in postprocessor/ffmpeg.py) — exactly
+            # what this ffmpeg build can still do. Output keeps whatever extension the source
+            # audio codec maps to (Reddit/Instagram's aac/opus -> .m4a/.opus, not always .mp3),
+            # which is the expected, documented behavior of --audio-format best itself.
+            postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "best"})
         if embed_thumbnail:
             ydl_opts["writethumbnail"] = True
             postprocessors.append({"key": "EmbedThumbnail"})
