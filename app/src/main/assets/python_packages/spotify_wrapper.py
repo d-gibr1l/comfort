@@ -303,11 +303,24 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
             captured_path = [None]
 
+            # Retagging has to happen HERE — before forwarding the line on to _cb — not after
+            # yt_dlp_wrapper.download() returns like a first version of this did. _cb is
+            # DownloadWorker.kt's own actualCallback: the moment it receives this exact bare
+            # absolute-path line, it moves the file into MediaStore and deletes the staging
+            # copy (see its own doc comment on the file-path branch) — synchronously, since the
+            # Python->Kotlin callback bridge blocks until that suspend function returns. Calling
+            # _cb(line) first, then retagging captured_path[0] afterward, was retagging a file
+            # that either no longer existed or (worse) had already been read into MediaStore
+            # with its untagged bytes — reproduced live: mutagen's write silently no-op'd or
+            # landed too late, and MediaStore's own scanned metadata for the saved file showed
+            # no real artist/album at all. Tagging the file on disk before it ever gets handed
+            # to Kotlin is the only ordering that can actually work.
             def _capture_and_forward(line, _cb=callback, _out=captured_path):
-                if _cb:
-                    _cb(line)
                 if line and not line.startswith("[") and os.path.isabs(line) and os.path.exists(line):
                     _out[0] = line
+                    _retag_with_spotify_metadata(line, title, artist, album_name, thumbnail_url)
+                if _cb:
+                    _cb(line)
 
             status = yt_dlp_wrapper.download(
                 url=matched_url, download_dir=download_dir, cookies_path=cookies_path,
@@ -322,9 +335,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             if status != "Done":
                 continue
             any_success = True
-
-            if captured_path[0]:
-                _retag_with_spotify_metadata(captured_path[0], title, artist, album_name, thumbnail_url)
 
         return "Done" if any_success else "Error: no tracks downloaded"
     except Exception as e:

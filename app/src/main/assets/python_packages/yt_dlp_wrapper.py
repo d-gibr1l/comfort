@@ -1013,10 +1013,19 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # best-available tier on sites (like YouTube) that split their highest resolutions into
     # separate streams, but needs no native dependency at all.
     default_format = "bestvideo+bestaudio/best" if ffmpeg_path else "best/18"
-    # audio_only overrides any quality-cap format_selector the caller passed — "bestaudio/best"
-    # is what ExtractAudio (added to postprocessors below) actually converts to mp3, so a
-    # video-shaped selector here would just waste bandwidth downloading video that gets discarded.
-    chosen_format = "bestaudio/best" if audio_only else (format_selector or default_format)
+    # audio_only overrides any quality-cap format_selector the caller passed — a video-shaped
+    # selector here would just waste bandwidth downloading video that gets discarded.
+    # "bestaudio[ext=m4a]" first, "bestaudio" as fallback: nearly every YouTube video's own
+    # bestaudio format is Opus-in-WebM these days (itag 251) — a real, valid audio format, but
+    # one this app's own stripped ffmpeg build can't remux without the ACODECS/webm-extension
+    # patch just above (see its own doc comment), and mutagen can't tag/embed cover art into a
+    # WebM container at all afterward regardless. m4a (itag 140, AAC), when YouTube also offers
+    # it for a given video, sidesteps both problems entirely — a real .m4a file, correctly filed
+    # under Music by MediaStore, with working mutagen tagging/cover art — at the cost of usually
+    # being YouTube's lower-bitrate alternative to its own opus stream when both exist. Falls
+    # back to plain "bestaudio" (Opus include) when a video has no m4a-native audio format at
+    # all, same as before this preference existed.
+    chosen_format = "bestaudio[ext=m4a]/bestaudio/best" if audio_only else (format_selector or default_format)
     # Poster name, then caption — "%(a,b|default)s" tries each field left to right and falls back
     # to the literal default only once every field in the list is empty; DownloadWorker derives
     # the entity's own display title from this same "name - caption [id]" shape (see its own
