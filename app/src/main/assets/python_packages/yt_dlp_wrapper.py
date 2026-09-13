@@ -397,7 +397,7 @@ def _patch_external_downloader_progress():
             # consume blocks — so multiplying by the POSIX-standard 512-byte block size recovers
             # real bytes-on-disk regardless of which segment wrote them or in what order.
             last_size = 0
-            while not stop_event.wait(1.0):
+            while not stop_event.wait(0.5):
                 try:
                     size = os.stat(tmpfilename).st_blocks * 512
                 except OSError:
@@ -676,7 +676,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     # DownloadWorker throttles nothing on its own end, so a raw per-chunk progress_hook (which
     # fires dozens of times a second) would otherwise flood the DB with writes — this closure
-    # state caps real updates to roughly once a second, matching what's actually useful on screen.
+    # state caps real updates to twice a second. QueueScreen's own progress bar eases toward each
+    # new value over 450ms (see its animateFloatAsState) rather than snapping to it; at the
+    # original once-a-second cadence the ease finished with ~550ms left before the next update,
+    # visible as a brief pause-then-jump. Twice a second keeps a new target arriving before the
+    # current ease finishes, so the animation reads as continuous motion instead.
     last_progress_emit = [0.0]
     last_emitted_bytes = [0]
     reported_size = [False]
@@ -748,7 +752,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 reported_size[0] = True
                 callback(f"[size] {total}")
             now = time.monotonic()
-            if now - last_progress_emit[0] >= 1.0:
+            if now - last_progress_emit[0] >= 0.5:
                 downloaded = d.get("downloaded_bytes") or 0
                 # Not d.get("speed") — yt-dlp computes that as a cumulative average over the whole
                 # transfer so far (total bytes ÷ total elapsed time since this file started), not a
