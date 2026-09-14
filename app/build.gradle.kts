@@ -49,7 +49,11 @@ android {
             // ships libffmpeg.zip.so — its actual shared-library dependencies, provisioned the
             // same zip.so-unpacking way PythonRuntime/Aria2Runtime already provision their own
             // (see FfmpegRuntime.ensureProvisioned).
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            // x86_64 dropped — real handsets essentially never ship it (it's used almost
+            // exclusively by Android emulators for dev testing), and it already lacked aria2c
+            // support entirely (no prebuilt binary for that ABI), so it wasn't even at feature
+            // parity with arm64-v8a/armeabi-v7a to begin with.
+            include("arm64-v8a", "armeabi-v7a")
             isUniversalApk = true
         }
     }
