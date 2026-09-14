@@ -315,6 +315,10 @@ fun DownloadPreviewSheet(
     // the engine side.
     var preview by remember { mutableStateOf<PreviewInfo?>(null) }
     var previewLoading by remember { mutableStateOf(false) }
+    // Real-time status text from the listing pass itself (e.g. "Fetching info…", "Found 40
+    // tracks…") — shown in place of a static "Loading…" while previewLoading is true, so a long
+    // playlist's listing doesn't look stuck with no feedback. Null falls back to "Loading…".
+    var previewStatus by remember { mutableStateOf<String?>(null) }
     // Checked once per url+itemFilter, independent of the listing fetch below — drives MAIN's own
     // Download button reading "Redownload" instead, so a duplicate is known *before* the user
     // commits to downloading rather than only surfacing afterward. Replaces the old post-hoc
@@ -367,7 +371,8 @@ fun DownloadPreviewSheet(
 
     LaunchedEffect(url) {
         previewLoading = true
-        preview = GalleryDlListing.fetchPreviewInfo(context, url)
+        previewStatus = null
+        preview = GalleryDlListing.fetchPreviewInfo(context, url) { status -> previewStatus = status }
         previewLoading = false
     }
     // Re-checked whenever the selection changes (not just the url) — SharePickerScreen already
@@ -425,6 +430,7 @@ fun DownloadPreviewSheet(
             previewDurationMs = preview?.durationMs,
             previewFilesize = preview?.filesizeBytes,
             previewLoading = previewLoading,
+            previewStatus = previewStatus,
             song = SongPreviewState(
                 mode = mode,
                 showQualityRow = !isSongSource,
@@ -500,6 +506,7 @@ private fun PreviewSheetOverlayHost(
     previewDurationMs: Long?,
     previewFilesize: Long?,
     previewLoading: Boolean,
+    previewStatus: String?,
     song: SongPreviewState,
     quality: VideoQuality,
     onQualityChange: (VideoQuality) -> Unit,
@@ -538,6 +545,7 @@ private fun PreviewSheetOverlayHost(
             thumbnail = previewThumbnail,
             filesizeBytes = previewFilesize,
             loading = previewLoading,
+            loadingStatus = previewStatus,
             song = song,
             quality = quality,
             onQualityChange = onQualityChange,
@@ -894,6 +902,7 @@ private fun MainPreviewScreen(
     thumbnail: String?,
     filesizeBytes: Long?,
     loading: Boolean,
+    loadingStatus: String?,
     song: SongPreviewState,
     quality: VideoQuality,
     onQualityChange: (VideoQuality) -> Unit,
@@ -985,7 +994,7 @@ private fun MainPreviewScreen(
                     onTitleChange = song.onEditedTitleChange,
                     onArtistChange = song.onEditedArtistChange,
                     durationMs = song.durationMs, filesizeBytes = filesizeBytes,
-                    thumbnail = thumbnail, loading = loading,
+                    thumbnail = thumbnail, loading = loading, loadingStatus = loadingStatus,
                 )
             }
             PreviewMode.SONG_LIST -> {
@@ -1231,6 +1240,7 @@ private fun SongPreviewCard(
     filesizeBytes: Long?,
     thumbnail: String?,
     loading: Boolean,
+    loadingStatus: String? = null,
 ) {
     // No outer Card here (unlike VideoPreviewCard/TrackListHeader) — the art box is the whole
     // card, on its own against the sheet's own background, rather than sitting inside a second,
@@ -1300,7 +1310,7 @@ private fun SongPreviewCard(
                         )
                     } else if (loading) {
                         Text(
-                            "Loading…",
+                            loadingStatus ?: "Loading…",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
