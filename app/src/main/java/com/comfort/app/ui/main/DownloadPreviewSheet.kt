@@ -1139,13 +1139,14 @@ private fun VideoPreviewCard(
     }
 }
 
-/** Single-song card: full-bleed square cover art with title/artist/duration scrimmed directly
- * onto the image (a dark gradient rising from the bottom, like a streaming app's own Now-Playing
- * screen), instead of the video card's inset 16:9 rectangle with text below it. "Artist — Album"
- * subtitle via the shared [audioSubtitle] helper. Used for a bare Spotify track link, a
- * music.youtube.com/soundcloud.com link, or any other link where the user manually picked
- * "Audio" quality. Three visual variants (inset/full-bleed/circular) were mocked up and reviewed
- * before this one — full-bleed-with-overlay — was picked. */
+/** Single-song card: centered, inset square cover art (65% of the card's width) with title/
+ * artist/duration scrimmed directly onto the image (a dark gradient rising from the bottom, like
+ * a streaming app's own Now-Playing screen), instead of the video card's inset 16:9 rectangle
+ * with text below it. "Artist — Album" subtitle via the shared [audioSubtitle] helper. Used for a
+ * bare Spotify track link, a music.youtube.com/soundcloud.com link, or any other link where the
+ * user manually picked "Audio" quality. Went through a full-bleed (edge-to-edge) version first —
+ * sized back down to this inset, centered box after review found the full-bleed art too large
+ * relative to the rest of the sheet. */
 @Composable
 private fun SongPreviewCard(
     url: String,
@@ -1164,8 +1165,11 @@ private fun SongPreviewCard(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.65f)
                 .aspectRatio(1f)
+                .align(Alignment.CenterHorizontally)
+                .padding(vertical = 16.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
         ) {
             if (thumbnail != null) {
