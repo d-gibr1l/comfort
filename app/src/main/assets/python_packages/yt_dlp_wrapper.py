@@ -861,6 +861,26 @@ class _Logger:
         if self.callback:
             self.callback(f"[error] {msg}")
 
+def probe(url):
+    # "1" if yt-dlp has a real (non-generic) extractor for url, "0" otherwise (incl. on any
+    # error). GenericIE.suitable() always returns True (it's yt-dlp's own catch-all fallback
+    # used only when nothing else matches) so it's explicitly excluded here — including it
+    # would make every URL "match" and defeat the whole point of this probe. suitable()
+    # wraps _match_valid_url(), pure regex, no network I/O.
+    try:
+        import yt_dlp.extractor
+        for ie in yt_dlp.extractor.gen_extractor_classes():
+            if ie.__name__ == "GenericIE":
+                continue
+            try:
+                if ie.suitable(url):
+                    return "1"
+            except Exception:
+                continue
+        return "0"
+    except Exception:
+        return "0"
+
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
              extra_args=None, archive_path=None, limit_rate=None, format_selector=None,
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
@@ -1592,9 +1612,13 @@ if __name__ == "__main__":
     def _emit(line):
         print(line, flush=True)
 
-    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <4 positional args>", file=_sys.stderr)
+    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list", "probe"):
+        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <4 positional args> | probe <url>", file=_sys.stderr)
         _sys.exit(2)
+
+    if _sys.argv[1] == "probe":
+        print(probe(_sys.argv[2]), flush=True)
+        _sys.exit(0)
 
     if _sys.argv[1] == "list":
         a = _sys.argv[2:]

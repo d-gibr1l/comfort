@@ -67,6 +67,19 @@ class CallbackWriter:
             self._emit(self.buffer)
             self.buffer = ""
 
+def probe(url):
+    # "1" if gallery-dl has a real extractor for url, "0" otherwise (incl. on any error).
+    # Pure regex match against each extractor's own `pattern` attribute, no network I/O.
+    # gallery-dl's generic/direct-link extractor is opt-in (needs a "g:" prefix or explicit
+    # config), so this doesn't trivially match everything. Used by DownloadWorker only to
+    # *skip* an attempt that would otherwise still run and safely fail on its own, so failing
+    # closed to "0" on any unexpected error here is always safe.
+    try:
+        import gallery_dl.extractor
+        return "1" if gallery_dl.extractor.find(url) is not None else "0"
+    except Exception:
+        return "0"
+
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
@@ -239,7 +252,7 @@ if __name__ == "__main__":
         print(line, file=_real_stdout, flush=True)
 
     if len(_sys.argv) < 2:
-        print("Usage: gallery_dl_wrapper.py <download|list_items> ...", file=_sys.stderr)
+        print("Usage: gallery_dl_wrapper.py <download|list_items|probe> ...", file=_sys.stderr)
         _sys.exit(2)
 
     _cmd, _rest = _sys.argv[1], _sys.argv[2:]
@@ -259,6 +272,8 @@ if __name__ == "__main__":
     elif _cmd == "list_items":
         _result = list_items(url=_rest[0], cookies_path=_s(_rest[1]), extra_args=_s(_rest[2]))
         print(_result, file=_real_stdout, flush=True)
+    elif _cmd == "probe":
+        print(probe(_rest[0]), file=_real_stdout, flush=True)
     else:
         print(f"Unknown command: {_cmd}", file=_sys.stderr)
         _sys.exit(2)
