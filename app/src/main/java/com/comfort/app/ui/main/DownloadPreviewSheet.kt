@@ -1158,17 +1158,17 @@ private fun SongPreviewCard(
     thumbnail: String?,
     loading: Boolean,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        shape = RoundedCornerShape(12.dp),
+    // No outer Card here (unlike VideoPreviewCard/TrackListHeader) — the art box is the whole
+    // card, on its own against the sheet's own background, rather than sitting inside a second,
+    // visibly-colored container around it.
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.65f)
                 .aspectRatio(1f)
-                .align(Alignment.CenterHorizontally)
-                .padding(vertical = 16.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.primaryContainer),
         ) {
