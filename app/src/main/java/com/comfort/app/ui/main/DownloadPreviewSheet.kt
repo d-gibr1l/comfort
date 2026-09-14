@@ -29,6 +29,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -1138,10 +1139,13 @@ private fun VideoPreviewCard(
     }
 }
 
-/** Single-song card: square cover-art box instead of the video card's 16:9 rectangle, "Artist —
- * Album" subtitle (via the shared [audioSubtitle] helper) instead of a bare uploader line, and
- * duration alongside filesize. Used for a bare Spotify track link, a music.youtube.com/
- * soundcloud.com link, or any other link where the user manually picked "Audio" quality. */
+/** Single-song card: full-bleed square cover art with title/artist/duration scrimmed directly
+ * onto the image (a dark gradient rising from the bottom, like a streaming app's own Now-Playing
+ * screen), instead of the video card's inset 16:9 rectangle with text below it. "Artist — Album"
+ * subtitle via the shared [audioSubtitle] helper. Used for a bare Spotify track link, a
+ * music.youtube.com/soundcloud.com link, or any other link where the user manually picked
+ * "Audio" quality. Three visual variants (inset/full-bleed/circular) were mocked up and reviewed
+ * before this one — full-bleed-with-overlay — was picked. */
 @Composable
 private fun SongPreviewCard(
     url: String,
@@ -1158,66 +1162,71 @@ private fun SongPreviewCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         shape = RoundedCornerShape(12.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+        ) {
+            if (thumbnail != null) {
+                AsyncImage(
+                    model = thumbnailRequest(thumbnail, url),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else if (!loading) {
+                Icon(
+                    FeatherIcons.Music,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(40.dp).align(Alignment.Center),
+                )
+            }
+            if (loading) {
+                ContainedLoadingIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+
+            // Text sits directly on the art, so it needs its own scrim to stay legible over any
+            // image — a fixed dark gradient rather than theme-derived colors (MaterialTheme's own
+            // onPrimaryContainer isn't guaranteed to contrast against an arbitrary cover-art
+            // photo the way it is against the flat placeholder background above).
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.55f)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
+                        ),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
-                if (thumbnail != null) {
-                    AsyncImage(
-                        model = thumbnailRequest(thumbnail, url),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                Column {
+                    Text(
+                        title ?: if (loading) "Loading…" else "Untitled",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                } else if (!loading) {
-                    Icon(
-                        FeatherIcons.Music,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(40.dp),
-                    )
+                    val subtitle = audioSubtitle(artist, album)
+                    val meta = listOfNotNull(
+                        subtitle,
+                        durationMs?.let { formatDurationShort(it) },
+                        filesizeBytes?.let { formatFilesize(it) },
+                    ).joinToString(" · ")
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            meta,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                if (loading) {
-                    ContainedLoadingIndicator()
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                title ?: if (loading) "Loading…" else "Untitled",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
-            val subtitle = audioSubtitle(artist, album)
-            if (subtitle != null) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-            }
-            val meta = listOfNotNull(
-                durationMs?.let { formatDurationShort(it) },
-                filesizeBytes?.let { formatFilesize(it) },
-            ).joinToString(" · ")
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    meta,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
             }
         }
     }
