@@ -887,6 +887,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     if ffmpeg_path:
         if audio_only:
             custom_pp_keys.append("ExtractAudio")
+        # Metadata *before* EmbedThumbnail — FFmpegMetadataPP's own ffmpeg command includes "-vn"
+        # (no video), and mutagen exposes an m4a's embedded cover art back to ffmpeg as an
+        # attached-pic video stream when re-reading the file; running Metadata after Thumbnail
+        # silently stripped the cover art that step had just embedded (reproduced live: an audio
+        # download with both "Embed Metadata" and a thumbnail landed with real tags but no art at
+        # all). Embedding art last means nothing downstream ever remuxes the file again to lose it.
+        if embed_metadata or embed_chapters or audio_only:
+            custom_pp_keys.append("Metadata")
         # Cover art is worth embedding into an audio file regardless of the general "Embed
         # thumbnail" setting (which is really about *video* files) — an audio-only download with
         # no cover art at all looks broken in most music players, whereas video thumbnails are
@@ -897,8 +905,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         if embed_thumbnail or audio_only:
             custom_pp_keys.append("EmbedThumbnail")
             _patch_embed_thumbnail_fallback()
-        if embed_metadata:
-            custom_pp_keys.append("Metadata")
         if download_subtitles and not audio_only:
             custom_pp_keys.append("EmbedSubtitle")
         if clip_ranges:
@@ -1294,14 +1300,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # which is the expected, documented behavior of --audio-format best itself.
             postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "best"})
             _patch_ffmpeg_audio_copy_for_stripped_build()
-        if embed_thumbnail or audio_only:
-            ydl_opts["writethumbnail"] = True
-            postprocessors.append({"key": "EmbedThumbnail"})
         if embed_metadata or embed_chapters or audio_only:
             # A single FFmpegMetadata entry handles both — add_chapters is that postprocessor's
             # own independent kwarg (this is literally how the real CLI's --embed-chapters is
             # implemented), so embed_chapters doesn't need a metadata embed to come along with it.
-            # "or audio_only": same reasoning as "embed_thumbnail or audio_only" just above — an
+            # "or audio_only": same reasoning as "embed_thumbnail or audio_only" below — an
             # audio download always gets its real artist/album/title written into the file itself,
             # regardless of the global "Embed Metadata" setting, the same way Spotify downloads
             # already always do via spotify_wrapper.py's own unconditional mutagen retag.
@@ -1311,7 +1314,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # whenever the user hadn't separately turned this setting on — a real, confusing
             # inconsistency between what the app's own Library showed and what the file itself
             # actually carried.
+            #
+            # Appended *before* EmbedThumbnail (custom_pp_keys above has the matching order, and
+            # its own doc comment there has the full story) — FFmpegMetadataPP's own ffmpeg
+            # command includes "-vn", which silently strips an m4a's embedded cover art if a
+            # thumbnail was already embedded by the time this runs.
             postprocessors.append({"key": "FFmpegMetadata", "add_chapters": embed_chapters})
+        if embed_thumbnail or audio_only:
+            ydl_opts["writethumbnail"] = True
+            postprocessors.append({"key": "EmbedThumbnail"})
         if (download_subtitles or save_subtitle_files) and not audio_only:
             # writesubtitles alone (no EmbedSubtitle postprocessor) leaves the fetched track as
             # its own sidecar .srt/.vtt file next to the video — DownloadWorker's own staging-dir
