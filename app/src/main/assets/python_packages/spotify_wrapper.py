@@ -112,14 +112,29 @@ def _get_track_metadata(track_id):
     return title, artist, duration, thumbnail
 
 
+def _entity_cover_art(entity):
+    """Largest available cover-art URL from an album/playlist embed entity's own
+    visualIdentity.image list (confirmed live: [{"url", "maxHeight", "maxWidth"}, ...], smallest
+    first) — no extra network call, this is already sitting on the same entity _fetch_entity's
+    caller paid for. None if the shape isn't there (defensive; every entity checked live had it)."""
+    images = ((entity.get("visualIdentity") or {}).get("image")) or []
+    if not images:
+        return None
+    return max(images, key=lambda img: img.get("maxWidth") or 0).get("url")
+
+
 def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls_client_path=None):
     """Same JSON contract as yt_dlp_wrapper.py's own list_info() — a single track is
-    {"title", "thumbnail", "uploader" (artist), "filesize", "duration", "url",
-    "requested_formats"}; an album/playlist is {"entries": [...]} in that same per-item shape —
-    so the existing share-sheet/preview-sheet UI, built for that exact shape, needs no changes to
-    render a Spotify listing. Per-track thumbnails are deliberately left null in an album/playlist
-    listing (an oEmbed call per track just for a preview doesn't scale to a large playlist); each
-    track's own cover art is still fetched for real during the actual download, where it matters."""
+    {"title", "thumbnail", "uploader"/"artist", "album", "filesize", "duration", "url",
+    "requested_formats"}; an album/playlist is {"entries": [...]} in that same per-item shape,
+    plus top-level "collection_type"/"collection_title"/"collection_artist"/"collection_thumbnail"
+    describing the album/playlist itself — so the existing share-sheet/preview-sheet UI, built for
+    the per-item shape, needs no changes to render a Spotify listing, while a new song-preview UI
+    can additionally use the collection_* fields for a track-list header. Per-track thumbnails are
+    deliberately left null in an album/playlist listing (an oEmbed call per track just for a
+    preview doesn't scale to a large playlist); each track's own cover art is still fetched for
+    real during the actual download, where it matters. "artist" is an alias of "uploader" — kept
+    for the same JSON either way so a caller doesn't need to know which engine listed a URL."""
     try:
         url = _resolve_redirect(url)
         match = _SPOTIFY_URL_RE.search(url)
@@ -130,27 +145,45 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
         if entity_type == "track":
             title, artist, duration, thumbnail = _get_track_metadata(entity_id)
             return json.dumps({
-                "title": title, "thumbnail": thumbnail, "uploader": artist,
+                "title": title, "thumbnail": thumbnail, "uploader": artist, "artist": artist,
+                # Not exposed on a single track's own embed page — see this module's own top
+                # comment. The matched YouTube result's own album (if any) fills this in later,
+                # at download time, not here.
+                "album": None,
                 "filesize": None, "duration": duration, "url": url, "requested_formats": None,
             })
 
         entity = _fetch_entity(entity_type, entity_id)
+        collection_title = entity.get("name")
+        # A playlist's own "subtitle" is its curator ("Spotify", a username, ...), not a musical
+        # artist — only an album's is meaningful as one, so this is deliberately album-only; the
+        # track-list header falls back to just title + track count for a playlist.
+        collection_artist = entity.get("subtitle") if entity_type == "album" else None
+        collection_thumbnail = _entity_cover_art(entity)
         entries = []
         for track in entity.get("trackList") or []:
             track_id = (track.get("uri") or "").rsplit(":", 1)[-1]
             if not track_id:
                 continue
             duration_ms = track.get("duration")
+            track_artist = track.get("subtitle")
             entries.append({
                 "title": track.get("title"),
                 "thumbnail": None,
-                "uploader": track.get("subtitle"),
+                "uploader": track_artist, "artist": track_artist,
+                "album": collection_title if entity_type == "album" else None,
                 "filesize": None,
                 "duration": (duration_ms / 1000) if duration_ms else None,
                 "url": f"https://open.spotify.com/track/{track_id}",
                 "requested_formats": None,
             })
-        return json.dumps({"entries": entries})
+        return json.dumps({
+            "entries": entries,
+            "collection_type": entity_type,
+            "collection_title": collection_title,
+            "collection_artist": collection_artist,
+            "collection_thumbnail": collection_thumbnail,
+        })
     except Exception as e:
         return json.dumps({"error": str(e)})
 
@@ -243,15 +276,33 @@ def _retag_with_spotify_metadata(filepath, title, artist, album, thumbnail_url):
     _embed_cover_art(filepath, cover_data)
 
 
+def _parse_playlist_items(playlist_items):
+    """Parses the same "{csv}" digit list DownloadWorker.kt's own ITEM_FILTER_NUMS_RE already
+    extracts out of DownloadEntity.itemFilter for the yt-dlp engine's own playlist_items argument
+    — reused verbatim here so the preview sheet's per-track checkbox selection needs only one
+    string format app-wide. Garbage/empty input degrades to "no filter" (every track downloads)
+    rather than raising, matching this module's own general tolerance for bad optional input."""
+    if not playlist_items:
+        return None
+    try:
+        nums = {int(x) for x in playlist_items.split(",") if x.strip().isdigit()}
+        return nums or None
+    except Exception:
+        return None
+
+
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
              archive_path=None, js_runtime_path=None, ffmpeg_path=None, ffmpeg_lib_dir=None,
              aria2_path=None, aria2_lib_dir=None, restrict_filenames=True, trim_filenames=True,
-             verbose=False, tls_client_path=None):
+             verbose=False, tls_client_path=None, save_thumbnail=False, playlist_items=None):
     """One call per Spotify link (track, or every track in an album/playlist in turn). Each
     track's own final-file callback line comes straight from the inner yt_dlp_wrapper.download()
     call unchanged, so DownloadWorker.kt's existing bare-filepath/[progress]/[size] handling needs
     no Spotify-specific protocol at all — multi-item counting works exactly the way a multi-item
-    gallery-dl download already does."""
+    gallery-dl download already does. [playlist_items], when given, is a "1,3,4"-style string of
+    1-based track positions (matching the preview sheet's own per-track checkbox list, in the same
+    order this function itself resolves track_ids) — anything else is skipped entirely, never
+    resolved against YouTube or downloaded."""
     try:
         url = _resolve_redirect(url)
         match = _SPOTIFY_URL_RE.search(url)
@@ -272,6 +323,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 track_id = (track.get("uri") or "").rsplit(":", 1)[-1]
                 if track_id:
                     track_ids.append(track_id)
+
+        selected_positions = _parse_playlist_items(playlist_items)
+        if selected_positions is not None:
+            track_ids = [t for i, t in enumerate(track_ids, 1) if i in selected_positions]
 
         if not track_ids:
             if callback:
@@ -330,7 +385,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 audio_only=True, restrict_filenames=restrict_filenames,
                 trim_filenames=trim_filenames, verbose=verbose,
                 aria2_path=aria2_path, aria2_lib_dir=aria2_lib_dir,
-                tls_client_path=tls_client_path,
+                tls_client_path=tls_client_path, save_thumbnail=save_thumbnail,
             )
             if status != "Done":
                 continue
@@ -358,7 +413,7 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: spotify_wrapper.py download <13 positional args> | list <4 positional args>", file=_sys.stderr)
+        print("Usage: spotify_wrapper.py download <16 positional args> | list <5 positional args>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "list":
@@ -378,5 +433,7 @@ if __name__ == "__main__":
         trim_filenames=_b(a[11]) if len(a) > 11 else True,
         verbose=_b(a[12]) if len(a) > 12 else False,
         tls_client_path=_s(a[13]) if len(a) > 13 else None,
+        save_thumbnail=_b(a[14]) if len(a) > 14 else False,
+        playlist_items=_s(a[15]) if len(a) > 15 else None,
     )
     print(f"[__status__] {status}", flush=True)

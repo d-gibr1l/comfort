@@ -1488,10 +1488,16 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
         # headers, ...) that both bloat this JSON line for no reason and were never meant to leave
         # the process.
         requested_formats = entry.get("requested_formats")
+        # artist/album: for the download preview sheet's own song-styled card/subtitle — same
+        # fields download()'s own [artist]/[album] callback lines already read off this same
+        # info-dict (see its own doc comment there), just also surfaced during listing so the
+        # sheet can show them before a download ever starts.
         return {
             "title": entry.get("title"),
             "thumbnail": entry.get("thumbnail"),
             "uploader": uploader,
+            "artist": entry.get("artist") or entry.get("creator"),
+            "album": entry.get("album"),
             "filesize": filesize,
             "duration": entry.get("duration"),
             "url": entry.get("url"),

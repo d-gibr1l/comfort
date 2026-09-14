@@ -294,6 +294,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     viewModel.enqueueDownload(
                         url = pendingUrl,
                         title = "Downloading from ${VideoSiteRouter.siteName(pendingUrl)}",
+                        itemFilter = options.itemFilter,
+                        totalItems = options.totalItems,
                         videoQuality = options.quality,
                         clipRange = options.clipRange,
                         extraCommands = options.extraCommands,

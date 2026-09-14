@@ -17,6 +17,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,7 +48,10 @@ import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
+import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.GalleryDlListing
+import com.comfort.app.util.PreviewInfo
+import com.comfort.app.util.TrackPreview
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import kotlinx.coroutines.launch
@@ -76,6 +81,33 @@ private const val DEFAULT_SEGMENT_LENGTH_MS = 30 * 1000L
  * is a plain Surface animated with slideInVertically/slideOutVertically instead. */
 private enum class PreviewScreen { MAIN, COMMANDS, TRIM, TEMPLATES, VIEW_TEMPLATES }
 
+/** Which card/chip layout MainPreviewScreen renders — VIDEO is today's original layout,
+ * unchanged; SONG_SINGLE is the square-art/artist-album card for one song; SONG_LIST is the
+ * per-track checklist for a Spotify album/playlist. See DownloadPreviewSheet's own mode
+ * computation for exactly how a URL/quality combination picks one of these. */
+private enum class PreviewMode { VIDEO, SONG_SINGLE, SONG_LIST }
+
+/** Everything MainPreviewScreen needs for the song-styled modes, bundled into one param instead
+ * of eight so PreviewSheetOverlayHost/MainPreviewScreen's own already-long signatures don't grow
+ * by one new parameter per song field. [mode] drives which card/chip layout renders; the rest are
+ * only ever read when [mode] isn't VIDEO. [selectedNums] and its two callbacks are only relevant
+ * for SONG_LIST (a Spotify album/playlist) — see DownloadPreviewSheet's own selection-state doc
+ * comment for what they mean and how the "num in {...}" filter string is built from them. */
+private data class SongPreviewState(
+    val mode: PreviewMode,
+    val showQualityRow: Boolean,
+    val artist: String?,
+    val album: String?,
+    val durationMs: Long?,
+    val tracks: List<TrackPreview>,
+    val collectionTitle: String?,
+    val collectionArtist: String?,
+    val collectionThumbnail: String?,
+    val selectedNums: Set<Int>,
+    val onToggleNum: (Int) -> Unit,
+    val onToggleAll: () -> Unit,
+)
+
 /** Snapshot of everything an overlay sub-screen (Commands/Trim/Templates) can touch, taken the
  * moment MAIN opens one — restored verbatim by [PreviewScreen] back-out paths that aren't Done
  * (scrim tap, hardware Back, drag-to-dismiss, Cancel), so backing out of a sub-screen is always a
@@ -98,6 +130,15 @@ data class DownloadOptions(
     val extraCommands: String?,
     val clipRange: String?,
     val filenameTemplate: String?,
+    /** Same "num in {1,3,4}" gallery-dl-syntax expression SharePickerScreen already builds for its
+     * own multi-item selection — null means "everything". Set only for a song-list preview
+     * (Spotify album/playlist) where the user unchecked at least one track; see DownloadWorker's
+     * own per-engine translation of DownloadEntity.itemFilter for how each engine consumes it. */
+    val itemFilter: String? = null,
+    /** The real selected count when [itemFilter] is set (0 otherwise) — passed straight through to
+     * DownloadEntity.totalItems so the progress bar's denominator is right immediately, instead of
+     * DownloadWorker's own pre-flight listing pass overwriting it with the full album's size. */
+    val totalItems: Int = 0,
 )
 
 /** Same spoofed User-Agent/Referer the queue and share picker already use for remote preview
@@ -250,35 +291,62 @@ fun DownloadPreviewSheet(
         },
     )
 
-    // Title/thumbnail for the preview card. The listing pass is the same one the share picker
-    // already uses, so this costs nothing new on the engine side.
-    var previewTitle by remember { mutableStateOf<String?>(null) }
-    var previewUploader by remember { mutableStateOf<String?>(null) }
-    var previewThumbnail by remember { mutableStateOf<String?>(null) }
-    var previewFilesize by remember { mutableStateOf<Long?>(null) }
-    val previewStreamUrlsState = remember { mutableStateOf<List<String>>(emptyList()) }
-    val previewDurationMsState = remember { mutableStateOf<Long?>(null) }
+    // Everything the listing pass returns — one state var instead of one per field (title/
+    // uploader/thumbnail/filesize/streamUrls/durationMs used to each be their own, before this
+    // grew artist/album/tracks/collection* alongside them for the song preview). The listing
+    // pass is the same one the share picker already uses, so none of this costs anything new on
+    // the engine side.
+    var preview by remember { mutableStateOf<PreviewInfo?>(null) }
     var previewLoading by remember { mutableStateOf(false) }
-    // Checked once per url, independent of the listing fetch below — drives MAIN's own Download
-    // button reading "Redownload" instead, so a duplicate is known *before* the user commits to
-    // downloading rather than only surfacing afterward. Replaces the old post-hoc Snackbar+its own
-    // separate "Redownload" action; the button itself already saying "Redownload" here is the
-    // confirmation, so the caller's own onDownload now just forces straight through.
+    // Checked once per url+itemFilter, independent of the listing fetch below — drives MAIN's own
+    // Download button reading "Redownload" instead, so a duplicate is known *before* the user
+    // commits to downloading rather than only surfacing afterward. Replaces the old post-hoc
+    // Snackbar+its own separate "Redownload" action; the button itself already saying
+    // "Redownload" here is the confirmation, so the caller's own onDownload now just forces
+    // straight through. Re-keyed on the track selection below (see its own doc comment) so
+    // unchecking a song doesn't leave a stale duplicate verdict from the full album.
     var isDuplicate by remember { mutableStateOf(false) }
+
+    // Which songs are selected for a song-list (Spotify album/playlist) preview — 1-based
+    // GalleryDlListing.TrackPreview.num values, same numbering "num in {...}" item-filter strings
+    // already use app-wide (see DownloadOptions.itemFilter's own doc comment). Seeded to "every
+    // track" the moment the track list arrives, same pattern SharePickerScreen already uses for
+    // its own gallery-dl multi-item selection.
+    var selectedNums by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    LaunchedEffect(preview?.tracks) {
+        preview?.tracks?.takeIf { it.isNotEmpty() }?.let { selectedNums = it.map { t -> t.num }.toSet() }
+    }
+
+    // "num in {1,3,4}" — same gallery-dl-syntax expression SharePickerScreen already builds for
+    // its own selection, kept as one string format app-wide (see DownloadWorker's own per-engine
+    // translation of DownloadEntity.itemFilter). Null whenever there's no song list or nothing's
+    // been deselected — "everything" is the common case, not a special one.
+    val tracks = preview?.tracks.orEmpty()
+    val itemFilter = if (tracks.isEmpty() || selectedNums.size == tracks.size) {
+        null
+    } else {
+        "num in {${selectedNums.sorted().joinToString(",")}}"
+    }
+
+    val isSongSource = remember(url) { VideoSiteRouter.isSongSource(url) }
+    val mode = when {
+        isSongSource && tracks.isNotEmpty() -> PreviewMode.SONG_LIST
+        isSongSource || quality == VideoQuality.AUDIO_ONLY -> PreviewMode.SONG_SINGLE
+        else -> PreviewMode.VIDEO
+    }
 
     LaunchedEffect(url) {
         previewLoading = true
-        val info = GalleryDlListing.fetchPreviewInfo(context, url)
-        previewTitle = info?.title
-        previewUploader = info?.uploader
-        previewThumbnail = info?.thumbnail
-        previewFilesize = info?.filesizeBytes
-        previewStreamUrlsState.value = info?.streamUrls ?: emptyList()
-        previewDurationMsState.value = info?.durationMs
+        preview = GalleryDlListing.fetchPreviewInfo(context, url)
         previewLoading = false
     }
-    LaunchedEffect(url) {
-        isDuplicate = DownloadDispatcher.isDuplicate(context, url)
+    // Re-checked whenever the selection changes (not just the url) — SharePickerScreen already
+    // does the same thing for its own itemFilter, for the same reason: a 4-track subset and the
+    // full 16-track album are different downloads (DownloadDao.findActiveOrFinishedByUrl treats
+    // them that way), so "Redownload" should only show once the *current* selection, not some
+    // earlier one, is confirmed to already exist.
+    LaunchedEffect(url, itemFilter) {
+        isDuplicate = DownloadDispatcher.isDuplicate(context, url, itemFilter)
     }
 
     // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
@@ -320,13 +388,31 @@ fun DownloadPreviewSheet(
             context = context,
             scope = scope,
             clipboard = clipboard,
-            previewTitle = previewTitle,
-            previewUploader = previewUploader,
-            previewThumbnail = previewThumbnail,
-            previewStreamUrls = previewStreamUrlsState.value,
-            previewDurationMs = previewDurationMsState.value,
-            previewFilesize = previewFilesize,
+            previewTitle = preview?.title,
+            previewUploader = preview?.uploader,
+            previewThumbnail = preview?.thumbnail,
+            previewStreamUrls = preview?.streamUrls ?: emptyList(),
+            previewDurationMs = preview?.durationMs,
+            previewFilesize = preview?.filesizeBytes,
             previewLoading = previewLoading,
+            song = SongPreviewState(
+                mode = mode,
+                showQualityRow = !isSongSource,
+                artist = preview?.artist,
+                album = preview?.album,
+                durationMs = preview?.durationMs,
+                tracks = tracks,
+                collectionTitle = preview?.collectionTitle,
+                collectionArtist = preview?.collectionArtist,
+                collectionThumbnail = preview?.collectionThumbnail,
+                selectedNums = selectedNums,
+                onToggleNum = { num ->
+                    selectedNums = if (num in selectedNums) selectedNums - num else selectedNums + num
+                },
+                onToggleAll = {
+                    selectedNums = if (selectedNums.size == tracks.size) emptySet() else tracks.map { it.num }.toSet()
+                },
+            ),
             quality = quality,
             onQualityChange = {
                 quality = it
@@ -352,6 +438,8 @@ fun DownloadPreviewSheet(
             onCommandsChange = { commands = it },
             filenameTemplate = filenameTemplate,
             onFilenameTemplateChange = { filenameTemplate = it },
+            itemFilter = itemFilter,
+            selectedTrackCount = selectedNums.size,
             onDismiss = onDismiss,
             onDownload = onDownload,
         )
@@ -378,6 +466,7 @@ private fun PreviewSheetOverlayHost(
     previewDurationMs: Long?,
     previewFilesize: Long?,
     previewLoading: Boolean,
+    song: SongPreviewState,
     quality: VideoQuality,
     onQualityChange: (VideoQuality) -> Unit,
     outputFormat: OutputFormat,
@@ -392,6 +481,8 @@ private fun PreviewSheetOverlayHost(
     onCommandsChange: (List<String>) -> Unit,
     filenameTemplate: String?,
     onFilenameTemplateChange: (String?) -> Unit,
+    itemFilter: String?,
+    selectedTrackCount: Int,
     onDismiss: () -> Unit,
     onDownload: (DownloadOptions) -> Unit,
 ) {
@@ -413,6 +504,7 @@ private fun PreviewSheetOverlayHost(
             thumbnail = previewThumbnail,
             filesizeBytes = previewFilesize,
             loading = previewLoading,
+            song = song,
             quality = quality,
             onQualityChange = onQualityChange,
             outputFormat = outputFormat,
@@ -439,12 +531,20 @@ private fun PreviewSheetOverlayHost(
                 scope.launch {
                     onDownload(
                         DownloadOptions(
-                            quality = quality,
+                            // Spotify ignores quality entirely, but music.youtube.com/soundcloud.com
+                            // go through the normal yt-dlp/gallery-dl path and would otherwise
+                            // download video despite the sheet showing song styling — !showQualityRow
+                            // means the song-ness came from the URL itself, not just a manual "Audio"
+                            // pick, so this is the one case that needs forcing rather than trusting
+                            // whatever quality happens to be selected.
+                            quality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
                             outputFormat = outputFormat,
                             saveThumbnail = saveThumbnail,
                             extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
                             clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
                             filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
+                            itemFilter = itemFilter,
+                            totalItems = if (itemFilter != null) selectedTrackCount else 0,
                         ),
                     )
                 }
@@ -687,6 +787,38 @@ private fun formatFilesize(bytes: Long): String = when {
     else -> "${bytes}b"
 }
 
+/** "3:42" / "1:02:11" — no existing formatter has this shape: formatTimestamp (Trim screen) is
+ * "mm:ss.mmm", and formatFilesize above is the naming/placement precedent for this one. */
+private fun formatDurationShort(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val h = totalSeconds / 3600
+    val m = (totalSeconds % 3600) / 60
+    val s = totalSeconds % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
+/** "Artist — Album" (or just "Artist" when the album isn't known) — shared between
+ * DownloadsHistoryScreen's Library card subtitle and this sheet's own song preview card so the
+ * two formats can't drift apart. Null (not a fallback string) when there's no artist at all;
+ * callers own their own fallback (the Library card's domain, this sheet's own "Untitled"-style
+ * treatment). */
+internal fun audioSubtitle(artist: String?, album: String?): String? =
+    artist?.let { a -> album?.let { "$a — $it" } ?: a }
+
+private val FIRST_CHIP_SHAPE = androidx.compose.foundation.shape.RoundedCornerShape(
+    topStart = androidx.compose.foundation.shape.CornerSize(50),
+    bottomStart = androidx.compose.foundation.shape.CornerSize(50),
+    topEnd = androidx.compose.foundation.shape.CornerSize(8.dp),
+    bottomEnd = androidx.compose.foundation.shape.CornerSize(8.dp)
+)
+private val MIDDLE_CHIP_SHAPE = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+private val LAST_CHIP_SHAPE = androidx.compose.foundation.shape.RoundedCornerShape(
+    topStart = androidx.compose.foundation.shape.CornerSize(8.dp),
+    bottomStart = androidx.compose.foundation.shape.CornerSize(8.dp),
+    topEnd = androidx.compose.foundation.shape.CornerSize(50),
+    bottomEnd = androidx.compose.foundation.shape.CornerSize(50)
+)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MainPreviewScreen(
@@ -697,6 +829,7 @@ private fun MainPreviewScreen(
     thumbnail: String?,
     filesizeBytes: Long?,
     loading: Boolean,
+    song: SongPreviewState,
     quality: VideoQuality,
     onQualityChange: (VideoQuality) -> Unit,
     outputFormat: OutputFormat,
@@ -713,217 +846,492 @@ private fun MainPreviewScreen(
     onOpenTemplates: () -> Unit,
     onDownload: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
-            // contentWindowInsets = 0 on the sheet means nothing pads this above the nav bar for
-            // us anymore — this keeps the Download button clear of it while the sheet's own
-            // background (now free to size past this Column) still bleeds behind the bar.
-            .navigationBarsPadding(),
+    // A plain LazyColumn cannot nest inside a verticalScroll parent (unbounded height), which is
+    // exactly what SONG_LIST's track list needs to host efficiently — so the whole root became a
+    // LazyColumn (every previous top-level child now one item{}) rather than adding a second,
+    // separately-scrolling list inside the old Column. The overlay-panel system (Commands/Trim/
+    // Templates) lives in a sibling Box in PreviewSheetOverlayHost, not inside this composable, so
+    // it's unaffected by this change.
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
-                Icon(FeatherIcons.Copy, contentDescription = "Copy link")
-            }
-            FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
-                Icon(FeatherIcons.XCircle, contentDescription = "Cancel")
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
+                    Icon(FeatherIcons.Copy, contentDescription = "Copy link")
+                }
+                FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
+                    Icon(FeatherIcons.XCircle, contentDescription = "Cancel")
+                }
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Spacer(modifier = Modifier.width(12.dp))
-            val total = VideoQuality.entries.size
-            VideoQuality.entries.forEachIndexed { index, option ->
-                val segmentedShape = when (index) {
-                    0 -> androidx.compose.foundation.shape.RoundedCornerShape(
-                        topStart = androidx.compose.foundation.shape.CornerSize(50),
-                        bottomStart = androidx.compose.foundation.shape.CornerSize(50),
-                        topEnd = androidx.compose.foundation.shape.CornerSize(8.dp),
-                        bottomEnd = androidx.compose.foundation.shape.CornerSize(8.dp)
-                    )
-                    total - 1 -> androidx.compose.foundation.shape.RoundedCornerShape(
-                        topStart = androidx.compose.foundation.shape.CornerSize(8.dp),
-                        bottomStart = androidx.compose.foundation.shape.CornerSize(8.dp),
-                        topEnd = androidx.compose.foundation.shape.CornerSize(50),
-                        bottomEnd = androidx.compose.foundation.shape.CornerSize(50)
-                    )
-                    else -> androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
-                }
-                PreviewChip(
-                    label = option.chipLabel,
-                    selected = quality == option,
-                    shape = segmentedShape,
-                    onClick = { onQualityChange(option) },
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-        }
-
-        // The preview card: an inset image box (not edge-to-edge — the card's own background
-        // shows as a margin around it, matching the reference), then title/uploader below in the
-        // same padded column. The loading indicator sits layered over the image box while the
-        // listing pass is still resolving it.
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (thumbnail != null) {
-                        AsyncImage(
-                            model = thumbnailRequest(thumbnail, url),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else if (!loading) {
-                        Icon(
-                            FeatherIcons.Image,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(40.dp),
-                        )
-                    }
-                    if (loading) {
-                        ContainedLoadingIndicator()
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    title ?: if (loading) "Loading…" else "Untitled",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(4.dp))
-                // Uploader and size share a row so the size sits bottom-right of the card, level
-                // with the uploader line, rather than adding a whole row of its own.
+        // Quality picker: hidden when the song-ness came from the URL itself (Spotify/known song
+        // host) — quality is meaningless there (Spotify ignores it outright; a known song host
+        // downloads audio regardless — see DownloadOptions' own construction). Kept visible when
+        // the user only got here by manually picking "Audio" on an otherwise-ordinary link, so
+        // they still have a way back to a video quality without dismissing the whole sheet.
+        if (song.showQualityRow) {
+            item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    val total = VideoQuality.entries.size
+                    VideoQuality.entries.forEachIndexed { index, option ->
+                        val segmentedShape = when (index) {
+                            0 -> FIRST_CHIP_SHAPE
+                            total - 1 -> LAST_CHIP_SHAPE
+                            else -> MIDDLE_CHIP_SHAPE
+                        }
+                        PreviewChip(
+                            label = option.chipLabel,
+                            selected = quality == option,
+                            shape = segmentedShape,
+                            onClick = { onQualityChange(option) },
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+            }
+        }
+
+        when (song.mode) {
+            PreviewMode.VIDEO -> item {
+                VideoPreviewCard(
+                    url = url, title = title, uploader = uploader, thumbnail = thumbnail,
+                    filesizeBytes = filesizeBytes, loading = loading,
+                )
+            }
+            PreviewMode.SONG_SINGLE -> item {
+                SongPreviewCard(
+                    url = url, title = title, artist = song.artist, album = song.album,
+                    durationMs = song.durationMs, filesizeBytes = filesizeBytes,
+                    thumbnail = thumbnail, loading = loading,
+                )
+            }
+            PreviewMode.SONG_LIST -> {
+                item {
+                    TrackListHeader(
+                        collectionTitle = song.collectionTitle ?: title,
+                        collectionArtist = song.collectionArtist,
+                        collectionThumbnail = song.collectionThumbnail ?: thumbnail,
+                        url = url,
+                        trackCount = song.tracks.size,
+                        selectedCount = song.selectedNums.size,
+                        onToggleAll = song.onToggleAll,
+                    )
+                }
+                items(song.tracks, key = { it.num }) { track ->
+                    TrackRow(
+                        track = track,
+                        selected = track.num in song.selectedNums,
+                        onToggle = { song.onToggleNum(track.num) },
+                    )
+                }
+            }
+        }
+
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (song.mode == PreviewMode.VIDEO) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        PreviewChip(
+                            label = "Save thumbnail",
+                            selected = saveThumbnail,
+                            icon = FeatherIcons.Image,
+                            shape = FIRST_CHIP_SHAPE,
+                            onClick = onToggleSaveThumbnail,
+                        )
+                        PreviewChip(
+                            label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
+                            selected = commandCount > 0,
+                            icon = FeatherIcons.Terminal,
+                            shape = LAST_CHIP_SHAPE,
+                            onClick = onOpenCommands,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        PreviewChip(
+                            label = "Trim Video",
+                            selected = trimmed,
+                            icon = FeatherIcons.Scissors,
+                            shape = FIRST_CHIP_SHAPE,
+                            onClick = onOpenTrim,
+                        )
+                        PreviewChip(
+                            label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
+                            icon = FeatherIcons.Film,
+                            shape = MIDDLE_CHIP_SHAPE,
+                            onClick = onToggleFormat,
+                        )
+                        PreviewChip(
+                            label = "Filename Templates.",
+                            selected = filenameTemplate != null,
+                            icon = FeatherIcons.Tag,
+                            shape = LAST_CHIP_SHAPE,
+                            onClick = onOpenTemplates,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                } else {
+                    // Song modes: no Trim (not a video), no Mp4/Mkv format toggle (yt-dlp's own
+                    // audio-only output format isn't a container choice the way video is) — just
+                    // the cover-art save toggle, Commands, and Filename Templates.
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        PreviewChip(
+                            label = "Save cover art",
+                            selected = saveThumbnail,
+                            icon = FeatherIcons.Image,
+                            shape = FIRST_CHIP_SHAPE,
+                            onClick = onToggleSaveThumbnail,
+                        )
+                        PreviewChip(
+                            label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
+                            selected = commandCount > 0,
+                            icon = FeatherIcons.Terminal,
+                            shape = MIDDLE_CHIP_SHAPE,
+                            onClick = onOpenCommands,
+                        )
+                        PreviewChip(
+                            label = "Filename Templates.",
+                            selected = filenameTemplate != null,
+                            icon = FeatherIcons.Tag,
+                            shape = LAST_CHIP_SHAPE,
+                            onClick = onOpenTemplates,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                }
+            }
+        }
+
+        item {
+            // Empty-selection guard: with a non-empty track list and nothing checked, disabled —
+            // same guard SharePickerScreen already uses for its own selection, so unchecking every
+            // song can never be mistaken for (or silently become) "download everything".
+            val downloadEnabled = song.mode != PreviewMode.SONG_LIST || song.selectedNums.isNotEmpty()
+            val countSuffix = if (song.mode == PreviewMode.SONG_LIST) " ${song.selectedNums.size}" else ""
+            Button(
+                onClick = onDownload,
+                enabled = downloadEnabled,
+                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 0.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
+                // only after tapping — replaces the old flow where this always said "Download" and a
+                // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
+                // action to confirm.
+                Text("${if (isDuplicate) "Redownload" else "Download"}$countSuffix")
+            }
+        }
+    }
+}
+
+/** Today's original video-styled preview card — unchanged from before the song-preview redesign,
+ * just broken out into its own composable so MainPreviewScreen's per-mode branch reads as three
+ * sibling card composables instead of one large inlined conditional. */
+@Composable
+private fun VideoPreviewCard(
+    url: String,
+    title: String?,
+    uploader: String?,
+    thumbnail: String?,
+    filesizeBytes: Long?,
+    loading: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (thumbnail != null) {
+                    AsyncImage(
+                        model = thumbnailRequest(thumbnail, url),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (!loading) {
+                    Icon(
+                        FeatherIcons.Image,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
+                if (loading) {
+                    ContainedLoadingIndicator()
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                title ?: if (loading) "Loading…" else "Untitled",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
+            // Uploader and size share a row so the size sits bottom-right of the card, level
+            // with the uploader line, rather than adding a whole row of its own.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    uploader.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (filesizeBytes != null) {
                     Text(
-                        uploader.orEmpty(),
+                        formatFilesize(filesizeBytes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
                     )
-                    if (filesizeBytes != null) {
-                        Text(
-                            formatFilesize(filesizeBytes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
                 }
             }
         }
+    }
+}
 
-        val firstShape = androidx.compose.foundation.shape.RoundedCornerShape(
-            topStart = androidx.compose.foundation.shape.CornerSize(50),
-            bottomStart = androidx.compose.foundation.shape.CornerSize(50),
-            topEnd = androidx.compose.foundation.shape.CornerSize(8.dp),
-            bottomEnd = androidx.compose.foundation.shape.CornerSize(8.dp)
-        )
-        val middleShape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
-        val lastShape = androidx.compose.foundation.shape.RoundedCornerShape(
-            topStart = androidx.compose.foundation.shape.CornerSize(8.dp),
-            bottomStart = androidx.compose.foundation.shape.CornerSize(8.dp),
-            topEnd = androidx.compose.foundation.shape.CornerSize(50),
-            bottomEnd = androidx.compose.foundation.shape.CornerSize(50)
-        )
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-                Spacer(modifier = Modifier.width(12.dp))
-                PreviewChip(
-                    label = "Save thumbnail",
-                    selected = saveThumbnail,
-                    icon = FeatherIcons.Image,
-                    shape = firstShape,
-                    onClick = onToggleSaveThumbnail,
-                )
-                PreviewChip(
-                    label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
-                    selected = commandCount > 0,
-                    icon = FeatherIcons.Terminal,
-                    shape = lastShape,
-                    onClick = onOpenCommands,
-                )
-                Spacer(modifier = Modifier.width(12.dp))
+/** Single-song card: square cover-art box instead of the video card's 16:9 rectangle, "Artist —
+ * Album" subtitle (via the shared [audioSubtitle] helper) instead of a bare uploader line, and
+ * duration alongside filesize. Used for a bare Spotify track link, a music.youtube.com/
+ * soundcloud.com link, or any other link where the user manually picked "Audio" quality. */
+@Composable
+private fun SongPreviewCard(
+    url: String,
+    title: String?,
+    artist: String?,
+    album: String?,
+    durationMs: Long?,
+    filesizeBytes: Long?,
+    thumbnail: String?,
+    loading: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.55f)
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (thumbnail != null) {
+                    AsyncImage(
+                        model = thumbnailRequest(thumbnail, url),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (!loading) {
+                    Icon(
+                        FeatherIcons.Music,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
+                if (loading) {
+                    ContainedLoadingIndicator()
+                }
             }
-
-            Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-                Spacer(modifier = Modifier.width(12.dp))
-                PreviewChip(
-                    label = "Trim Video",
-                    selected = trimmed,
-                    icon = FeatherIcons.Scissors,
-                    shape = firstShape,
-                    onClick = onOpenTrim,
+            Spacer(Modifier.height(12.dp))
+            Text(
+                title ?: if (loading) "Loading…" else "Untitled",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            val subtitle = audioSubtitle(artist, album)
+            if (subtitle != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
-                PreviewChip(
-                    label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
-                    icon = FeatherIcons.Film,
-                    shape = middleShape,
-                    onClick = onToggleFormat,
+            }
+            val meta = listOfNotNull(
+                durationMs?.let { formatDurationShort(it) },
+                filesizeBytes?.let { formatFilesize(it) },
+            ).joinToString(" · ")
+            if (meta.isNotEmpty()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    meta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
-                PreviewChip(
-                    label = "Filename Templates.",
-                    selected = filenameTemplate != null,
-                    icon = FeatherIcons.Tag,
-                    shape = lastShape,
-                    onClick = onOpenTemplates,
-                )
-                Spacer(modifier = Modifier.width(12.dp))
             }
         }
+    }
+}
 
-        Button(
-            onClick = onDownload,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = MaterialTheme.shapes.extraLarge,
+/** Header for the SONG_LIST (Spotify album/playlist) case: the collection's own cover art/title/
+ * artist and a "Select all"/"Deselect all" toggle — same pattern as SharePickerScreen's own
+ * TopAppBar select-all action, just inline here since this isn't a full-screen picker. */
+@Composable
+private fun TrackListHeader(
+    collectionTitle: String?,
+    collectionArtist: String?,
+    collectionThumbnail: String?,
+    url: String,
+    trackCount: Int,
+    selectedCount: Int,
+    onToggleAll: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (collectionThumbnail != null) {
+                    AsyncImage(
+                        model = thumbnailRequest(collectionThumbnail, url),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(
+                        FeatherIcons.Music,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    collectionTitle ?: "Untitled",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val subtitle = listOfNotNull(collectionArtist, "$trackCount songs").joinToString(" · ")
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = onToggleAll) {
+                Text(if (selectedCount == trackCount) "Deselect all" else "Select all")
+            }
+        }
+    }
+}
+
+/** One selectable song in a SONG_LIST track list — checkbox, title/artist, duration. No per-row
+ * thumbnail: spotify_wrapper.py's own list_info() deliberately never fetches per-track cover art
+ * for an album/playlist listing (an oEmbed call per track doesn't scale — see its own doc
+ * comment), and a column of identical album covers wouldn't add anything even if it did. */
+@Composable
+private fun TrackRow(track: TrackPreview, selected: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = selected, onCheckedChange = { onToggle() })
+        Spacer(Modifier.width(4.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                track.title ?: "Untitled",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (track.artist != null) {
+                Text(
+                    track.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (track.durationMs != null) {
             Spacer(Modifier.width(8.dp))
-            // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
-            // only after tapping — replaces the old flow where this always said "Download" and a
-            // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
-            // action to confirm.
-            Text(if (isDuplicate) "Redownload" else "Download")
+            Text(
+                formatDurationShort(track.durationMs),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
