@@ -1191,11 +1191,9 @@ private fun HistoryRow(
             // that's the actual point of capturing this metadata at all (see DownloadEntity's
             // own doc comments on artist/album). Falls back to the domain exactly like before
             // for anything else, including an audio download whose source never reported one.
-            val subtitleText = if (item.isAudio && item.artist != null) {
-                if (item.album != null) "${item.artist} — ${item.album}" else item.artist
-            } else {
-                domain
-            }
+            // audioSubtitle is shared with DownloadPreviewSheet's own song preview card (see its
+            // own doc comment) so the two formats can't drift apart.
+            val subtitleText = if (item.isAudio) audioSubtitle(item.artist, item.album) ?: domain else domain
             Text(
                 text = subtitleText,
                 style = MaterialTheme.typography.bodySmall,

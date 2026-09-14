@@ -58,6 +58,26 @@ object VideoSiteRouter {
         }
     }
 
+    // Presentation-only signal for the download preview sheet ("does this URL deserve the
+    // song-styled card/track-list instead of the video-styled one?") — deliberately NOT consulted
+    // by classify() above. music.youtube.com still routes to YT_DLP (via the plain "youtube.com"
+    // entry in videoOnlyHosts already matching its subdomain) and soundcloud.com still routes to
+    // GALLERY_DL (it has its own gallery-dl extractor) exactly as before this existed; this only
+    // changes how the preview sheet renders, never which engine downloads the link.
+    private val songHosts = setOf("music.youtube.com", "soundcloud.com")
+
+    fun isKnownSongHost(url: String): Boolean {
+        val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
+            ?: return false
+        return songHosts.any { host == it || host.endsWith(".$it") }
+    }
+
+    /** Whether [url] is a known "song" source for the preview sheet's own styling — a Spotify
+     * link (always audio, see spotifyHosts above) or a known other song host (see [songHosts]).
+     * Does not include "the user manually picked Audio quality on some other link" — that's
+     * per-sheet UI state, not a property of the URL, so it's checked separately at the call site. */
+    fun isSongSource(url: String): Boolean = classify(url) == DownloadEngine.SPOTIFY || isKnownSongHost(url)
+
     private val videoExtensions = setOf("mp4", "webm", "mov", "mkv", "m4v", "avi", "flv", "wmv")
 
     fun isVideoFilename(filename: String): Boolean {

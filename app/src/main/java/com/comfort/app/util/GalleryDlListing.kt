@@ -33,7 +33,30 @@ data class PreviewInfo(
     val filesizeBytes: Long?,
     val durationMs: Long?,
     val streamUrls: List<String>,
+    /** Real track artist/album, for the download preview sheet's own song-styled card — populated
+     * by both yt_dlp_wrapper.py's and spotify_wrapper.py's list_info() (see their own doc
+     * comments). Null for anything that isn't a song, and often null for [album] even on a real
+     * song (a plain YouTube video, or a bare Spotify track link — see spotify_wrapper.py's own
+     * top comment on that specific gap). */
+    val artist: String? = null,
+    val album: String? = null,
+    /** Every track of a Spotify album/playlist link, in resolution order — empty for a single-item
+     * link. [TrackPreview.num] is the same 1-based position the rest of the app's
+     * "num in {...}" item-filter format already means (see DownloadEntity.itemFilter's own doc
+     * comment) and the same order spotify_wrapper.py's download() resolves its own track_ids in,
+     * so a UI-built filter string from these nums lines up with the real download without any
+     * translation. */
+    val tracks: List<TrackPreview> = emptyList(),
+    /** The album/playlist itself (not any one track) — from spotify_wrapper.py's own
+     * "collection_*" fields, null for a single-item link. */
+    val collectionTitle: String? = null,
+    val collectionArtist: String? = null,
+    val collectionThumbnail: String? = null,
 )
+
+/** One track of a multi-item song listing (Spotify album/playlist today — see [PreviewInfo.tracks]
+ * doc comment for why [num] is load-bearing beyond just display). */
+data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?)
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
@@ -369,6 +392,8 @@ object GalleryDlListing {
      * beyond what a preview already did. Null for anything that fails to list (an unsupported
      * link, a login-gated post, no network): the sheet just shows its placeholder card and the
      * download itself still goes ahead, since a preview failing is not a reason to block it. */
+    private fun String?.blankToNull(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
+
     suspend fun fetchPreviewInfo(context: Context, url: String): PreviewInfo? = withContext(Dispatchers.IO) {
         val json = when (VideoSiteRouter.classify(url)) {
             DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url)
@@ -376,27 +401,49 @@ object GalleryDlListing {
         } ?: return@withContext null
         // A multi-item source comes back as {"entries": [...]} — the sheet previews one download,
         // so the first entry that actually resolved stands in for it.
-        val entry = json.optJSONArray("entries")?.let { entries ->
+        val entriesArray = json.optJSONArray("entries")
+        val entry = entriesArray?.let { entries ->
             (0 until entries.length())
                 .mapNotNull { entries.optJSONObject(it) }
                 .firstOrNull { !it.optString("title").isNullOrBlank() || !it.optString("thumbnail").isNullOrBlank() }
         } ?: json
         val requestedFormats = entry.optJSONArray("requested_formats")
         val streamUrls = if (requestedFormats != null && requestedFormats.length() > 0) {
-            (0 until requestedFormats.length()).mapNotNull { 
+            (0 until requestedFormats.length()).mapNotNull {
                 requestedFormats.optJSONObject(it)?.optString("url")?.takeIf { u -> u.isNotBlank() }
             }
         } else {
             entry.optString("url").takeIf { it.isNotBlank() }?.let { listOf(it) } ?: emptyList()
         }
 
+        // Every entry (not just the first "usable" one above) becomes a TrackPreview when this is
+        // a multi-item listing — num is positional (see TrackPreview's own doc comment), so an
+        // entry can never be skipped here without silently shifting every later track's number and
+        // selecting the wrong song once a checkbox filter is built from it.
+        val tracks = entriesArray?.let { entries ->
+            (0 until entries.length()).mapNotNull { i -> entries.optJSONObject(i) }.mapIndexed { i, e ->
+                TrackPreview(
+                    num = i + 1,
+                    title = e.optString("title").blankToNull(),
+                    artist = (e.optString("artist").blankToNull() ?: e.optString("uploader").blankToNull()),
+                    durationMs = e.optDouble("duration", -1.0).takeIf { it > 0.0 }?.let { (it * 1000).toLong() },
+                )
+            }
+        } ?: emptyList()
+
         PreviewInfo(
-            title = entry.optString("title").takeIf { it.isNotBlank() && it != "null" },
-            uploader = entry.optString("uploader").takeIf { it.isNotBlank() && it != "null" },
-            thumbnail = entry.optString("thumbnail").takeIf { it.isNotBlank() && it != "null" },
+            title = entry.optString("title").blankToNull(),
+            uploader = entry.optString("uploader").blankToNull(),
+            thumbnail = entry.optString("thumbnail").blankToNull(),
             filesizeBytes = entry.optLong("filesize", 0L).takeIf { it > 0L } ?: entry.optLong("filesize_approx", 0L).takeIf { it > 0L },
             durationMs = entry.optDouble("duration", -1.0).takeIf { it > 0.0 }?.let { (it * 1000).toLong() },
             streamUrls = streamUrls,
+            artist = (entry.optString("artist").blankToNull() ?: entry.optString("uploader").blankToNull()),
+            album = entry.optString("album").blankToNull(),
+            tracks = tracks,
+            collectionTitle = json.optString("collection_title").blankToNull(),
+            collectionArtist = json.optString("collection_artist").blankToNull(),
+            collectionThumbnail = json.optString("collection_thumbnail").blankToNull(),
         )
     }
 

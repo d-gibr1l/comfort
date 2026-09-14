@@ -240,7 +240,7 @@ class DownloadWorker(
                 // already does, so this is the only Spotify-specific wiring the multi-item case
                 // actually needs; everything downstream (item counting, progress %) is engine-
                 // agnostic already.
-                if (engine == DownloadEngine.SPOTIFY && (entity?.totalItems ?: 0) <= 0) {
+                if (engine == DownloadEngine.SPOTIFY && (entity?.totalItems ?: 0) <= 0 && entity?.itemFilter == null) {
                     val listed = GalleryDlListing.listItems(applicationContext, url).items
                     if (listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
                         dao.setTotalItems(downloadId, listed.size)
@@ -682,13 +682,18 @@ class DownloadWorker(
                 val outputFormat = entity?.outputFormat?.let { stored -> runCatching { OutputFormat.valueOf(stored) }.getOrNull() }
                     ?: GalleryDlPreferences.getOutputFormat(applicationContext)
                 // The share-sheet picker's own gallery-dl-syntax --filter ("num in {1,3,4}", see
-                // SharePickerScreen) translated into yt-dlp's own native playlist_items syntax
-                // ("1,3,4") — the item numbers themselves are already the right 1-indexed positions
-                // either way (see GalleryDlListing.listViaYtDlp's entryToGalleryItem), only the
-                // surrounding syntax differs between the two engines' filter mechanisms. Previously
-                // dropped entirely for a yt-dlp-routed download: the picker let the user uncheck
-                // specific playlist videos, but yt-dlp itself never heard about that selection and
-                // downloaded based only on the global "Download Playlists" setting instead.
+                // SharePickerScreen) translated into the bare "1,3,4" digit-list syntax both
+                // yt-dlp's own native playlist_items AND spotify_wrapper.py's own playlist_items
+                // param (added for the song preview sheet's per-track checkboxes) expect — the
+                // item numbers themselves are already the right 1-indexed positions in every case
+                // (see GalleryDlListing.listViaYtDlp's entryToGalleryItem and
+                // GalleryDlListing.PreviewInfo.tracks' own doc comment for the Spotify case), only
+                // the surrounding syntax differs between engines' own filter mechanisms — so this
+                // one extraction is reused verbatim for both the yt-dlp and Spotify engines below.
+                // Previously dropped entirely for a yt-dlp-routed download: the picker let the
+                // user uncheck specific playlist videos, but yt-dlp itself never heard about that
+                // selection and downloaded based only on the global "Download Playlists" setting
+                // instead.
                 val ytDlpPlaylistItems = ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
                 // Imported from YTDLnis's own settings screens — see GalleryDlPreferences' own
                 // doc comments on each of these for why they're yt-dlp-only.
@@ -762,10 +767,10 @@ class DownloadWorker(
 
                 // Always audio-only (Spotify links have no video concept at all — see
                 // VideoSiteRouter's own doc comment on why this is its own dedicated engine) —
-                // no quality/subtitle/playlist-filter options apply, so this passes a much
-                // smaller argv than runYtDlp's own. spotify_wrapper.py delegates the actual
-                // per-track download to yt_dlp_wrapper.py's own download() internally, which is
-                // where ffmpeg/aria2c/js-runtime actually get used.
+                // no quality/subtitle options apply, so this passes a much smaller argv than
+                // runYtDlp's own. spotify_wrapper.py delegates the actual per-track download to
+                // yt_dlp_wrapper.py's own download() internally, which is where ffmpeg/aria2c/
+                // js-runtime actually get used.
                 suspend fun runSpotify(): Int =
                     PythonRuntime.run(
                         applicationContext, "spotify_wrapper.py",
@@ -784,6 +789,8 @@ class DownloadWorker(
                             if (trimFilenames) "1" else "0",
                             if (verboseLogging) "1" else "0",
                             tlsClientPath,
+                            if (saveThumbnail) "1" else "0",
+                            ytDlpPlaylistItems,
                         ),
                         actualCallback,
                     )
