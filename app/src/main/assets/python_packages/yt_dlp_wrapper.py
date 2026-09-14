@@ -798,11 +798,12 @@ class _FinalFilePP(PostProcessor):
     dict (see YoutubeDL.run_pp/run_all_pps, which thread the return value from each postprocessor
     into the next) — so info['filepath'] here is always the true, currently-real final path."""
 
-    def __init__(self, downloader, callback, override_title=None, override_artist=None):
+    def __init__(self, downloader, callback, override_title=None, override_artist=None, source_url=None):
         super().__init__(downloader)
         self._callback = callback
         self._override_title = override_title
         self._override_artist = override_artist
+        self._source_url = source_url
 
     def run(self, info):
         filepath = info.get("filepath")
@@ -815,6 +816,18 @@ class _FinalFilePP(PostProcessor):
             # happen before that line fires, not after.
             if self._override_title or self._override_artist:
                 _apply_title_artist_override(filepath, self._override_title, self._override_artist)
+            # music.youtube.com only (not plain youtube.com/youtu.be) — a real song is a
+            # near-guarantee there, unlike a random YouTube video, where an iTunes title+artist
+            # search would just as often return a wrong or nonexistent match. See
+            # _apply_cover_art_override's own doc comment for why this is worth doing at all:
+            # YouTube's own thumbnail is always a 16:9 video frame, never a square cover.
+            if self._source_url and "music.youtube.com" in self._source_url:
+                title = self._override_title or info.get("track") or info.get("title")
+                artist = self._override_artist or info.get("artist") or info.get("uploader") or info.get("channel")
+                if title and artist:
+                    cover_url = _itunes_cover_art_url(title, artist)
+                    if cover_url:
+                        _apply_cover_art_override(filepath, cover_url)
             self._callback(os.path.abspath(filepath))
         return [], info
 
@@ -837,6 +850,72 @@ def _apply_title_artist_override(filepath, title, artist):
             audio.save()
     except Exception:
         pass
+
+
+def _itunes_cover_art_url(title, artist):
+    """Best-effort square album-art URL for a title+artist pair with no known track id — used
+    for plain YouTube Music downloads (see _FinalFilePP's own call site below), which only ever
+    carry YouTube's own non-square 16:9 video-frame thumbnail. iTunes' public search API needs
+    no signup/API key at all — tried instead of Spotify's own search, which needs either a
+    registered developer app's Client Credentials token or an anonymous session token scraped
+    from open.spotify.com/search (confirmed live that the latter no longer works: Spotify has
+    evidently moved token issuance to a client-side JS call a plain HTTP fetch can't observe).
+    "artworkUrl100"'s "100x100" segment is a well-documented, swappable size hint — requesting
+    600x600 back gets a real high-res image instead of the tiny default thumbnail. Returns None
+    on no match or any failure, never raises — a missing cover-art upgrade should never fail an
+    otherwise-successful download."""
+    try:
+        import urllib.parse
+        import urllib.request
+        import ssl
+        cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+        ssl_context = ssl.create_default_context(cafile=cacert_path) if os.path.exists(cacert_path) else None
+        query = urllib.parse.quote(f"{artist} {title}")
+        req = urllib.request.Request(
+            f"https://itunes.apple.com/search?term={query}&media=music&entity=song&limit=1",
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as resp:
+            data = json.loads(resp.read().decode("utf-8", "replace"))
+        results = data.get("results") or []
+        if not results:
+            return None
+        artwork = results[0].get("artworkUrl100")
+        return artwork.replace("100x100", "600x600") if artwork else None
+    except Exception:
+        return None
+
+
+def _apply_cover_art_override(filepath, image_url):
+    """Square cover art from _itunes_cover_art_url's own lookup (see _FinalFilePP's own call
+    site above), overriding whatever EmbedThumbnailPP already embedded from YouTube's own 16:9
+    video-frame thumbnail — this app's stripped ffmpeg build has no
+    image encoder/muxer at all (see _patch_embed_thumbnail_fallback's own doc comment on that
+    same limitation) and the bundled Python has no image library, so cropping that thumbnail
+    locally isn't possible; fetching an already-square image instead sidesteps the problem
+    entirely. mutagen-only, mp4/m4a only (the container every audio-only YouTube Music download
+    actually uses) — mirrors yt-dlp's own EmbedThumbnailPP mutagen branch for that container.
+    Silently no-ops on any failure (bad URL, wrong container, ...): a missing cover-art upgrade
+    should never turn an otherwise-successful download into a failure."""
+    try:
+        import ssl
+        import urllib.request
+        cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+        ssl_context = None
+        if os.path.exists(cacert_path):
+            ssl_context = ssl.create_default_context(cafile=cacert_path)
+        req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as resp:
+            image_data = resp.read()
+        if not image_data:
+            return
+        from mutagen.mp4 import MP4, MP4Cover
+        audio = MP4(filepath)
+        audio.tags["covr"] = [MP4Cover(data=image_data, imageformat=MP4Cover.FORMAT_JPEG)]
+        audio.save()
+    except Exception:
+        pass
+
 
 class _Logger:
     """Routes yt-dlp's own log messages through the same per-line callback DownloadWorker
@@ -1465,7 +1544,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # what reports the real final file whenever any postprocessing could happen —
                 # added last, after _LocalTrimPP above, so it always runs genuinely last.
                 ydl.add_post_processor(
-                    _FinalFilePP(ydl, callback, override_title, override_artist), when="post_process",
+                    _FinalFilePP(ydl, callback, override_title, override_artist, source_url=url), when="post_process",
                 )
             ydl.download([url])
         return "Done"
