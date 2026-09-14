@@ -1044,7 +1044,10 @@ private fun MainPreviewScreen(
             Button(
                 onClick = onDownload,
                 enabled = downloadEnabled,
-                modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 0.dp),
+                // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin
+                // (navBarPill's own Box uses padding(horizontal = 24.dp)) — kept consistent so
+                // this button reads the same width as that pill rather than running edge-to-edge.
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).height(56.dp),
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))

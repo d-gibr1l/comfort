@@ -230,7 +230,9 @@ fun SharePickerScreen(
         bottomBar = {
             if (state == ListingState.LOADED) {
                 Surface(color = Color.Transparent, tonalElevation = 3.dp) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin,
+                    // so this button reads the same width as that pill rather than a narrower one.
+                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
                         Button(
                             onClick = {
                                 // itemFilter (hoisted above, shared with the isDuplicate check)

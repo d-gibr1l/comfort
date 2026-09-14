@@ -1297,10 +1297,20 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         if embed_thumbnail or audio_only:
             ydl_opts["writethumbnail"] = True
             postprocessors.append({"key": "EmbedThumbnail"})
-        if embed_metadata or embed_chapters:
+        if embed_metadata or embed_chapters or audio_only:
             # A single FFmpegMetadata entry handles both — add_chapters is that postprocessor's
             # own independent kwarg (this is literally how the real CLI's --embed-chapters is
             # implemented), so embed_chapters doesn't need a metadata embed to come along with it.
+            # "or audio_only": same reasoning as "embed_thumbnail or audio_only" just above — an
+            # audio download always gets its real artist/album/title written into the file itself,
+            # regardless of the global "Embed Metadata" setting, the same way Spotify downloads
+            # already always do via spotify_wrapper.py's own unconditional mutagen retag.
+            # Reproduced live without this: DownloadEntity.artist/album were captured correctly
+            # (the separate [artist]/[album] callback lines, read straight off this same
+            # info_dict, always fire), but the saved file's own tags stayed empty/"<unknown>"
+            # whenever the user hadn't separately turned this setting on — a real, confusing
+            # inconsistency between what the app's own Library showed and what the file itself
+            # actually carried.
             postprocessors.append({"key": "FFmpegMetadata", "add_chapters": embed_chapters})
         if (download_subtitles or save_subtitle_files) and not audio_only:
             # writesubtitles alone (no EmbedSubtitle postprocessor) leaves the fetched track as
