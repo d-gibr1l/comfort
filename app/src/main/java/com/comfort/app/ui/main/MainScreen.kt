@@ -302,6 +302,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         outputFormat = options.outputFormat,
                         filenameTemplate = options.filenameTemplate,
                         saveThumbnail = options.saveThumbnail,
+                        overrideTitle = options.overrideTitle,
+                        overrideArtist = options.overrideArtist,
                         forceDuplicate = true,
                     )
                     previewUrl = null

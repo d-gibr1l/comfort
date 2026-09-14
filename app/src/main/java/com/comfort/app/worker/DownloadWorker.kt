@@ -130,6 +130,14 @@ class DownloadWorker(
         val dao = AppDatabase.getDatabase(applicationContext).downloadDao()
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
+        // The song preview sheet's own editable title/artist (SongPreviewCard) — see
+        // DownloadEntity.overrideTitle/overrideArtist's own doc comment. Empty string (not null)
+        // is this argv's own "not set" sentinel, same convention every other optional string arg
+        // passed to the Python wrappers already uses. Computed here (not down by runYtDlp's own
+        // other argv-building vals) since the final-file handling block, well above that point in
+        // the file, also needs these to update the DB's own displayed title/artist.
+        val overrideTitle = entity?.overrideTitle.orEmpty()
+        val overrideArtist = entity?.overrideArtist.orEmpty()
 
         // A resumed/retried download already has real progress sitting in the DB from its last
         // run — starting the notification back at a bare indeterminate spinner (only for the first
@@ -587,6 +595,16 @@ class DownloadWorker(
                                         if (hasPlaceholderTitle) {
                                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                                         }
+                                        // The song preview sheet's own editable title/artist
+                                        // (SongPreviewCard) — applied last, unconditionally, so a
+                                        // user's explicit edit always wins in the Library's own
+                                        // display regardless of whatever the source itself (or the
+                                        // filename-derived title just above) already set. Matches
+                                        // what actually got embedded into the file's own tags —
+                                        // see yt_dlp_wrapper.py's/spotify_wrapper.py's own
+                                        // override_title/override_artist handling.
+                                        if (!overrideTitle.isNullOrBlank()) dao.updateTitle(downloadId, overrideTitle)
+                                        if (!overrideArtist.isNullOrBlank()) dao.setArtist(downloadId, overrideArtist)
                                         DownloadNotifications.updateProgress(
                                             applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
                                             speedMbs = speedMbs, currentBytes = totalBytes, expectedBytes = expectedBytesRef.get(),
@@ -761,6 +779,8 @@ class DownloadWorker(
                             aria2LibDir,
                             ffmpegLibDir,
                             tlsClientPath,
+                            overrideTitle,
+                            overrideArtist,
                         ),
                         actualCallback,
                     )
@@ -791,6 +811,8 @@ class DownloadWorker(
                             tlsClientPath,
                             if (saveThumbnail) "1" else "0",
                             ytDlpPlaylistItems,
+                            overrideTitle,
+                            overrideArtist,
                         ),
                         actualCallback,
                     )

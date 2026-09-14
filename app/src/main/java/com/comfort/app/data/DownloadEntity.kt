@@ -138,6 +138,15 @@ data class DownloadEntity(
     // Track/album position (e.g. "3"), if the source reports one. Not currently surfaced in the
     // UI — captured now so it's available without another migration once/if it is.
     val track: String? = null,
+    // User-edited title/artist from the song preview sheet's own editable fields (SongPreviewCard)
+    // — null means the user never touched them, in which case the real download uses whatever the
+    // source itself reports, same as before these existed. When set, these override the source's
+    // own title/artist for both the embedded file tags and this row's own `title`/`artist` — NOT
+    // the on-disk filename, which still derives from the source's raw values (see
+    // yt_dlp_wrapper.py's/spotify_wrapper.py's own doc comments on their override_title/
+    // override_artist params for exactly where each is and isn't applied).
+    val overrideTitle: String? = null,
+    val overrideArtist: String? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

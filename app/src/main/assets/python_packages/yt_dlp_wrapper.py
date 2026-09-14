@@ -798,15 +798,45 @@ class _FinalFilePP(PostProcessor):
     dict (see YoutubeDL.run_pp/run_all_pps, which thread the return value from each postprocessor
     into the next) — so info['filepath'] here is always the true, currently-real final path."""
 
-    def __init__(self, downloader, callback):
+    def __init__(self, downloader, callback, override_title=None, override_artist=None):
         super().__init__(downloader)
         self._callback = callback
+        self._override_title = override_title
+        self._override_artist = override_artist
 
     def run(self, info):
         filepath = info.get("filepath")
         if filepath:
+            # Applied here — after every other postprocessor (ExtractAudio/EmbedThumbnail/
+            # Metadata/...) has already finished, same reasoning as this whole class's own doc
+            # comment above, and the identical ordering fix spotify_wrapper.py's own retag needed
+            # this session: DownloadWorker's actualCallback moves/deletes the staging file the
+            # moment it receives this callback's own path line, synchronously — retagging has to
+            # happen before that line fires, not after.
+            if self._override_title or self._override_artist:
+                _apply_title_artist_override(filepath, self._override_title, self._override_artist)
             self._callback(os.path.abspath(filepath))
         return [], info
+
+
+def _apply_title_artist_override(filepath, title, artist):
+    """The download preview sheet's own editable title/artist (SongPreviewCard) — overrides
+    whatever the source itself reported, the same way spotify_wrapper.py's own
+    _retag_with_spotify_metadata overrides a matched YouTube video's tags with Spotify's real
+    ones. Text tags only (no cover art — EmbedThumbnail, earlier in the postprocessor chain,
+    already handled that); silently no-ops on a format mutagen's "easy" interface can't open,
+    same tolerance every other optional metadata step in this app's audio pipeline already has."""
+    try:
+        import mutagen
+        audio = mutagen.File(filepath, easy=True)
+        if audio is not None:
+            if title:
+                audio["title"] = title
+            if artist:
+                audio["artist"] = artist
+            audio.save()
+    except Exception:
+        pass
 
 class _Logger:
     """Routes yt-dlp's own log messages through the same per-line callback DownloadWorker
@@ -844,7 +874,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
-             tls_client_path=None):
+             tls_client_path=None, override_title=None, override_artist=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1414,7 +1444,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # See _FinalFilePP's own doc comment for why this (not postprocessor_hooks) is
                 # what reports the real final file whenever any postprocessing could happen —
                 # added last, after _LocalTrimPP above, so it always runs genuinely last.
-                ydl.add_post_processor(_FinalFilePP(ydl, callback), when="post_process")
+                ydl.add_post_processor(
+                    _FinalFilePP(ydl, callback, override_title, override_artist), when="post_process",
+                )
             ydl.download([url])
         return "Done"
     except _Cancelled:
@@ -1614,5 +1646,7 @@ if __name__ == "__main__":
         aria2_lib_dir=(_s(a[44]) if len(a) > 44 else None),
         ffmpeg_lib_dir=(_s(a[45]) if len(a) > 45 else None),
         tls_client_path=(_s(a[46]) if len(a) > 46 else None),
+        override_title=(_s(a[47]) if len(a) > 47 else None),
+        override_artist=(_s(a[48]) if len(a) > 48 else None),
     )
     print(f"[__status__] {status}", flush=True)
