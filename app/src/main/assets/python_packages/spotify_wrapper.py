@@ -294,7 +294,8 @@ def _parse_playlist_items(playlist_items):
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
              archive_path=None, js_runtime_path=None, ffmpeg_path=None, ffmpeg_lib_dir=None,
              aria2_path=None, aria2_lib_dir=None, restrict_filenames=True, trim_filenames=True,
-             verbose=False, tls_client_path=None, save_thumbnail=False, playlist_items=None):
+             verbose=False, tls_client_path=None, save_thumbnail=False, playlist_items=None,
+             override_title=None, override_artist=None):
     """One call per Spotify link (track, or every track in an album/playlist in turn). Each
     track's own final-file callback line comes straight from the inner yt_dlp_wrapper.download()
     call unchanged, so DownloadWorker.kt's existing bare-filepath/[progress]/[size] handling needs
@@ -302,7 +303,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     gallery-dl download already does. [playlist_items], when given, is a "1,3,4"-style string of
     1-based track positions (matching the preview sheet's own per-track checkbox list, in the same
     order this function itself resolves track_ids) — anything else is skipped entirely, never
-    resolved against YouTube or downloaded."""
+    resolved against YouTube or downloaded. [override_title]/[override_artist] are the preview
+    sheet's own editable fields (SongPreviewCard) — only meaningful, and only ever actually sent,
+    for a single-track link (that card only exists for SONG_SINGLE, never a multi-track list), so
+    they're applied only when exactly one track ends up being downloaded; a multi-track
+    album/playlist run ignores them rather than stamping every track with the same title."""
     try:
         url = _resolve_redirect(url)
         match = _SPOTIFY_URL_RE.search(url)
@@ -341,12 +346,24 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                     callback("[error] Couldn't resolve metadata for a track — skipping")
                 continue
 
+            # tag_title/tag_artist are what actually get embedded/shown — override_title/
+            # override_artist substitute here (single-track downloads only, see this function's
+            # own doc comment), but _resolve_youtube_match below still searches on Spotify's own
+            # real title/artist regardless, since an edited display title has nothing to do with
+            # finding the right YouTube match.
+            tag_title, tag_artist = title, artist
+            if len(track_ids) == 1:
+                if override_title:
+                    tag_title = override_title
+                if override_artist:
+                    tag_artist = override_artist
+
             # Spotify's own metadata is authoritative — sent BEFORE delegating to
             # yt_dlp_wrapper.download() below, so its own *IfAbsent DAO writes (driven by
             # whatever the matched YouTube video's own info_dict reports) never overwrite this
             # once it lands in the DB (see DownloadDao's own doc comment on why *IfAbsent exists).
             if callback:
-                callback(f"[artist] {artist[:200]}")
+                callback(f"[artist] {tag_artist[:200]}")
                 if album_name:
                     callback(f"[album] {album_name[:200]}")
 
@@ -373,7 +390,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             def _capture_and_forward(line, _cb=callback, _out=captured_path):
                 if line and not line.startswith("[") and os.path.isabs(line) and os.path.exists(line):
                     _out[0] = line
-                    _retag_with_spotify_metadata(line, title, artist, album_name, thumbnail_url)
+                    _retag_with_spotify_metadata(line, tag_title, tag_artist, album_name, thumbnail_url)
                 if _cb:
                     _cb(line)
 
@@ -413,7 +430,7 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: spotify_wrapper.py download <16 positional args> | list <5 positional args>", file=_sys.stderr)
+        print("Usage: spotify_wrapper.py download <18 positional args> | list <5 positional args>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "list":
@@ -435,5 +452,7 @@ if __name__ == "__main__":
         tls_client_path=_s(a[13]) if len(a) > 13 else None,
         save_thumbnail=_b(a[14]) if len(a) > 14 else False,
         playlist_items=_s(a[15]) if len(a) > 15 else None,
+        override_title=_s(a[16]) if len(a) > 16 else None,
+        override_artist=_s(a[17]) if len(a) > 17 else None,
     )
     print(f"[__status__] {status}", flush=True)

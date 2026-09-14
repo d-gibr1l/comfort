@@ -125,9 +125,20 @@ private val MIGRATION_16_17 = object : Migration(16, 17) {
     }
 }
 
+// Adds overrideTitle/overrideArtist — the song preview sheet's own editable title/artist fields
+// (SongPreviewCard), persisted per-download the same way filenameTemplate/saveThumbnail already
+// are, so a retry/resume re-applies the same edit instead of silently reverting to the source's
+// raw values.
+private val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN overrideTitle TEXT")
+        db.execSQL("ALTER TABLE downloads ADD COLUMN overrideArtist TEXT")
+    }
+}
+
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 17,
+    version = 18,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -143,7 +154,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
-                        MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+                        MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

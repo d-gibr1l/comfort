@@ -101,6 +101,8 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         outputFormat: OutputFormat? = null,
         filenameTemplate: String? = null,
         saveThumbnail: Boolean? = null,
+        overrideTitle: String? = null,
+        overrideArtist: String? = null,
         // Pass true from a caller whose own "Download" button already checked
         // DownloadDispatcher.isDuplicate and relabeled itself "Redownload" (DownloadPreviewSheet
         // does this internally) — the button already told the user, so tapping it is the
@@ -116,6 +118,8 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 outputFormat = outputFormat,
                 filenameTemplate = filenameTemplate,
                 saveThumbnail = saveThumbnail,
+                overrideTitle = overrideTitle,
+                overrideArtist = overrideArtist,
                 forceDuplicate = forceDuplicate,
             )
         }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -107,6 +109,13 @@ private data class SongPreviewState(
     val selectedNums: Set<Int>,
     val onToggleNum: (Int) -> Unit,
     val onToggleAll: () -> Unit,
+    /** Editable title/artist for SONG_SINGLE's own card — null while the preview is still loading
+     * (no source value to seed from yet). Not used in SONG_LIST or VIDEO; the per-track checklist
+     * doesn't get individually-editable rows. */
+    val editedTitle: String?,
+    val editedArtist: String?,
+    val onEditedTitleChange: (String) -> Unit,
+    val onEditedArtistChange: (String) -> Unit,
 )
 
 /** Snapshot of everything an overlay sub-screen (Commands/Trim/Templates) can touch, taken the
@@ -140,6 +149,13 @@ data class DownloadOptions(
      * DownloadEntity.totalItems so the progress bar's denominator is right immediately, instead of
      * DownloadWorker's own pre-flight listing pass overwriting it with the full album's size. */
     val totalItems: Int = 0,
+    /** The song preview sheet's own editable title/artist (SongPreviewCard) — null unless the
+     * sheet was in a song mode with a value to edit. Overrides the source's own title/artist for
+     * both the embedded file tags and this download's own DB `title`/`artist`; the on-disk
+     * filename still derives from the source's raw values regardless (see
+     * DownloadEntity.overrideTitle/overrideArtist's own doc comment). */
+    val overrideTitle: String? = null,
+    val overrideArtist: String? = null,
 )
 
 /** Same spoofed User-Agent/Referer the queue and share picker already use for remote preview
@@ -336,6 +352,19 @@ fun DownloadPreviewSheet(
         else -> PreviewMode.VIDEO
     }
 
+    // SONG_SINGLE's own editable title/artist fields (SongPreviewCard) — null until the listing
+    // pass resolves a real value to seed from. Seeded exactly once per url (the `== null` guard),
+    // so a user edit survives the preview's own later state updates (e.g. isDuplicate's separate
+    // effect re-running) instead of getting silently overwritten mid-edit.
+    var editedTitle by remember(url) { mutableStateOf<String?>(null) }
+    var editedArtist by remember(url) { mutableStateOf<String?>(null) }
+    LaunchedEffect(preview?.title) {
+        if (editedTitle == null) preview?.title?.let { editedTitle = cleanTrackTitle(it) }
+    }
+    LaunchedEffect(preview?.artist) {
+        if (editedArtist == null) preview?.artist?.let { editedArtist = cleanArtistName(it) }
+    }
+
     LaunchedEffect(url) {
         previewLoading = true
         preview = GalleryDlListing.fetchPreviewInfo(context, url)
@@ -413,6 +442,10 @@ fun DownloadPreviewSheet(
                 onToggleAll = {
                     selectedNums = if (selectedNums.size == tracks.size) emptySet() else tracks.map { it.num }.toSet()
                 },
+                editedTitle = editedTitle,
+                editedArtist = editedArtist,
+                onEditedTitleChange = { editedTitle = it },
+                onEditedArtistChange = { editedArtist = it },
             ),
             quality = quality,
             onQualityChange = {
@@ -546,6 +579,12 @@ private fun PreviewSheetOverlayHost(
                             filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
                             itemFilter = itemFilter,
                             totalItems = if (itemFilter != null) selectedTrackCount else 0,
+                            // Only SONG_SINGLE has editable title/artist at all (SONG_LIST's own
+                            // per-track rows aren't individually editable, and VIDEO never shows
+                            // these fields) — null here means "use the source's own title/artist",
+                            // same as if this sheet had never had an editable field to begin with.
+                            overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE },
+                            overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE },
                         ),
                     )
                 }
@@ -806,6 +845,31 @@ private fun formatDurationShort(ms: Long): String {
 internal fun audioSubtitle(artist: String?, album: String?): String? =
     artist?.let { a -> album?.let { "$a — $it" } ?: a }
 
+// Matches a parenthesized/bracketed segment containing common upload clutter — "(Official Video)",
+// "[Official Music Video]", "(Lyrics)", "[HD]", "(Visualizer)", etc. Matched case-insensitively,
+// keyword-anchored with \b so it doesn't eat a segment that merely contains one of these words as
+// part of something else (e.g. a real "(Radio Edit)" stays untouched — "edit" isn't in the list).
+private val CLUTTER_TAG_RE = Regex(
+    """[(\[][^()\[\]]*\b(official\s*(video|audio|music\s*video|lyric\s*video)?|lyrics?|visualizer|explicit|clean\s*version|hd|4k|m/?v)\b[^()\[\]]*[)\]]""",
+    RegexOption.IGNORE_CASE,
+)
+private val EXTRA_SPACES_RE = Regex("""\s{2,}""")
+private val TOPIC_SUFFIX_RE = Regex(""" - Topic$""")
+
+/** Starting value for the preview sheet's own editable title field — strips common YouTube-upload
+ * clutter tags so the field opens already tidy rather than a raw scrape; the user can still edit
+ * (or restore) anything from there. Deliberately conservative: only removes whole bracketed/
+ * parenthesized segments matching known clutter keywords, never touches free text outside them. */
+internal fun cleanTrackTitle(raw: String): String =
+    raw.replace(CLUTTER_TAG_RE, "").replace(EXTRA_SPACES_RE, " ").trim()
+
+/** Starting value for the preview sheet's own editable artist field — strips the " - Topic" suffix
+ * YouTube's auto-generated artist channels carry (the preview's own listing pass doesn't run
+ * through MetadataParserPP the way a real download does — see yt_dlp_wrapper.py's own
+ * progress_hook — so this same cleanup needs its own copy here for the editable field's starting
+ * value). */
+internal fun cleanArtistName(raw: String): String = raw.replace(TOPIC_SUFFIX_RE, "").trim()
+
 private val FIRST_CHIP_SHAPE = androidx.compose.foundation.shape.RoundedCornerShape(
     topStart = androidx.compose.foundation.shape.CornerSize(50),
     bottomStart = androidx.compose.foundation.shape.CornerSize(50),
@@ -914,7 +978,12 @@ private fun MainPreviewScreen(
             }
             PreviewMode.SONG_SINGLE -> item {
                 SongPreviewCard(
-                    url = url, title = title, artist = song.artist, album = song.album,
+                    url = url,
+                    title = song.editedTitle ?: title,
+                    artist = song.editedArtist ?: song.artist,
+                    album = song.album,
+                    onTitleChange = song.onEditedTitleChange,
+                    onArtistChange = song.onEditedArtistChange,
                     durationMs = song.durationMs, filesizeBytes = filesizeBytes,
                     thumbnail = thumbnail, loading = loading,
                 )
@@ -1156,6 +1225,8 @@ private fun SongPreviewCard(
     title: String?,
     artist: String?,
     album: String?,
+    onTitleChange: (String) -> Unit,
+    onArtistChange: (String) -> Unit,
     durationMs: Long?,
     filesizeBytes: Long?,
     thumbnail: String?,
@@ -1210,28 +1281,56 @@ private fun SongPreviewCard(
                     .padding(horizontal = 16.dp, vertical = 14.dp),
             ) {
                 Column {
-                    Text(
-                        title ?: if (loading) "Loading…" else "Untitled",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val subtitle = audioSubtitle(artist, album)
-                    val meta = listOfNotNull(
-                        subtitle,
-                        durationMs?.let { formatDurationShort(it) },
-                        filesizeBytes?.let { formatFilesize(it) },
-                    ).joinToString(" · ")
-                    if (meta.isNotEmpty()) {
-                        Text(
-                            meta,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                    if (title != null) {
+                        // Editable, pre-filled with the auto-cleaned scraped title (see
+                        // cleanTrackTitle's own doc comment) — a plain BasicTextField rather than
+                        // an OutlinedTextField/TextField, since this sits directly on the scrim
+                        // over the art and needs no visible box/label of its own, just a cursor,
+                        // to read as "the title, which happens to be editable" rather than a form.
+                        BasicTextField(
+                            value = title,
+                            onValueChange = onTitleChange,
+                            textStyle = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                            ),
+                            singleLine = true,
+                            cursorBrush = SolidColor(Color.White),
+                            modifier = Modifier.fillMaxWidth(),
                         )
+                    } else if (loading) {
+                        Text(
+                            "Loading…",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (artist != null) {
+                            BasicTextField(
+                                value = artist,
+                                onValueChange = onArtistChange,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White.copy(alpha = 0.85f)),
+                                singleLine = true,
+                                cursorBrush = SolidColor(Color.White),
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                        }
+                        val trailing = listOfNotNull(
+                            album,
+                            durationMs?.let { formatDurationShort(it) },
+                            filesizeBytes?.let { formatFilesize(it) },
+                        ).joinToString(" · ")
+                        if (trailing.isNotEmpty()) {
+                            Text(
+                                (if (artist != null) " — " else "") + trailing,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.85f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }

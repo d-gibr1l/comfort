@@ -120,6 +120,10 @@ object DownloadDispatcher {
         outputFormat: OutputFormat? = null,
         filenameTemplate: String? = null,
         saveThumbnail: Boolean? = null,
+        // The song preview sheet's own editable title/artist (SongPreviewCard) — see
+        // DownloadEntity's own doc comment on these two fields for exactly what they override.
+        overrideTitle: String? = null,
+        overrideArtist: String? = null,
         // Set true for the explicit "Redownload anyway" action on a duplicate's own Snackbar/
         // Library entry — skips the check below for just this one deliberate retry, same shape as
         // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
@@ -179,6 +183,8 @@ object DownloadDispatcher {
                 outputFormat = outputFormat?.name,
                 filenameTemplate = filenameTemplate,
                 saveThumbnail = saveThumbnail,
+                overrideTitle = overrideTitle,
+                overrideArtist = overrideArtist,
                 // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
                 // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
                 // this as (a plain Settings switch, not a per-download picker).

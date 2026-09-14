@@ -118,6 +118,13 @@ interface DownloadDao {
     @Query("UPDATE downloads SET artist = :artist WHERE id = :id AND artist IS NULL")
     suspend fun setArtistIfAbsent(id: String, artist: String)
 
+    // Unconditional, unlike setArtistIfAbsent above — for the song preview sheet's own editable
+    // artist field (SongPreviewCard/DownloadEntity.overrideArtist): a user's explicit edit should
+    // always win over whatever *IfAbsent already captured from the source, not silently no-op
+    // because a value happened to land first.
+    @Query("UPDATE downloads SET artist = :artist WHERE id = :id")
+    suspend fun setArtist(id: String, artist: String)
+
     @Query("UPDATE downloads SET album = :album WHERE id = :id AND album IS NULL")
     suspend fun setAlbumIfAbsent(id: String, album: String)
 
