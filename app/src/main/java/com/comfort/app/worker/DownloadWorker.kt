@@ -15,6 +15,7 @@ import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.Aria2Runtime
+import com.comfort.app.util.EngineProbe
 import com.comfort.app.util.FfmpegRuntime
 import com.comfort.app.util.TlsClientRuntime
 import com.comfort.app.util.GalleryDlListing
@@ -821,35 +822,60 @@ class DownloadWorker(
                     DownloadEngine.YT_DLP -> runYtDlp()
                     DownloadEngine.SPOTIFY -> runSpotify()
                     DownloadEngine.GALLERY_DL -> {
-                        // Always excluded, not just when hasVideoItem's own listing pass happened
-                        // to succeed: gallery-dl has its own *unconfigured* internal yt-dlp
-                        // delegation for video posts on sites like Instagram (no ffmpeg_location,
-                        // no js_runtimes), which silently produces broken split video/audio
-                        // fragments instead of the one properly-merged file our own yt_dlp_wrapper
-                        // (below) produces. Relying on hasVideoItem here would mean any listing
-                        // failure — Instagram rate-limits this extra lookup fairly readily — falls
-                        // straight through to that broken path with no exclusion at all.
-                        runGalleryDl(excludeVideo = true)
-                        if (!isStopped) {
-                            // hasVideoItem reflects gallery-dl's own listing, which uses the same
-                            // extractor code path as the real download pass — a real, reproduced
-                            // case: Instagram's API silently omitted media info for exactly the
-                            // video child of an otherwise-fine photo carousel, so gallery-dl's own
-                            // listing genuinely never saw a video to report, and this would
-                            // otherwise skip yt-dlp entirely with no trace of a video ever having
-                            // existed. See VideoSiteRouter.alwaysSupplementsVideo's own doc comment
-                            // for which hosts get this always-on attempt and why.
-                            val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
-                            if (savedCount.get() == 0) {
-                                // gallery-dl found nothing at all — unsupported URL, blocked
-                                // request, or a genuinely empty gallery. Try yt-dlp on the same
-                                // link before giving up on the download entirely.
-                                runYtDlp()
-                            } else if (hasVideoItem || alwaysTryVideo) {
-                                // gallery-dl already grabbed the pictures (video excluded from its
-                                // own pass above); yt-dlp now handles this same post's video, since
-                                // it has real format/quality selection gallery-dl doesn't.
-                                runYtDlp()
+                        // classify() only routed here because this host isn't in the hardcoded
+                        // videoOnlyHosts/spotifyHosts fast paths — not because gallery-dl is
+                        // actually known to support it. A live, no-network probe against the
+                        // real bundled packages (see EngineProbe's own doc comment) tells us
+                        // whether either engine has a genuine extractor for this URL, so an
+                        // engine-exclusive link never wastes an attempt on the wrong one.
+                        val probe = EngineProbe.probeBoth(applicationContext, url)
+
+                        if (!probe.galleryDlHasExtractor && probe.ytDlpHasExtractor) {
+                            // gallery-dl has nothing for this URL at all, yt-dlp does — skip the
+                            // doomed gallery-dl attempt entirely.
+                            runYtDlp()
+                        } else {
+                            // Always excluded, not just when hasVideoItem's own listing pass
+                            // happened to succeed: gallery-dl has its own *unconfigured* internal
+                            // yt-dlp delegation for video posts on sites like Instagram (no
+                            // ffmpeg_location, no js_runtimes), which silently produces broken
+                            // split video/audio fragments instead of the one properly-merged file
+                            // our own yt_dlp_wrapper (below) produces. Relying on hasVideoItem
+                            // here would mean any listing failure — Instagram rate-limits this
+                            // extra lookup fairly readily — falls straight through to that broken
+                            // path with no exclusion at all.
+                            runGalleryDl(excludeVideo = true)
+                            if (!isStopped) {
+                                // hasVideoItem reflects gallery-dl's own listing, which uses the
+                                // same extractor code path as the real download pass — a real,
+                                // reproduced case: Instagram's API silently omitted media info for
+                                // exactly the video child of an otherwise-fine photo carousel, so
+                                // gallery-dl's own listing genuinely never saw a video to report,
+                                // and this would otherwise skip yt-dlp entirely with no trace of a
+                                // video ever having existed. See
+                                // VideoSiteRouter.alwaysSupplementsVideo's own doc comment for
+                                // which hosts get this always-on attempt and why.
+                                val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
+                                // Only skip the yt-dlp fallback/supplement below when CONFIDENT
+                                // it's doomed: gallery-dl had a real extractor for this URL (so
+                                // its own gap is a content issue, not a wrong-engine issue) AND
+                                // yt-dlp has no extractor at all. A link unknown to BOTH engines
+                                // must still fall through to the unconditional runYtDlp() calls
+                                // below, unchanged — that's today's "unknown link -> default
+                                // system" behavior, which this probe must never alter.
+                                val skipYtDlpFallback = probe.galleryDlHasExtractor && !probe.ytDlpHasExtractor
+                                if (savedCount.get() == 0) {
+                                    // gallery-dl found nothing at all — unsupported URL, blocked
+                                    // request, or a genuinely empty gallery. Try yt-dlp on the
+                                    // same link before giving up on the download entirely.
+                                    if (!skipYtDlpFallback) runYtDlp()
+                                } else if (hasVideoItem || alwaysTryVideo) {
+                                    // gallery-dl already grabbed the pictures (video excluded
+                                    // from its own pass above); yt-dlp now handles this same
+                                    // post's video, since it has real format/quality selection
+                                    // gallery-dl doesn't.
+                                    if (!skipYtDlpFallback) runYtDlp()
+                                }
                             }
                         }
                     }
