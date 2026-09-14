@@ -328,7 +328,7 @@ object GalleryDlListing {
         return GalleryItem(num, thumbnail, "$num.m4a", title, listIndex = listIndex)
     }
 
-    private suspend fun runSpotifyListInfo(context: Context, url: String): JSONObject? {
+    private suspend fun runSpotifyListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
         val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
@@ -339,6 +339,7 @@ object GalleryDlListing {
         val lastLine = runCatching {
             PythonRuntime.run(context, "spotify_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, tlsClientArg)) { line ->
                 lines.add(line)
+                if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
             }
             lines.lastOrNull { it.isNotBlank() }
         }.getOrNull() ?: return null
@@ -394,10 +395,10 @@ object GalleryDlListing {
      * download itself still goes ahead, since a preview failing is not a reason to block it. */
     private fun String?.blankToNull(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
 
-    suspend fun fetchPreviewInfo(context: Context, url: String): PreviewInfo? = withContext(Dispatchers.IO) {
+    suspend fun fetchPreviewInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): PreviewInfo? = withContext(Dispatchers.IO) {
         val json = when (VideoSiteRouter.classify(url)) {
-            DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url)
-            else -> runYtDlpListInfo(context, url)
+            DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url, onStatus)
+            else -> runYtDlpListInfo(context, url, onStatus)
         } ?: return@withContext null
         // A multi-item source comes back as {"entries": [...]} — the sheet previews one download,
         // so the first entry that actually resolved stands in for it.
@@ -447,7 +448,7 @@ object GalleryDlListing {
         )
     }
 
-    private suspend fun runYtDlpListInfo(context: Context, url: String): JSONObject? {
+    private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
         // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a corrupted
         // 0-byte file) still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like
@@ -484,6 +485,7 @@ object GalleryDlListing {
         val lastLine = runCatching {
             PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, tlsClientArg)) { line ->
                 lines.add(line)
+                if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
             }
             lines.lastOrNull { it.isNotBlank() }
         }.getOrNull() ?: return null

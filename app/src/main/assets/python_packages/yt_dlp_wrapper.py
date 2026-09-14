@@ -1512,6 +1512,17 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
         # photo entries, which yt-dlp can't extract at all) shouldn't abort metadata extraction
         # for the whole post — those entries just come back as None in "entries" below instead.
         "ignoreerrors": "only_download",
+        # Only flattens a *playlist's own child entries* (a directly-requested single video is
+        # unaffected either way) — without this, listing a long playlist fully resolves every
+        # single entry (a separate webpage/watch-page request per video) before returning
+        # anything, which is what made a long YouTube Music playlist's preview sheet take a very
+        # long time to appear with no feedback in the meantime, reported live as looking like the
+        # request had failed. Most playlist extractors (YouTube/YouTube Music included) already
+        # carry title/uploader/duration on the playlist page itself, so flat entries still have
+        # those for _pick() below — only per-entry thumbnail/requested_formats reliably disappear,
+        # which the multi-track checklist UI never rendered anyway (see GalleryDlListing's
+        # TrackPreview — no per-track thumbnail field at all).
+        "extract_flat": "in_playlist",
         # Deliberately NOT setting "noplaylist" at all (not even False) — reproduced live that an
         # *explicit* noplaylist=False on a single Instagram Reel URL sends its extractor down a
         # different internal path that comes back "Failed to parse JSON (... Expecting value in
@@ -1580,6 +1591,11 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
             ),
         }
 
+    # Real-time status line (not part of the returned JSON) — this function's own caller
+    # (GalleryDlListing.kt's runYtDlpListInfo) reads PythonRuntime.run()'s per-line callback as
+    # it's printed, well before this call returns, and surfaces it in place of a static "Loading…"
+    # so a long-playlist listing doesn't look stuck with no feedback.
+    print("[status] Fetching info…", flush=True)
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             _fix_impersonate_availability_check(ydl)
@@ -1591,6 +1607,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
         return json.dumps({"error": "no info extracted"})
     entries = info.get("entries")
     if entries is not None:
+        print(f"[status] Found {len(entries)} tracks…", flush=True)
         return json.dumps({"entries": [_pick(e) for e in entries]})
     return json.dumps(_pick(info) or {"error": "no info extracted"})
 

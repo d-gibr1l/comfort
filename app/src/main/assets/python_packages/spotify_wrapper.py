@@ -153,6 +153,13 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
                 "filesize": None, "duration": duration, "url": url, "requested_formats": None,
             })
 
+        # Real-time status line (not part of the returned JSON) — read live by
+        # GalleryDlListing.kt's runSpotifyListInfo via PythonRuntime.run()'s per-line callback, in
+        # place of a static "Loading…" while this one request is in flight. This is already the
+        # only network round-trip for an entire album/playlist regardless of track count (the
+        # whole trackList comes back in this one response), so this is mostly reassurance against
+        # a slow/rate-limited connection rather than covering genuine per-track work.
+        print("[status] Fetching info…", flush=True)
         entity = _fetch_entity(entity_type, entity_id)
         collection_title = entity.get("name")
         # A playlist's own "subtitle" is its curator ("Spotify", a username, ...), not a musical
