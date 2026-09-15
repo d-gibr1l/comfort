@@ -713,7 +713,23 @@ class DownloadWorker(
                 // user uncheck specific playlist videos, but yt-dlp itself never heard about that
                 // selection and downloaded based only on the global "Download Playlists" setting
                 // instead.
-                val ytDlpPlaylistItems = ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
+                //
+                // Blank whenever engine == GALLERY_DL, though: runYtDlp() below is reused verbatim
+                // as that engine's own video-supplement pass (see the GALLERY_DL branch further
+                // down), and for a multi-item Instagram/TikTok post the checklist's "num"s now come
+                // from gallery-dl's own listing (GalleryDlListing.fetchGalleryDlPreviewInfo) so
+                // runGalleryDl's own --filter (below) understands them correctly — but yt-dlp lists
+                // that exact same post completely independently (its own extractor, its own
+                // numbering, usually far fewer entries since it only ever sees the video items), so
+                // the same digits handed to its playlist_items would filter against the wrong
+                // listing entirely. Left unfiltered here, the supplement pass just fetches every
+                // real video it finds regardless of the checklist selection — an occasional extra
+                // file, never a silently wrong one, which is the safer failure mode of the two.
+                val ytDlpPlaylistItems = if (engine == DownloadEngine.GALLERY_DL) {
+                    ""
+                } else {
+                    ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
+                }
                 // Imported from YTDLnis's own settings screens — see GalleryDlPreferences' own
                 // doc comments on each of these for why they're yt-dlp-only.
                 val forceIpv4 = GalleryDlPreferences.isForceIpv4(applicationContext)
