@@ -261,11 +261,15 @@ private fun InstantShareHandler(url: String, onFinished: () -> Unit) {
 
 /** Runs the same listing pass SharePickerScreen itself would (see its own `preloadedResult` doc
  * comment) to decide, for *any* site — not a fixed host list — whether this share is a single
- * detected video: if so, DownloadPreviewSheet (quality/trim/format/commands/filename) is a much
- * more useful landing spot than a picker grid with nothing to pick between. Anything else (a real
- * multi-item gallery, an image-only post, an unlistable link, a genuine listing failure) falls
- * through to the existing SharePickerScreen item-picker unchanged, fed this same already-fetched
- * result so it isn't listed a second time. */
+ * detected video, or a listing that contains multiple videos even mixed in with photos (an
+ * Instagram carousel with two reels and a photo, say): either way DownloadPreviewSheet's
+ * quality/trim/format/commands/filename controls are a much more useful landing spot than a
+ * picker grid with nothing meaningful to pick between video items on. Downloading still proceeds
+ * exactly like it already does for a single video — every item in the post, not just the videos,
+ * still gets downloaded; this only changes which screen shows up, not what gets fetched. An
+ * image-only listing, an unlistable link, or a genuine listing failure still falls through to the
+ * existing SharePickerScreen item-picker unchanged, fed this same already-fetched result so it
+ * isn't listed a second time. */
 @Composable
 private fun ShareRouter(url: String, onFinished: () -> Unit) {
     val context = LocalContext.current
@@ -284,8 +288,14 @@ private fun ShareRouter(url: String, onFinished: () -> Unit) {
     }
 
     val result = listingResult
-    val singleVideoItem = result != null && result.items.size == 1 &&
-        result.items[0].filename?.let(VideoSiteRouter::isVideoFilename) == true
+    val videoItemCount = result?.items?.count { it.filename?.let(VideoSiteRouter::isVideoFilename) == true } ?: 0
+    // Single video (the original case), or two-or-more videos anywhere in the listing regardless
+    // of how many non-video items sit alongside them — both land on DownloadPreviewSheet instead
+    // of the picker grid. A single video mixed with photos (one video, some images) still falls
+    // through to SharePickerScreen: there's exactly one video to pick quality for either way, but
+    // the picker's own per-item selection is what actually lets the photos be excluded, which the
+    // preview sheet's own single-video card has no UI for.
+    val usePreviewSheet = result != null && ((result.items.size == 1 && videoItemCount == 1) || videoItemCount >= 2)
 
     when {
         result == null -> LoadingSheet(
@@ -305,7 +315,7 @@ private fun ShareRouter(url: String, onFinished: () -> Unit) {
                 }
             },
         )
-        singleVideoItem -> DownloadPreviewSheet(
+        usePreviewSheet -> DownloadPreviewSheet(
             url = url,
             onDismiss = onFinished,
             // Same forceDuplicate = true reasoning as LoadingSheet above — DownloadPreviewSheet's
