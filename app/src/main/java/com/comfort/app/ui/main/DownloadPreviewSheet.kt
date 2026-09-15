@@ -951,7 +951,14 @@ private fun MainPreviewScreen(
     // itself is scrolled; only the LazyColumn's own weight(1f) fills whatever height is left. The
     // overlay-panel system (Commands/Trim/Templates) lives in a sibling Box in
     // PreviewSheetOverlayHost, not inside this composable, so it's unaffected by any of this.
-    Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+    //
+    // fillMaxHeight()/weight(1f) only apply in SONG_LIST: that's the one mode whose content can
+    // outgrow the sheet and needs its own internal scroll. VIDEO/SONG_SINGLE render a single card
+    // — forcing the same fillMaxHeight() there left the LazyColumn stretched to fill the whole
+    // sheet regardless of how short its one item was, showing as a large dead gap between the
+    // card and the fixed chips/Download footer (reproduced live, screenshot from the user).
+    val isList = song.mode == PreviewMode.SONG_LIST
+    Column(modifier = Modifier.fillMaxWidth().let { if (isList) it.fillMaxHeight() else it }) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -960,13 +967,21 @@ private fun MainPreviewScreen(
             FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
                 Icon(FeatherIcons.Copy, contentDescription = "Copy link")
             }
+            // Only SONG_LIST has a selection to toggle — the control TrackListHeader used to
+            // provide before it was removed, moved here so it survives without needing its own
+            // dedicated row.
+            if (isList) {
+                TextButton(onClick = song.onToggleAll) {
+                    Text(if (song.selectedNums.size == song.tracks.size) "Deselect all" else "Select all")
+                }
+            }
             FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
                 Icon(FeatherIcons.XCircle, contentDescription = "Cancel")
             }
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.fillMaxWidth().let { if (isList) it.weight(1f) else it },
             contentPadding = PaddingValues(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
