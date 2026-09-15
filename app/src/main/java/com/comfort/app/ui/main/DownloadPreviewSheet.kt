@@ -374,8 +374,17 @@ fun DownloadPreviewSheet(
     }
 
     val isSongSource = remember(url) { VideoSiteRouter.isSongSource(url) }
+    // Any multi-entry listing gets the checklist — not just song sources. fetchPreviewInfo already
+    // populates [tracks] for a plain multi-video yt-dlp playlist the exact same way it does for a
+    // Spotify album (both just read yt-dlp's own {"entries": [...]} shape), so this was purely a
+    // gating condition, not a data gap: a YouTube playlist used to render as a single-video VIDEO
+    // card (previewing only its first entry, even though the whole playlist still downloaded) —
+    // now it gets the same real per-item checklist a Spotify album already had. showQualityRow
+    // (below) already keys off isSongSource independently of mode, so a video-list still shows its
+    // quality picker; see the chips Row further down for how it also still gets Format/no-Trim
+    // treatment instead of song styling.
     val mode = when {
-        isSongSource && tracks.isNotEmpty() -> PreviewMode.SONG_LIST
+        tracks.isNotEmpty() -> PreviewMode.SONG_LIST
         isSongSource || quality == VideoQuality.AUDIO_ONLY -> PreviewMode.SONG_SINGLE
         else -> PreviewMode.VIDEO
     }
@@ -1057,7 +1066,12 @@ private fun MainPreviewScreen(
             modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (song.mode == PreviewMode.VIDEO) {
+            // A video list (song.mode == SONG_LIST but showQualityRow is still true, since it's
+            // not a song source) gets the same chip set as a single VIDEO — Format toggle, no
+            // song-only "cover art" wording — minus Trim, which doesn't make sense across several
+            // selected videos at once. song.mode == VIDEO keeps Trim since there's exactly one.
+            val videoStyledChips = song.mode == PreviewMode.VIDEO || song.showQualityRow
+            if (videoStyledChips) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
@@ -1081,23 +1095,30 @@ private fun MainPreviewScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
 
+                    // Trim only makes sense against a single clip — song.mode == VIDEO. A video
+                    // list (song.mode == SONG_LIST, several selected videos at once) skips it and
+                    // starts straight at Format, same shape-relabeling SharePickerScreen's own
+                    // segmented chip rows already do when a middle chip becomes the first.
+                    val showTrim = song.mode == PreviewMode.VIDEO
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Spacer(modifier = Modifier.width(12.dp))
-                        PreviewChip(
-                            label = "Trim Video",
-                            selected = trimmed,
-                            icon = FeatherIcons.Scissors,
-                            shape = FIRST_CHIP_SHAPE,
-                            onClick = onOpenTrim,
-                        )
+                        if (showTrim) {
+                            PreviewChip(
+                                label = "Trim Video",
+                                selected = trimmed,
+                                icon = FeatherIcons.Scissors,
+                                shape = FIRST_CHIP_SHAPE,
+                                onClick = onOpenTrim,
+                            )
+                        }
                         PreviewChip(
                             label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
                             icon = FeatherIcons.Film,
-                            shape = MIDDLE_CHIP_SHAPE,
+                            shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
                             onClick = onToggleFormat,
                         )
                         PreviewChip(
