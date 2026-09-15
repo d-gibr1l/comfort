@@ -116,50 +116,50 @@ private val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry("Multiple concurrent downloads", "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Wi-Fi only", "Queued downloads wait for a Wi-Fi connection instead of using mobile data.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Speed limit", "Caps download bandwidth for all future downloads.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Retries", "How many times a failed request is retried before the download actually fails.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Fragment retries", "How many times a failed piece of a merge download (separate video/audio fragments) is retried.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Retries", "How many times a failed request is retried before giving up. Off uses the engine's built-in default.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Fragment retries", "How many times a failed video/audio fragment is retried. Off shares the main Retries budget.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Proxy", "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Force IPv4", "Binds outgoing connections to IPv4 — try this if a site's downloads fail with a broken IPv6 route.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Skip certificate checks", "Disables TLS certificate validation.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Concurrent fragments", "How many pieces of a single video download in parallel.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Sleep interval", "Pauses a random 2-to-this-many seconds before each request — eases rate-limit/bot-detection pressure.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Socket timeout", "How long a single stalled connection is allowed before giving up on it.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Buffer size", "yt-dlp only — the download stream's read chunk size.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Multi-connection downloads (aria2c)", "yt-dlp only — downloads a file over several connections at once via a bundled aria2c binary.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Force IPv4", "Forces connections over IPv4. Try this if downloads fail due to broken IPv6 routes.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Skip certificate checks", "Disables security certificate checks. Only enable this if a server is misconfigured.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Concurrent fragments", "How many fragments of a single video to download in parallel.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Sleep interval", "Adds a random delay before requests to avoid triggering rate limits and bot bans.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Socket timeout", "How long to wait on a stalled connection before retrying. Off uses the engine's default.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Buffer size", "The size of each read chunk (yt-dlp only). Rarely worth changing from the default.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Multi-connection downloads (aria2c)", "Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Restrict to time window", "New downloads wait in the queue until the window opens.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Use alarm for scheduling", "Wakes the device near the window's real open time even during Doze/battery-saving.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Use alarm for scheduling", "Ensures scheduled downloads start exactly on time by bypassing Android's battery-saving delays.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Limit max file size", "Files larger than this are skipped instead of downloaded.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Download delay", "Waits this many seconds after one queued download finishes before the next one starts.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Incognito by default", "New downloads are removed from Library/history the moment they finish.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Prevent duplicate downloads", "A link that's already queued, running, or finished is skipped instead of starting a second copy.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Remember last quality", "Changing the quality chip on the download sheet also becomes the new default.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Clean up leftover downloads", "A cancelled or errored download's partial files are removed from cache.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Download delay", "Adds a delay between a finished download and the next one in the queue.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Incognito by default", "Downloads are still saved to your device, but won't appear in the app's History or Library.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Prevent duplicate downloads", "Skips downloading a link if it's already queued, running, or finished.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Remember last quality", "Makes the quality chosen on the download sheet the new default for future downloads.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Clean up leftover downloads", "Automatically deletes partial files when a download is cancelled or fails.", SettingsRoute.DOWNLOADS),
 
     // Folders
     SubpageSearchEntry("Filename format", "How downloaded files are named.", SettingsRoute.FOLDERS),
-    SubpageSearchEntry("Restrict filenames", "ASCII letters/digits only, spaces replaced with underscores.", SettingsRoute.FOLDERS),
-    SubpageSearchEntry("Trim filenames", "Caps an overlong title at 150 characters instead of using it in full.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry("Restrict filenames", "Removes special characters and replaces spaces with underscores. Safer for sharing and older file systems.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry("Trim filenames", "Caps long titles at 150 characters (only applies to the default filename format).", SettingsRoute.FOLDERS),
     SubpageSearchEntry("Download location", "Where downloaded files are saved.", SettingsRoute.FOLDERS),
     SubpageSearchEntry("Storage", "How much space downloads are using.", SettingsRoute.FOLDERS),
 
     // Processing
-    SubpageSearchEntry("Single video only", "A link that's part of a playlist or channel downloads just that one video.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Live streams from the start", "Download an in-progress live stream from its beginning.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Single video only", "Only downloads the specific video from a link, even if it belongs to a larger playlist or channel.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Live streams from the start", "Downloads live streams from the beginning instead of the current moment.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed thumbnail", "Save the video's thumbnail as cover art inside the file.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed metadata", "Tag the file with its title, uploader, and other details.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Embed chapters", "Save the source's chapter markers inside the file.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Embed chapters", "Saves chapter markers inside the video file.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Write description / info.json files", "Save a separate JSON metadata file alongside each download.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Download subtitles", "Fetch and embed subtitles when they're available.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Save subtitle files", "Keeps a separate .srt/.vtt file alongside the video.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Save subtitle files", "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.", SettingsRoute.PROCESSING),
 
     // Advanced
     SubpageSearchEntry("Extra arguments", "Raw gallery-dl command-line arguments.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Rotate player clients", "Tries the android, web, and ios internal API clients instead of just web.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Impersonate a browser", "Spoofs a real browser's TLS handshake for every download.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Rotate player clients", "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Impersonate a browser", "Makes the app look like a real web browser to bypass bot detection on strict websites.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("yt-dlp extractor arguments", "Site-specific extractor options passed straight to yt-dlp.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Format sort", "Custom yt-dlp format-selection priority.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Custom headers", "Extra HTTP headers sent with every request.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Verbose logging", "Every internal yt-dlp debug line, for troubleshooting a failure.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Verbose logging", "Logs all internal yt-dlp debug output for advanced troubleshooting.", SettingsRoute.ADVANCED),
 
     // Cookies & Login
     SubpageSearchEntry("Cookies", "Sign in to sites that require it, via a real embedded browser.", SettingsRoute.COOKIES),
@@ -778,7 +778,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.RefreshCw,
                 title = "Retries",
-                subtitle = "How many times a failed request is retried before the download actually fails. Off uses each engine's own built-in default.",
+                subtitle = "How many times a failed request is retried before giving up. Off uses the engine's built-in default.",
                 checked = networkRetriesEnabled,
                 onCheckedChange = {
                     networkRetriesEnabled = it
@@ -805,7 +805,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.RefreshCw,
                 title = "Fragment retries",
-                subtitle = "How many times a failed piece of a merge download (separate video/audio fragments) is retried, independent of Retries above. Off shares the same budget as Retries.",
+                subtitle = "How many times a failed video/audio fragment is retried. Off shares the main Retries budget.",
                 checked = fragmentRetriesEnabled,
                 onCheckedChange = {
                     fragmentRetriesEnabled = it
@@ -875,7 +875,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Globe,
                 title = "Force IPv4",
-                subtitle = "Binds outgoing connections to IPv4 — try this if a site's downloads fail with a broken IPv6 route.",
+                subtitle = "Forces connections over IPv4. Try this if downloads fail due to broken IPv6 routes.",
                 checked = forceIpv4,
                 onCheckedChange = {
                     forceIpv4 = it
@@ -890,7 +890,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.ShieldOff,
                 title = "Skip certificate checks",
-                subtitle = "Disables TLS certificate validation. Only useful against a misconfigured server — leave off otherwise.",
+                subtitle = "Disables security certificate checks. Only enable this if a server is misconfigured.",
                 checked = noCheckCertificates,
                 onCheckedChange = {
                     noCheckCertificates = it
@@ -905,7 +905,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.GitPullRequest,
                 title = "Concurrent fragments",
-                subtitle = "How many pieces of a single video download in parallel — separate from the concurrent downloads count above.",
+                subtitle = "How many fragments of a single video to download in parallel.",
                 checked = concurrentFragmentsEnabled,
                 onCheckedChange = {
                     concurrentFragmentsEnabled = it
@@ -934,7 +934,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Clock,
                 title = "Sleep interval",
-                subtitle = "Pauses a random 2-to-this-many seconds before each request — a real range (not a fixed delay) eases rate-limit/bot-detection pressure the same way a lower concurrency does, just per-request.",
+                subtitle = "Adds a random delay before requests to avoid triggering rate limits and bot bans.",
                 checked = sleepIntervalEnabled,
                 onCheckedChange = {
                     sleepIntervalEnabled = it
@@ -964,7 +964,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Clock,
                 title = "Socket timeout",
-                subtitle = "How long a single stalled connection is allowed before giving up on it (then retried, per Retries above). Off uses each engine's own default (yt-dlp: 20s, gallery-dl: 30s).",
+                subtitle = "How long to wait on a stalled connection before retrying. Off uses the engine's default.",
                 checked = socketTimeoutEnabled,
                 onCheckedChange = {
                     socketTimeoutEnabled = it
@@ -991,7 +991,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Database,
                 title = "Buffer size",
-                subtitle = "yt-dlp only — the download stream's read chunk size. Off uses yt-dlp's own default (1024 KB); rarely worth changing.",
+                subtitle = "The size of each read chunk (yt-dlp only). Rarely worth changing from the default.",
                 checked = bufferSizeEnabled,
                 onCheckedChange = {
                     bufferSizeEnabled = it
@@ -1023,7 +1023,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Zap,
                 title = "Multi-connection downloads (aria2c)",
-                subtitle = "yt-dlp only — downloads a file over several connections at once instead of one, via a bundled aria2c binary (~7 MB added). Real speed gain on a slow/high-latency connection, negligible on a fast one.",
+                subtitle = "Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.",
                 checked = aria2Enabled,
                 onCheckedChange = {
                     aria2Enabled = it
@@ -1124,7 +1124,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 IconToggleRow(
                     icon = FeatherIcons.RefreshCw,
                     title = "Use alarm for scheduling",
-                    subtitle = "Wakes the device near the window's real open time even during Doze/battery-saving, instead of trusting WorkManager's own countdown — which the OS can silently defer past the intended moment for a long wait.",
+                    subtitle = "Ensures scheduled downloads start exactly on time by bypassing Android's battery-saving delays.",
                     checked = alarmSchedulingEnabled,
                     onCheckedChange = {
                         alarmSchedulingEnabled = it
@@ -1168,7 +1168,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Clock,
                 title = "Download delay",
-                subtitle = "Waits this many seconds after one queued download finishes before the next one in the same slot starts.",
+                subtitle = "Adds a delay between a finished download and the next one in the queue.",
                 checked = downloadDelayEnabled,
                 onCheckedChange = {
                     downloadDelayEnabled = it
@@ -1201,7 +1201,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.EyeOff,
                 title = "Incognito by default",
-                subtitle = "New downloads still save their file normally, but are removed from Library/history the moment they finish.",
+                subtitle = "Downloads are still saved to your device, but won't appear in the app's History or Library.",
                 checked = incognitoDefault,
                 onCheckedChange = {
                     incognitoDefault = it
@@ -1216,7 +1216,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Copy,
                 title = "Prevent duplicate downloads",
-                subtitle = "A link that's already queued, running, or finished is skipped instead of starting a second copy.",
+                subtitle = "Skips downloading a link if it's already queued, running, or finished.",
                 checked = preventDuplicateDownloads,
                 onCheckedChange = {
                     preventDuplicateDownloads = it
@@ -1231,7 +1231,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.RotateCcw,
                 title = "Remember last quality",
-                subtitle = "Changing the quality chip on the download sheet also becomes the new default for future downloads.",
+                subtitle = "Makes the quality chosen on the download sheet the new default for future downloads.",
                 checked = rememberDownloadType,
                 onCheckedChange = {
                     rememberDownloadType = it
@@ -1246,7 +1246,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             IconToggleRow(
                 icon = FeatherIcons.Trash2,
                 title = "Clean up leftover downloads",
-                subtitle = "A cancelled or errored download's partial files are removed from cache. Off leaves them for manual inspection or resume.",
+                subtitle = "Automatically deletes partial files when a download is cancelled or fails.",
                 checked = deleteLeftoverOnFailure,
                 onCheckedChange = {
                     deleteLeftoverOnFailure = it
@@ -1407,7 +1407,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             IconToggleRow(
                 icon = FeatherIcons.Type,
                 title = "Restrict filenames",
-                subtitle = "ASCII letters/digits only, spaces replaced with underscores — safer for older file systems and some file-sharing apps.",
+                subtitle = "Removes special characters and replaces spaces with underscores. Safer for sharing and older file systems.",
                 checked = restrictFilenames,
                 onCheckedChange = {
                     restrictFilenames = it
@@ -1422,7 +1422,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             IconToggleRow(
                 icon = FeatherIcons.Scissors,
                 title = "Trim filenames",
-                subtitle = "Caps an overlong title at 150 characters instead of using it in full. Only affects the default filename format above, not a custom one.",
+                subtitle = "Caps long titles at 150 characters (only applies to the default filename format).",
                 checked = trimFilenames,
                 onCheckedChange = {
                     trimFilenames = it
@@ -1668,7 +1668,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             IconToggleRow(
                 icon = FeatherIcons.List,
                 title = "Single video only",
-                subtitle = "A link that's part of a playlist or channel downloads just that one video. Can noticeably slow down extraction on some sites, so it's off by default.",
+                subtitle = "Only downloads the specific video from a link, even if it belongs to a larger playlist or channel.",
                 checked = noPlaylist,
                 onCheckedChange = {
                     noPlaylist = it
@@ -1683,7 +1683,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             IconToggleRow(
                 icon = FeatherIcons.Rewind,
                 title = "Live streams from the start",
-                subtitle = "Download an in-progress live stream from its beginning instead of starting at the current moment. Has no effect on a video that isn't currently live.",
+                subtitle = "Downloads live streams from the beginning instead of the current moment.",
                 checked = liveFromStart,
                 onCheckedChange = {
                     liveFromStart = it
@@ -1728,7 +1728,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             IconToggleRow(
                 icon = FeatherIcons.List,
                 title = "Embed chapters",
-                subtitle = "Save the source's chapter markers inside the file, independent of Embed metadata.",
+                subtitle = "Saves chapter markers inside the video file.",
                 checked = embedChapters,
                 onCheckedChange = {
                     embedChapters = it
@@ -1794,7 +1794,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             IconToggleRow(
                 icon = FeatherIcons.MessageCircle,
                 title = "Save subtitle files",
-                subtitle = "Keeps a separate .srt/.vtt file alongside the video — independent of Download subtitles above, which only embeds.",
+                subtitle = "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.",
                 checked = saveSubtitleFiles,
                 onCheckedChange = {
                     saveSubtitleFiles = it
@@ -1949,7 +1949,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             IconToggleRow(
                 icon = FeatherIcons.RefreshCw,
                 title = "Rotate player clients",
-                subtitle = "Tries the android, web, and ios internal API clients instead of just web — if one's throttled or serving degraded formats, yt-dlp falls back to the next. An explicit youtube:player_client=... in Extractor arguments below still wins.",
+                subtitle = "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.",
                 checked = youtubeClientRotation,
                 onCheckedChange = {
                     youtubeClientRotation = it
@@ -1962,7 +1962,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             IconToggleRow(
                 icon = FeatherIcons.ShieldOff,
                 title = "Impersonate a browser",
-                subtitle = "Spoofs a real browser's TLS handshake for every download, not just headers — makes the app harder to fingerprint as a script. Already always on for one specific known case (a Reddit share-link redirect); this extends it to every site.",
+                subtitle = "Makes the app look like a real web browser to bypass bot detection on strict websites.",
                 checked = impersonateEnabled,
                 onCheckedChange = {
                     impersonateEnabled = it
@@ -2090,7 +2090,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             IconToggleRow(
                 icon = FeatherIcons.Terminal,
                 title = "Verbose logging",
-                subtitle = "Every internal yt-dlp debug line, not just what this app's own UI already shows. For troubleshooting a failure.",
+                subtitle = "Logs all internal yt-dlp debug output for advanced troubleshooting.",
                 checked = verboseLogging,
                 onCheckedChange = {
                     verboseLogging = it
@@ -3125,7 +3125,7 @@ private fun EnginesSection() {
         IconToggleRow(
             icon = FeatherIcons.Zap,
             title = "Auto-update",
-            subtitle = "Install a newer yt-dlp/gallery-dl release automatically when one's found, instead of just flagging it.",
+            subtitle = "Automatically installs newer yt-dlp and gallery-dl updates when found.",
             checked = autoUpdate,
             onCheckedChange = {
                 autoUpdate = it
