@@ -998,17 +998,6 @@ private fun MainPreviewScreen(
                 )
             }
             PreviewMode.SONG_LIST -> {
-                item {
-                    TrackListHeader(
-                        collectionTitle = song.collectionTitle ?: title,
-                        collectionArtist = song.collectionArtist,
-                        collectionThumbnail = song.collectionThumbnail ?: thumbnail,
-                        url = url,
-                        trackCount = song.tracks.size,
-                        selectedCount = song.selectedNums.size,
-                        onToggleAll = song.onToggleAll,
-                    )
-                }
                 items(song.tracks, key = { it.num }) { track ->
                     TrackRow(
                         track = track,
@@ -1344,76 +1333,6 @@ private fun SongPreviewCard(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-/** Header for the SONG_LIST (Spotify album/playlist) case: the collection's own cover art/title/
- * artist and a "Select all"/"Deselect all" toggle — same pattern as SharePickerScreen's own
- * TopAppBar select-all action, just inline here since this isn't a full-screen picker. */
-@Composable
-private fun TrackListHeader(
-    collectionTitle: String?,
-    collectionArtist: String?,
-    collectionThumbnail: String?,
-    url: String,
-    trackCount: Int,
-    selectedCount: Int,
-    onToggleAll: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (collectionThumbnail != null) {
-                    AsyncImage(
-                        model = thumbnailRequest(collectionThumbnail, url),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        FeatherIcons.Music,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    collectionTitle ?: "Untitled",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val subtitle = listOfNotNull(collectionArtist, "$trackCount songs").joinToString(" · ")
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            TextButton(onClick = onToggleAll) {
-                Text(if (selectedCount == trackCount) "Deselect all" else "Select all")
             }
         }
     }
