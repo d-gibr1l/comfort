@@ -989,43 +989,44 @@ private fun MainPreviewScreen(
             }
         }
 
+        // Quality picker — outside the LazyColumn below, so it never scrolls out of view either
+        // (reported live via screenshot, same "static" treatment already applied to the top icon
+        // row/chips/Download button). Hidden when the song-ness came from the URL itself (Spotify/
+        // known song host) — quality is meaningless there (Spotify ignores it outright; a known
+        // song host downloads audio regardless — see DownloadOptions' own construction). Kept
+        // visible when the user only got here by manually picking "Audio" on an otherwise-ordinary
+        // link, so they still have a way back to a video quality without dismissing the whole sheet.
+        if (song.showQualityRow) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(modifier = Modifier.width(12.dp))
+                val total = VideoQuality.entries.size
+                VideoQuality.entries.forEachIndexed { index, option ->
+                    val segmentedShape = when (index) {
+                        0 -> FIRST_CHIP_SHAPE
+                        total - 1 -> LAST_CHIP_SHAPE
+                        else -> MIDDLE_CHIP_SHAPE
+                    }
+                    PreviewChip(
+                        label = option.chipLabel,
+                        selected = quality == option,
+                        shape = segmentedShape,
+                        onClick = { onQualityChange(option) },
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxWidth().let { if (isList) it.weight(1f) else it },
             contentPadding = PaddingValues(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-        // Quality picker: hidden when the song-ness came from the URL itself (Spotify/known song
-        // host) — quality is meaningless there (Spotify ignores it outright; a known song host
-        // downloads audio regardless — see DownloadOptions' own construction). Kept visible when
-        // the user only got here by manually picking "Audio" on an otherwise-ordinary link, so
-        // they still have a way back to a video quality without dismissing the whole sheet.
-        if (song.showQualityRow) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    val total = VideoQuality.entries.size
-                    VideoQuality.entries.forEachIndexed { index, option ->
-                        val segmentedShape = when (index) {
-                            0 -> FIRST_CHIP_SHAPE
-                            total - 1 -> LAST_CHIP_SHAPE
-                            else -> MIDDLE_CHIP_SHAPE
-                        }
-                        PreviewChip(
-                            label = option.chipLabel,
-                            selected = quality == option,
-                            shape = segmentedShape,
-                            onClick = { onQualityChange(option) },
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
-            }
-        }
-
         when (song.mode) {
             PreviewMode.VIDEO -> item {
                 VideoPreviewCard(
