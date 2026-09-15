@@ -37,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -292,21 +293,44 @@ fun DownloadPreviewSheet(
         screen = PreviewScreen.MAIN
     }
 
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true,
-        // A swipe-to-hide drag normally commits straight to Hidden. With an overlay panel open,
-        // reject that commit and back out to MAIN instead — the sheet snaps back to expanded the
-        // same way it would if the user hadn't dragged far enough, rather than visibly collapsing
-        // and then being forced back open.
-        confirmValueChange = { target ->
-            if (target == SheetValue.Hidden && screen != PreviewScreen.MAIN) {
-                revertOverlay()
-                false
-            } else {
-                true
-            }
-        },
-    )
+    // A plain rememberModalBottomSheetState() uses Material3's own default drag thresholds (a
+    // fairly short distance commits straight to Hidden) — reproduced live as "too easy to
+    // dismiss" once the top icon row and Download button became fixed (see MainPreviewScreen's
+    // own doc comment below): a slow, incidental drag starting anywhere on that non-scrolling
+    // chrome would close the whole sheet. SheetState's own public constructor (not the
+    // convenience rememberModalBottomSheetState() function, which hardcodes Material3's
+    // defaults) exposes positionalThreshold directly, raised well above the default here —
+    // verified live against AnchoredDraggableState's own source (androidx.compose.foundation.
+    // gestures.AnchoredDraggable.kt): a slow drag below this distance now snaps back instead of
+    // dismissing, confirmed with real on-device drags both under and over the threshold.
+    // velocityThreshold is still passed (SheetState's constructor requires it), but confirmed
+    // dead for this component: ModalBottomSheet's real fling behavior
+    // (AnchoredDraggableDefaults.flingBehavior) hardcodes its own ~125dp/s fling floor and never
+    // reads this field, so any release at or above that floor — including a slow-looking but
+    // not-slow-enough drag — still commits straight to Hidden regardless of this value. Not
+    // fixable without forking that internal fling behavior; not worth doing for this app.
+    val density = LocalDensity.current
+    val sheetState = remember {
+        SheetState(
+            skipPartiallyExpanded = true,
+            positionalThreshold = { with(density) { 200.dp.toPx() } },
+            velocityThreshold = { with(density) { 800.dp.toPx() } },
+            initialValue = SheetValue.Expanded,
+            // A swipe-to-hide drag normally commits straight to Hidden. With an overlay panel
+            // open, reject that commit and back out to MAIN instead — the sheet snaps back to
+            // expanded the same way it would if the user hadn't dragged far enough, rather than
+            // visibly collapsing and then being forced back open.
+            confirmValueChange = { target ->
+                if (target == SheetValue.Hidden && screen != PreviewScreen.MAIN) {
+                    revertOverlay()
+                    false
+                } else {
+                    true
+                }
+            },
+            skipHiddenState = false,
+        )
+    }
 
     // Everything the listing pass returns — one state var instead of one per field (title/
     // uploader/thumbnail/filesize/streamUrls/durationMs used to each be their own, before this
@@ -921,31 +945,31 @@ private fun MainPreviewScreen(
     onDownload: () -> Unit,
 ) {
     // A plain LazyColumn cannot nest inside a verticalScroll parent (unbounded height), which is
-    // exactly what SONG_LIST's track list needs to host efficiently — so the whole root became a
-    // LazyColumn (every previous top-level child now one item{}) rather than adding a second,
-    // separately-scrolling list inside the old Column. The overlay-panel system (Commands/Trim/
-    // Templates) lives in a sibling Box in PreviewSheetOverlayHost, not inside this composable, so
-    // it's unaffected by this change.
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
-                    Icon(FeatherIcons.Copy, contentDescription = "Copy link")
-                }
-                FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
-                    Icon(FeatherIcons.XCircle, contentDescription = "Cancel")
-                }
+    // exactly what SONG_LIST's track list needs to host efficiently. The top icon row and the
+    // Download button are fixed siblings *outside* this LazyColumn (in the Column below) rather
+    // than items inside it, so both stay put — visible and tappable — no matter how far the list
+    // itself is scrolled; only the LazyColumn's own weight(1f) fills whatever height is left. The
+    // overlay-panel system (Commands/Trim/Templates) lives in a sibling Box in
+    // PreviewSheetOverlayHost, not inside this composable, so it's unaffected by any of this.
+    Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
+                Icon(FeatherIcons.Copy, contentDescription = "Copy link")
+            }
+            FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
+                Icon(FeatherIcons.XCircle, contentDescription = "Cancel")
             }
         }
 
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentPadding = PaddingValues(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         // Quality picker: hidden when the song-ness came from the URL itself (Spotify/known song
         // host) — quality is meaningless there (Spotify ignores it outright; a known song host
         // downloads audio regardless — see DownloadOptions' own construction). Kept visible when
@@ -1009,12 +1033,15 @@ private fun MainPreviewScreen(
             }
         }
 
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (song.mode == PreviewMode.VIDEO) {
+        } // end LazyColumn
+
+        // Fixed chips row — outside the LazyColumn above, so it never scrolls out of view
+        // alongside the top icon row and the Download button below.
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (song.mode == PreviewMode.VIDEO) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
@@ -1101,31 +1128,29 @@ private fun MainPreviewScreen(
                     }
                 }
             }
-        }
-
-        item {
-            // Empty-selection guard: with a non-empty track list and nothing checked, disabled —
-            // same guard SharePickerScreen already uses for its own selection, so unchecking every
-            // song can never be mistaken for (or silently become) "download everything".
-            val downloadEnabled = song.mode != PreviewMode.SONG_LIST || song.selectedNums.isNotEmpty()
-            val countSuffix = if (song.mode == PreviewMode.SONG_LIST) " ${song.selectedNums.size}" else ""
-            Button(
-                onClick = onDownload,
-                enabled = downloadEnabled,
-                // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin
-                // (navBarPill's own Box uses padding(horizontal = 24.dp)) — kept consistent so
-                // this button reads the same width as that pill rather than running edge-to-edge.
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).height(56.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-            ) {
-                Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
-                // only after tapping — replaces the old flow where this always said "Download" and a
-                // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
-                // action to confirm.
-                Text("${if (isDuplicate) "Redownload" else "Download"}$countSuffix")
-            }
+        // Fixed footer — outside the LazyColumn above, so it never scrolls out of view. Same
+        // empty-selection guard as before: with a non-empty track list and nothing checked,
+        // disabled — same guard SharePickerScreen already uses for its own selection, so
+        // unchecking every song can never be mistaken for (or silently become) "download
+        // everything".
+        val downloadEnabled = song.mode != PreviewMode.SONG_LIST || song.selectedNums.isNotEmpty()
+        val countSuffix = if (song.mode == PreviewMode.SONG_LIST) " ${song.selectedNums.size}" else ""
+        Button(
+            onClick = onDownload,
+            enabled = downloadEnabled,
+            // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin
+            // (navBarPill's own Box uses padding(horizontal = 24.dp)) — kept consistent so
+            // this button reads the same width as that pill rather than running edge-to-edge.
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp).height(56.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+        ) {
+            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
+            // only after tapping — replaces the old flow where this always said "Download" and a
+            // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
+            // action to confirm.
+            Text("${if (isDuplicate) "Redownload" else "Download"}$countSuffix")
         }
     }
 }
