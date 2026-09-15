@@ -1051,9 +1051,10 @@ private fun MainPreviewScreen(
         } // end LazyColumn
 
         // Fixed chips row — outside the LazyColumn above, so it never scrolls out of view
-        // alongside the top icon row and the Download button below.
+        // alongside the top icon row and the Download button below. Bottom padding keeps it from
+        // crowding the Download button now that both are fixed and always touching.
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (song.mode == PreviewMode.VIDEO) {
