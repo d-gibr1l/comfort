@@ -98,11 +98,25 @@ outside an emulator and would otherwise triple the release-matrix size for no re
 
 ## Credits
 
-- [gallery-dl](https://github.com/mikf/gallery-dl) and [yt-dlp](https://github.com/yt-dlp/yt-dlp) —
-  the actual download engines this app wraps
-- [YTDLnis](https://github.com/deniscerri/ytdlnis) — the subprocess-Python-on-Android architecture
-  (and its published Python interpreter package) this app's own Python runtime is built on
+- [gallery-dl](https://github.com/mikf/gallery-dl) (GPLv2) and
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense) — the actual download engines this app
+  wraps
+- [YTDLnis](https://github.com/deniscerri/ytdlnis) / its
+  [ytdlnis-packages](https://github.com/deniscerri/ytdlnis-packages) repo (GPLv3) — the
+  subprocess-Python-on-Android architecture this app's own Python runtime is built on, and the
+  actual prebuilt Python/ffmpeg/QuickJS binaries bundled directly into this app
+- [aria2](https://github.com/aria2/aria2) (GPLv2+) — multi-connection downloads
+- [QuickJS](https://github.com/bellard/quickjs) (MIT) — JS-challenge solving for sites that require it
+- [tls-client](https://github.com/bogdanfinn/tls-client) (BSD-3-Clause) — TLS fingerprint
+  impersonation on ABIs `curl_cffi` isn't available for
+- [TachiyomiJ2K](https://github.com/Jays2Kings/tachiyomiJ2K) (Apache-2.0) — the Appearance
+  screen's theme-picker layout (light/dark preview card rows) is ported from its own Settings UI
 
 ## License
 
-Personal project; no license has been set yet.
+GPLv3 — see [`LICENSE`](LICENSE). Required by the GPL-licensed components this app bundles
+directly (gallery-dl, aria2, and the ytdlnis-packages Python/ffmpeg/QuickJS binaries) — bundling
+GPL code into a distributed app means the combined work has to be GPL-compatible too, with source
+available to anyone who gets the APK (this repo). The permissively-licensed pieces (yt-dlp,
+QuickJS, tls-client, the ported TachiyomiJ2K UI) are all GPL-compatible on their own terms; see
+Credits above for each one's actual license.
