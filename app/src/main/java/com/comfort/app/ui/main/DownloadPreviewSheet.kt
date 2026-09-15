@@ -1054,7 +1054,7 @@ private fun MainPreviewScreen(
         // alongside the top icon row and the Download button below. Bottom padding keeps it from
         // crowding the Download button now that both are fixed and always touching.
         Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (song.mode == PreviewMode.VIDEO) {
