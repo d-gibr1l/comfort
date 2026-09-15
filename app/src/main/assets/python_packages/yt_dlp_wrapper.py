@@ -1651,13 +1651,23 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
         # headers, ...) that both bloat this JSON line for no reason and were never meant to leave
         # the process.
         requested_formats = entry.get("requested_formats")
+        # A flat-extracted playlist entry (extract_flat="in_playlist" — see list_info()'s own
+        # ydl_opts above) doesn't populate the singular "thumbnail" field: that's yt-dlp's own
+        # best-pick result from fully processing a video, which flat mode skips — reproduced live,
+        # every row of a real 150-track playlist fell back to a blank placeholder instead of its
+        # real thumbnail. What flat mode does carry per entry is "thumbnails" (plural), so fall
+        # back to its own last entry (yt-dlp's own convention: highest quality sorts last) — the
+        # same workaround Seal, another yt-dlp-based Android downloader, uses for its own flat
+        # playlist rows.
+        thumbnails = entry.get("thumbnails")
+        thumbnail = entry.get("thumbnail") or (thumbnails[-1].get("url") if thumbnails else None)
         # artist/album: for the download preview sheet's own song-styled card/subtitle — same
         # fields download()'s own [artist]/[album] callback lines already read off this same
         # info-dict (see its own doc comment there), just also surfaced during listing so the
         # sheet can show them before a download ever starts.
         return {
             "title": entry.get("title"),
-            "thumbnail": entry.get("thumbnail"),
+            "thumbnail": thumbnail,
             "uploader": uploader,
             "artist": entry.get("artist") or entry.get("creator"),
             "album": entry.get("album"),

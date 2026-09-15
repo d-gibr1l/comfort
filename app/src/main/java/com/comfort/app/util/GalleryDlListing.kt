@@ -55,8 +55,14 @@ data class PreviewInfo(
 )
 
 /** One track of a multi-item song listing (Spotify album/playlist today — see [PreviewInfo.tracks]
- * doc comment for why [num] is load-bearing beyond just display). */
-data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?)
+ * doc comment for why [num] is load-bearing beyond just display). [thumbnail] is the track's own
+ * cover art when the source engine actually provides one per-item (YouTube Music playlists do);
+ * for Spotify, which has no per-track art at all (confirmed live against its own embed-page JSON
+ * — every track entry carries only title/subtitle/duration, never an image), this is left null
+ * here and the UI falls back to the whole collection's own cover art instead (see
+ * [PreviewInfo.collectionThumbnail]) rather than fetching one image per track, which doesn't
+ * scale to a long playlist. */
+data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null)
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
@@ -421,6 +427,7 @@ object GalleryDlListing {
         // a multi-item listing — num is positional (see TrackPreview's own doc comment), so an
         // entry can never be skipped here without silently shifting every later track's number and
         // selecting the wrong song once a checkbox filter is built from it.
+        val collectionThumbnail = json.optString("collection_thumbnail").blankToNull()
         val tracks = entriesArray?.let { entries ->
             (0 until entries.length()).mapNotNull { i -> entries.optJSONObject(i) }.mapIndexed { i, e ->
                 TrackPreview(
@@ -428,6 +435,12 @@ object GalleryDlListing {
                     title = e.optString("title").blankToNull(),
                     artist = (e.optString("artist").blankToNull() ?: e.optString("uploader").blankToNull()),
                     durationMs = e.optDouble("duration", -1.0).takeIf { it > 0.0 }?.let { (it * 1000).toLong() },
+                    // Real per-track art when the engine actually provides one (YouTube Music
+                    // playlists do); Spotify never does (see TrackPreview's own doc comment), so
+                    // every row falls back to the same collection cover rather than showing a
+                    // blank/placeholder box for something that does have a real image, just not
+                    // a per-track one.
+                    thumbnail = e.optString("thumbnail").blankToNull() ?: collectionThumbnail,
                 )
             }
         } ?: emptyList()
@@ -444,7 +457,7 @@ object GalleryDlListing {
             tracks = tracks,
             collectionTitle = json.optString("collection_title").blankToNull(),
             collectionArtist = json.optString("collection_artist").blankToNull(),
-            collectionThumbnail = json.optString("collection_thumbnail").blankToNull(),
+            collectionThumbnail = collectionThumbnail,
         )
     }
 
