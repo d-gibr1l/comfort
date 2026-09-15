@@ -1012,6 +1012,7 @@ private fun MainPreviewScreen(
                 items(song.tracks, key = { it.num }) { track ->
                     TrackRow(
                         track = track,
+                        url = url,
                         selected = track.num in song.selectedNums,
                         onToggle = { song.onToggleNum(track.num) },
                     )
@@ -1418,21 +1419,48 @@ private fun TrackListHeader(
     }
 }
 
-/** One selectable song in a SONG_LIST track list — checkbox, title/artist, duration. No per-row
- * thumbnail: spotify_wrapper.py's own list_info() deliberately never fetches per-track cover art
- * for an album/playlist listing (an oEmbed call per track doesn't scale — see its own doc
- * comment), and a column of identical album covers wouldn't add anything even if it did. */
+/** One selectable song in a SONG_LIST track list — a Seal-style list row: leading checkbox, a
+ * horizontal 16:9 thumbnail, then title/artist with duration trailing. [track]'s own thumbnail is
+ * real per-track art when the source engine provides one (YouTube Music playlists do), or the
+ * whole collection's cover as a fallback (see [TrackPreview.thumbnail]'s own doc comment) — either
+ * way there's always something to show, never a bare placeholder box next to real art elsewhere in
+ * the same list. */
 @Composable
-private fun TrackRow(track: TrackPreview, selected: Boolean, onToggle: () -> Unit) {
+private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = selected, onCheckedChange = { onToggle() })
-        Spacer(Modifier.width(4.dp))
+        Checkbox(checked = selected, onCheckedChange = null)
+        Spacer(Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .width(112.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (track.thumbnail != null) {
+                AsyncImage(
+                    model = thumbnailRequest(track.thumbnail, url),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(
+                    FeatherIcons.Music,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 track.title ?: "Untitled",
