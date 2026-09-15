@@ -402,6 +402,17 @@ object GalleryDlListing {
     private fun String?.blankToNull(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
 
     suspend fun fetchPreviewInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): PreviewInfo? = withContext(Dispatchers.IO) {
+        // GALLERY_DL is the real download engine for a multi-item Instagram/TikTok *post* (not a
+        // reel — see VideoSiteRouter.classify), so its checklist has to come from gallery-dl's own
+        // listing/numbering too, not yt-dlp's. yt-dlp's own listing for these hosts only ever
+        // enumerates the video items (never the photos) — using it here silently dropped every
+        // photo from the checklist, and worse, its per-item "num" never corresponded to gallery-dl's
+        // own numbering of the same post, so deselecting a video risked telling gallery-dl's real
+        // --filter to keep/drop the wrong items entirely (reproduced live: missing photo thumbnails
+        // is what surfaced this). See fetchGalleryDlPreviewInfo's own doc comment for the rest.
+        if (VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL) {
+            return@withContext fetchGalleryDlPreviewInfo(context, url)
+        }
         val json = when (VideoSiteRouter.classify(url)) {
             DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url, onStatus)
             else -> runYtDlpListInfo(context, url, onStatus)
@@ -458,6 +469,37 @@ object GalleryDlListing {
             collectionTitle = json.optString("collection_title").blankToNull(),
             collectionArtist = json.optString("collection_artist").blankToNull(),
             collectionThumbnail = collectionThumbnail,
+        )
+    }
+
+    /** The GALLERY_DL-engine counterpart to fetchPreviewInfo's own general (Spotify/yt-dlp) path —
+     * builds the checklist from [listItems] instead, the exact same listing+numbering
+     * SharePickerScreen/ShareRouter already use, so a "num" the user unchecks here is the same
+     * "num" gallery-dl's own real --filter at download time understands. [GalleryItem.url] doubles
+     * directly as the row's own thumbnail: for a plain photo item it already *is* the image, and
+     * for a video item it's whatever [enrichVideoThumbnails] resolved it to during [listViaGalleryDl]
+     * (a real yt-dlp-sourced thumbnail by position) — no separate per-item fetch needed either way.
+     * Single-item listings (nothing to check between) fall back to the plain single-item VIDEO/
+     * SONG_SINGLE card as before — this only ever returns a non-empty [PreviewInfo.tracks] when
+     * there's a real multi-item choice to make. */
+    private suspend fun fetchGalleryDlPreviewInfo(context: Context, url: String): PreviewInfo? {
+        val result = listItems(context, url)
+        val items = result.items
+        if (items.isEmpty()) return null
+        if (items.size == 1) {
+            val only = items[0]
+            return PreviewInfo(title = only.title, uploader = null, thumbnail = only.url, filesizeBytes = null, durationMs = null, streamUrls = listOf(only.url))
+        }
+        val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url) }
+        val first = items.first()
+        return PreviewInfo(
+            title = first.title,
+            uploader = null,
+            thumbnail = first.url,
+            filesizeBytes = null,
+            durationMs = null,
+            streamUrls = emptyList(),
+            tracks = tracks,
         )
     }
 
