@@ -399,10 +399,23 @@ fun QueueScreen(
             }
 
             if (filteredItems.isEmpty()) {
+                // Tab-specific copy — "Paste a link on Home to start one" only actually helps on
+                // the tabs that describe genuinely-no-work-at-all (Running/In Queue/Scheduled);
+                // Paused/Errored/Cancelled describe downloads that already went through some other
+                // state, so the same generic line there read as a non sequitur (reported live:
+                // the Paused tab said "No downloads in queue" while Errored/Cancelled next to it
+                // had real counts, which read as those two other tabs error being wrong).
+                val (emptyTitle, emptySubtitle) = when (selectedFilter) {
+                    "Paused" -> "No paused downloads" to "Downloads you pause will show up here."
+                    "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
+                    "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
+                    "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
+                    else -> "No downloads in queue" to "Paste a link on Home to start one."
+                }
                 EmptyState(
                     icon = FeatherIcons.Inbox,
-                    title = "No downloads in queue",
-                    subtitle = "Paste a link on Home to start one.",
+                    title = emptyTitle,
+                    subtitle = emptySubtitle,
                     // weight(1f): without it, this Column child requests the Column's full height
                     // rather than just what's left below the filter row, so its centered content
                     // sat well below true middle. Bottom padding excludes the floating nav pill.
