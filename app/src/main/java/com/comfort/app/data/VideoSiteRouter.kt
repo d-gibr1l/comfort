@@ -103,6 +103,19 @@ object VideoSiteRouter {
         return alwaysSupplementVideoHosts.any { host == it || host.endsWith(".$it") }
     }
 
+    // Two-label public suffixes common enough among sites this app actually sees that the plain
+    // "second-to-last label" heuristic below needs to skip both, not just the TLD — without this,
+    // "mangaplus.shueisha.co.jp" read as "Co" (host.substringBeforeLast('.').substringAfterLast('.')
+    // landed on "co", not the real "shueisha" brand label before it) — reproduced live as
+    // "Downloading from Co" in the Errored queue. Not an exhaustive public-suffix list (that's a
+    // much larger, constantly-updated dataset — overkill for a cosmetic placeholder title), just
+    // the handful likely to actually show up.
+    private val twoLabelSuffixes = setOf(
+        "co.jp", "co.uk", "co.kr", "co.in", "co.nz", "co.za", "co.il", "co.id",
+        "com.br", "com.au", "com.cn", "com.tw", "com.mx", "com.sg", "com.hk",
+        "ne.jp", "or.jp", "ac.jp", "org.uk", "net.au",
+    )
+
     /** A short, human-readable site name for [url] — "Instagram" rather than "instagram.com" or
      * the URL itself. Used as the placeholder title for a download until the real poster/caption
      * is known (see DownloadWorker's derivePosterCaptionTitle), and as the fallback if it never
@@ -110,7 +123,9 @@ object VideoSiteRouter {
     fun siteName(url: String): String {
         val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
             ?: return "this link"
-        val label = host.substringBeforeLast('.').substringAfterLast('.')
+        val parts = host.split('.')
+        val suffixLabels = if (parts.size >= 3 && "${parts[parts.size - 2]}.${parts.last()}" in twoLabelSuffixes) 2 else 1
+        val label = parts.getOrNull(parts.size - 1 - suffixLabels) ?: parts.first()
         return label.replaceFirstChar { it.uppercase() }
     }
 }
