@@ -838,9 +838,17 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
 // own QueueThumbnail uses (many sites reject hotlinked image requests without a browser-like UA
 // and a same-site Referer), kept local here rather than exported since it's a small, self-contained
 // image request and Home has no other reason to depend on QueueScreen's internals.
+//
+// SubcomposeAsyncImage with explicit loading/error composables, not a plain AsyncImage — the
+// latter renders nothing at all on a failed load, leaving just the parent Box's flat background
+// color showing (reproduced live: a finished download's own real content:// thumbnail URI
+// intermittently failed to load here and showed as a blank tile in "Recently downloaded", while
+// the exact same item's thumbnail rendered fine in Library, which already uses this same
+// loading/error-icon pattern QueueScreen's own QueueThumbnail does). Matches both of those instead
+// of being the one thumbnail spot in the app with no fallback.
 @Composable
 private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, modifier: Modifier = Modifier) {
-    coil.compose.AsyncImage(
+    coil.compose.SubcomposeAsyncImage(
         model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
             .data(path)
             .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -849,6 +857,21 @@ private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, 
         contentDescription = title,
         contentScale = ContentScale.Crop,
         modifier = modifier,
+        loading = {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            }
+        },
+        error = {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    FeatherIcons.Image,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+        },
     )
 }
 
