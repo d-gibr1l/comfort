@@ -70,6 +70,20 @@ data class TrackPreview(val num: Int, val title: String?, val artist: String?, v
  * silently, the latter should tell the user why before doing anything. */
 data class ListingResult(val items: List<GalleryItem>, val errorMessage: String? = null)
 
+/** Whether a listing should land on DownloadPreviewSheet (quality/trim/format/commands controls)
+ * rather than SharePickerScreen's picker grid — a single detected video, or two-or-more videos
+ * anywhere in the listing regardless of how many non-video items sit alongside them. Shared by
+ * every caller that has to make this same "which sheet does this link deserve" call before it even
+ * knows what's in the link (ShareActivity's own share-sheet flow, MainScreen's paste-a-link flow)
+ * so the two never quietly drift into deciding it differently. A single video mixed with photos
+ * still goes to the picker: there's exactly one video either way, but excluding the photos needs
+ * the picker's own per-item selection, which DownloadPreviewSheet's single-video card has no UI
+ * for. */
+fun ListingResult.shouldUsePreviewSheet(): Boolean {
+    val videoItemCount = items.count { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }
+    return items.isNotEmpty() && ((items.size == 1 && videoItemCount == 1) || videoItemCount >= 2)
+}
+
 object GalleryDlListing {
     // gallery-dl's own Message.Url constant — stable across extractors, see gallery_dl/job.py.
     private const val MESSAGE_URL = 3
