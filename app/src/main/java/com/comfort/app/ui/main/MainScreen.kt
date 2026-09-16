@@ -53,6 +53,7 @@ import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.theme.PillShape
 import com.comfort.app.util.AppUpdater
 import com.comfort.app.util.EngineUpdater
+import com.comfort.app.util.shouldUsePreviewSheet
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.*
 import com.comfort.app.viewmodel.DownloadsViewModel
@@ -116,6 +117,7 @@ val NAV_BAR_RESERVED_HEIGHT = 100.dp
 fun navBarClearance(): Dp = NAV_BAR_RESERVED_HEIGHT + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0) {
     var selectedTab by remember { mutableStateOf(0) }
@@ -131,6 +133,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // button opens the sheet instead of enqueueing straight away, so per-download quality/format/
     // trim/commands/filename can be set before anything starts.
     var previewUrl by remember { mutableStateOf<String?>(null) }
+    // Non-null while a just-pasted/downloaded URL is being listed to decide which of the two
+    // sheets above it actually deserves — see routingUrl's own LaunchedEffect further down.
+    var routingUrl by remember { mutableStateOf<String?>(null) }
+    // Non-null once that listing decides this link is a real multi-item gallery rather than a
+    // single/multi-video case: url paired with the already-fetched result, fed straight into
+    // SharePickerScreen as its own preloadedResult so it isn't listed a second time — same
+    // optimization ShareActivity's own share-sheet flow already does for a shared link.
+    var pickerState by remember { mutableStateOf<Pair<String, com.comfort.app.util.ListingResult>?>(null) }
     // Hoisted here (not owned inside MoreScreen) specifically so it survives switching away from
     // and back to the Settings tab — see MoreScreen's own doc comment for why a local remember
     // there wasn't enough.
@@ -152,6 +162,19 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // elapsed since the last one, so relaunching the app repeatedly doesn't spam it. The Engines
     // section in Settings > About always does its own fresh check regardless of this cache.
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Runs the same listing pass ShareActivity's own share-sheet flow already does, so a link
+    // pasted directly on Home gets the same "look at what's there first" treatment a shared link
+    // does instead of always assuming it's a single video — reproduced live: pasting a plain
+    // multi-image gallery link went straight to DownloadPreviewSheet's video-styled card with
+    // nothing to actually pick between, no way to exclude any of the images.
+    LaunchedEffect(routingUrl) {
+        val url = routingUrl ?: return@LaunchedEffect
+        val result = com.comfort.app.util.GalleryDlListing.listItems(context, url)
+        if (result.shouldUsePreviewSheet()) previewUrl = url else pickerState = url to result
+        routingUrl = null
+    }
+
     LaunchedEffect(Unit) {
         // Seeded from the persisted flag immediately (so the badge shows right away without
         // waiting on a fresh network round trip), then only actually re-checks PyPI if
@@ -211,7 +234,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // a duplicate/live second copy of Home.
         if (selectedTab != 0) {
             HomeScreen(
-                onDownload = { url -> previewUrl = url },
+                onDownload = { url -> routingUrl = url },
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = { showQueueScreen = true },
@@ -227,7 +250,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(tabBackProgress)) {
             when (selectedTab) {
                 0 -> HomeScreen(
-                    onDownload = { url -> previewUrl = url },
+                    onDownload = { url -> routingUrl = url },
                     viewModel = viewModel,
                     onOpenLibrary = { selectedTab = 1 },
                     onOpenQueue = { showQueueScreen = true },
@@ -309,6 +332,59 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     previewUrl = null
                 },
             )
+        }
+
+        // Brief — the listing pass above usually resolves in well under a second — but real
+        // enough on a slow/rate-limited site that a bare frozen Download button would otherwise
+        // look broken with no feedback at all.
+        if (routingUrl != null) {
+            ModalBottomSheet(onDismissRequest = { routingUrl = null }) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().height(220.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Looking at what's there…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        // routingUrl's own listing decided this is a real multi-item gallery rather than a
+        // single/multi-video case — same SharePickerScreen the share-sheet flow already uses,
+        // fed the same already-fetched result so it isn't listed a second time.
+        pickerState?.let { (pickerUrl, preloadedResult) ->
+            var sheetHeight by remember { mutableStateOf(400.dp) }
+            val animatedHeight by androidx.compose.animation.core.animateDpAsState(targetValue = sheetHeight, label = "sharePickerSheetHeight")
+            ModalBottomSheet(
+                onDismissRequest = { pickerState = null },
+                dragHandle = null,
+            ) {
+                Box(modifier = Modifier.fillMaxWidth().height(animatedHeight)) {
+                    SharePickerScreen(
+                        url = pickerUrl,
+                        onDismiss = { pickerState = null },
+                        onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate ->
+                            viewModel.enqueueDownload(
+                                url = downloadUrl,
+                                title = "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}",
+                                itemFilter = itemFilter,
+                                totalItems = totalItems,
+                                videoQuality = videoQuality,
+                                forceDuplicate = forceDuplicate,
+                            )
+                            pickerState = null
+                        },
+                        onHeightChange = { sheetHeight = it },
+                        preloadedResult = preloadedResult,
+                    )
+                }
+            }
         }
     }
 }

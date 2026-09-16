@@ -61,6 +61,7 @@ import com.comfort.app.ui.main.DownloadPreviewSheet
 import com.comfort.app.ui.main.SharePickerScreen
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.ListingResult
+import com.comfort.app.util.shouldUsePreviewSheet
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowDown
 import kotlinx.coroutines.Job
@@ -288,14 +289,9 @@ private fun ShareRouter(url: String, onFinished: () -> Unit) {
     }
 
     val result = listingResult
-    val videoItemCount = result?.items?.count { it.filename?.let(VideoSiteRouter::isVideoFilename) == true } ?: 0
-    // Single video (the original case), or two-or-more videos anywhere in the listing regardless
-    // of how many non-video items sit alongside them — both land on DownloadPreviewSheet instead
-    // of the picker grid. A single video mixed with photos (one video, some images) still falls
-    // through to SharePickerScreen: there's exactly one video to pick quality for either way, but
-    // the picker's own per-item selection is what actually lets the photos be excluded, which the
-    // preview sheet's own single-video card has no UI for.
-    val usePreviewSheet = result != null && ((result.items.size == 1 && videoItemCount == 1) || videoItemCount >= 2)
+    // See ListingResult.shouldUsePreviewSheet's own doc comment — shared with MainScreen's own
+    // paste-a-link flow so the two never quietly drift into deciding this differently.
+    val usePreviewSheet = result?.shouldUsePreviewSheet() == true
 
     when {
         result == null -> LoadingSheet(
