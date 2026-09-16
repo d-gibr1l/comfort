@@ -73,9 +73,18 @@ object EngineUpdater {
         val artifactKind: ArtifactKind?,
         val sha256: String?,
     ) {
-        // null-vs-null (both unknown) is deliberately NOT "update available" — nothing to act on.
+        // null-vs-null (both unknown) is deliberately NOT "update available" — there's no target
+        // version to offer installing. But installedVersion == null with a real latestVersion is
+        // NOT the same case and must still count as available: it means installedVersion() found
+        // no ".dist-info" directory at all for this engine (reproduced live — gallery-dl's own
+        // originally-bundled install only ever produced a ".data" directory, never ".dist-info",
+        // so this read null from day one), not that the two versions genuinely match. The old
+        // `installedVersion != null && ...` form silently rendered that as "Up to date" — a false
+        // claim with nothing behind it — and since nothing ever treated it as an available update,
+        // gallery-dl could never self-heal via auto-update either, unlike yt-dlp (whose bundled
+        // install happened to already carry a real dist-info to begin with).
         val updateAvailable: Boolean
-            get() = installedVersion != null && latestVersion != null && installedVersion != latestVersion
+            get() = latestVersion != null && (installedVersion == null || installedVersion != latestVersion)
     }
 
     private data class FetchResult(
