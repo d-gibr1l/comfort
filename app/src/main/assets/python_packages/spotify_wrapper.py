@@ -123,7 +123,7 @@ def _entity_cover_art(entity):
     return max(images, key=lambda img: img.get("maxWidth") or 0).get("url")
 
 
-def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls_client_path=None):
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
     """Same JSON contract as yt_dlp_wrapper.py's own list_info() — a single track is
     {"title", "thumbnail", "uploader"/"artist", "album", "filesize", "duration", "url",
     "requested_formats"}; an album/playlist is {"entries": [...]} in that same per-item shape,
@@ -301,7 +301,7 @@ def _parse_playlist_items(playlist_items):
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
              archive_path=None, js_runtime_path=None, ffmpeg_path=None, ffmpeg_lib_dir=None,
              aria2_path=None, aria2_lib_dir=None, restrict_filenames=True, trim_filenames=True,
-             verbose=False, tls_client_path=None, save_thumbnail=False, playlist_items=None,
+             verbose=False, save_thumbnail=False, playlist_items=None,
              override_title=None, override_artist=None):
     """One call per Spotify link (track, or every track in an album/playlist in turn). Each
     track's own final-file callback line comes straight from the inner yt_dlp_wrapper.download()
@@ -409,7 +409,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 audio_only=True, restrict_filenames=restrict_filenames,
                 trim_filenames=trim_filenames, verbose=verbose,
                 aria2_path=aria2_path, aria2_lib_dir=aria2_lib_dir,
-                tls_client_path=tls_client_path, save_thumbnail=save_thumbnail,
+                save_thumbnail=save_thumbnail,
             )
             if status != "Done":
                 continue
@@ -437,14 +437,13 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: spotify_wrapper.py download <18 positional args> | list <5 positional args>", file=_sys.stderr)
+        print("Usage: spotify_wrapper.py download <17 positional args> | list <4 positional args>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "list":
         a = _sys.argv[2:]
         print(list_info(
             url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3]),
-            tls_client_path=(_s(a[4]) if len(a) > 4 else None),
         ), flush=True)
         _sys.exit(0)
 
@@ -456,10 +455,9 @@ if __name__ == "__main__":
         aria2_lib_dir=_s(a[9]), restrict_filenames=_b(a[10]) if len(a) > 10 else True,
         trim_filenames=_b(a[11]) if len(a) > 11 else True,
         verbose=_b(a[12]) if len(a) > 12 else False,
-        tls_client_path=_s(a[13]) if len(a) > 13 else None,
-        save_thumbnail=_b(a[14]) if len(a) > 14 else False,
-        playlist_items=_s(a[15]) if len(a) > 15 else None,
-        override_title=_s(a[16]) if len(a) > 16 else None,
-        override_artist=_s(a[17]) if len(a) > 17 else None,
+        save_thumbnail=_b(a[13]) if len(a) > 13 else False,
+        playlist_items=_s(a[14]) if len(a) > 14 else None,
+        override_title=_s(a[15]) if len(a) > 15 else None,
+        override_artist=_s(a[16]) if len(a) > 16 else None,
     )
     print(f"[__status__] {status}", flush=True)

@@ -17,7 +17,6 @@ import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.Aria2Runtime
 import com.comfort.app.util.EngineProbe
 import com.comfort.app.util.FfmpegRuntime
-import com.comfort.app.util.TlsClientRuntime
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.MediaStoreHelper
 import com.comfort.app.util.PythonRuntime
@@ -757,8 +756,6 @@ class DownloadWorker(
                 } else {
                     ""
                 }
-                val tlsClientPath = TlsClientRuntime.getLibraryPath(applicationContext).orEmpty()
-
                 suspend fun runYtDlp(): Int =
                     // Neither gallery-dl's filename-format template syntax nor its extra-args
                     // string mean anything to yt-dlp, so those two aren't passed through — cookies
@@ -795,7 +792,6 @@ class DownloadWorker(
                             aria2Path,
                             aria2LibDir,
                             ffmpegLibDir,
-                            tlsClientPath,
                             overrideTitle,
                             overrideArtist,
                         ),
@@ -825,7 +821,6 @@ class DownloadWorker(
                             if (restrictFilenames) "1" else "0",
                             if (trimFilenames) "1" else "0",
                             if (verboseLogging) "1" else "0",
-                            tlsClientPath,
                             if (saveThumbnail) "1" else "0",
                             ytDlpPlaylistItems,
                             overrideTitle,

@@ -33,274 +33,6 @@ class _Cancelled(Exception):
 # rather than requiring digits only.
 _FRAGMENT_SUFFIX_RE = re.compile(r"\.f[A-Za-z0-9][A-Za-z0-9_-]*\.[^./\\]+$")
 
-# Reddit's own WAF blocks a plain request for a reddit.com/r/<sub>/s/<code> mobile share link's
-# redirect (reproduced live: "[generic] ...: Unable to download webpage: HTTP Error 403: Blocked")
-# — yt-dlp's Reddit extractor only recognizes the /comments/... URL that redirect resolves to, not
-# the /s/ shape itself, so a raw share link falls through to the generic extractor to resolve it,
-# which is what actually hits the block. A prior fix resolved the redirect in Kotlin first with a
-# naked HttpURLConnection and a spoofed User-Agent header — but a spoofed *header* with the wrong
-# TLS fingerprint behind it is exactly what a WAF like this is designed to catch, so that "fix" was
-# tripping the same block it was meant to avoid.
-#
-# Real TLS-fingerprint impersonation (not just a spoofed header) is what actually gets past it —
-# curl_cffi (yt-dlp's --impersonate backend) does this but is only bundled for arm64-v8a (its cffi
-# dependency needs a Python-version-locked native module nobody has built for armeabi-v7a/x86_64),
-# so a first attempt scoping this fix to curl_cffi left it unresolved on every other device
-# (crashing outright until _IMPERSONATE_AVAILABLE above was added as a stopgap). A second attempt
-# fixed only the one redirect request with a narrow, standalone tls-client (github.com/bogdanfinn/
-# tls-client) ctypes call — a plain Go binary with zero Python version coupling, so the exact same
-# build works on all three ABIs (see TlsClientRuntime.kt) — but a controlled back-to-back A/B test
-# (same posts, both builds, minutes apart) showed Reddit's own JSON metadata endpoint *also*
-# intermittently rejects a plain, unimpersonated follow-up request ("Your IP address is unable to
-# access the Reddit API") even once the redirect itself resolves fine — curl_cffi's old fix
-# happened to dodge this because setting `impersonate` on YoutubeDL applies to the *entire*
-# session, not just the one request that needed it.
-#
-# TlsClientRH below is the fix that actually matches that: a real yt_dlp RequestHandler (mirroring
-# curl_cffi's own CurlCFFIRH), registered so any reddit.com request — the share-link redirect, the
-# JSON metadata fetch, anything else reddit.com itself serves — rides on tls-client's real
-# TLS-fingerprint impersonation, on every ABI. It deliberately never claims requests to other hosts
-# (_validate rejects them outright, see below) — Reddit's actual video/audio segments are served
-# from a completely different host (v.redd.it) that has never needed impersonation, and TlsClientRH
-# never touches that path at all. That host-scoping is exactly what keeps this from being the
-# *general* impersonate backend already considered and rejected (see TlsClientRuntime.kt's own
-# comment): every request this handler will ever actually send is a single small page/JSON fetch,
-# never a multi-hundred-MB video body, so tls-client's call-blocks-until-the-whole-body-is-done
-# model (fine for a few KB, a real problem for a video) never comes into play here.
-_REDDIT_HOST_RE = re.compile(r"^(www\.)?reddit\.com$", re.IGNORECASE)
-
-# Set once per process, from the CLI arg, before any YoutubeDL(...) is constructed — read directly
-# by TlsClientRH below rather than threaded through YoutubeDL's own handler-construction kwargs
-# (build_request_director only forwards params it already knows about), which is fine since this
-# whole script is a single download/list call running as its own fresh OS process (see
-# PythonRuntime.kt), the same lifetime a module-level global here needs to have.
-_TLS_CLIENT_PATH = None
-
-def _tls_client_request(url, method="GET", headers=None, body=None, timeout_seconds=20):
-    """One HTTP request via tls-client's request() export, working around two Android-specific
-    problems confirmed live on-device before landing this:
-    - Go's own DNS resolver doesn't work reliably on Android at all (reproduced live: even a plain
-      https://example.com request from this exact bundled binary times out with "dial tcp: lookup
-      example.com: i/o timeout"). Python's own socket.gethostbyname(), going through bionic's real
-      resolver, works fine — every other network call in this app already depends on that same
-      resolver — so this resolves the hostname itself and connects to that literal IP instead,
-      with requestHostOverride/serverNameOverwrite keeping the real hostname in the Host header and
-      the TLS SNI/certificate check, so the server and cert validation still see the real host
-      exactly as normal — only the actual TCP connection target changes.
-    - Never asks tls-client to follow redirects itself (followRedirects=False always) — a redirect
-      target is a literal hostname again (not our resolved IP), so an internally-followed hop would
-      hit the exact same broken DNS resolution this function exists to route around. Callers that
-      care about redirects (TlsClientRH below) read the Location header and loop themselves,
-      re-resolving each hop's own host the same way.
-
-    Returns (status, headers_dict, body_text). Raises on any load/network/JSON failure — every
-    caller here treats that as an ordinary transport failure, not a special case."""
-    import ctypes
-    import socket
-    from urllib.parse import urlsplit, urlunsplit
-
-    parsed = urlsplit(url)
-    host = parsed.hostname
-    ip = socket.gethostbyname(host)
-    netloc = ip if parsed.port is None else f"{ip}:{parsed.port}"
-    ip_url = urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
-
-    lib = ctypes.CDLL(_TLS_CLIENT_PATH)
-    lib.request.argtypes = [ctypes.c_char_p]
-    lib.request.restype = ctypes.c_char_p
-    lib.freeMemory.argtypes = [ctypes.c_char_p]
-    payload = {
-        "tlsClientIdentifier": "chrome_146",
-        "followRedirects": False,
-        "timeoutSeconds": timeout_seconds,
-        "requestUrl": ip_url,
-        "requestHostOverride": host,
-        "serverNameOverwrite": host,
-        "requestMethod": method,
-        "headers": {**(headers or {}), "host": host},
-    }
-    if body is not None:
-        payload["requestBody"] = body
-    raw = lib.request(json.dumps(payload).encode("utf-8"))
-    response = json.loads(ctypes.string_at(raw).decode("utf-8"))
-    response_id = response.get("id")
-    try:
-        status = response.get("status") or 0
-        if status == 0:
-            raise OSError(response.get("body") or "tls-client request failed")
-        return status, (response.get("headers") or {}), (response.get("body") or "")
-    finally:
-        # Every response allocates memory on the Go side that's only ever freed by this call —
-        # skipping it on an early return/exception would leak it for the life of this process.
-        if response_id:
-            lib.freeMemory(response_id.encode("utf-8"))
-
-def _header_value(headers, name):
-    """First value for `name` in a tls-client response's headers dict, case-insensitively — Go's
-    http.Header round-trips through JSON as {"Canonical-Case-Name": ["value", ...]}."""
-    for key, value in headers.items():
-        if key.lower() == name.lower():
-            return value[0] if isinstance(value, list) and value else value
-    return None
-
-from yt_dlp.networking.common import Request, Response, register_preference, register_rh
-from yt_dlp.networking.exceptions import HTTPError, RequestError, TransportError, UnsupportedRequest
-from yt_dlp.networking.impersonate import ImpersonateRequestHandler
-
-@register_rh
-class TlsClientRH(ImpersonateRequestHandler):
-    """See this module's own comment above _REDDIT_HOST_RE for the full story — scoped to
-    reddit.com requests only, via _validate below, never a general impersonate backend."""
-    RH_NAME = "tls_client"
-    _SUPPORTED_URL_SCHEMES = ("http", "https")
-    _SUPPORTED_PROXY_SCHEMES = None
-    _SUPPORTED_FEATURES = ()
-    _SUPPORTED_IMPERSONATE_TARGET_MAP = {ImpersonateTarget("chrome"): "chrome_146"}
-
-    def _check_extensions(self, extensions):
-        super()._check_extensions(extensions)
-        extensions.pop("impersonate", None)
-        extensions.pop("cookiejar", None)
-        extensions.pop("timeout", None)
-
-    def _validate(self, request):
-        super()._validate(request)
-        if not _TLS_CLIENT_PATH:
-            raise UnsupportedRequest("tls-client library not available on this ABI")
-        from urllib.parse import urlsplit
-        host = (urlsplit(request.url).hostname or "").lower()
-        if not _REDDIT_HOST_RE.match(host):
-            raise UnsupportedRequest("tls_client is scoped to reddit.com requests only")
-
-    def _send(self, request):
-        import io
-        import urllib.request
-        from email.message import Message
-        from urllib.parse import urljoin
-
-        # Reddit's own extractor does a two-step dance for this exact host: a "session setup"
-        # request first (to get a `loid` session cookie), then the real JSON metadata fetch that
-        # only trusts the response if that cookie is attached (see reddit.py's own _real_extract —
-        # confirmed live: without this, the second request looks sessionless to Reddit and gets
-        # rejected with "Your IP address is unable to access the Reddit API", a misleading message
-        # for what's actually a missing-cookie problem, not a real IP block). curl_cffi's own
-        # CurlCFFIRH gets this for free from its persistent Session object; this handler has no
-        # persistent session at all (each call is a stateless one-shot ctypes request), so cookies
-        # have to be carried explicitly through yt-dlp's own cookiejar instead — added to every
-        # outgoing request here, and every Set-Cookie response fed back into the same jar, exactly
-        # like the plain urllib handler's HTTPCookieProcessor does, so the *next* request in this
-        # same download (the actual JSON fetch) sees whatever the session-setup request left behind.
-        cookiejar = self._get_cookiejar(request)
-
-        url = request.url
-        method = request.method
-        body = request.data
-        if isinstance(body, bytes):
-            body = body.decode("utf-8", "replace")
-        elif body is not None and not isinstance(body, str):
-            body = None  # a file-like/iterable payload — none of this handler's own callers send one
-        headers = dict(self._get_impersonate_headers(request))
-        timeout = int(self._calculate_timeout(request)) or 20
-
-        for _ in range(6):
-            cookie_req = urllib.request.Request(url)
-            if cookiejar is not None and "cookie" not in {k.lower() for k in headers}:
-                cookiejar.add_cookie_header(cookie_req)
-                cookie_header = cookie_req.get_header("Cookie")
-                if cookie_header:
-                    headers = {**headers, "Cookie": cookie_header}
-            try:
-                status, resp_headers, resp_body = _tls_client_request(
-                    url, method=method, headers=headers, body=body, timeout_seconds=timeout)
-            except Exception as e:
-                raise TransportError(cause=e) from e
-            if cookiejar is not None:
-                set_cookie_msg = Message()
-                for key, value in resp_headers.items():
-                    if key.lower() == "set-cookie":
-                        for one in (value if isinstance(value, list) else [value]):
-                            set_cookie_msg.add_header("Set-Cookie", one)
-                fake_response = type("_TlsClientCookieResponse", (), {"info": lambda self: set_cookie_msg})()
-                cookiejar.extract_cookies(fake_response, cookie_req)
-            if status in (301, 302, 303, 307, 308):
-                location = _header_value(resp_headers, "location")
-                if not location:
-                    break
-                url = urljoin(url, location)
-                if status == 303:
-                    method, body = "GET", None
-                continue
-            flat_headers = {k: (v[0] if isinstance(v, list) and v else v) for k, v in resp_headers.items()}
-            response = Response(fp=io.BytesIO(resp_body.encode("utf-8")), url=url, headers=flat_headers, status=status)
-            if not 200 <= status < 300:
-                raise HTTPError(response)
-            return response
-        raise TransportError(cause=Exception("too many redirects"))
-
-@register_preference(TlsClientRH)
-def _tls_client_preference(rh, request):
-    # Same shape as yt_dlp.networking.impersonate's own impersonate_preference — outranks the
-    # default non-impersonating handlers for every request once `impersonate` is configured, not
-    # just ones that explicitly ask for it. _validate above is what actually limits this to
-    # reddit.com; every other host falls through to the next handler in preference order.
-    # One point above impersonate_preference's own 1000 so this deterministically wins the tie
-    # against curl_cffi for a reddit.com request on arm64-v8a (the one ABI where both are
-    # registered and eligible) — this handler is the one actually verified end-to-end against
-    # Reddit's current WAF/API behavior, so every ABI takes the same, consistently-tested path
-    # for reddit.com rather than arm64 silently diverging onto curl_cffi's.
-    if request.extensions.get("impersonate") or rh.impersonate:
-        return 1001
-    return 0
-
-def _fix_impersonate_availability_check(ydl):
-    """Extractors decide whether to *request* impersonation at all by first asking yt-dlp
-    "is impersonation available in general" (YoutubeDL._impersonate_target_available, called with
-    no host/URL in scope — see instagram.py's own _can_impersonate property, which every one of
-    its impersonated requests is gated behind, and _request_webpage's own _parse_impersonate_targets
-    call, which every "impersonate=True" extractor kwarg funnels through, Reddit's included). That
-    check just asks every registered ImpersonateRequestHandler "can you EVER serve a chrome
-    target", with no awareness that TlsClientRH's answer to that is only true for reddit.com
-    (enforced separately, in _validate, which this check never calls). Reproduced live on a
-    non-arm64 device (no curl_cffi, so before TlsClientRH existed, nothing answered "yes" and
-    Instagram correctly skipped impersonation): once TlsClientRH is registered, the generic check
-    now answers "yes" everywhere TlsClientRH's .so is bundled (every ABI), so Instagram believes
-    impersonation is available, requests it for its instagram.com calls, TlsClientRH._validate
-    then rejects those on the real dispatch (wrong host), no other handler exists to pick up the
-    slack on non-arm64, and the request fails with yt-dlp's own "Impersonate target ... is not
-    available" error.
-
-    Excluding TlsClientRH from the availability check itself (the first thing tried here) is
-    wrong, not just narrow: Reddit's own impersonate=True call goes through this exact same
-    check, and on the very ABIs TlsClientRH exists to support (armeabi-v7a/x86_64, no curl_cffi),
-    excluding it would make Reddit's own request believe impersonation isn't available either —
-    reintroducing the WAF block TlsClientRH was built to fix, on the ABIs that need it most.
-
-    Fixed one layer down instead: let the availability check keep answering honestly (TlsClientRH
-    really can impersonate chrome, just not for arbitrary hosts), and catch the resulting failure
-    only when it actually happens — at dispatch, when TlsClientRH._validate rejects the concrete
-    non-reddit URL and no other handler picks it up. That surfaces as YoutubeDL.urlopen's own
-    "Impersonate target ... is not available" RequestError; caught here and silently retried once
-    with the impersonate extension stripped, so a non-reddit request degrades to a plain
-    unimpersonated one — exactly the graceful behavior every extractor already falls back to when
-    _parse_impersonate_targets finds nothing available up front (see extractor/common.py's
-    _request_webpage) — rather than hard-failing the whole download."""
-    _orig_urlopen = ydl.urlopen
-
-    def _urlopen_with_impersonate_fallback(req):
-        try:
-            return _orig_urlopen(req)
-        except RequestError as e:
-            if "requires browser impersonation" not in str(e):
-                raise
-            request = Request(req) if isinstance(req, str) else req
-            if not request.extensions.get("impersonate"):
-                raise
-            fallback_request = request.copy()
-            fallback_request.extensions.pop("impersonate", None)
-            return _orig_urlopen(fallback_request)
-
-    ydl.urlopen = _urlopen_with_impersonate_fallback
-
 _EXTERNAL_DOWNLOADER_PROGRESS_PATCHED = False
 
 def _patch_external_downloader_progress():
@@ -973,19 +705,13 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
-             tls_client_path=None, override_title=None, override_artist=None):
+             override_title=None, override_artist=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
     dict and reports progress through callbacks, so it's self-contained per call. Every finished
     file's absolute path is sent to `callback`, matching how DownloadWorker's actualCallback
     already expects one path per line from gallery_dl_wrapper.download()."""
-    # See TlsClientRH's own comment (near _REDDIT_HOST_RE, above) for why this needs to be a real
-    # registered RequestHandler rather than a one-off pre-fetch, and why a module global rather
-    # than threading this through YoutubeDL's own handler-construction kwargs.
-    global _TLS_CLIENT_PATH
-    _TLS_CLIENT_PATH = tls_client_path
-
     # DownloadWorker throttles nothing on its own end, so a raw per-chunk progress_hook (which
     # fires dozens of times a second) would otherwise flood the DB with writes — this closure
     # state caps real updates to twice a second. QueueScreen's own progress bar eases toward each
@@ -1265,8 +991,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 headers[name] = value
         if headers:
             ydl_opts["http_headers"] = headers
-    from urllib.parse import urlsplit as _urlsplit
-    if (impersonate and _IMPERSONATE_AVAILABLE) or (tls_client_path and _REDDIT_HOST_RE.match((_urlsplit(url).hostname or ""))):
+    if impersonate and _IMPERSONATE_AVAILABLE:
         # An empty ImpersonateTarget() (rather than a specific browser/version string) asks yt-dlp
         # for its own default target — the first one whose backend is actually available in this
         # bundled environment. YoutubeDL.__init__'s own availability check
@@ -1276,14 +1001,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # accepts hits an `assert isinstance(target, ImpersonateTarget)` in is_supported_target()
         # instead (reproduced live: AssertionError with an empty message, right out of
         # YoutubeDL(ydl_opts) construction). Constructing the real object ourselves sidesteps that.
-        #
-        # A reddit.com URL always sets this (regardless of the `impersonate` param) — TlsClientRH
-        # is scoped to reddit.com specifically (see its own comment) and outranks the default
-        # handler for every request once this is set, so it's the one that actually ends up
-        # carrying both the redirect resolution and the JSON metadata fetch; `impersonate` itself
-        # (Settings > Advanced) stays the opt-in "try this everywhere else" toggle for other sites
-        # hitting bot detection, off by default so a site that already works fine doesn't pay
-        # curl_cffi's overhead or risk a TLS profile going stale for no reason.
         ydl_opts["impersonate"] = ImpersonateTarget()
     if retries:
         # "retries" alone only covers whole-request failures (extraction, a plain single-file
@@ -1529,7 +1246,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            _fix_impersonate_availability_check(ydl)
             if clip_ranges and ffmpeg_path:
                 # Added directly rather than through ydl_opts["postprocessors"] (a list of plain
                 # {"key": ...} dicts yt-dlp itself resolves to stock Ffmpeg*PP classes) since
@@ -1555,7 +1271,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             callback(f"[error] {e}")
         return f"Error: {e}"
 
-def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls_client_path=None):
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
     """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
     item picker's preview, specifically to get a *real*, directly fetchable thumbnail image URL
     for video items. gallery-dl's own listing gives every video item an internal "ytdl:"-prefixed
@@ -1572,9 +1288,6 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
     don't share an item-numbering scheme). {"error": "..."} on failure — callers fall back to
     treating this the same as "nothing usable came back" rather than crashing the whole listing
     over a preview-only enrichment step."""
-    # See download()'s own use of this — same module global TlsClientRH reads from.
-    global _TLS_CLIENT_PATH
-    _TLS_CLIENT_PATH = tls_client_path
     ydl_opts = {
         "quiet": True,
         # "quiet" alone only suppresses yt-dlp's normal progress/info output — WARNING/ERROR lines
@@ -1618,11 +1331,6 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
         # URLs — without this, extract_info() below fails outright for them instead of just
         # returning fewer fields.
         ydl_opts["js_runtimes"] = {"quickjs": {"path": js_runtime_path}}
-    from urllib.parse import urlsplit as _urlsplit
-    if tls_client_path and _REDDIT_HOST_RE.match((_urlsplit(url).hostname or "")):
-        # Same reasoning as download()'s own use of this — the share-sheet picker's preview hits
-        # the exact same reddit.com redirect/metadata calls a real download would.
-        ydl_opts["impersonate"] = ImpersonateTarget()
     if extra_args:
         for token in extra_args.split():
             if "=" in token:
@@ -1687,7 +1395,6 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, tls
     print("[status] Fetching info…", flush=True)
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            _fix_impersonate_availability_check(ydl)
             info = ydl.extract_info(url, download=False)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -1730,7 +1437,6 @@ if __name__ == "__main__":
         a = _sys.argv[2:]
         print(list_info(
             url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3]),
-            tls_client_path=(_s(a[4]) if len(a) > 4 else None),
         ), flush=True)
         _sys.exit(0)
 
@@ -1775,8 +1481,7 @@ if __name__ == "__main__":
         aria2_path=(_s(a[43]) if len(a) > 43 else None),
         aria2_lib_dir=(_s(a[44]) if len(a) > 44 else None),
         ffmpeg_lib_dir=(_s(a[45]) if len(a) > 45 else None),
-        tls_client_path=(_s(a[46]) if len(a) > 46 else None),
-        override_title=(_s(a[47]) if len(a) > 47 else None),
-        override_artist=(_s(a[48]) if len(a) > 48 else None),
+        override_title=(_s(a[46]) if len(a) > 46 else None),
+        override_artist=(_s(a[47]) if len(a) > 47 else None),
     )
     print(f"[__status__] {status}", flush=True)
