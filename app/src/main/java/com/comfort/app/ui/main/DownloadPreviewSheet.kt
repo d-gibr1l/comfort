@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -446,10 +447,19 @@ fun DownloadPreviewSheet(
         // visible seam that read as two disconnected sheets stacked with a gap between them
         // (reported live, circled in a screenshot). The overlay panel already has its own handle
         // once it's open, so MAIN's is only ever needed when MAIN itself is actually on top.
-        dragHandle = if (screen == PreviewScreen.MAIN) {
-            { BottomSheetDefaults.DragHandle() }
-        } else {
-            {}
+        //
+        // alpha 0, not swapped out for an empty composable — this slot's own height feeds directly
+        // into the outer ModalBottomSheet's total measured height, so dropping it to zero-size the
+        // instant an overlay opens made the *whole sheet* jump upward by the handle's own height in
+        // one frame, with nothing to animate that discontinuity (reported live: "looks cut off when
+        // there's another overlay" — the overlay's rounded top ended up sitting almost flush
+        // against the sheet's own top edge instead of leaving MAIN's dimmed chrome visible above
+        // it). graphicsLayer only affects the draw phase, not layout, so the handle keeps occupying
+        // the exact same space at every screen — invisible, never absent.
+        dragHandle = {
+            Box(modifier = Modifier.graphicsLayer { alpha = if (screen == PreviewScreen.MAIN) 1f else 0f }) {
+                BottomSheetDefaults.DragHandle()
+            }
         },
     ) {
         // Broken out into its own (non-extension) composable so the AnimatedVisibility calls below
@@ -667,12 +677,24 @@ private fun PreviewSheetOverlayHost(
         // than replacing it — Commands/Trim/Templates/View Templates all render inside this
         // one panel, swapping via a plain Crossfade so switching between them (e.g. Templates
         // -> View Templates) doesn't re-trigger the slide-up entrance.
+        //
+        // matchParentSize(), not align(Alignment.BottomCenter) — same reasoning as the scrim
+        // right above using it: align() still lets this child's own measured height count toward
+        // the outer Box's own intrinsic size, so a taller overlay (Trim, with its video preview
+        // + slider + segment chips, easily taller than MAIN's own content) instantly grew the
+        // *whole* ModalBottomSheet the moment it opened — a hard snap with nothing to animate it,
+        // on top of a shorter overlay doing the reverse on the way back to MAIN (reported live:
+        // "looks cut off when there's another overlay"). matchParentSize() is measured only after
+        // the Box's size is already settled from MAIN alone, so the sheet's overall height now
+        // stays constant across every screen; the inner Box below aligns the actual panel to the
+        // bottom of that fixed area the same way the outer align() used to.
         AnimatedVisibility(
             visible = overlayOpen,
             enter = slideInVertically(tween(300)) { it } + fadeIn(tween(300)),
             exit = slideOutVertically(tween(300)) { it } + fadeOut(tween(300)),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.matchParentSize(),
         ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -806,6 +828,7 @@ private fun PreviewSheetOverlayHost(
                         }
                     }
                 }
+            }
             }
         }
     }
