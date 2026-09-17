@@ -1271,7 +1271,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             callback(f"[error] {e}")
         return f"Error: {e}"
 
-def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, impersonate=False):
     """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
     item picker's preview, specifically to get a *real*, directly fetchable thumbnail image URL
     for video items. gallery-dl's own listing gives every video item an internal "ytdl:"-prefixed
@@ -1331,6 +1331,17 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         # URLs — without this, extract_info() below fails outright for them instead of just
         # returning fewer fields.
         ydl_opts["js_runtimes"] = {"quickjs": {"path": js_runtime_path}}
+    if impersonate and _IMPERSONATE_AVAILABLE:
+        # Same "Impersonate a browser" toggle download() itself already respects (see its own,
+        # identical condition) — list_info() never had any equivalent at all until this: the only
+        # thing that ever impersonated a *listing* request was the removed tls-client integration's
+        # own unconditional reddit.com special-case, which ignored this setting entirely and only
+        # ever applied to Reddit. Reproduced live: with tls-client gone and this toggle on, a real
+        # download of a Reddit share link succeeded (impersonated via curl_cffi in download() as
+        # normal) while its own preview kept failing — list_info() had no wiring to curl_cffi at
+        # all, on any host, regardless of the toggle. This makes the preview honor the same global
+        # setting the real download already does, rather than reviving a Reddit-only special case.
+        ydl_opts["impersonate"] = ImpersonateTarget()
     if extra_args:
         for token in extra_args.split():
             if "=" in token:
@@ -1426,7 +1437,7 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list", "probe"):
-        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <4 positional args> | probe <url>", file=_sys.stderr)
+        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <5 positional args> | probe <url>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "probe":
@@ -1437,6 +1448,7 @@ if __name__ == "__main__":
         a = _sys.argv[2:]
         print(list_info(
             url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3]),
+            impersonate=_b(a[4]) if len(a) > 4 else False,
         ), flush=True)
         _sys.exit(0)
 

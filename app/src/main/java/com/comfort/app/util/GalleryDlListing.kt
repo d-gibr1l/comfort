@@ -532,6 +532,14 @@ object GalleryDlListing {
         // straight to the UNAVAILABLE/instant-whole-download fallback (reproduced live: the
         // picker sheet flashed and closed in under a second instead of showing anything).
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
+        // list_info() never had any impersonation wiring of its own until this — the only thing
+        // that ever impersonated a *listing* request was the removed tls-client integration's own
+        // unconditional reddit.com special-case, scoped to that one host regardless of this
+        // setting. Passing the same global toggle download() already respects here too means a
+        // preview can now succeed under the same condition a real download already does, instead
+        // of never getting impersonation at all (reproduced live: with tls-client gone, a Reddit
+        // download succeeded with this setting on while its own preview kept failing).
+        val impersonateArg = if (GalleryDlPreferences.isImpersonateEnabled(context)) "1" else "0"
 
         // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
         // prints (see yt_dlp_wrapper.py) — but PythonRuntime.run() merges the subprocess's stderr
@@ -547,7 +555,7 @@ object GalleryDlListing {
         // does.
         val lines = mutableListOf<String>()
         val lastLine = runCatching {
-            PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
+            PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg)) { line ->
                 lines.add(line)
                 if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
             }
