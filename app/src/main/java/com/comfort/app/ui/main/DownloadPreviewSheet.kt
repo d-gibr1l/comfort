@@ -440,6 +440,17 @@ fun DownloadPreviewSheet(
         // ourselves (below, in both MAIN and the overlay) lets each one grow into that space with
         // its own background instead of only the sheet's base color showing through it.
         contentWindowInsets = { WindowInsets(0) },
+        // The outer sheet's own default drag handle renders above PreviewSheetOverlayHost's whole
+        // content Box — outside the scrim it draws inside that Box — so with an overlay open it
+        // stayed fully lit, undimmed, floating above the overlay's own handle further down: a
+        // visible seam that read as two disconnected sheets stacked with a gap between them
+        // (reported live, circled in a screenshot). The overlay panel already has its own handle
+        // once it's open, so MAIN's is only ever needed when MAIN itself is actually on top.
+        dragHandle = if (screen == PreviewScreen.MAIN) {
+            { BottomSheetDefaults.DragHandle() }
+        } else {
+            {}
+        },
     ) {
         // Broken out into its own (non-extension) composable so the AnimatedVisibility calls below
         // aren't lexically inside ModalBottomSheet's ColumnScope receiver — with that receiver in
@@ -2087,7 +2098,7 @@ private fun TrimVideoScreen(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
