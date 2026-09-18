@@ -84,7 +84,22 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
-    args = ["gallery-dl", "--directory", download_dir]
+    # Reddit's own extractor defaults to its plain, unauthenticated "REST" mode (a bare GET to
+    # reddit.com/.../.json) whenever no client-id is configured, *regardless* of any "api" option
+    # (reddit.py: "if config('api') == 'rest' or not client_id" — the "or not client_id" half means
+    # setting api=oauth alone, tried first, does nothing on its own) — confirmed live that REST mode
+    # now gets a flat 403 from Reddit for *any* anonymous request, not just NSFW/quarantined ones (a
+    # plain r/aww listing 403'd identically). Setting client-id to gallery-dl's own bundled default
+    # value (the same constant reddit.py falls back to itself once this escapes the REST branch —
+    # not a real secret) is what actually flips it into Reddit's still-sanctioned anonymous
+    # "installed_client" app-token flow — confirmed live end-to-end against a real reddit.com share
+    # link whose post links out to a redgifs video: OAuth token issued, submission JSON fetched
+    # (200, vs REST mode's 403), and the redgifs file downloaded successfully. reddit.py's own
+    # request loop already retries with a backoff on that path's occasional 429 rate limit (shared
+    # client-id, contended across every anonymous gallery-dl install), unlike REST mode's
+    # un-recoverable 403. Also incidentally re-enables reddit.py's own "allow downloading from
+    # quarantined subreddits" cookie logic, which is dead code under REST mode.
+    args = ["gallery-dl", "--directory", download_dir, "-o", "extractor.reddit.client-id=6N9uN0krSDE-ig"]
     if cookies_path:
         args.extend(["--cookies", cookies_path])
     if filename_format:
@@ -171,7 +186,8 @@ def list_items(url, cookies_path=None, extra_args=None):
     [message_type, url, keywords] entries); parsed on the Kotlin side. --dump-json already
     implies simulate mode on its own, so no separate --simulate flag is needed."""
     original_argv = sys.argv
-    args = ["gallery-dl", "--dump-json"]
+    # Same fix as download()'s own identical line — see its comment for the full reasoning.
+    args = ["gallery-dl", "--dump-json", "-o", "extractor.reddit.client-id=6N9uN0krSDE-ig"]
     if cookies_path:
         args.extend(["--cookies", cookies_path])
     if extra_args:

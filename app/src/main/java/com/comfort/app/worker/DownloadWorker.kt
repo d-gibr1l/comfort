@@ -876,10 +876,28 @@ class DownloadWorker(
                                 // system" behavior, which this probe must never alter.
                                 val skipYtDlpFallback = probe.galleryDlHasExtractor && !probe.ytDlpHasExtractor
                                 if (savedCount.get() == 0) {
-                                    // gallery-dl found nothing at all — unsupported URL, blocked
-                                    // request, or a genuinely empty gallery. Try yt-dlp on the
-                                    // same link before giving up on the download entirely.
-                                    if (!skipYtDlpFallback) runYtDlp()
+                                    // Deliberately NOT gated by skipYtDlpFallback, unlike the
+                                    // hasVideoItem branch below — reproduced live against a Reddit
+                                    // share link (.../s/<code>) whose only content was an external
+                                    // redgifs video: gallery-dl's own redirect-following extractor
+                                    // matched and correctly found it, then excludeVideo=true (above)
+                                    // correctly threw it away for gallery-dl's own pass — but
+                                    // probe.ytDlpHasExtractor came back false for the *raw, un-
+                                    // resolved* share link (yt-dlp's dedicated reddit extractor's
+                                    // own regex requires "/comments/<id>", which a bare "/s/<code>"
+                                    // redirect never has), so skipYtDlpFallback wrongly concluded
+                                    // yt-dlp was doomed too and this branch never ran at all —
+                                    // silent "No downloadable content found", nothing else. In
+                                    // reality yt-dlp's own generic extractor (deliberately excluded
+                                    // from probe()'s "real extractor" check, same "opt-in" reasoning
+                                    // as gallery-dl's — see EngineProbe's own doc comment) DOES
+                                    // follow that exact redirect and finds the same redgifs video
+                                    // fine on its own (confirmed live, --simulate). gallery-dl
+                                    // having already run at all by this point is itself the signal
+                                    // that this URL resolves to *something* real — worth yt-dlp's
+                                    // cheap attempt regardless of what a no-network regex probe on
+                                    // the original, pre-redirect URL alone could ever know.
+                                    runYtDlp()
                                 } else if (hasVideoItem || alwaysTryVideo) {
                                     // gallery-dl already grabbed the pictures (video excluded
                                     // from its own pass above); yt-dlp now handles this same
