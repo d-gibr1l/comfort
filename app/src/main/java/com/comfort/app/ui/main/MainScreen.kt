@@ -823,27 +823,36 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        // shapes.medium (12dp) — the spec's own card token; shapes.large (16dp) is for FABs/nav
+        // drawers, same finding as the Queue screen's own running card had.
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            // 16dp, not 14dp — MD3's spacing system is built on an 8dp grid.
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    // shapes.small (8dp) — 10dp matched no real shape token.
+                    .clip(MaterialTheme.shapes.small)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!item.thumbnailPath.isNullOrBlank()) {
                     HomeCardThumbnail(item.thumbnailPath, item.url, item.title, Modifier.fillMaxSize())
                 } else {
-                    Icon(FeatherIcons.DownloadCloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    // onPrimaryContainer, not the bare (unpaired) primary — same tonal-pairing
+                    // fix as the Queue screen's own thumbnail icon: this box's background is
+                    // primaryContainer, and MD3 only guarantees contrast for a container against
+                    // its own matching "on" color, not an arbitrary combination.
+                    Icon(FeatherIcons.DownloadCloud, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
                 }
             }
-            Spacer(Modifier.width(12.dp))
+            // 16dp, not 12dp — same 8dp-grid reasoning as the padding above.
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     item.title.ifBlank { item.url },
@@ -858,7 +867,9 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                         progress = { progress },
                         modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        // surfaceContainerHighest, not the older surfaceVariant token — same
+                        // finding as the Queue screen's own progress track.
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                     )
                 } else {
                     Text(
@@ -902,7 +913,9 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
     Box(
         modifier = Modifier
             .size(76.dp)
-            .clip(RoundedCornerShape(14.dp))
+            // shapes.large (16dp) — same fix, same magic-number/size pairing, as the Library
+            // screen's own equivalent thumbnail box (DownloadsHistoryScreen.kt's HistoryRow).
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick),
     ) {
