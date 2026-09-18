@@ -33,6 +33,16 @@ enum class OutputFormat(val label: String, val extension: String) {
     MP4("MP4", "mp4"),
 }
 
+/** What a shared link does when opened through ShareActivity's default "Configure" Sharesheet
+ * entry (the ".QuickDownloadActivity" alias — labeled "Instant" in the Sharesheet — always
+ * downloads instantly regardless of this, since picking that entry by name is already an
+ * explicit one-tap request for it). */
+enum class ShareMode(val label: String) {
+    CONFIGURE("Configure"),
+    INSTANT("Instant"),
+    ALWAYS_ASK("Always ask"),
+}
+
 /** Which upstream source EngineUpdater checks/installs an engine from. Applies independently per
  * engine (yt-dlp and gallery-dl each have their own stored channel) since what "the bleeding-edge
  * option" even means differs between them — see EngineUpdater's own fetchLatestYtDlpNightly/
@@ -67,6 +77,7 @@ object GalleryDlPreferences {
     const val KEY_DOWNLOAD_LOCATION_URI = "download_location_uri"
     const val KEY_GLOBAL_PAUSE = "global_pause"
     const val KEY_INSTANT_SHARE = "instant_share"
+    const val KEY_SHARE_MODE = "share_mode"
     const val KEY_LIBRARY_GRID_VIEW = "library_grid_view"
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
@@ -419,14 +430,17 @@ object GalleryDlPreferences {
         prefs(context).edit().putBoolean(KEY_GLOBAL_PAUSE, paused).apply()
     }
 
-    /** When enabled, a shared link downloads immediately in the background instead of opening
-     * the item picker. */
-    fun isInstantShareEnabled(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_INSTANT_SHARE, false)
+    /** Falls back to the old KEY_INSTANT_SHARE boolean (pre-dating this 3-way setting) on an
+     * upgrade so an existing install's choice carries over unchanged instead of silently
+     * resetting to CONFIGURE. */
+    fun getShareMode(context: Context): ShareMode {
+        val stored = prefs(context).getString(KEY_SHARE_MODE, null)
+        if (stored != null) return runCatching { ShareMode.valueOf(stored) }.getOrDefault(ShareMode.CONFIGURE)
+        return if (prefs(context).getBoolean(KEY_INSTANT_SHARE, false)) ShareMode.INSTANT else ShareMode.CONFIGURE
     }
 
-    fun setInstantShareEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_INSTANT_SHARE, enabled).apply()
+    fun setShareMode(context: Context, mode: ShareMode) {
+        prefs(context).edit().putString(KEY_SHARE_MODE, mode.name).apply()
     }
 
     fun isLibraryGridView(context: Context): Boolean {

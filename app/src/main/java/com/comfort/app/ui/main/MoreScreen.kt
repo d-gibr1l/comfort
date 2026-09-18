@@ -15,6 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -113,7 +114,7 @@ private data class SubpageSearchEntry(val title: String, val subtitle: String, v
 // changes. Order doesn't matter — this is only ever filtered, never displayed as-is.
 private val SUBPAGE_SEARCH_INDEX = listOf(
     // Downloads
-    SubpageSearchEntry("Instant download", "Sharing a link downloads it right away in the background. Off shows a picker to choose which images to download.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Sharing mode", "Configure, Instant, or Always ask — what the Sharesheet's default entry does with a shared link.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Multiple concurrent downloads", "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Wi-Fi only", "Queued downloads wait for a Wi-Fi connection instead of using mobile data.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Speed limit", "Caps download bandwidth for all future downloads.", SettingsRoute.DOWNLOADS),
@@ -472,20 +473,10 @@ private fun SettingsListRow(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    // A hardcoded primaryContainer background here disappeared entirely on a
-                    // PRIMARY row (Downloads, Cookies & Login) — its own Surface color IS
-                    // primaryContainer, so the circle drew in the same color as what's behind it.
-                    // A tint of the row's own onContainerColor instead stays visibly distinct no
-                    // matter which of the three row colors this is.
-                    .background(onContainerColor.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(24.dp))
-            }
+            // No tinted circle behind this any more — onContainerColor was already chosen to
+            // read correctly against this row's own Surface color (containerColor), so it stays
+            // the right tint for the bare icon too, not just for a badge drawn on top of it.
+            Icon(icon, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(28.dp))
             // 16dp, not 14dp — MD3's spacing system is built on an 8dp grid. Fixed once here
             // rather than everywhere it recurs across this file: every settings row on every
             // subpage renders through this one shared row, so this is the single highest-leverage
@@ -644,7 +635,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
     var proxyEnabled by remember { mutableStateOf(GalleryDlPreferences.isProxyEnabled(context)) }
     var maxFilesizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isMaxFilesizeEnabled(context)) }
     var maxFilesize by remember { mutableStateOf(GalleryDlPreferences.getMaxFilesize(context)) }
-    var instantShare by remember { mutableStateOf(GalleryDlPreferences.isInstantShareEnabled(context)) }
+    var shareMode by remember { mutableStateOf(GalleryDlPreferences.getShareMode(context)) }
     var deleteLeftoverOnFailure by remember { mutableStateOf(GalleryDlPreferences.isDeleteLeftoverOnFailure(context)) }
     var cleanupLeftoverInterval by remember { mutableStateOf(GalleryDlPreferences.getCleanupLeftoverInterval(context)) }
     var preventDuplicateDownloads by remember { mutableStateOf(GalleryDlPreferences.isPreventDuplicateDownloads(context)) }
@@ -691,14 +682,11 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
 
     SettingsSubScaffold(title = "Downloads", onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Sharing", icon = Icons.Outlined.Share) {
-            IconToggleRow(
-                icon = Icons.Outlined.Bolt,
-                title = "Instant download",
-                subtitle = "Sharing a link downloads it right away in the background. Off shows a picker to choose which images to download.",
-                checked = instantShare,
-                onCheckedChange = {
-                    instantShare = it
-                    GalleryDlPreferences.setInstantShareEnabled(context, it)
+            ShareModeRow(
+                mode = shareMode,
+                onModeChange = {
+                    shareMode = it
+                    GalleryDlPreferences.setShareMode(context, it)
                 },
             )
         }
@@ -1276,36 +1264,44 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
+                // Real FilterChips, not a hand-rolled Surface+onClick row — same conversion, and
+                // same reasoning, as the Sharing mode row above: the chip API's own accessibility
+                // semantics, minimum touch target, and selected-state contract, for free.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     // "Never" isn't one of the options here — the toggle above already covers
                     // that state, so (same off-value-redundancy fix as Concurrent downloads/
                     // fragments' sliders) it's deliberately excluded from what's reachable once
                     // the toggle reveals this row, rather than being selectable two different ways.
-                    listOf("" to "On failure", "daily" to "Daily", "weekly" to "Weekly", "monthly" to "Monthly").forEach { (value, label) ->
+                    val cleanupOptions = listOf("" to "On failure", "daily" to "Daily", "weekly" to "Weekly", "monthly" to "Monthly")
+                    cleanupOptions.forEachIndexed { index, (value, label) ->
+                        val interactionSource = remember { MutableInteractionSource() }
                         val selected = cleanupLeftoverInterval == value
-                        Surface(
-                            modifier = Modifier.weight(1f),
-                            shape = MaterialTheme.shapes.medium,
-                            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        FilterChip(
+                            selected = selected,
                             onClick = {
                                 cleanupLeftoverInterval = value
                                 GalleryDlPreferences.setCleanupLeftoverInterval(context, value)
                                 DownloadDispatcher.rescheduleStagingCleanup(context)
                             },
-                        ) {
-                            Box(modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center,
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
+                            modifier = Modifier.weight(1f).height(40.dp),
+                            interactionSource = interactionSource,
+                            shape = rememberMorphingChipShape(index, cleanupOptions.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                            label = {
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    Text(label, style = MaterialTheme.typography.labelMedium)
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            border = null,
+                        )
                     }
                 }
             }
@@ -1612,27 +1608,30 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     }
                     .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                VideoQuality.entries.forEach { quality ->
+                val qualities = VideoQuality.entries
+                qualities.forEachIndexed { index, quality ->
                     val selected = videoQuality == quality
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    val interactionSource = remember { MutableInteractionSource() }
+                    FilterChip(
+                        selected = selected,
                         onClick = {
                             videoQuality = quality
                             GalleryDlPreferences.setVideoQuality(context, quality)
                         },
-                    ) {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                            Text(
-                                quality.label,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                        modifier = Modifier.height(40.dp),
+                        interactionSource = interactionSource,
+                        shape = rememberMorphingChipShape(index, qualities.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                        label = { Text(quality.label, style = MaterialTheme.typography.labelLarge) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        border = null,
+                    )
                 }
             }
 
@@ -1650,28 +1649,34 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                OutputFormat.entries.forEach { format ->
+                val formats = OutputFormat.entries
+                formats.forEachIndexed { index, format ->
                     val selected = outputFormat == format
-                    Surface(
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    val interactionSource = remember { MutableInteractionSource() }
+                    FilterChip(
+                        selected = selected,
                         onClick = {
                             outputFormat = format
                             GalleryDlPreferences.setOutputFormat(context, format)
                         },
-                    ) {
-                        Box(modifier = Modifier.padding(vertical = 12.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(
-                                format.label,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        interactionSource = interactionSource,
+                        shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                        label = {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(format.label, style = MaterialTheme.typography.labelLarge)
+                            }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        border = null,
+                    )
                 }
             }
 
@@ -2124,6 +2129,10 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
 
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
     val scope = rememberCoroutineScope()
+    // Same fix as IconToggleRow's own Switch — Compose's Switch doesn't call
+    // performHapticFeedback internally, so this per-site toggle was the one Switch in Settings
+    // still silent on tap.
+    val haptics = LocalHapticFeedback.current
     var showBrowser by remember { mutableStateOf(false) }
     var extractedCookies by remember { mutableStateOf("") }
     // Deliberately empty, not seeded from whatever's already saved — this box is for pasting a
@@ -2376,9 +2385,19 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         Switch(
                             checked = enabled,
                             onCheckedChange = { checked ->
+                                haptics.performHapticFeedback(if (checked) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                                 GalleryDlPreferences.setCookieDomainEnabled(context, site.rootDomain, checked)
                                 disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
                             },
+                            // Same fix as IconToggleRow's own Switch: the default unchecked thumb
+                            // color is nearly invisible against the unchecked track in this theme
+                            // — an off site (e.g. Instagram/Reddit above) read as a dead, unlabeled
+                            // gray blob instead of a working control resting in its off position.
+                            colors = SwitchDefaults.colors(
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+                            ),
                         )
                     }
                     if (index != cookieSites.lastIndex) {
@@ -3450,15 +3469,10 @@ private fun IconToggleRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
-        }
+        // No tinted circle behind this any more. onSurfaceVariant, not the bare onSurface the
+        // circle version used — full onSurface is meant for primary content (titles/body text),
+        // not a supporting row icon with nothing behind it to soften the contrast.
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -3483,6 +3497,54 @@ private fun IconToggleRow(
                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
             ),
         )
+    }
+}
+
+/** What tapping the Sharesheet's default "Configure" entry does — mirrors the three ways of
+ * sharing into the app: "Configure" (open the picker/preview sheet), "Instant" (download right
+ * away, same as picking the Sharesheet's own separate "Instant" entry), or "Always ask" (a small
+ * sheet asking which, per share). A 3-segment chip row (same connected-group shape as the Queue
+ * card's Pause/Cancel chips) rather than a Switch — this replaced a plain on/off toggle once a
+ * genuine third option (Always ask) existed that a boolean couldn't represent. */
+@Composable
+private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (com.comfort.app.data.ShareMode) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(4.dp)) {
+        Text("Sharing mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "What the Sharesheet's default \"Configure\" entry does. Its separate \"Instant\" entry always downloads right away.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        val options = com.comfort.app.data.ShareMode.entries
+        // Same connected-group treatment as the Library toolbar row's chips (Sort/Deleted/
+        // Duplicates/Audio) — near-touching (2dp) with rounded outer ends/square inner corners,
+        // not the wider 8dp-gap/uniform-shape look tried first.
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            options.forEachIndexed { index, option ->
+                val interactionSource = remember { MutableInteractionSource() }
+                FilterChip(
+                    selected = mode == option,
+                    onClick = { onModeChange(option) },
+                    modifier = Modifier.weight(1f).height(40.dp),
+                    interactionSource = interactionSource,
+                    shape = rememberMorphingChipShape(index, options.size, selected = mode == option, interactionSource = interactionSource, height = 40.dp),
+                    label = {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text(option.label, style = MaterialTheme.typography.labelLarge)
+                        }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                    border = null,
+                )
+            }
+        }
     }
 }
 
@@ -3514,9 +3576,24 @@ private fun SettingsSlider(
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.primary,
     )
+    // Same gap as the Switch/toggle fixes above — Slider doesn't call performHapticFeedback
+    // internally either. SegmentTick (not ToggleOn/Off) is the fitting one here: this is a
+    // stepped, snap-to-integer slider, not a two-state control. Fired only on an actual step
+    // change (tracked via lastTick), not on every pixel of drag the way a naive onValueChange
+    // hook would — a continuous drag across a wide range would otherwise buzz constantly instead
+    // of ticking once per whole number.
+    val haptics = LocalHapticFeedback.current
+    var lastTick by remember { mutableStateOf(displayValue) }
     Slider(
         value = displayValue.toFloat(),
-        onValueChange = { onValueChange(it.roundToInt().coerceIn(valueRange.first, valueRange.last)) },
+        onValueChange = {
+            val rounded = it.roundToInt().coerceIn(valueRange.first, valueRange.last)
+            if (rounded != lastTick) {
+                lastTick = rounded
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+            }
+            onValueChange(rounded)
+        },
         valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
         steps = (valueRange.last - valueRange.first - 1).coerceAtLeast(0),
         modifier = Modifier.fillMaxWidth(),

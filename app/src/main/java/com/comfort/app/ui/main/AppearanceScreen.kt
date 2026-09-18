@@ -16,6 +16,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
@@ -249,6 +250,14 @@ private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, on
                 haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                 onCheckedChange(it)
             },
+            // Same fix as MoreScreen.kt's IconToggleRow: the default unchecked thumb color is
+            // nearly invisible against the unchecked track in this theme, so an off toggle read
+            // as a dead gray blob rather than a working control resting in its off position.
+            colors = SwitchDefaults.colors(
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+            ),
         )
     }
 }

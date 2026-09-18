@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -54,11 +57,13 @@ import kotlin.math.roundToInt
 import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.EnqueueResult
 import com.comfort.app.data.GalleryDlPreferences
+import com.comfort.app.data.ShareMode
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.theme.GalleryDLTheme
 import com.comfort.app.theme.ThemePreferences
 import com.comfort.app.ui.main.DownloadPreviewSheet
 import com.comfort.app.ui.main.SharePickerScreen
+import com.comfort.app.ui.main.groupedChipShape
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.ListingResult
 import com.comfort.app.util.shouldUsePreviewSheet
@@ -88,6 +93,17 @@ class ShareActivity : ComponentActivity() {
     // it, rather than the new Intent just sitting unread against whatever was parsed the first
     // time onCreate ran.
     private var sharedUrls by mutableStateOf<List<String>>(emptyList())
+
+    // True when this share arrived through the manifest's ".QuickDownloadActivity"
+    // activity-alias (see AndroidManifest.xml's own comment on it) rather than the normal
+    // ShareActivity entry — the alias is a second Sharesheet entry, labeled "Instant", that
+    // resolves to this exact same Activity. Tracked separately from the "Instant download"
+    // setting below: picking that entry is itself an explicit one-tap request to skip the
+    // picker, whether or not the user has that setting turned on globally.
+    private fun isQuickDownloadAlias(intent: Intent): Boolean =
+        intent.component?.className == "com.comfort.app.QuickDownloadActivity"
+
+    private var isQuickDownload by mutableStateOf(false)
 
     /** while(find()), not a single if — used to stop at the first match, so sharing a block of
      * text with two separate links (e.g. a text message with two TikTok URLs) silently discarded
@@ -127,6 +143,7 @@ class ShareActivity : ComponentActivity() {
         com.comfort.app.util.AppImageLoader.install(applicationContext)
 
         sharedUrls = parseUrls(intent)
+        isQuickDownload = isQuickDownloadAlias(intent)
         if (sharedUrls.isEmpty()) {
             finish()
             return
@@ -167,10 +184,14 @@ class ShareActivity : ComponentActivity() {
                             // Multiple links: the picker/preview sheets below are built around
                             // reviewing/filtering exactly one link's own gallery, and stacking one
                             // per link would be terrible UX — so this bypasses them (and the
-                            // "Instant download" preference, which only ever gated whether *one*
-                            // link's sheet appears) and just enqueues every link found.
+                            // Sharing mode setting, which only ever gated whether *one* link's
+                            // sheet appears) and just enqueues every link found.
                             urls.size > 1 -> MultiLinkHandler(urls = urls, onFinished = { finish() })
-                            GalleryDlPreferences.isInstantShareEnabled(context) -> InstantShareHandler(
+                            isQuickDownload || GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
+                                url = urls[0],
+                                onFinished = { finish() },
+                            )
+                            GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
                                 onFinished = { finish() },
                             )
@@ -201,6 +222,7 @@ class ShareActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val urls = parseUrls(intent)
+        isQuickDownload = isQuickDownloadAlias(intent)
         if (urls.isEmpty()) {
             // Only close if nothing else is in flight — a URL-less intent (e.g. sharing a photo
             // with no link right after a real share) used to call finish() unconditionally here,
@@ -258,6 +280,97 @@ private fun InstantShareHandler(url: String, onFinished: () -> Unit) {
             Toast.LENGTH_SHORT,
         ).show()
         onFinished()
+    }
+}
+
+/** The "Always ask" Sharing mode: a tiny sheet offering the same two choices as the Sharesheet's
+ * own two entries ("Configure"/"Instant"), just for this one share — picking either one hands
+ * straight off to that same handler, so the two paths stay identical to sharing directly into the
+ * matching Sharesheet entry, not a third, subtly-different behavior. */
+@Composable
+private fun AskShareModeHandler(url: String, onFinished: () -> Unit) {
+    var choice by remember { mutableStateOf<ShareMode?>(null) }
+    when (choice) {
+        ShareMode.INSTANT -> InstantShareHandler(url = url, onFinished = onFinished)
+        ShareMode.CONFIGURE -> ShareRouter(url = url, onFinished = onFinished)
+        ShareMode.ALWAYS_ASK, null -> AskShareModeSheet(
+            onDismiss = onFinished,
+            onChoose = { choice = it },
+        )
+    }
+}
+
+@Composable
+private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    BackHandler { visible = false }
+    LaunchedEffect(visible) {
+        if (!visible) {
+            delay(SHEET_ANIM_MS.toLong())
+            onDismiss()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { visible = false }
+        )
+        AnimatedVisibility(
+            visible = visible,
+            enter = slideInVertically(tween(SHEET_ANIM_MS), initialOffsetY = { it }),
+            exit = slideOutVertically(tween(SHEET_ANIM_MS), targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("Download this how?", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(16.dp))
+                    // Same connected-group AssistChip pair as the Queue card's Pause/Cancel
+                    // chips — two real, independent actions (not a mutually-exclusive selection),
+                    // so AssistChip fits better than a Switch/FilterChip pairing would. A real M3
+                    // Expressive ButtonGroup would additionally spring/morph shape on press, but
+                    // its actual Kotlin API isn't reliably recoverable from this alpha's bytecode
+                    // without a sources jar — not worth guessing blind at an unstable API's
+                    // contract a second time (see groupedChipShape's own doc comment for the
+                    // first attempt).
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        AssistChip(
+                            onClick = { onChoose(ShareMode.INSTANT) },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = groupedChipShape(0, 2, height = 52.dp),
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            border = null,
+                            leadingIcon = { Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Instant") } },
+                        )
+                        AssistChip(
+                            onClick = { onChoose(ShareMode.CONFIGURE) },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = groupedChipShape(1, 2, height = 52.dp),
+                            border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = MaterialTheme.colorScheme.outline),
+                            colors = AssistChipDefaults.assistChipColors(
+                                labelColor = MaterialTheme.colorScheme.onSurface,
+                                leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            leadingIcon = { Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Configure") } },
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
     }
 }
 
