@@ -409,6 +409,11 @@ class DownloadWorker(
                         line.startsWith("[phase] ") -> {
                             dao.setDownloadingAudioTrack(downloadId, line.removePrefix("[phase] ").trim() == "audio")
                         }
+                        // Sent alongside [phase] above, same per-sub-file timing — see
+                        // DownloadEntity.formatTags' own doc comment.
+                        line.startsWith("[format] ") -> {
+                            dao.setFormatTags(downloadId, line.removePrefix("[format] ").trim())
+                        }
                         line.startsWith("[progress] ") -> {
                             val rest = line.removePrefix("[progress] ")
                             val downloaded = Regex("downloaded=(\\d+)").find(rest)?.groupValues?.get(1)?.toLongOrNull()

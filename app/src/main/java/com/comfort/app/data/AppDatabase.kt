@@ -138,7 +138,7 @@ private val MIGRATION_17_18 = object : Migration(17, 18) {
 
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 19,
+    version = 20,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

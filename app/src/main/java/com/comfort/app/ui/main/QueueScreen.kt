@@ -46,6 +46,7 @@ import compose.icons.feathericons.*
 import com.comfort.app.viewmodel.DownloadsViewModel
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
+import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.rememberIsNetworkAvailable
 import com.comfort.app.util.rememberIsReducedMotionEnabled
 import java.net.URI
@@ -983,6 +984,67 @@ fun QueueItemCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                // Fills what used to be dead space below the size/speed row on a running
+                // download's card — a site badge (titles are frequently in the source post's own
+                // language/script, giving no hint where a download actually came from) and a
+                // rough ETA, only ever shown for the same genuine single-item byte-progress case
+                // the "X%" text above is already gated on, since remaining-bytes÷speed means
+                // nothing for an item-count-only gallery download. A tinted pill rather than bare
+                // icon+text — a plain label read as an afterthought floating in a lot of empty
+                // card, not a deliberate piece of the layout.
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        InfoPill {
+                            Icon(
+                                FeatherIcons.Globe,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(13.dp),
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                text = VideoSiteRouter.siteName(item.url),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        // Exactly what got picked for the file currently downloading — resolution/
+                        // fps/container for video, bitrate+codec for audio (see
+                        // yt_dlp_wrapper.py's own "[format]" signal) — at a glance, no need to
+                        // open anything to find out. Gallery-dl-routed downloads never populate
+                        // this at all, so the row is just the site badge for those, same as before.
+                        item.formatTags?.split("|")?.filter { it.isNotBlank() }?.forEach { tag ->
+                            InfoPill {
+                                Text(
+                                    text = tag,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    if (byteProgress != null && item.speedMbs > 0f) {
+                        val remainingBytes = item.expectedBytes - (item.totalBytes + item.liveBytes)
+                        val remainingSeconds = (remainingBytes / (item.speedMbs * 1024f * 1024f)).toInt()
+                        if (remainingSeconds > 0) {
+                            Text(
+                                text = formatEta(remainingSeconds),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             } else if (item.status == DownloadStatus.QUEUED) {
                 if (isNetworkAvailable) {
                     Text(
@@ -1038,8 +1100,6 @@ fun QueueItemCard(
             }
 
             if (!selectionMode) {
-                Spacer(modifier = Modifier.height(8.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     // Explicit gap rather than relying on each TextButton/IconButton's own default
@@ -1052,11 +1112,33 @@ fun QueueItemCard(
                 ) {
                     when (item.status) {
                         DownloadStatus.RUNNING -> {
-                            IconButton(onClick = onPauseResume) {
-                                Icon(FeatherIcons.Pause, contentDescription = "Pause")
+                            // Tonal, color-coded rather than plain IconButtons — a bare glyph read
+                            // as an afterthought floating in the card's own empty space, same
+                            // critique as the site badge/format tags above; Pause and Cancel also
+                            // read as visually identical at a glance without some distinction
+                            // between "safe, resumable" and "destructive" beyond the icon shape
+                            // alone. Explicit 40dp rather than the default 48dp for the same
+                            // reason the plain IconButtons here were already shrunk — still well
+                            // within Material's own accepted range for a dense list row.
+                            FilledTonalIconButton(
+                                onClick = onPauseResume,
+                                modifier = Modifier.size(40.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                            ) {
+                                Icon(FeatherIcons.Pause, contentDescription = "Pause", modifier = Modifier.size(18.dp))
                             }
-                            IconButton(onClick = onCancel) {
-                                Icon(FeatherIcons.X, contentDescription = "Cancel")
+                            FilledTonalIconButton(
+                                onClick = onCancel,
+                                modifier = Modifier.size(40.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                ),
+                            ) {
+                                Icon(FeatherIcons.X, contentDescription = "Cancel", modifier = Modifier.size(18.dp))
                             }
                         }
                         DownloadStatus.ERRORED -> {

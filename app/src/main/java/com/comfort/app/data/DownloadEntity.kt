@@ -80,6 +80,12 @@ data class DownloadEntity(
     // as expectedBytes/liveBytes above.
     @ColumnInfo(defaultValue = "0")
     val downloadingAudioTrack: Boolean = false,
+    // Pipe-delimited tags describing exactly what got picked for the currently-downloading
+    // sub-file — resolution/fps/container for video, bitrate+codec for audio (e.g. "1080p|60fps|MP4"
+    // or "128 kbps AAC") — see yt_dlp_wrapper.py's own "[format]" signal. Same staleness pattern as
+    // downloadingAudioTrack above; null when nothing's been reported yet or the engine is gallery-dl
+    // (which never emits this).
+    val formatTags: String? = null,
     // gallery-dl `--filter "num in {...}"` expression, set when the user picked specific items
     // in the share sheet instead of the whole gallery. Persisted so retry/resume re-applies the
     // same selection instead of re-fetching everything.

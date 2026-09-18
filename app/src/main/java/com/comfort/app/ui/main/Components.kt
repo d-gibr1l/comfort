@@ -214,6 +214,31 @@ fun formatFileSize(bytes: Long): String {
     return if (unitIndex == 0) "${value.toInt()} ${units[unitIndex]}" else "%.1f %s".format(value, units[unitIndex])
 }
 
+/** A rough ETA from remaining bytes ÷ current speed — same "estimate, not a promise" spirit as
+ * yt-dlp/gallery-dl's own terminal ETA, which also jumps around as speed fluctuates rather than
+ * settling into a smooth countdown. Caller is expected to only call this with a positive value. */
+fun formatEta(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return if (m > 0) "${m}m ${s}s left" else "${s}s left"
+}
+
+/** A small tinted pill for a queue card's site badge/format tags — a plain icon+text label read
+ * as an afterthought floating in mostly-empty card space, not a deliberate piece of the layout. */
+@Composable
+fun InfoPill(content: @Composable () -> Unit) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            content = { content() },
+        )
+    }
+}
+
 @Composable
 fun EmptyState(
     icon: ImageVector,
