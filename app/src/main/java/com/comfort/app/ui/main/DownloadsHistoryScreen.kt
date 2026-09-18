@@ -338,6 +338,30 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
+                            // Favorites and the Grid/List toggle moved up here from the scrollable
+                            // chip row below — they're both view-changing controls someone reaches
+                            // for on every visit, not situational filters like Deleted/Duplicates/
+                            // Audio, so they earn a fixed spot in the header instead of living
+                            // wherever the chip row's horizontal scroll happens to leave them.
+                            IconToggleButton(checked = favoritesOnly, onCheckedChange = {
+                                favoritesOnly = it
+                                if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false }
+                            }) {
+                                Icon(
+                                    FeatherIcons.Star,
+                                    contentDescription = "Favorites only",
+                                    tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(onClick = {
+                                gridView = !gridView
+                                GalleryDlPreferences.setLibraryGridView(context, gridView)
+                            }) {
+                                Icon(
+                                    if (gridView) FeatherIcons.List else FeatherIcons.Grid,
+                                    contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
+                                )
+                            }
                             IconButton(onClick = onOpenQueue) {
                                 if (hasActiveDownloads) {
                                     BadgedBox(
@@ -419,15 +443,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 }
                             }
                             LibraryToolbarChip(
-                                icon = FeatherIcons.Star,
-                                label = "Favorites",
-                                active = favoritesOnly,
-                                onClick = {
-                                    favoritesOnly = !favoritesOnly
-                                    if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false }
-                                },
-                            )
-                            LibraryToolbarChip(
                                 icon = FeatherIcons.Trash2,
                                 label = "Deleted",
                                 active = showDeletedOnly,
@@ -453,14 +468,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 onClick = {
                                     audioOnly = !audioOnly
                                     if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
-                                },
-                            )
-                            LibraryToolbarChip(
-                                icon = if (gridView) FeatherIcons.List else FeatherIcons.Grid,
-                                label = if (gridView) "List" else "Grid",
-                                onClick = {
-                                    gridView = !gridView
-                                    GalleryDlPreferences.setLibraryGridView(context, gridView)
                                 },
                             )
                         }
