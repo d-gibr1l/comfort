@@ -58,8 +58,9 @@ import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.PreviewInfo
 import com.comfort.app.util.TrackPreview
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -896,7 +897,7 @@ private fun PreviewChip(
     onClick: () -> Unit,
 ) {
     val leading = when {
-        selected -> FeatherIcons.Check
+        selected -> Icons.Outlined.Check
         else -> icon
     }
     FilterChip(
@@ -1046,7 +1047,7 @@ private fun MainPreviewScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
-                Icon(FeatherIcons.Copy, contentDescription = "Copy link")
+                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy link")
             }
             // Only SONG_LIST has a selection to toggle — the control TrackListHeader used to
             // provide before it was removed, moved here so it survives without needing its own
@@ -1057,7 +1058,7 @@ private fun MainPreviewScreen(
                 }
             }
             FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
-                Icon(FeatherIcons.XCircle, contentDescription = "Cancel")
+                Icon(Icons.Outlined.HighlightOff, contentDescription = "Cancel")
             }
         }
 
@@ -1154,14 +1155,14 @@ private fun MainPreviewScreen(
                         PreviewChip(
                             label = "Save thumbnail",
                             selected = saveThumbnail,
-                            icon = FeatherIcons.Image,
+                            icon = Icons.Outlined.Image,
                             shape = FIRST_CHIP_SHAPE,
                             onClick = onToggleSaveThumbnail,
                         )
                         PreviewChip(
                             label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
                             selected = commandCount > 0,
-                            icon = FeatherIcons.Terminal,
+                            icon = Icons.Outlined.Terminal,
                             shape = LAST_CHIP_SHAPE,
                             onClick = onOpenCommands,
                         )
@@ -1183,21 +1184,21 @@ private fun MainPreviewScreen(
                             PreviewChip(
                                 label = "Trim Video",
                                 selected = trimmed,
-                                icon = FeatherIcons.Scissors,
+                                icon = Icons.Outlined.ContentCut,
                                 shape = FIRST_CHIP_SHAPE,
                                 onClick = onOpenTrim,
                             )
                         }
                         PreviewChip(
                             label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
-                            icon = FeatherIcons.Film,
+                            icon = Icons.Outlined.Movie,
                             shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
                             onClick = onToggleFormat,
                         )
                         PreviewChip(
                             label = "Filename Templates.",
                             selected = filenameTemplate != null,
-                            icon = FeatherIcons.Tag,
+                            icon = Icons.Outlined.Tag,
                             shape = LAST_CHIP_SHAPE,
                             onClick = onOpenTemplates,
                         )
@@ -1216,21 +1217,21 @@ private fun MainPreviewScreen(
                         PreviewChip(
                             label = "Save cover art",
                             selected = saveThumbnail,
-                            icon = FeatherIcons.Image,
+                            icon = Icons.Outlined.Image,
                             shape = FIRST_CHIP_SHAPE,
                             onClick = onToggleSaveThumbnail,
                         )
                         PreviewChip(
                             label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
                             selected = commandCount > 0,
-                            icon = FeatherIcons.Terminal,
+                            icon = Icons.Outlined.Terminal,
                             shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenCommands,
                         )
                         PreviewChip(
                             label = "Filename Templates.",
                             selected = filenameTemplate != null,
-                            icon = FeatherIcons.Tag,
+                            icon = Icons.Outlined.Tag,
                             shape = LAST_CHIP_SHAPE,
                             onClick = onOpenTemplates,
                         )
@@ -1254,7 +1255,7 @@ private fun MainPreviewScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp).height(56.dp),
             shape = MaterialTheme.shapes.extraLarge,
         ) {
-            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
             // only after tapping — replaces the old flow where this always said "Download" and a
@@ -1300,7 +1301,7 @@ private fun VideoPreviewCard(
                     )
                 } else if (!loading) {
                     Icon(
-                        FeatherIcons.Image,
+                        Icons.Outlined.Image,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(40.dp),
@@ -1390,7 +1391,7 @@ private fun SongPreviewCard(
                 )
             } else if (!loading) {
                 Icon(
-                    FeatherIcons.Music,
+                    Icons.Outlined.MusicNote,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(40.dp).align(Alignment.Center),
@@ -1507,7 +1508,7 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
                 )
             } else {
                 Icon(
-                    FeatherIcons.Music,
+                    Icons.Outlined.MusicNote,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(24.dp),
@@ -1695,7 +1696,7 @@ private fun ExtraCommandsScreen(
                 onClick = onCopy,
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(FeatherIcons.Copy, contentDescription = "Copy current command")
+                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy current command")
             }
         }
 
@@ -1725,7 +1726,7 @@ private fun ExtraCommandsScreen(
             onValueChange = { input = it },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             placeholder = { Text("Add Command") },
-            leadingIcon = { Icon(FeatherIcons.Terminal, contentDescription = null) },
+            leadingIcon = { Icon(Icons.Outlined.Terminal, contentDescription = null) },
             trailingIcon = {
                 Box(modifier = Modifier.padding(end = 8.dp)) {
                     PreviewChip(label = "Add", onClick = { add() })
@@ -2118,7 +2119,7 @@ private fun TrimVideoScreen(
                     },
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Icon(FeatherIcons.Trash2, contentDescription = "Delete segment")
+                    Icon(Icons.Outlined.Delete, contentDescription = "Delete segment")
                 }
             }
             ChipRow(modifier = Modifier.weight(1f)) {
@@ -2203,7 +2204,7 @@ private fun FilenameTemplatesScreen(
             onValueChange = { input = it; message = null },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Add FileName template") },
-            leadingIcon = { Icon(FeatherIcons.Tag, contentDescription = null) },
+            leadingIcon = { Icon(Icons.Outlined.Tag, contentDescription = null) },
             singleLine = true,
             shape = MaterialTheme.shapes.medium,
             supportingText = message?.let { { Text(it) } },
@@ -2266,7 +2267,7 @@ private fun ViewTemplatesScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
             }
             Text("Saved templates", style = MaterialTheme.typography.titleMedium)
         }
@@ -2318,7 +2319,7 @@ private fun ViewTemplatesScreen(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    FeatherIcons.Trash2,
+                                    Icons.Outlined.Delete,
                                     contentDescription = "Delete template",
                                     modifier = Modifier.size(18.dp)
                                 )

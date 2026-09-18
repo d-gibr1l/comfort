@@ -41,8 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import com.comfort.app.viewmodel.DownloadsViewModel
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
@@ -241,7 +242,7 @@ fun QueueScreen(
             if (retryAllStatus != null && filteredItems.isNotEmpty()) {
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.retryAll(retryAllStatus) },
-                    icon = { Icon(FeatherIcons.RefreshCw, contentDescription = null) },
+                    icon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
                     text = { Text("Retry All") },
                 )
             } else if (hasActiveDownload || hasPausedDownload || isGloballyPaused) {
@@ -255,7 +256,7 @@ fun QueueScreen(
                     onClick = { if (showResumeAction) viewModel.resumeAll() else viewModel.pauseAll() },
                     icon = {
                         Icon(
-                            if (showResumeAction) FeatherIcons.Play else FeatherIcons.Pause,
+                            if (showResumeAction) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
                             contentDescription = null,
                         )
                     },
@@ -269,7 +270,7 @@ fun QueueScreen(
                     title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { selectedIds = emptySet() }) {
-                            Icon(FeatherIcons.X, contentDescription = "Cancel selection")
+                            Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
                         }
                     },
                     actions = {
@@ -281,7 +282,7 @@ fun QueueScreen(
                             selectedIds = if (allSelected) emptySet() else filteredItems.map { it.id }.toSet()
                         }) {
                             Icon(
-                                if (allSelected) FeatherIcons.XSquare else FeatherIcons.CheckSquare,
+                                if (allSelected) Icons.Outlined.Cancel else Icons.Outlined.CheckBox,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -296,7 +297,7 @@ fun QueueScreen(
                             requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "Delete selected")
+                            Icon(Icons.Outlined.Delete, contentDescription = "Delete selected")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -309,7 +310,7 @@ fun QueueScreen(
                     title = { Text("Download Queue", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -414,7 +415,7 @@ fun QueueScreen(
                     else -> "No downloads in queue" to "Paste a link on Home to start one."
                 }
                 EmptyState(
-                    icon = FeatherIcons.Inbox,
+                    icon = Icons.Outlined.Inbox,
                     title = emptyTitle,
                     subtitle = emptySubtitle,
                     // weight(1f): without it, this Column child requests the Column's full height
@@ -516,7 +517,7 @@ fun QueueScreen(
                                             .padding(horizontal = 24.dp),
                                         contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
                                     ) {
-                                        Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                                        Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
                                     }
                                 },
                             ) {
@@ -562,7 +563,7 @@ private fun QueueThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) 
         error = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Icon(
-                    FeatherIcons.Image,
+                    Icons.Outlined.Image,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.size(26.dp),
@@ -604,7 +605,7 @@ private fun SelectableThumbnail(
             ) {
                 if (selected) {
                     Icon(
-                        FeatherIcons.Check,
+                        Icons.Outlined.Check,
                         contentDescription = "Selected",
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(13.dp),
@@ -663,7 +664,7 @@ private fun StoppedRow(
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
-                            FeatherIcons.Image,
+                            Icons.Outlined.Image,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             modifier = Modifier.size(26.dp),
@@ -695,7 +696,7 @@ private fun StoppedRow(
             val sdf = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    if (isPaused) FeatherIcons.Pause else FeatherIcons.X,
+                    if (isPaused) Icons.Outlined.Pause else Icons.Outlined.Close,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(13.dp),
@@ -711,16 +712,16 @@ private fun StoppedRow(
 
             if (!selectionMode) {
                 IconButton(onClick = onResume) {
-                    Icon(FeatherIcons.Play, contentDescription = "Resume")
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = "Resume")
                 }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(FeatherIcons.MoreVertical, contentDescription = "More options")
+                        Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
                             text = { Text("Copy link") },
-                            leadingIcon = { Icon(FeatherIcons.Copy, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
                             onClick = {
                                 menuExpanded = false
                                 scope.launch {
@@ -731,7 +732,7 @@ private fun StoppedRow(
                         )
                         DropdownMenuItem(
                             text = { Text("Remove") },
-                            leadingIcon = { Icon(FeatherIcons.Trash2, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                             onClick = { menuExpanded = false; onDelete() },
                         )
                     }
@@ -818,10 +819,10 @@ fun QueueItemCard(
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             val icon = when (item.status) {
-                                DownloadStatus.ERRORED -> FeatherIcons.AlertTriangle
-                                DownloadStatus.QUEUED -> FeatherIcons.Clock
-                                DownloadStatus.SCHEDULED -> FeatherIcons.Calendar
-                                else -> FeatherIcons.DownloadCloud
+                                DownloadStatus.ERRORED -> Icons.Outlined.Warning
+                                DownloadStatus.QUEUED -> Icons.Outlined.Schedule
+                                DownloadStatus.SCHEDULED -> Icons.Outlined.CalendarMonth
+                                else -> Icons.Outlined.CloudDownload
                             }
                             val tint = if (isErrored) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                             Icon(icon, contentDescription = null, tint = tint)
@@ -880,7 +881,7 @@ fun QueueItemCard(
                     // of leaving the user watching a stalled progress bar with no explanation.
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
                         Icon(
-                            FeatherIcons.WifiOff,
+                            Icons.Outlined.WifiOff,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(14.dp),
@@ -1024,7 +1025,7 @@ fun QueueItemCard(
                     ) {
                         InfoPill {
                             Icon(
-                                FeatherIcons.Globe,
+                                Icons.Outlined.Public,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(13.dp),
@@ -1078,7 +1079,7 @@ fun QueueItemCard(
                     // against a Wi-Fi network that was connected but never validated by the OS.
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            FeatherIcons.WifiOff,
+                            Icons.Outlined.WifiOff,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(14.dp),
@@ -1147,7 +1148,7 @@ fun QueueItemCard(
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                 ),
                             ) {
-                                Icon(FeatherIcons.Pause, contentDescription = "Pause", modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.Pause, contentDescription = "Pause", modifier = Modifier.size(18.dp))
                             }
                             FilledTonalIconButton(
                                 onClick = onCancel,
@@ -1157,16 +1158,16 @@ fun QueueItemCard(
                                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
                                 ),
                             ) {
-                                Icon(FeatherIcons.X, contentDescription = "Cancel", modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.Close, contentDescription = "Cancel", modifier = Modifier.size(18.dp))
                             }
                         }
                         DownloadStatus.ERRORED -> {
                             IconButton(onClick = onShowError) {
-                                Icon(FeatherIcons.Info, contentDescription = "Error details")
+                                Icon(Icons.Outlined.Info, contentDescription = "Error details")
                             }
                             if (isCookieRelatedError(item.errorMessage)) {
                                 TextButton(onClick = onAddCookies) {
-                                    Icon(FeatherIcons.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
                                     Text("Add cookies")
                                 }
@@ -1180,20 +1181,20 @@ fun QueueItemCard(
                                     Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
                                 }
                             }) {
-                                Icon(FeatherIcons.Copy, contentDescription = "Copy link")
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy link")
                             }
                             IconButton(onClick = onDelete) {
-                                Icon(FeatherIcons.Trash2, contentDescription = "Remove")
+                                Icon(Icons.Outlined.Delete, contentDescription = "Remove")
                             }
                         }
                         DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
                             TextButton(onClick = onStartNow) {
-                                Icon(FeatherIcons.Zap, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text("Start now")
                             }
                             IconButton(onClick = onCancel) {
-                                Icon(FeatherIcons.X, contentDescription = "Cancel")
+                                Icon(Icons.Outlined.Close, contentDescription = "Cancel")
                             }
                         }
                         else -> {}
@@ -1218,7 +1219,7 @@ private fun ErrorDetailsSheet(
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
-                    FeatherIcons.AlertTriangle,
+                    Icons.Outlined.Warning,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(22.dp).padding(top = 2.dp),

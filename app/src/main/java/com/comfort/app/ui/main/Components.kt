@@ -42,10 +42,9 @@ import androidx.compose.ui.unit.dp
 import com.comfort.app.R
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.AlertTriangle
-import compose.icons.feathericons.CheckCircle
-import compose.icons.feathericons.X
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.launch
 
 /** A finished/failed-download toast's own [SnackbarVisuals] — [isSuccess] is read back out in
@@ -97,7 +96,7 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        if (isSuccess) FeatherIcons.CheckCircle else FeatherIcons.AlertTriangle,
+                        if (isSuccess) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = onAccent,
@@ -135,7 +134,7 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                 }
                 IconButton(onClick = { data.dismiss() }, modifier = Modifier.size(32.dp)) {
                     Icon(
-                        FeatherIcons.X,
+                        Icons.Outlined.Close,
                         contentDescription = "Dismiss",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
