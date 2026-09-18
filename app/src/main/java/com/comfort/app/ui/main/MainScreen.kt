@@ -125,6 +125,9 @@ fun navBarClearance(): Dp = NAV_BAR_RESERVED_HEIGHT + WindowInsets.navigationBar
 fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
+    // Owned here, not inside DownloadsHistoryScreen's own Scaffold — see that screen's own
+    // snackbarHostState parameter doc comment for why (it drew behind FloatingNavBar otherwise).
+    val librarySnackbarHostState = remember { SnackbarHostState() }
     // A download-in-progress notification tap bumps this (MainActivity.openQueueSignal) — jump
     // straight to Queue regardless of which tab was showing. Keyed on the signal itself (not
     // Unit) so a second tap while already on Queue still re-triggers this instead of being a no-op
@@ -262,6 +265,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     viewModel = viewModel,
                     onOpenQueue = { showQueueScreen = true },
                     isQueueOpen = showQueueScreen,
+                    snackbarHostState = librarySnackbarHostState,
                 )
                 2 -> MoreScreen(
                     route = settingsRoute,
@@ -292,6 +296,19 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter),
+        )
+
+        // Composed after FloatingNavBar (draws on top of it) and inset by the same
+        // navBarClearance() the FAB below already uses to clear the pill — otherwise this
+        // renders invisibly empty until Library's "Download removed" Undo snackbar actually
+        // fires, same as SnackbarHost always does when it has nothing queued.
+        // DownloadEventSnackbarHost (Components.kt), not the plain default SnackbarHost — same
+        // themed surfaceContainerHigh card + accent Undo button QueueScreen's own equivalent
+        // delete-undo Snackbar already uses, instead of Material's flat default bar this one
+        // still had, unthemed against the rest of the app.
+        DownloadEventSnackbarHost(
+            librarySnackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance()),
         )
 
         // Rendered on top of (not instead of) the tab content above, specifically so the tab

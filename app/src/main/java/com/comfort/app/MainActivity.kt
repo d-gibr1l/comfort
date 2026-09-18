@@ -29,6 +29,7 @@ import com.comfort.app.theme.LocalThemeState
 import com.comfort.app.theme.ThemePreferences
 import com.comfort.app.theme.ThemeState
 import com.comfort.app.data.DownloadDispatcher
+import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.util.AppImageLoader
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -86,6 +87,12 @@ class MainActivity : ComponentActivity() {
     }
 
     AppImageLoader.install(applicationContext)
+    // Re-applies the stored Sharing mode's side effect (enabling/disabling the Sharesheet's
+    // "Instant" alias component — see GalleryDlPreferences.setShareMode's own doc comment) on
+    // every launch, not just when the user actively changes the setting — component-enabled
+    // state can silently reset to the manifest default across a reinstall/update, and there's no
+    // other hook that would ever re-sync it otherwise.
+    GalleryDlPreferences.setShareMode(applicationContext, GalleryDlPreferences.getShareMode(applicationContext))
 
     setContent {
       val notificationPermissionLauncher = rememberLauncherForActivityResult(
