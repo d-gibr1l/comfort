@@ -430,6 +430,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     icon = Icons.Outlined.Tune,
                                     label = "Sort",
                                     onClick = { sortMenuExpanded = true },
+                                    shape = groupedChipShape(0, 4),
                                 )
                                 DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
                                     LibrarySort.entries.forEach { option ->
@@ -451,6 +452,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     showDeletedOnly = !showDeletedOnly
                                     if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false; audioOnly = false }
                                 },
+                                shape = groupedChipShape(1, 4),
                             )
                             LibraryToolbarChip(
                                 icon = Icons.Outlined.ContentCopy,
@@ -461,6 +463,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     showDuplicatesOnly = !showDuplicatesOnly
                                     if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false; audioOnly = false }
                                 },
+                                shape = groupedChipShape(2, 4),
                             )
                             LibraryToolbarChip(
                                 icon = Icons.Outlined.MusicNote,
@@ -470,6 +473,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     audioOnly = !audioOnly
                                     if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
                                 },
+                                shape = groupedChipShape(3, 4),
                             )
                         }
                     }
@@ -845,6 +849,10 @@ private fun LibraryToolbarChip(
     // (and FloatingNavBar's own Settings-tab dot), not a "(N)" suffix on the label text, so a
     // count on any icon in this app always looks like the same one thing.
     count: Int? = null,
+    // Same connected-group treatment as the Queue card's Pause/Cancel chips: the caller passes
+    // its own position in the row via groupedChipShape so the row's outer ends land fully
+    // rounded and the chips facing each other get the tighter shared corner.
+    shape: Shape = MaterialTheme.shapes.large,
 ) {
     // Badge sits on the whole chip's own top-right corner (not the icon inside it — tried that
     // first, reported live as reading like it belonged to the icon rather than as a count on the
@@ -870,7 +878,7 @@ private fun LibraryToolbarChip(
             selected = active,
             onClick = onClick,
             modifier = Modifier.onSizeChanged { chipWidthPx = it.width },
-            shape = MaterialTheme.shapes.large,
+            shape = shape,
             leadingIcon = {
                 // better-interface review: this icon's contentDescription duplicated the visible
                 // Text right next to it inside one clickable (merged-semantics) row — decorative
