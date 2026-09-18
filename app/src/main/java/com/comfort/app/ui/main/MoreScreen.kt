@@ -2143,6 +2143,10 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
     // straight from their own onClick, so neither can wipe a saved login from one stray tap with no
     // way back.
     var pendingDelete by remember { mutableStateOf<PendingCookieDelete?>(null) }
+    // The per-site "use these cookies" toggle's own state — kept and used just like the real
+    // save file above (read once, mutated in place, never re-read from disk mid-screen) since
+    // this is the only place in the app that changes it.
+    var disabledDomains by remember { mutableStateOf(GalleryDlPreferences.getDisabledCookieDomains(context)) }
 
     fun persist(content: String) {
         sharedPreferences.edit().putString(GalleryDlPreferences.KEY_COOKIES, content).apply()
@@ -2314,10 +2318,26 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 )
             } else {
                 cookieSites.forEachIndexed { index, site ->
+                    val enabled = site.rootDomain !in disabledDomains
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        // Actions moved to the lead position, ahead of the label — the toggle at
+                        // the far end is the one control a user is likely to reach for repeatedly
+                        // per site, so it keeps the same, predictable trailing spot every switch-
+                        // style row in this app already uses; copy/delete are the occasional ones.
+                        IconButton(onClick = {
+                            val text = site.cookies.joinToString("\n") { it.rawLine }
+                            scope.launch {
+                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
+                            }
+                        }) {
+                            Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = { pendingDelete = PendingCookieDelete.Site(site) }) {
+                            Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                        }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 site.label,
@@ -2335,17 +2355,18 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        IconButton(onClick = {
-                            val text = site.cookies.joinToString("\n") { it.rawLine }
-                            scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
-                            }
-                        }) {
-                            Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(onClick = { pendingDelete = PendingCookieDelete.Site(site) }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                        }
+                        // Kept, not deleted — a saved login the user just doesn't want *sent* right
+                        // now (a stale account, testing anonymous behavior, ...) without losing it
+                        // outright. Filters this site's cookies out of every download/preview from
+                        // here on (see GalleryDlPreferences.filterCookiesByDisabledDomains and its
+                        // call sites in DownloadWorker.kt/GalleryDlListing.kt) until switched back.
+                        Switch(
+                            checked = enabled,
+                            onCheckedChange = { checked ->
+                                GalleryDlPreferences.setCookieDomainEnabled(context, site.rootDomain, checked)
+                                disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
+                            },
+                        )
                     }
                     if (index != cookieSites.lastIndex) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -2526,6 +2547,11 @@ private fun parseCookiesFile(content: String): List<ParsedCookie> {
  * [soonestExpiryEpochSeconds]), while the row itself only ever shows [label] and a count. */
 private data class SiteCookies(
     val label: String,
+    // The raw registrable domain (e.g. "reddit.com"), distinct from [label] ("Reddit") — used as
+    // the stable key for the per-site "use these cookies" toggle (GalleryDlPreferences' own
+    // disabled-domains set), since a human-readable label is derived/cosmetic and shouldn't be
+    // relied on as a persisted identity.
+    val rootDomain: String,
     val cookies: List<ParsedCookie>,
 ) {
     // The soonest of the group's own expiries is what actually determines when this login first
@@ -2554,7 +2580,7 @@ private fun groupCookiesBySite(cookies: List<ParsedCookie>): List<SiteCookies> {
             val labelParts = bare.split(".")
             if (labelParts.size <= 2) bare else labelParts.takeLast(2).joinToString(".")
         }
-        .map { (rootDomain, group) -> SiteCookies(label = VideoSiteRouter.siteName("https://$rootDomain"), cookies = group) }
+        .map { (rootDomain, group) -> SiteCookies(label = VideoSiteRouter.siteName("https://$rootDomain"), rootDomain = rootDomain, cookies = group) }
         .sortedBy { it.label.lowercase() }
 }
 

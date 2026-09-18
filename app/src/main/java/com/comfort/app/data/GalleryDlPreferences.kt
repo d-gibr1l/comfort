@@ -71,6 +71,7 @@ object GalleryDlPreferences {
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
+    const val KEY_DISABLED_COOKIE_DOMAINS = "disabled_cookie_domains"
     const val KEY_EMBED_THUMBNAIL = "embed_thumbnail"
     const val KEY_EMBED_METADATA = "embed_metadata"
     const val KEY_WRITE_INFO_FILES = "write_info_files"
@@ -459,6 +460,43 @@ object GalleryDlPreferences {
 
     fun setSubtitleLanguages(context: Context, languages: String) {
         prefs(context).edit().putString(KEY_SUBTITLE_LANGUAGES, languages.trim()).apply()
+    }
+
+    /** Registrable domains (e.g. "reddit.com" — same grouping key the Cookies & Login screen's
+     * own per-site rows use) whose saved cookies exist but shouldn't actually be sent — the
+     * per-site toggle there. Comma-separated string, same convention as [getSubtitleLanguages],
+     * rather than a StringSet (SharedPreferences' own StringSet requires a defensive copy before
+     * every mutation or edits silently alias the same underlying Set — not worth it for a value
+     * this small and infrequently changed). */
+    fun getDisabledCookieDomains(context: Context): Set<String> {
+        return (prefs(context).getString(KEY_DISABLED_COOKIE_DOMAINS, "") ?: "")
+            .split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setCookieDomainEnabled(context: Context, domain: String, enabled: Boolean) {
+        val current = getDisabledCookieDomains(context).toMutableSet()
+        if (enabled) current.remove(domain) else current.add(domain)
+        prefs(context).edit().putString(KEY_DISABLED_COOKIE_DOMAINS, current.joinToString(",")).apply()
+    }
+
+    /** Filters raw Netscape cookies.txt content down to only the domains NOT in [disabledDomains]
+     * — same registrable-domain extraction (last two dot-separated labels of a cookie's own
+     * domain field, minus any leading ".") the Cookies & Login screen's own per-site grouping
+     * uses for its rows, kept here rather than imported from the UI since this is a plain data
+     * transform DownloadWorker needs at download time, not a UI concern. Comment lines and
+     * anything that doesn't look like a real cookie row pass through untouched. */
+    fun filterCookiesByDisabledDomains(content: String, disabledDomains: Set<String>): String {
+        if (disabledDomains.isEmpty()) return content
+        return content.lineSequence().filter { rawLine ->
+            val trimmed = rawLine.trimEnd('\r')
+            val dataLine = trimmed.removePrefix("#HttpOnly_")
+            if (trimmed.isBlank() || (dataLine.startsWith("#") && dataLine == trimmed)) return@filter true
+            val domainField = dataLine.split(Regex("\\s+")).firstOrNull() ?: return@filter true
+            val bare = domainField.removePrefix(".")
+            val parts = bare.split(".")
+            val registrable = if (parts.size <= 2) bare else parts.takeLast(2).joinToString(".")
+            registrable !in disabledDomains
+        }.joinToString("\n")
     }
 
     fun isEmbedThumbnail(context: Context): Boolean {
