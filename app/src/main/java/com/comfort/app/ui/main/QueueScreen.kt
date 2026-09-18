@@ -1155,7 +1155,7 @@ fun QueueItemCard(
                                     labelColor = MaterialTheme.colorScheme.onSurface,
                                     leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
                                 ),
-                                leadingIcon = { Icon(Icons.Outlined.Pause, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                leadingIcon = { Icon(Icons.Outlined.PausePresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                 label = { Text("Pause", style = MaterialTheme.typography.labelLarge) },
                             )
                             AssistChip(
@@ -1169,7 +1169,7 @@ fun QueueItemCard(
                                     labelColor = MaterialTheme.colorScheme.error,
                                     leadingIconContentColor = MaterialTheme.colorScheme.error,
                                 ),
-                                leadingIcon = { Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                leadingIcon = { Icon(Icons.Outlined.CancelPresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                 label = { Text("Cancel", style = MaterialTheme.typography.labelLarge) },
                             )
                         }
