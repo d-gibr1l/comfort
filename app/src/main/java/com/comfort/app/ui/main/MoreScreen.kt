@@ -358,7 +358,11 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
 fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: String = "Search", modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth().height(56.dp),
-        shape = RoundedCornerShape(28.dp),
+        // A percentage shape, not a fixed 28dp — 28dp only reads as a true pill (MD3's "full"
+        // token) because it happens to equal exactly half of this bar's own 56dp height; tied to
+        // a literal dp value, it'd stop being a pill the moment this bar's height ever changed.
+        // RoundedCornerShape(50) is always exactly half of whatever height it's actually given.
+        shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -404,8 +408,13 @@ private class SettingsItemSpec(
         query.isBlank() || title.contains(query, ignoreCase = true) || summary.contains(query, ignoreCase = true)
 }
 
-// The M3 Expressive "list group" shape treatment: 3dp gaps between items, 28dp on the group's
-// outer top/bottom corners, 8dp on the corners items share with their neighbor.
+// The M3 Expressive "list group" shape treatment: 3dp gaps between items, extra-large (28dp) on
+// the group's outer top/bottom corners, small (8dp) on the corners items share with their
+// neighbor. These match MaterialTheme.shapes.extraLarge/.small's own corner values exactly (not
+// arbitrary numbers) — kept as literals rather than pulled from those Shape objects since
+// RoundedCornerShape's own per-corner constructor takes plain Dp, not a CornerSize/Shape, and
+// there's no clean way to mix "this corner from shapes.extraLarge, that one from shapes.small"
+// otherwise.
 private fun expressiveListItemShape(index: Int, count: Int): RoundedCornerShape {
     val outer = 28.dp
     val inner = 8.dp
@@ -476,7 +485,11 @@ private fun SettingsListRow(
             ) {
                 Icon(icon, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(24.dp))
             }
-            Spacer(Modifier.width(14.dp))
+            // 16dp, not 14dp — MD3's spacing system is built on an 8dp grid. Fixed once here
+            // rather than everywhere it recurs across this file: every settings row on every
+            // subpage renders through this one shared row, so this is the single highest-leverage
+            // spacing fix available.
+            Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, color = onContainerColor, fontWeight = FontWeight.SemiBold)
                 if (summary != null) {
@@ -2323,18 +2336,9 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Actions moved to the lead position, ahead of the label — the toggle at
-                        // the far end is the one control a user is likely to reach for repeatedly
-                        // per site, so it keeps the same, predictable trailing spot every switch-
-                        // style row in this app already uses; copy/delete are the occasional ones.
-                        IconButton(onClick = {
-                            val text = site.cookies.joinToString("\n") { it.rawLine }
-                            scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
-                            }
-                        }) {
-                            Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
-                        }
+                        // Delete stays at the lead position; Copy moved to sit right beside the
+                        // toggle at the trailing end instead, next to the one other cookie-related
+                        // action a user might reach for around the same time as flipping the switch.
                         IconButton(onClick = { pendingDelete = PendingCookieDelete.Site(site) }) {
                             Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
@@ -2354,6 +2358,14 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                        IconButton(onClick = {
+                            val text = site.cookies.joinToString("\n") { it.rawLine }
+                            scope.launch {
+                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
+                            }
+                        }) {
+                            Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
                         }
                         // Kept, not deleted — a saved login the user just doesn't want *sent* right
                         // now (a stale account, testing anonymous behavior, ...) without losing it
@@ -2645,7 +2657,9 @@ fun CookieLoginDialog(
                         onValueChange = { addressBarText = it },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                        // shapes.small (8dp) — the spec's own text-field token; 24dp matched
+                        // nothing on the shape scale.
+                        shape = MaterialTheme.shapes.small,
                         trailingIcon = {
                             IconButton(onClick = {
                                 val target = normalizeBrowserAddress(addressBarText)

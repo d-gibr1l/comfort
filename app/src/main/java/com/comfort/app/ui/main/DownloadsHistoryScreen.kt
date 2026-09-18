@@ -838,19 +838,9 @@ private fun LibraryToolbarChip(
     // count on any icon in this app always looks like the same one thing.
     count: Int? = null,
 ) {
-    val bg by animateColorAsState(
-        targetValue = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = tween(200),
-        label = "chipBg",
-    )
-    val tint by animateColorAsState(
-        targetValue = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = tween(200),
-        label = "chipTint",
-    )
-    // Badge sits on the whole pill's own top-right corner (not the icon inside it — tried that
+    // Badge sits on the whole chip's own top-right corner (not the icon inside it — tried that
     // first, reported live as reading like it belonged to the icon rather than as a count on the
-    // chip itself) — an outer Box wrapping the real chip Row plus the badge as its own sibling,
+    // chip itself) — an outer Box wrapping the real FilterChip plus the badge as its own sibling,
     // so [modifier] (whatever a caller passes — e.g. the Sort chip's own wrapping Box for its
     // DropdownMenu) still sizes/positions the *whole* chip+badge unit as one thing.
     //
@@ -864,23 +854,33 @@ private fun LibraryToolbarChip(
     var chipWidthPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
     Box(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .onSizeChanged { chipWidthPx = it.width }
-                .clip(MaterialTheme.shapes.large)
-                .background(bg)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // better-interface review: this icon's contentDescription duplicated the visible Text
-            // right next to it inside one clickable (merged-semantics) row — decorative next to
-            // real text, so null here, not a repeat of the same name TalkBack already gets from
-            // the Text.
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium, color = tint, fontWeight = FontWeight.Medium)
-        }
+        // A real FilterChip instead of a hand-rolled Row+clip+background+clickable — same tokens,
+        // same animated color transition (FilterChip animates its own colors on selection change
+        // internally), but now with the chip API's own accessibility semantics, minimum touch
+        // target, and selected-state contract for free instead of reimplementing them.
+        FilterChip(
+            selected = active,
+            onClick = onClick,
+            modifier = Modifier.onSizeChanged { chipWidthPx = it.width },
+            shape = MaterialTheme.shapes.large,
+            leadingIcon = {
+                // better-interface review: this icon's contentDescription duplicated the visible
+                // Text right next to it inside one clickable (merged-semantics) row — decorative
+                // next to real text, so null here, not a repeat of the same name TalkBack already
+                // gets from the label.
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            },
+            label = { Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium) },
+            colors = FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ),
+            border = null,
+        )
         if (count != null && count > 0 && chipWidthPx > 0) {
             Badge(
                 containerColor = MaterialTheme.colorScheme.error,
@@ -909,7 +909,10 @@ private fun HistoryGridItem(
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(12.dp))
+            // shapes.medium (12dp token) — same value as before, now tied to the theme's own
+            // shape scale instead of a magic number that would silently drift out of sync with
+            // it if the app's shape theme is ever customized.
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .combinedClickable(
                 onClick = {
@@ -1069,7 +1072,14 @@ private fun HistoryRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.background)
+            // "background" is the top-level scaffold/page role, not a role for a row sitting on
+            // top of it as its own distinct surface — this row now reads as a real MD3 surface
+            // (surfaceContainer, same tone the Queue screen's own cards use) instead of blending
+            // into the page. The selected state used an alpha-blended primaryContainer, which
+            // breaks the tonal-pairing contract other content on this row (onSurface title text,
+            // not onPrimaryContainer) assumes a fully-opaque container guarantees — full-opacity
+            // primaryContainer instead.
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
             .combinedClickable(
                 onClick = {
                     if (selectionMode) {
@@ -1099,15 +1109,17 @@ private fun HistoryRow(
                 },
                 onLongClick = onLongPress,
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            // 8dp, not 10dp — MD3's spacing system is built on an 8dp grid.
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.size(76.dp)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                    // shapes.large (16dp) — 14dp was a magic number matching no real shape token.
+                    .clip(MaterialTheme.shapes.large)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 if (hasThumbnail) {
                     AsyncImage(
@@ -1176,7 +1188,8 @@ private fun HistoryRow(
             }
         }
 
-        Spacer(Modifier.width(14.dp))
+        // 16dp, not 14dp — same 8dp-grid reasoning as the padding above.
+        Spacer(Modifier.width(16.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(

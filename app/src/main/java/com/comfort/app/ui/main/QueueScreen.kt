@@ -764,13 +764,16 @@ fun QueueItemCard(
     // unconditionally. Flattening amplitude to 0 under reduced motion keeps the progress *level*
     // itself moving (functional feedback, not decorative) while dropping the continuous undulation.
     val reducedMotion = rememberIsReducedMotionEnabled()
-    ElevatedCard(
+    // Plain Card, not ElevatedCard-with-elevation-zeroed-out — MD3 communicates elevation
+    // through tonal surface color (surfaceContainer below), not shadow; choosing the Elevated
+    // variant only to strip its own elevation back to 0dp was self-contradictory. shapes.medium
+    // (12dp) is the spec's own card token — shapes.large (16dp) is for FABs/nav drawers.
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.elevatedCardColors(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -789,10 +792,21 @@ fun QueueItemCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // shapes.small (8dp token) instead of a hardcoded RoundedCornerShape(8.dp) — same
+                // radius, but tied to the theme's own shape scale instead of a magic number.
+                // Container/icon now pair correctly per MD3's tonal-pairing rule (errorContainer +
+                // onErrorContainer for ERRORED, same as the Cancel button below; primaryContainer +
+                // onPrimaryContainer otherwise) — previously the background stayed primaryContainer
+                // unconditionally while only the icon switched to the bare (unpaired) error color,
+                // an arbitrary combination the spec explicitly calls out as breaking contrast
+                // guarantees in dynamic color and high-contrast modes.
+                val isErrored = item.status == DownloadStatus.ERRORED
                 SelectableThumbnail(
                     selectionMode = selectionMode,
                     selected = selected,
-                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier.size(40.dp).clip(MaterialTheme.shapes.small).background(
+                        if (isErrored) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+                    ),
                 ) {
                     // A RUNNING download gets a thumbnail as soon as yt-dlp's extractor picks one
                     // (a remote preview URL, well before any bytes land — see DownloadWorker's
@@ -809,13 +823,15 @@ fun QueueItemCard(
                                 DownloadStatus.SCHEDULED -> FeatherIcons.Calendar
                                 else -> FeatherIcons.DownloadCloud
                             }
-                            val tint = if (item.status == DownloadStatus.ERRORED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            val tint = if (isErrored) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                             Icon(icon, contentDescription = null, tint = tint)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                // 8dp, not 12dp — MD3's own spacing system is built on an 8dp grid so margins/
+                // padding/gaps stay consistent and can adapt programmatically across densities.
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -853,7 +869,8 @@ fun QueueItemCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // Same 8dp-grid reasoning as the thumbnail gap above.
+            Spacer(modifier = Modifier.height(8.dp))
 
             if (item.status == DownloadStatus.RUNNING) {
                 if (!isNetworkAvailable) {
@@ -916,7 +933,9 @@ fun QueueItemCard(
                             .fillMaxWidth()
                             .height(12.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        // surfaceContainerHighest, not the older surfaceVariant token this app's
+                        // current MD3 color-role set doesn't otherwise use anywhere else.
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         amplitude = { progress -> if (reducedMotion || progress > 0.9f) 0f else 0.4f },
                         wavelength = 40.dp,
                         waveSpeed = 8.dp,
@@ -934,7 +953,7 @@ fun QueueItemCard(
                             .fillMaxWidth()
                             .height(12.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         amplitude = if (reducedMotion) 0f else 0.4f,
                         wavelength = 40.dp,
                         waveSpeed = if (isExtracting) 4.dp else 8.dp,
