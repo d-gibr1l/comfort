@@ -119,12 +119,44 @@ object GalleryDlListing {
     // capture, so this needs to be reusable there too rather than duplicated.
     private val MARKUP_LIKE_REGEX = Regex("""[{}<>]|--[a-zA-Z-]+:""")
 
+    /** Same cookies.txt every real download reads (see DownloadWorker's own identical
+     * exists()/length()>0 check for why "empty" counts as "absent") — but filtered through the
+     * Cookies & Login screen's per-site toggle first, same as DownloadWorker's own per-download
+     * normalized copy, so a preview never shows content a toggled-off site's cookies would have
+     * unlocked when the real download wouldn't actually send them either. Writes a temp filtered
+     * copy only when something's actually disabled; otherwise just hands back the real file's own
+     * path, avoiding pointless I/O on every listing when nothing's toggled off. */
+    private fun effectiveCookiesPath(context: Context): String {
+        val cookiesPath = context.filesDir.resolve("cookies.txt")
+        if (!cookiesPath.exists() || cookiesPath.length() <= 0) return ""
+        val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
+        if (disabledDomains.isEmpty()) return cookiesPath.absolutePath
+        val filtered = GalleryDlPreferences.filterCookiesByDisabledDomains(
+            cookiesPath.readText().replace("\r\n", "\n"), disabledDomains,
+        )
+        // Unique per call, not a fixed name — two listing calls (e.g. a paste and a share-sheet
+        // open) can genuinely run concurrently, and a shared filename would let one overwrite the
+        // other mid-read.
+        return java.io.File(context.cacheDir, "cookies-listing-filtered-${System.nanoTime()}.txt")
+            .apply { writeText(filtered) }.absolutePath
+    }
+
     fun sanitizeErrorMessage(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
-        val looksLikeMarkup = trimmed.length > 400 || MARKUP_LIKE_REGEX.containsMatchIn(trimmed.take(200))
-        if (!looksLikeMarkup) return trimmed
-        return "This site didn't return a usable response for this link — it may require login, or this URL might not be supported."
+        // Structural markup (an actual HTML/CSS blob, real gallery-dl AbortExtraction garbage —
+        // see this function's own callers) always shows it within the first 200 chars, so this
+        // alone is a reliable signal on its own; length alone used to also count as "looks like
+        // garbage" and get fully replaced by the generic line below — but a genuinely long, real,
+        // plain-English error is common too (reproduced live: yt-dlp's own "Instagram sent an
+        // empty media response... may need cookies..." message, 588 chars purely from its own
+        // verbose "please file an issue"/"confirm you're on the latest version" boilerplate) —
+        // full replacement threw away the one actually-informative sentence at the front of it.
+        // Truncating instead keeps that sentence and only drops the boilerplate tail.
+        if (MARKUP_LIKE_REGEX.containsMatchIn(trimmed.take(200))) {
+            return "This site didn't return a usable response for this link — it may require login, or this URL might not be supported."
+        }
+        return if (trimmed.length > 400) trimmed.take(400).trimEnd() + "…" else trimmed
     }
 
     /** Enumerates the items behind [url] for the share-sheet picker. An empty result with no
@@ -177,14 +209,7 @@ object GalleryDlListing {
     }
 
     private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
-        val cookiesPath = context.filesDir.resolve("cookies.txt")
-        // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a corrupted
-        // 0-byte file) still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like
-        // a real Netscape cookies file, which used to fail every download outright even though a
-        // *missing* cookies file downloads just fine anonymously. Treating "empty" the same as
-        // "absent" here means a bad cookies file degrades to normal anonymous behavior instead of
-        // breaking every download regardless of whether that particular site even needs cookies.
-        val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
+        val cookiesArg = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
 
         // list_items() only ever prints once (see gallery_dl_wrapper.py's __main__), but that one
@@ -349,8 +374,7 @@ object GalleryDlListing {
     }
 
     private suspend fun runSpotifyListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val cookiesPath = context.filesDir.resolve("cookies.txt")
-        val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
+        val cookiesArg = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
 
@@ -517,14 +541,7 @@ object GalleryDlListing {
     }
 
     private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val cookiesPath = context.filesDir.resolve("cookies.txt")
-        // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a corrupted
-        // 0-byte file) still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like
-        // a real Netscape cookies file, which used to fail every download outright even though a
-        // *missing* cookies file downloads just fine anonymously. Treating "empty" the same as
-        // "absent" here means a bad cookies file degrades to normal anonymous behavior instead of
-        // breaking every download regardless of whether that particular site even needs cookies.
-        val cookiesArg = if (cookiesPath.exists() && cookiesPath.length() > 0) cookiesPath.absolutePath else ""
+        val cookiesArg = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than

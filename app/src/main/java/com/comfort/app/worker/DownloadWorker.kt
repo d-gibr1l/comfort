@@ -289,7 +289,14 @@ class DownloadWorker(
                 // site even needs cookies.
                 val normalizedCookiesPath = if (cookiesPath.exists() && cookiesPath.length() > 0) {
                     File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
-                        writeText(cookiesPath.readText().replace("\r\n", "\n"))
+                        // The Cookies & Login screen's per-site toggle — a site can have real,
+                        // valid saved cookies that the user still doesn't want sent (e.g. a stale
+                        // or unwanted login), without deleting them outright. Filtered out of this
+                        // per-download copy only; the real, persistent cookies.txt this reads from
+                        // is never touched by a toggle, only by an actual delete.
+                        val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(applicationContext)
+                        val normalized = cookiesPath.readText().replace("\r\n", "\n")
+                        writeText(GalleryDlPreferences.filterCookiesByDisabledDomains(normalized, disabledDomains))
                     }
                 } else null
 
@@ -495,8 +502,24 @@ class DownloadWorker(
                             // captured error is that class of garbage, not a real diagnostic message
                             // worth protecting from being overwritten.
                             val candidate = line.substringAfter("[error] ").trim()
-                            lastErrorLine.getAndUpdate { current ->
-                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) candidate else current
+                            // yt-dlp's own logger reprints *every* line of a multi-line Python
+                            // traceback with this same "[error] " prefix — not just the real
+                            // "ERROR: ..." announcement, but every "  File \"...\", line N, in ..."
+                            // and bare code-fragment continuation line too. A genuinely long-but-
+                            // real message (reproduced live: yt-dlp's own "Instagram sent an empty
+                            // media response... may need cookies" line) is long enough to trip
+                            // sanitizeErrorMessage's own length-based "looks like garbage"
+                            // heuristic above — which used to let the *traceback's own noise*, a
+                            // few lines later, win the overwrite race purely for arriving after it,
+                            // discarding the one actually informative line in favor of a bare
+                            // "ie_result = self._real_extract(url)" fragment. yt-dlp always starts
+                            // a real error announcement with "ERROR:"; a continuation line never
+                            // does — this is the correct signal to gate on here, not length.
+                            val isTracebackNoise = line.startsWith("[error] ") && !candidate.startsWith("ERROR:")
+                            if (!isTracebackNoise) {
+                                lastErrorLine.getAndUpdate { current ->
+                                    if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) candidate else current
+                                }
                             }
                         }
                         // gallery-dl's own "no results" outcome — not an [error] line at all (just
