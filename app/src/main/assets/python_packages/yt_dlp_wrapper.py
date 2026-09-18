@@ -800,6 +800,30 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # same signal yt-dlp itself uses to mean "this format carries no video at all".
                 is_audio_track = (info.get("vcodec") or "none") == "none"
                 callback(f"[phase] {'audio' if is_audio_track else 'video'}")
+                # A quick "exactly what did it pick" readout beside the site badge — resolution/
+                # fps/container for a video track, bitrate+codec for an audio one. Every field
+                # here is best-effort (an HLS/DASH manifest doesn't always expose all of them);
+                # tags simply get skipped rather than showing a placeholder when missing.
+                tags = []
+                if is_audio_track:
+                    abr = info.get("abr") or info.get("tbr")
+                    acodec = info.get("acodec")
+                    codec_name = acodec.split(".")[0].upper() if acodec and acodec != "none" else None
+                    if abr and codec_name:
+                        tags.append(f"{int(abr)} kbps {codec_name}")
+                    elif abr:
+                        tags.append(f"{int(abr)} kbps")
+                    elif codec_name:
+                        tags.append(codec_name)
+                else:
+                    if height := info.get("height"):
+                        tags.append(f"{height}p")
+                    if (fps := info.get("fps")) and fps > 30:
+                        tags.append(f"{int(fps)}fps")
+                    if ext := info.get("ext"):
+                        tags.append(ext.upper())
+                if tags:
+                    callback(f"[format] {'|'.join(tags)}")
             if not reported_title[0]:
                 # Extraction has already happened by the time any "downloading" event fires, so
                 # the real poster/caption are available immediately — sent once, this early,

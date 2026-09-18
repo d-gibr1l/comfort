@@ -85,6 +85,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET downloadingAudioTrack = :value WHERE id = :id")
     suspend fun setDownloadingAudioTrack(id: String, value: Boolean)
 
+    /** From yt_dlp_wrapper.py's own "[format] ..." signal — see DownloadEntity.formatTags' own
+     * doc comment. */
+    @Query("UPDATE downloads SET formatTags = :tags WHERE id = :id")
+    suspend fun setFormatTags(id: String, tags: String)
+
     /** Known ahead of time only when the download came from the share-sheet item picker (its
      * selection count) or when we enumerate the gallery first via list_items(); otherwise stays 0
      * and the UI falls back to an indeterminate progress indicator. */
