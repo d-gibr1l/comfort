@@ -47,9 +47,9 @@ import com.comfort.app.theme.DarkColorScheme
 import com.comfort.app.theme.LightColorScheme
 import com.comfort.app.theme.LocalThemeState
 import com.comfort.app.theme.ThemeMode
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.ArrowLeft
-import compose.icons.feathericons.Check
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 
 // Ported from TachiyomiJ2K's "Appearance" settings screen: a big title, a labeled row of light
 // theme preview cards and a labeled row of dark theme preview cards (each a tiny mockup of the
@@ -82,7 +82,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                     }
                 },
                 // Same top-of-screen gradient as the rest of Settings (and Home/Library) — this
@@ -383,7 +383,7 @@ private fun ThemePreviewCard(
                         .background(scheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(FeatherIcons.Check, contentDescription = "Selected", tint = scheme.onPrimary, modifier = Modifier.size(11.dp))
+                    Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = scheme.onPrimary, modifier = Modifier.size(11.dp))
                 }
             }
         }

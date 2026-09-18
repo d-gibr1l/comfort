@@ -34,8 +34,9 @@ import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.GalleryItem
 import com.comfort.app.util.ListingResult
 import com.comfort.app.util.rememberIsNetworkAvailable
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.launch
 
 private enum class ListingState { LOADING, LOADED, UNAVAILABLE, ERROR }
@@ -208,7 +209,7 @@ fun SharePickerScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(FeatherIcons.X, contentDescription = "Cancel")
+                        Icon(Icons.Outlined.Close, contentDescription = "Cancel")
                     }
                 },
                 actions = {
@@ -248,7 +249,7 @@ fun SharePickerScreen(
                             shape = MaterialTheme.shapes.medium,
                             enabled = selectedNums.isNotEmpty(),
                         ) {
-                            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(if (isDuplicate) "Redownload ${selectedNums.size}" else "Download ${selectedNums.size}")
                         }
@@ -270,7 +271,7 @@ fun SharePickerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            FeatherIcons.WifiOff,
+                            Icons.Outlined.WifiOff,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.size(16.dp),
@@ -311,7 +312,7 @@ fun SharePickerScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Icon(
-                            FeatherIcons.AlertTriangle,
+                            Icons.Outlined.Warning,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(32.dp),
@@ -336,7 +337,7 @@ fun SharePickerScreen(
                                 modifier = Modifier.fillMaxWidth().height(50.dp),
                                 shape = MaterialTheme.shapes.medium,
                             ) {
-                                Icon(FeatherIcons.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text("Log in")
                             }
@@ -505,7 +506,7 @@ fun SharePickerScreen(
                                     error = {
                                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                             Icon(
-                                                FeatherIcons.Image,
+                                                Icons.Outlined.Image,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                                 modifier = Modifier.size(28.dp),
@@ -528,7 +529,7 @@ fun SharePickerScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     if (selected) {
-                                        Icon(FeatherIcons.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
+                                        Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
                                     }
                                 }
                                 if (isVideo) {
@@ -541,7 +542,7 @@ fun SharePickerScreen(
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Icon(
-                                            FeatherIcons.Play,
+                                            Icons.Outlined.PlayArrow,
                                             contentDescription = "Video",
                                             tint = Color.White,
                                             // Nudged right so the triangle's own visual weight

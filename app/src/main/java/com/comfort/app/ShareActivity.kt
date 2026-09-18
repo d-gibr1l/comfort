@@ -62,8 +62,9 @@ import com.comfort.app.ui.main.SharePickerScreen
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.ListingResult
 import com.comfort.app.util.shouldUsePreviewSheet
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.ArrowDown
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -416,7 +417,7 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = MaterialTheme.shapes.medium,
                         ) {
-                            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(if (isDuplicate) "Redownload" else "Download")
                         }

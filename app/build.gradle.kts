@@ -122,6 +122,9 @@ dependencies {
   // state, since coil-compose alone has no decoder that understands video content at all.
   implementation("io.coil-kt:coil-video:2.6.0")
   implementation("br.com.devsrsouza.compose.icons:feather:1.1.0")
+  // Material Symbols (the real MD3 icon set) — version-less, resolved by composeBom above like
+  // every other androidx.compose.* artifact here.
+  implementation("androidx.compose.material:material-icons-extended")
   implementation("androidx.documentfile:documentfile:1.0.1")
   // Media3 ExoPlayer for Trim UI Video Streaming. media3-exoplayer-hls specifically: yt-dlp/
   // YouTube resolve some formats (confirmed live on a YouTube Shorts link) to an HLS (.m3u8)

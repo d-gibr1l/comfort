@@ -55,6 +55,9 @@ import com.comfort.app.util.AppUpdater
 import com.comfort.app.util.EngineUpdater
 import com.comfort.app.util.shouldUsePreviewSheet
 import compose.icons.FeatherIcons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import compose.icons.feathericons.*
 import com.comfort.app.viewmodel.DownloadsViewModel
 
@@ -65,9 +68,9 @@ private val CrystalRadioKit = FontFamily(Font(R.font.crystal_radio_kit))
 private data class NavTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 private val tabs = listOf(
-    NavTab("Home", FeatherIcons.Home),
-    NavTab("Library", FeatherIcons.Image),
-    NavTab("Settings", FeatherIcons.Settings),
+    NavTab("Home", Icons.Outlined.Home),
+    NavTab("Library", Icons.Outlined.Image),
+    NavTab("Settings", Icons.Outlined.Settings),
 )
 
 /** Live, in-session mirror of GalleryDlPreferences.isEngineUpdateAvailable() — the persisted flag
@@ -607,11 +610,11 @@ fun HomeScreen(
                         placeholder = { Text("Paste a link") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.extraLarge,
-                        leadingIcon = { Icon(FeatherIcons.Link, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
                         trailingIcon = {
                             if (url.isNotEmpty()) {
                                 IconButton(onClick = { url = "" }) {
-                                    Icon(FeatherIcons.X, contentDescription = "Clear")
+                                    Icon(Icons.Outlined.Close, contentDescription = "Clear")
                                 }
                             }
                         },
@@ -632,7 +635,7 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f).height(52.dp),
                             shape = MaterialTheme.shapes.extraLarge,
                         ) {
-                            Icon(FeatherIcons.Clipboard, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Paste")
                         }
@@ -648,7 +651,7 @@ fun HomeScreen(
                             shape = MaterialTheme.shapes.extraLarge,
                             enabled = url.isNotBlank(),
                         ) {
-                            Icon(FeatherIcons.ArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Download")
                         }
@@ -667,9 +670,9 @@ fun HomeScreen(
 
             val sources = listOf(
                 Triple("Twitter / X", FeatherIcons.Twitter, MaterialTheme.colorScheme.primary),
-                Triple("Pixiv", FeatherIcons.Image, MaterialTheme.colorScheme.secondary),
+                Triple("Pixiv", Icons.Outlined.Image, MaterialTheme.colorScheme.secondary),
                 Triple("Instagram", FeatherIcons.Instagram, MaterialTheme.colorScheme.primary),
-                Triple("+ hundreds more", FeatherIcons.Globe, MaterialTheme.colorScheme.secondary),
+                Triple("+ hundreds more", Icons.Outlined.Public, MaterialTheme.colorScheme.secondary),
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -798,7 +801,7 @@ fun HomeScreen(
                     ClipboardSuggestionState.lastHandled = suggestion
                     clipboardSuggestion = null
                 },
-                icon = { Icon(FeatherIcons.Clipboard, contentDescription = null) },
+                icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = null) },
                 text = { Text("Paste copied link") },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -848,7 +851,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                     // fix as the Queue screen's own thumbnail icon: this box's background is
                     // primaryContainer, and MD3 only guarantees contrast for a container against
                     // its own matching "on" color, not an arbitrary combination.
-                    Icon(FeatherIcons.DownloadCloud, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
                 }
             }
             // 16dp, not 12dp — same 8dp-grid reasoning as the padding above.
@@ -903,7 +906,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -954,7 +957,7 @@ private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, 
         error = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Icon(
-                    FeatherIcons.Image,
+                    Icons.Outlined.Image,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.size(26.dp),
@@ -968,11 +971,11 @@ private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, 
 // multi-select and auto-updating engines especially, both added the same session this carousel
 // was, with no other obvious discovery path on Home.
 private val HOME_TIPS = listOf(
-    "Long-press a card in Queue to select multiple downloads at once." to FeatherIcons.CheckSquare,
-    "gallery-dl and yt-dlp engines auto-update in the background — check Settings > About." to FeatherIcons.RefreshCw,
-    "Add cookies from Settings to unlock private or age-restricted content." to FeatherIcons.Lock,
-    "Tap a queued download's \"Start now\" to skip the schedule window or its place in line." to FeatherIcons.Zap,
-    "Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads." to FeatherIcons.Settings,
+    "Long-press a card in Queue to select multiple downloads at once." to Icons.Outlined.CheckBox,
+    "gallery-dl and yt-dlp engines auto-update in the background — check Settings > About." to Icons.Outlined.Refresh,
+    "Add cookies from Settings to unlock private or age-restricted content." to Icons.Outlined.Lock,
+    "Tap a queued download's \"Start now\" to skip the schedule window or its place in line." to Icons.Outlined.Bolt,
+    "Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads." to Icons.Outlined.Settings,
 )
 
 @Composable

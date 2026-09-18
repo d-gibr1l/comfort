@@ -68,8 +68,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalTime
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 
 enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, ABOUT }
 
@@ -85,14 +86,14 @@ private fun SettingsRoute.displayName(): String = when (this) {
 }
 
 private fun SettingsRoute.icon(): ImageVector = when (this) {
-    SettingsRoute.ROOT -> FeatherIcons.Settings
-    SettingsRoute.APPEARANCE -> FeatherIcons.Sun
-    SettingsRoute.FOLDERS -> FeatherIcons.Folder
-    SettingsRoute.DOWNLOADS -> FeatherIcons.Download
-    SettingsRoute.PROCESSING -> FeatherIcons.Film
-    SettingsRoute.ADVANCED -> FeatherIcons.Terminal
-    SettingsRoute.COOKIES -> FeatherIcons.Lock
-    SettingsRoute.ABOUT -> FeatherIcons.Info
+    SettingsRoute.ROOT -> Icons.Outlined.Settings
+    SettingsRoute.APPEARANCE -> Icons.Outlined.WbSunny
+    SettingsRoute.FOLDERS -> Icons.Outlined.Folder
+    SettingsRoute.DOWNLOADS -> Icons.Outlined.Download
+    SettingsRoute.PROCESSING -> Icons.Outlined.Movie
+    SettingsRoute.ADVANCED -> Icons.Outlined.Terminal
+    SettingsRoute.COOKIES -> Icons.Outlined.Lock
+    SettingsRoute.ABOUT -> Icons.Outlined.Info
 }
 
 /** One individual row from inside a settings sub-screen — as opposed to SettingsItemSpec below,
@@ -234,16 +235,16 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     // at once had grown too long to scan.
     val mainItems = remember(themeSummary, filenameFormat, hasCookies) {
         listOf(
-            SettingsItemSpec(FeatherIcons.Sun, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
-            SettingsItemSpec(FeatherIcons.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
-            SettingsItemSpec(FeatherIcons.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
-            SettingsItemSpec(FeatherIcons.Film, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
-            SettingsItemSpec(FeatherIcons.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
-            SettingsItemSpec(FeatherIcons.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
+            SettingsItemSpec(Icons.Outlined.WbSunny, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
+            SettingsItemSpec(Icons.Outlined.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
+            SettingsItemSpec(Icons.Outlined.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
+            SettingsItemSpec(Icons.Outlined.Movie, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
+            SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
+            SettingsItemSpec(Icons.Outlined.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
         )
     }
     val aboutItems = remember {
-        listOf(SettingsItemSpec(FeatherIcons.Info, "About", "Version, credits & source", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT, null) })
+        listOf(SettingsItemSpec(Icons.Outlined.Info, "About", "Version, credits & source", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT, null) })
     }
     val filteredMainItems = mainItems.filter { it.matches(searchQuery) }
     val filteredAboutItems = aboutItems.filter { it.matches(searchQuery) }
@@ -369,7 +370,7 @@ fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: S
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(FeatherIcons.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Box(modifier = Modifier.weight(1f)) {
                 if (query.isEmpty()) {
@@ -388,7 +389,7 @@ fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: S
             // there's something to clear.
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp)) {
-                    Icon(FeatherIcons.X, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -503,7 +504,7 @@ private fun SettingsListRow(
                     )
                 }
             }
-            Icon(FeatherIcons.ChevronRight, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -583,7 +584,7 @@ private fun SettingsSubScaffold(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                     }
                 },
                 // Same top-of-screen gradient as the Settings root (and Home/Library) instead of a
@@ -689,9 +690,9 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
     ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }
 
     SettingsSubScaffold(title = "Downloads", onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Sharing", icon = FeatherIcons.Share2) {
+        SettingsSection(title = "Sharing", icon = Icons.Outlined.Share) {
             IconToggleRow(
-                icon = FeatherIcons.Zap,
+                icon = Icons.Outlined.Bolt,
                 title = "Instant download",
                 subtitle = "Sharing a link downloads it right away in the background. Off shows a picker to choose which images to download.",
                 checked = instantShare,
@@ -702,9 +703,9 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
         }
 
-        SettingsSection(title = "Concurrent downloads", icon = FeatherIcons.Layers) {
+        SettingsSection(title = "Concurrent downloads", icon = Icons.Outlined.Layers) {
             IconToggleRow(
-                icon = FeatherIcons.Layers,
+                icon = Icons.Outlined.Layers,
                 title = "Multiple concurrent downloads",
                 subtitle = "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.",
                 checked = concurrentDownloadsEnabled,
@@ -739,9 +740,9 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             }
         }
 
-        SettingsSection(title = "Network", icon = FeatherIcons.Wifi) {
+        SettingsSection(title = "Network", icon = Icons.Outlined.Wifi) {
             IconToggleRow(
-                icon = FeatherIcons.Wifi,
+                icon = Icons.Outlined.Wifi,
                 title = "Wi-Fi only",
                 subtitle = "Queued downloads wait for a Wi-Fi connection instead of using mobile data.",
                 checked = wifiOnly,
@@ -756,7 +757,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.ArrowDown,
+                icon = Icons.Outlined.ArrowDownward,
                 title = "Speed limit",
                 subtitle = "Caps download bandwidth for all future downloads.",
                 checked = speedLimitEnabled,
@@ -789,7 +790,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.RefreshCw,
+                icon = Icons.Outlined.Refresh,
                 title = "Retries",
                 subtitle = "How many times a failed request is retried before giving up. Off uses the engine's built-in default.",
                 checked = networkRetriesEnabled,
@@ -816,7 +817,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.RefreshCw,
+                icon = Icons.Outlined.Refresh,
                 title = "Fragment retries",
                 subtitle = "How many times a failed video/audio fragment is retried. Off shares the main Retries budget.",
                 checked = fragmentRetriesEnabled,
@@ -843,7 +844,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Lock,
+                icon = Icons.Outlined.Lock,
                 title = "Proxy",
                 subtitle = "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.",
                 checked = proxyEnabled,
@@ -886,7 +887,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Globe,
+                icon = Icons.Outlined.Public,
                 title = "Force IPv4",
                 subtitle = "Forces connections over IPv4. Try this if downloads fail due to broken IPv6 routes.",
                 checked = forceIpv4,
@@ -901,7 +902,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.ShieldOff,
+                icon = Icons.Outlined.GppBad,
                 title = "Skip certificate checks",
                 subtitle = "Disables security certificate checks. Only enable this if a server is misconfigured.",
                 checked = noCheckCertificates,
@@ -916,7 +917,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.GitPullRequest,
+                icon = Icons.Outlined.CallSplit,
                 title = "Concurrent fragments",
                 subtitle = "How many fragments of a single video to download in parallel.",
                 checked = concurrentFragmentsEnabled,
@@ -945,7 +946,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Clock,
+                icon = Icons.Outlined.Schedule,
                 title = "Sleep interval",
                 subtitle = "Adds a random delay before requests to avoid triggering rate limits and bot bans.",
                 checked = sleepIntervalEnabled,
@@ -975,7 +976,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Clock,
+                icon = Icons.Outlined.Schedule,
                 title = "Socket timeout",
                 subtitle = "How long to wait on a stalled connection before retrying. Off uses the engine's default.",
                 checked = socketTimeoutEnabled,
@@ -1002,7 +1003,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Database,
+                icon = Icons.Outlined.Storage,
                 title = "Buffer size",
                 subtitle = "The size of each read chunk (yt-dlp only). Rarely worth changing from the default.",
                 checked = bufferSizeEnabled,
@@ -1034,7 +1035,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Zap,
+                icon = Icons.Outlined.Bolt,
                 title = "Multi-connection downloads (aria2c)",
                 subtitle = "Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.",
                 checked = aria2Enabled,
@@ -1045,9 +1046,9 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
         }
 
-        SettingsSection(title = "Reliability", icon = FeatherIcons.Zap) {
+        SettingsSection(title = "Reliability", icon = Icons.Outlined.Bolt) {
             if (batteryUnrestricted) {
-                StatusRow(FeatherIcons.CheckCircle, "Unrestricted — downloads can keep running in the background.", MaterialTheme.colorScheme.primary)
+                StatusRow(Icons.Outlined.CheckCircle, "Unrestricted — downloads can keep running in the background.", MaterialTheme.colorScheme.primary)
             } else {
                 Text(
                     "Unrestricted background activity",
@@ -1077,16 +1078,16 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(FeatherIcons.Zap, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Allow unrestricted background activity")
                 }
             }
         }
 
-        SettingsSection(title = "Schedule", icon = FeatherIcons.Clock) {
+        SettingsSection(title = "Schedule", icon = Icons.Outlined.Schedule) {
             IconToggleRow(
-                icon = FeatherIcons.Clock,
+                icon = Icons.Outlined.Schedule,
                 title = "Restrict to time window",
                 subtitle = "New downloads wait in the queue until the window opens.",
                 checked = scheduleEnabled,
@@ -1135,7 +1136,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 Spacer(Modifier.height(16.dp))
 
                 IconToggleRow(
-                    icon = FeatherIcons.RefreshCw,
+                    icon = Icons.Outlined.Refresh,
                     title = "Use alarm for scheduling",
                     subtitle = "Ensures scheduled downloads start exactly on time by bypassing Android's battery-saving delays.",
                     checked = alarmSchedulingEnabled,
@@ -1148,9 +1149,9 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             }
         }
 
-        SettingsSection(title = "Max file size", icon = FeatherIcons.HardDrive) {
+        SettingsSection(title = "Max file size", icon = Icons.Outlined.SdStorage) {
             IconToggleRow(
-                icon = FeatherIcons.HardDrive,
+                icon = Icons.Outlined.SdStorage,
                 title = "Limit max file size",
                 subtitle = "Files larger than this are skipped instead of downloaded.",
                 checked = maxFilesizeEnabled,
@@ -1177,9 +1178,9 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
         }
 
         // Imported from YTDLnis's own "Download Delay" and "Incognito" settings.
-        SettingsSection(title = "Pacing & privacy", icon = FeatherIcons.EyeOff) {
+        SettingsSection(title = "Pacing & privacy", icon = Icons.Outlined.VisibilityOff) {
             IconToggleRow(
-                icon = FeatherIcons.Clock,
+                icon = Icons.Outlined.Schedule,
                 title = "Download delay",
                 subtitle = "Adds a delay between a finished download and the next one in the queue.",
                 checked = downloadDelayEnabled,
@@ -1212,7 +1213,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.EyeOff,
+                icon = Icons.Outlined.VisibilityOff,
                 title = "Incognito by default",
                 subtitle = "Downloads are still saved to your device, but won't appear in the app's History or Library.",
                 checked = incognitoDefault,
@@ -1227,7 +1228,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Copy,
+                icon = Icons.Outlined.ContentCopy,
                 title = "Prevent duplicate downloads",
                 subtitle = "Skips downloading a link if it's already queued, running, or finished.",
                 checked = preventDuplicateDownloads,
@@ -1242,7 +1243,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.RotateCcw,
+                icon = Icons.Outlined.Restore,
                 title = "Remember last quality",
                 subtitle = "Makes the quality chosen on the download sheet the new default for future downloads.",
                 checked = rememberDownloadType,
@@ -1257,7 +1258,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Trash2,
+                icon = Icons.Outlined.Delete,
                 title = "Clean up leftover downloads",
                 subtitle = "Automatically deletes partial files when a download is cancelled or fails.",
                 checked = deleteLeftoverOnFailure,
@@ -1369,7 +1370,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
     }
 
     SettingsSubScaffold(title = "Folders", onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Filename format", icon = FeatherIcons.Type) {
+        SettingsSection(title = "Filename format", icon = Icons.Outlined.TextFields) {
             Text(
                 "Filename format applied to every downloaded file.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -1403,14 +1404,14 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Save format")
             }
 
             if (filenameFormatSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Filename format saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Filename format saved", tint = SuccessGreen40)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -1418,7 +1419,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Type,
+                icon = Icons.Outlined.TextFields,
                 title = "Restrict filenames",
                 subtitle = "Removes special characters and replaces spaces with underscores. Safer for sharing and older file systems.",
                 checked = restrictFilenames,
@@ -1433,7 +1434,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Scissors,
+                icon = Icons.Outlined.ContentCut,
                 title = "Trim filenames",
                 subtitle = "Caps long titles at 150 characters (only applies to the default filename format).",
                 checked = trimFilenames,
@@ -1444,7 +1445,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             )
         }
 
-        SettingsSection(title = "Download location", icon = FeatherIcons.Folder) {
+        SettingsSection(title = "Download location", icon = Icons.Outlined.Folder) {
             val locationName = remember(downloadLocationUri) {
                 downloadLocationUri?.let { uri ->
                     runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
@@ -1473,7 +1474,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = MaterialTheme.shapes.medium,
                 ) {
-                    Icon(FeatherIcons.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Choose folder")
                 }
@@ -1516,7 +1517,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             )
         }
 
-        SettingsSection(title = "Storage", icon = FeatherIcons.HardDrive) {
+        SettingsSection(title = "Storage", icon = Icons.Outlined.SdStorage) {
             var cacheSizeBytes by remember { mutableStateOf<Long?>(null) }
             var cacheCleared by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
@@ -1552,13 +1553,13 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Clear cache")
             }
             if (cacheCleared) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cache cleared", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cache cleared", tint = SuccessGreen40)
             }
         }
     }
@@ -1583,7 +1584,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
     var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
 
     SettingsSubScaffold(title = "Processing", onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Video downloads", icon = FeatherIcons.Film) {
+        SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
             Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -1679,7 +1680,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.List,
+                icon = Icons.Outlined.List,
                 title = "Single video only",
                 subtitle = "Only downloads the specific video from a link, even if it belongs to a larger playlist or channel.",
                 checked = noPlaylist,
@@ -1694,7 +1695,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Rewind,
+                icon = Icons.Outlined.FastRewind,
                 title = "Live streams from the start",
                 subtitle = "Downloads live streams from the beginning instead of the current moment.",
                 checked = liveFromStart,
@@ -1709,7 +1710,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Image,
+                icon = Icons.Outlined.Image,
                 title = "Embed thumbnail",
                 subtitle = "Save the video's thumbnail as cover art inside the file.",
                 checked = embedThumbnail,
@@ -1724,7 +1725,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.Tag,
+                icon = Icons.Outlined.Tag,
                 title = "Embed metadata",
                 subtitle = "Tag the file with its title, uploader, and other details.",
                 checked = embedMetadata,
@@ -1739,7 +1740,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.List,
+                icon = Icons.Outlined.List,
                 title = "Embed chapters",
                 subtitle = "Saves chapter markers inside the video file.",
                 checked = embedChapters,
@@ -1754,7 +1755,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.FileText,
+                icon = Icons.Outlined.Description,
                 title = "Write description / info.json files",
                 subtitle = "Save a separate JSON metadata file alongside each download.",
                 checked = writeInfoFiles,
@@ -1769,7 +1770,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.MessageSquare,
+                icon = Icons.Outlined.Message,
                 title = "Download subtitles",
                 subtitle = "Fetch and embed subtitles when they're available.",
                 checked = downloadSubtitles,
@@ -1805,7 +1806,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = FeatherIcons.MessageCircle,
+                icon = Icons.Outlined.Chat,
                 title = "Save subtitle files",
                 subtitle = "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.",
                 checked = saveSubtitleFiles,
@@ -1922,7 +1923,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
 
     SettingsSubScaffold(title = "Advanced", onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Extra arguments", icon = FeatherIcons.Terminal) {
+        SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
             Text(
                 "Extra command-line arguments passed to gallery-dl on every download. For advanced users.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -1947,20 +1948,20 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Save arguments")
             }
 
             if (saved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extra arguments saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extra arguments saved", tint = SuccessGreen40)
             }
         }
 
-        SettingsSection(title = "YouTube", icon = FeatherIcons.Cpu) {
+        SettingsSection(title = "YouTube", icon = Icons.Outlined.Memory) {
             IconToggleRow(
-                icon = FeatherIcons.RefreshCw,
+                icon = Icons.Outlined.Refresh,
                 title = "Rotate player clients",
                 subtitle = "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.",
                 checked = youtubeClientRotation,
@@ -1971,9 +1972,9 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             )
         }
 
-        SettingsSection(title = "Bot detection", icon = FeatherIcons.ShieldOff) {
+        SettingsSection(title = "Bot detection", icon = Icons.Outlined.GppBad) {
             IconToggleRow(
-                icon = FeatherIcons.ShieldOff,
+                icon = Icons.Outlined.GppBad,
                 title = "Impersonate a browser",
                 subtitle = "Makes the app look like a real web browser to bypass bot detection on strict websites.",
                 checked = impersonateEnabled,
@@ -1984,7 +1985,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             )
         }
 
-        SettingsSection(title = "yt-dlp extractor arguments", icon = FeatherIcons.Terminal) {
+        SettingsSection(title = "yt-dlp extractor arguments", icon = Icons.Outlined.Terminal) {
             Text(
                 "Site-specific yt-dlp tuning (throttling workarounds, player client selection, etc). " +
                     "CLI syntax, e.g. \"youtube:player_client=android,web\". Separate multiple " +
@@ -2011,20 +2012,20 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Save extractor arguments")
             }
 
             if (extractorArgsSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Extractor arguments saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extractor arguments saved", tint = SuccessGreen40)
             }
         }
 
         // Imported from YTDLnis's own advanced_preferences.xml (Format Sorting, User Agent
         // Header) — yt-dlp only, same reasoning as this screen's other two fields above.
-        SettingsSection(title = "Format sort", icon = FeatherIcons.Filter) {
+        SettingsSection(title = "Format sort", icon = Icons.Outlined.FilterAlt) {
             Text(
                 "Raw yt-dlp --format-sort syntax (e.g. \"codec:vp9,fps\"), applied after this app's own " +
                     "quality-cap and MP4-compatibility bias so it can still reorder or override them.",
@@ -2051,18 +2052,18 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Save format sort")
             }
 
             if (formatSortSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Format sort saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Format sort saved", tint = SuccessGreen40)
             }
         }
 
-        SettingsSection(title = "Custom headers", icon = FeatherIcons.Terminal) {
+        SettingsSection(title = "Custom headers", icon = Icons.Outlined.Terminal) {
             Text(
                 "One \"Header-Name: value\" per line, sent on every yt-dlp download — overrides that " +
                     "header's own default (including User-Agent/Referer) rather than only adding new ones.",
@@ -2088,20 +2089,20 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Save headers")
             }
 
             if (customHeadersSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Headers saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Headers saved", tint = SuccessGreen40)
             }
         }
 
-        SettingsSection(title = "Debugging", icon = FeatherIcons.Terminal) {
+        SettingsSection(title = "Debugging", icon = Icons.Outlined.Terminal) {
             IconToggleRow(
-                icon = FeatherIcons.Terminal,
+                icon = Icons.Outlined.Terminal,
                 title = "Verbose logging",
                 subtitle = "Logs all internal yt-dlp debug output for advanced troubleshooting.",
                 checked = verboseLogging,
@@ -2180,7 +2181,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
     }
 
     SettingsSubScaffold(title = "Cookies & Login", onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Cookies", icon = FeatherIcons.Lock) {
+        SettingsSection(title = "Cookies", icon = Icons.Outlined.Lock) {
             Text(
                 "Sign in through the built-in browser to unlock private/age-restricted content, or paste a cookies.txt below.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -2195,7 +2196,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             // ERRORED cards). A throwaway account sidesteps that entirely.
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
-                    FeatherIcons.AlertTriangle,
+                    Icons.Outlined.Warning,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(16.dp).padding(top = 2.dp),
@@ -2214,14 +2215,14 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Globe, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Public, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Log in via built-in browser")
             }
 
             if (extractedCookies.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies extracted successfully", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies extracted successfully", tint = SuccessGreen40)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -2288,20 +2289,20 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(FeatherIcons.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Save cookies")
             }
 
             if (savedConfirmation) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = FeatherIcons.CheckCircle, text = "Cookies saved and applied", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies saved and applied", tint = SuccessGreen40)
             }
             pasteError?.let { message ->
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
-                        FeatherIcons.AlertTriangle,
+                        Icons.Outlined.Warning,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp).padding(top = 2.dp),
@@ -2322,7 +2323,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         // Still sourced from the real cookies.txt (see savedCookiesContent's own comment), so it
         // always reflects exactly what a download would actually send. (cookieSites itself is
         // declared up with parsedCookies, not here — see that declaration's own comment for why.)
-        SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = FeatherIcons.List) {
+        SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = Icons.Outlined.List) {
             if (cookieSites.isEmpty()) {
                 Text(
                     "No cookies saved yet.",
@@ -2340,7 +2341,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         // toggle at the trailing end instead, next to the one other cookie-related
                         // action a user might reach for around the same time as flipping the switch.
                         IconButton(onClick = { pendingDelete = PendingCookieDelete.Site(site) }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.Delete, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -2365,7 +2366,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                                 clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
                             }
                         }) {
-                            Icon(FeatherIcons.Copy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
                         }
                         // Kept, not deleted — a saved login the user just doesn't want *sent* right
                         // now (a stale account, testing anonymous behavior, ...) without losing it
@@ -2395,7 +2396,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = MaterialTheme.shapes.medium,
                     ) {
-                        Icon(FeatherIcons.Copy, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Copy all")
                     }
@@ -2405,7 +2406,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                         shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {
-                        Icon(FeatherIcons.Trash2, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Clear all")
                     }
@@ -2466,7 +2467,7 @@ private fun ConfirmDeleteSheet(title: String, message: String, confirmLabel: Str
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Icon(
-                    FeatherIcons.AlertTriangle,
+                    Icons.Outlined.Warning,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(22.dp).padding(top = 2.dp),
@@ -2644,13 +2645,13 @@ fun CookieLoginDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onDismiss) {
-                        Icon(FeatherIcons.X, contentDescription = "Close")
+                        Icon(Icons.Outlined.Close, contentDescription = "Close")
                     }
                     IconButton(onClick = { webView?.goBack() }, enabled = canGoBack) {
-                        Icon(FeatherIcons.ArrowLeft, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
                     }
                     IconButton(onClick = { webView?.goForward() }, enabled = canGoForward) {
-                        Icon(FeatherIcons.ArrowRight, contentDescription = "Forward")
+                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Forward")
                     }
                     OutlinedTextField(
                         value = addressBarText,
@@ -2666,12 +2667,12 @@ fun CookieLoginDialog(
                                 currentUrl = target
                                 webView?.loadUrl(target)
                             }) {
-                                Icon(FeatherIcons.ArrowRightCircle, contentDescription = "Go")
+                                Icon(Icons.Outlined.ArrowCircleRight, contentDescription = "Go")
                             }
                         },
                     )
                     IconButton(onClick = { webView?.reload() }) {
-                        Icon(FeatherIcons.RefreshCw, contentDescription = "Reload")
+                        Icon(Icons.Outlined.Refresh, contentDescription = "Reload")
                     }
                 }
                 if (isLoading) {
@@ -2743,7 +2744,7 @@ fun CookieLoginDialog(
                                 onDismiss()
                             }
                         },
-                        icon = { Icon(FeatherIcons.Lock, contentDescription = null) },
+                        icon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
                         text = { Text("Extract cookies") },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -2805,7 +2806,7 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
     }
 
     SettingsSubScaffold(title = "About", onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "App", icon = FeatherIcons.Info) {
+        SettingsSection(title = "App", icon = Icons.Outlined.Info) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
                 // AdaptiveIconDrawable, not a plain vector/raster) — composed by hand here from
@@ -2849,34 +2850,34 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
         // (FfmpegRuntime) merging video/audio, QuickJS (QuickJsRuntime) solving yt-dlp's JS
         // challenges, and aria2 (Aria2Runtime) doing real multi-connection downloads — none of them
         // previously credited or linked anywhere in the app.
-        SettingsSection(title = "Credits", icon = FeatherIcons.Link) {
+        SettingsSection(title = "Credits", icon = Icons.Outlined.Link) {
             LinkRow(
-                icon = FeatherIcons.Code,
+                icon = Icons.Outlined.Code,
                 title = "gallery-dl",
                 url = "https://github.com/mikf/gallery-dl",
             )
             LinkRow(
-                icon = FeatherIcons.Terminal,
+                icon = Icons.Outlined.Terminal,
                 title = "yt-dlp",
                 url = "https://github.com/yt-dlp/yt-dlp",
             )
             LinkRow(
-                icon = FeatherIcons.Film,
+                icon = Icons.Outlined.Movie,
                 title = "FFmpeg",
                 url = "https://ffmpeg.org",
             )
             LinkRow(
-                icon = FeatherIcons.Cpu,
+                icon = Icons.Outlined.Memory,
                 title = "QuickJS",
                 url = "https://bellard.org/quickjs/",
             )
             LinkRow(
-                icon = FeatherIcons.Package,
+                icon = Icons.Outlined.Inventory2,
                 title = "YTDLnis Python runtime (curl_cffi build)",
                 url = "https://github.com/deniscerri/ytdlnis-packages",
             )
             LinkRow(
-                icon = FeatherIcons.Zap,
+                icon = Icons.Outlined.Bolt,
                 title = "aria2 (multi-connection downloads)",
                 url = "https://aria2.github.io/",
             )
@@ -2908,7 +2909,7 @@ private fun QuickAppUpdateSection() {
     val current = status
     if (current == null || !current.updateAvailable) return
 
-    SettingsSection(title = "App update available", icon = FeatherIcons.Download) {
+    SettingsSection(title = "App update available", icon = Icons.Outlined.Download) {
         AppUpdateRow(
             status = current,
             downloading = downloading,
@@ -2966,7 +2967,7 @@ private fun AppUpdateSection() {
 
     LaunchedEffect(Unit) { runCheck() }
 
-    SettingsSection(title = "App Update", icon = FeatherIcons.Download) {
+    SettingsSection(title = "App Update", icon = Icons.Outlined.Download) {
         val current = status
         if (current == null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3007,7 +3008,7 @@ private fun AppUpdateSection() {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
-                Icon(FeatherIcons.RefreshCw, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Check for updates")
             }
@@ -3085,7 +3086,7 @@ private fun QuickEngineUpdateSection() {
     val outdated = statuses?.filter { it.updateAvailable } ?: return
     if (outdated.isEmpty()) return
 
-    SettingsSection(title = "Updates available", icon = FeatherIcons.RefreshCw) {
+    SettingsSection(title = "Updates available", icon = Icons.Outlined.Refresh) {
         outdated.forEachIndexed { index, status ->
             EngineUpdateRow(
                 status = status,
@@ -3161,9 +3162,9 @@ private fun EnginesSection() {
     // for the first time does.
     LaunchedEffect(ytDlpChannel, galleryDlChannel) { runCheck() }
 
-    SettingsSection(title = "Engines", icon = FeatherIcons.RefreshCw) {
+    SettingsSection(title = "Engines", icon = Icons.Outlined.Refresh) {
         IconToggleRow(
-            icon = FeatherIcons.Zap,
+            icon = Icons.Outlined.Bolt,
             title = "Auto-update",
             subtitle = "Automatically installs newer yt-dlp and gallery-dl updates when found.",
             checked = autoUpdate,
@@ -3232,7 +3233,7 @@ private fun EnginesSection() {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
-                Icon(FeatherIcons.RefreshCw, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Check for updates")
             }
@@ -3288,7 +3289,7 @@ private fun EngineCard(
     updating: Boolean,
     onUpdate: () -> Unit,
 ) {
-    val icon = if (status.engine == EngineUpdater.YT_DLP) FeatherIcons.Terminal else FeatherIcons.Image
+    val icon = if (status.engine == EngineUpdater.YT_DLP) Icons.Outlined.Terminal else Icons.Outlined.Image
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -3553,7 +3554,7 @@ private fun FolderOverrideRow(
             modifier = Modifier.weight(1f).height(50.dp),
             shape = MaterialTheme.shapes.medium,
         ) {
-            Icon(FeatherIcons.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Choose folder")
         }
@@ -3619,7 +3620,7 @@ private fun SizeSheetField(
                 Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(displayValue, style = MaterialTheme.typography.titleMedium)
             }
-            Icon(FeatherIcons.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 

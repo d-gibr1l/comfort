@@ -61,8 +61,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import com.comfort.app.viewmodel.DownloadsViewModel
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
@@ -221,7 +222,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { selectedIds = emptySet() }) {
-                            Icon(FeatherIcons.X, contentDescription = "Cancel selection")
+                            Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
                         }
                     },
                     actions = {
@@ -237,19 +238,19 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 runCatching { context.startActivity(Intent.createChooser(intent, "Share images")) }
                             }
                         }) {
-                            Icon(FeatherIcons.Share2, contentDescription = "Share selected")
+                            Icon(Icons.Outlined.Share, contentDescription = "Share selected")
                         }
                         IconButton(onClick = {
                             selectedIds.forEach { viewModel.setFavorite(it, true) }
                             selectedIds = emptySet()
                         }) {
-                            Icon(FeatherIcons.Star, contentDescription = "Add selected to favorites")
+                            Icon(Icons.Outlined.Star, contentDescription = "Add selected to favorites")
                         }
                         IconButton(onClick = {
                             requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
-                            Icon(FeatherIcons.Trash2, contentDescription = "Remove selected")
+                            Icon(Icons.Outlined.Delete, contentDescription = "Remove selected")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -348,7 +349,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false }
                             }) {
                                 Icon(
-                                    FeatherIcons.Star,
+                                    Icons.Outlined.Star,
                                     contentDescription = "Favorites only",
                                     tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -358,7 +359,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 GalleryDlPreferences.setLibraryGridView(context, gridView)
                             }) {
                                 Icon(
-                                    if (gridView) FeatherIcons.List else FeatherIcons.Grid,
+                                    if (gridView) Icons.Outlined.List else Icons.Outlined.GridView,
                                     contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
                                 )
                             }
@@ -371,10 +372,10 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                             }
                                         }
                                     ) {
-                                        Icon(FeatherIcons.Download, contentDescription = "Active downloads")
+                                        Icon(Icons.Outlined.Download, contentDescription = "Active downloads")
                                     }
                                 } else {
-                                    Icon(FeatherIcons.Download, contentDescription = "Active downloads")
+                                    Icon(Icons.Outlined.Download, contentDescription = "Active downloads")
                                 }
                             }
                         }
@@ -426,7 +427,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                         ) {
                             Box {
                                 LibraryToolbarChip(
-                                    icon = FeatherIcons.Sliders,
+                                    icon = Icons.Outlined.Tune,
                                     label = "Sort",
                                     onClick = { sortMenuExpanded = true },
                                 )
@@ -435,7 +436,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                         DropdownMenuItem(
                                             text = { Text(option.label) },
                                             leadingIcon = if (option == sortOption) {
-                                                { Icon(FeatherIcons.Check, contentDescription = null) }
+                                                { Icon(Icons.Outlined.Check, contentDescription = null) }
                                             } else null,
                                             onClick = { sortOption = option; sortMenuExpanded = false },
                                         )
@@ -443,7 +444,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 }
                             }
                             LibraryToolbarChip(
-                                icon = FeatherIcons.Trash2,
+                                icon = Icons.Outlined.Delete,
                                 label = "Deleted",
                                 active = showDeletedOnly,
                                 onClick = {
@@ -452,7 +453,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 },
                             )
                             LibraryToolbarChip(
-                                icon = FeatherIcons.Copy,
+                                icon = Icons.Outlined.ContentCopy,
                                 label = "Duplicates",
                                 active = showDuplicatesOnly,
                                 count = duplicateAttempts.size,
@@ -462,7 +463,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 },
                             )
                             LibraryToolbarChip(
-                                icon = FeatherIcons.Music,
+                                icon = Icons.Outlined.MusicNote,
                                 label = "Audio",
                                 active = audioOnly,
                                 onClick = {
@@ -484,7 +485,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         if (showDuplicatesOnly) {
             if (duplicateAttempts.isEmpty()) {
                 EmptyState(
-                    icon = FeatherIcons.Copy,
+                    icon = Icons.Outlined.ContentCopy,
                     title = "No duplicates",
                     subtitle = "A link you share in that's already queued, running, or finished lands here instead of starting a second copy.",
                     modifier = Modifier.padding(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
@@ -500,7 +501,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
         } else if (visibleItems.isEmpty()) {
             val searching = searchQuery.isNotBlank()
             EmptyState(
-                icon = if (searching) FeatherIcons.Search else if (showDeletedOnly) FeatherIcons.Trash2 else if (favoritesOnly) FeatherIcons.Star else FeatherIcons.Image,
+                icon = if (searching) Icons.Outlined.Search else if (showDeletedOnly) Icons.Outlined.Delete else if (favoritesOnly) Icons.Outlined.Star else Icons.Outlined.Image,
                 title = if (searching) "No matches" else if (showDeletedOnly) "Nothing deleted" else if (favoritesOnly) "No favorites yet" else "Nothing here yet",
                 subtitle = if (searching) "Try a different search." else if (showDeletedOnly) "Pictures you remove from your device gallery will show up here." else if (favoritesOnly) "Star a download to pin it here." else "Downloaded pictures will show up in this gallery.",
                 modifier = Modifier.padding(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
@@ -677,7 +678,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                     }
                 },
             ) {
-                Icon(FeatherIcons.ArrowUp, contentDescription = "Scroll to top")
+                Icon(Icons.Outlined.ArrowUpward, contentDescription = "Scroll to top")
             }
         }
         }
@@ -718,7 +719,7 @@ private fun SwipeToDeleteCard(
                     .padding(horizontal = 24.dp),
                 contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
             ) {
-                Icon(FeatherIcons.Trash2, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         },
     ) {
@@ -795,7 +796,7 @@ private fun DuplicatesList(
                             modifier = Modifier.size(48.dp).clip(MaterialTheme.shapes.small).background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(FeatherIcons.Copy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Spacer(Modifier.width(12.dp))
@@ -816,10 +817,10 @@ private fun DuplicatesList(
                         )
                     }
                     IconButton(onClick = { onRedownload(attempt) }) {
-                        Icon(FeatherIcons.RotateCcw, contentDescription = "Redownload")
+                        Icon(Icons.Outlined.Restore, contentDescription = "Redownload")
                     }
                     IconButton(onClick = { onDismiss(attempt.id) }) {
-                        Icon(FeatherIcons.X, contentDescription = "Dismiss")
+                        Icon(Icons.Outlined.Close, contentDescription = "Dismiss")
                     }
                 }
             }
@@ -961,9 +962,9 @@ private fun HistoryGridItem(
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val icon = when (item.status) {
-                    DownloadStatus.ERRORED -> FeatherIcons.AlertTriangle
-                    DownloadStatus.DELETED -> FeatherIcons.Trash2
-                    else -> FeatherIcons.Image
+                    DownloadStatus.ERRORED -> Icons.Outlined.Warning
+                    DownloadStatus.DELETED -> Icons.Outlined.Delete
+                    else -> Icons.Outlined.Image
                 }
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(26.dp))
             }
@@ -983,7 +984,7 @@ private fun HistoryGridItem(
                     .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(FeatherIcons.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                    Icon(Icons.Outlined.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
                     Spacer(Modifier.width(3.dp))
                     Text("${item.downloadedItems}", color = Color.White, style = MaterialTheme.typography.labelSmall)
                 }
@@ -1000,7 +1001,7 @@ private fun HistoryGridItem(
                     .background(Color.Black.copy(alpha = 0.55f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
+                Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
             }
         }
 
@@ -1020,7 +1021,7 @@ private fun HistoryGridItem(
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(FeatherIcons.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
+                Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
             }
         }
     }
@@ -1032,8 +1033,8 @@ private fun HistoryGridItem(
 @Composable
 private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
     val (icon, tint, description) = when (status) {
-        DownloadStatus.FINISHED -> Triple(FeatherIcons.CheckCircle, SuccessGreen40, "Succeeded")
-        DownloadStatus.ERRORED -> Triple(FeatherIcons.AlertCircle, MaterialTheme.colorScheme.error, "Failed")
+        DownloadStatus.FINISHED -> Triple(Icons.Outlined.CheckCircle, SuccessGreen40, "Succeeded")
+        DownloadStatus.ERRORED -> Triple(Icons.Outlined.Error, MaterialTheme.colorScheme.error, "Failed")
         else -> return
     }
     Box(
@@ -1138,9 +1139,9 @@ private fun HistoryRow(
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         val icon = when (item.status) {
-                    DownloadStatus.ERRORED -> FeatherIcons.AlertTriangle
-                    DownloadStatus.DELETED -> FeatherIcons.Trash2
-                    else -> FeatherIcons.Image
+                    DownloadStatus.ERRORED -> Icons.Outlined.Warning
+                    DownloadStatus.DELETED -> Icons.Outlined.Delete
+                    else -> Icons.Outlined.Image
                 }
                         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(26.dp))
                     }
@@ -1156,7 +1157,7 @@ private fun HistoryRow(
                             .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(FeatherIcons.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                            Icon(Icons.Outlined.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
                             Spacer(Modifier.width(3.dp))
                             Text("${item.downloadedItems}", color = Color.White, style = MaterialTheme.typography.labelSmall)
                         }
@@ -1173,7 +1174,7 @@ private fun HistoryRow(
                             .background(Color.Black.copy(alpha = 0.55f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(FeatherIcons.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
                     }
                 }
 
@@ -1190,7 +1191,7 @@ private fun HistoryRow(
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(FeatherIcons.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
+                    Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
                 }
             }
         }
@@ -1224,30 +1225,30 @@ private fun HistoryRow(
             Spacer(Modifier.height(6.dp))
 
             val sdf = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
-            MetaRow(icon = FeatherIcons.Layers, text = "${item.downloadedItems} • ${sdf.format(Date(item.effectiveDate))}")
+            MetaRow(icon = Icons.Outlined.Layers, text = "${item.downloadedItems} • ${sdf.format(Date(item.effectiveDate))}")
             Spacer(Modifier.height(2.dp))
-            MetaRow(icon = FeatherIcons.HardDrive, text = "Size • ${formatFileSize(item.totalBytes)}")
+            MetaRow(icon = Icons.Outlined.SdStorage, text = "Size • ${formatFileSize(item.totalBytes)}")
         }
 
         // Bulk actions in the selection-mode top bar replace the per-item menu while selecting.
         if (!selectionMode) Box {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(FeatherIcons.MoreVertical, contentDescription = "More options")
+                Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
             }
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 DropdownMenuItem(
                     text = { Text(if (item.isFavorite) "Remove from Favorites" else "Add to Favorites") },
-                    leadingIcon = { Icon(FeatherIcons.Star, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
                     onClick = { menuExpanded = false; onToggleFavorite() },
                 )
                 DropdownMenuItem(
                     text = { Text("Rename") },
-                    leadingIcon = { Icon(FeatherIcons.Edit2, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                     onClick = { menuExpanded = false; showRenameDialog = true },
                 )
                 DropdownMenuItem(
                     text = { Text("Share Image") },
-                    leadingIcon = { Icon(FeatherIcons.Share2, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
                     enabled = hasThumbnail,
                     onClick = {
                         menuExpanded = false
@@ -1262,7 +1263,7 @@ private fun HistoryRow(
                 )
                 DropdownMenuItem(
                     text = { Text("View Original Source") },
-                    leadingIcon = { Icon(FeatherIcons.ExternalLink, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Outlined.OpenInNew, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url))) }
@@ -1270,7 +1271,7 @@ private fun HistoryRow(
                 )
                 DropdownMenuItem(
                     text = { Text("Copy Post Link") },
-                    leadingIcon = { Icon(FeatherIcons.Copy, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
                         scope.launch {
@@ -1282,7 +1283,7 @@ private fun HistoryRow(
                 HorizontalDivider()
                 DropdownMenuItem(
                     text = { Text("Remove") },
-                    leadingIcon = { Icon(FeatherIcons.Trash2, contentDescription = null) },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                     onClick = { menuExpanded = false; onDelete() },
                 )
             }
