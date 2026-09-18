@@ -388,7 +388,15 @@ class DownloadWorker(
                         // never emits these, so gallery-dl-routed downloads just never hit this
                         // branch and keep using the item-count progress path below untouched.
                         line.startsWith("[size] ") -> {
-                            val bytes = line.removePrefix("[size] ").trim().toLongOrNull()
+                            // toLongOrNull() alone silently dropped this for any HLS/fragmented
+                            // stream (Reddit's native videos, Twitter/X, ...): yt-dlp's own
+                            // total_bytes_estimate (used whenever there's no exact Content-Length
+                            // to report, only an estimate from fragment count/size) is a float,
+                            // e.g. "6897840.0" — reproduced live, that exact line never set a size
+                            // for a Twitter video, matching the user's own "size never shows for
+                            // Reddit/Twitter" report. toDoubleOrNull() first still accepts a plain
+                            // integer string too, so this covers both shapes.
+                            val bytes = line.removePrefix("[size] ").trim().toDoubleOrNull()?.toLong()
                             if (bytes != null) {
                                 dao.setExpectedBytes(downloadId, bytes)
                                 expectedBytesRef.set(bytes)
