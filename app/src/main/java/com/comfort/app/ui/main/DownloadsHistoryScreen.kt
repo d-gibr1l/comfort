@@ -19,6 +19,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -423,14 +424,14 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                 // header Surface's own shadowElevation, visible right above the
                                 // list) doesn't grow along with it.
                                 .padding(top = 8.dp, bottom = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
                         ) {
                             Box {
                                 LibraryToolbarChip(
                                     icon = Icons.Outlined.Tune,
                                     label = "Sort",
                                     onClick = { sortMenuExpanded = true },
-                                    shape = groupedChipShape(0, 4),
+                                    groupIndex = 0, groupSize = 4,
                                 )
                                 DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
                                     LibrarySort.entries.forEach { option ->
@@ -452,7 +453,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     showDeletedOnly = !showDeletedOnly
                                     if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false; audioOnly = false }
                                 },
-                                shape = groupedChipShape(1, 4),
+                                groupIndex = 1, groupSize = 4,
                             )
                             LibraryToolbarChip(
                                 icon = Icons.Outlined.ContentCopy,
@@ -463,7 +464,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     showDuplicatesOnly = !showDuplicatesOnly
                                     if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false; audioOnly = false }
                                 },
-                                shape = groupedChipShape(2, 4),
+                                groupIndex = 2, groupSize = 4,
                             )
                             LibraryToolbarChip(
                                 icon = Icons.Outlined.MusicNote,
@@ -473,7 +474,7 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
                                     audioOnly = !audioOnly
                                     if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
                                 },
-                                shape = groupedChipShape(3, 4),
+                                groupIndex = 3, groupSize = 4,
                             )
                         }
                     }
@@ -850,9 +851,12 @@ private fun LibraryToolbarChip(
     // count on any icon in this app always looks like the same one thing.
     count: Int? = null,
     // Same connected-group treatment as the Queue card's Pause/Cancel chips: the caller passes
-    // its own position in the row via groupedChipShape so the row's outer ends land fully
-    // rounded and the chips facing each other get the tighter shared corner.
-    shape: Shape = MaterialTheme.shapes.large,
+    // this chip's own position/row size so rememberMorphingChipShape below can compute the
+    // row's outer ends fully rounded and the chips facing each other the tighter shared corner
+    // — now owned internally (not a plain passed-in Shape) since the morph needs this chip's own
+    // interactionSource, which only this composable creates.
+    groupIndex: Int = 0,
+    groupSize: Int = 1,
 ) {
     // Badge sits on the whole chip's own top-right corner (not the icon inside it — tried that
     // first, reported live as reading like it belonged to the icon rather than as a count on the
@@ -869,6 +873,7 @@ private fun LibraryToolbarChip(
     // guess, keeps the badge correctly at the corner regardless of the label text's own length.
     var chipWidthPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
+    val interactionSource = remember { MutableInteractionSource() }
     Box(modifier = modifier) {
         // A real FilterChip instead of a hand-rolled Row+clip+background+clickable — same tokens,
         // same animated color transition (FilterChip animates its own colors on selection change
@@ -877,16 +882,17 @@ private fun LibraryToolbarChip(
         FilterChip(
             selected = active,
             onClick = onClick,
-            modifier = Modifier.onSizeChanged { chipWidthPx = it.width },
-            shape = shape,
+            modifier = Modifier.height(40.dp).onSizeChanged { chipWidthPx = it.width },
+            interactionSource = interactionSource,
+            shape = rememberMorphingChipShape(groupIndex, groupSize, selected = active, interactionSource = interactionSource, height = 40.dp),
             leadingIcon = {
                 // better-interface review: this icon's contentDescription duplicated the visible
                 // Text right next to it inside one clickable (merged-semantics) row — decorative
                 // next to real text, so null here, not a repeat of the same name TalkBack already
                 // gets from the label.
-                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             },
-            label = { Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium) },
+            label = { Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium) },
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,

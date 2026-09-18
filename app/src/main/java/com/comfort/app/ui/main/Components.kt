@@ -1,6 +1,7 @@
 package com.comfort.app.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -249,6 +250,44 @@ fun InfoPill(shape: Shape = MaterialTheme.shapes.small, content: @Composable () 
 fun groupedChipShape(index: Int, count: Int, height: Dp = 32.dp): RoundedCornerShape {
     val outer = height / 2
     val inner = 8.dp
+    return when {
+        count <= 1 -> RoundedCornerShape(outer)
+        index == 0 -> RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)
+        index == count - 1 -> RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
+        else -> RoundedCornerShape(inner)
+    }
+}
+
+/** [groupedChipShape], but with M3 Expressive's own signature move on a real ButtonGroup —
+ * corners spring-animate on press/selection — built by hand with plain animateDpAsState rather
+ * than the real ButtonGroup composable: that alpha API's actual Kotlin parameter names/order
+ * aren't recoverable from this app's bundled material3 1.5.0-alpha18 without a cached sources jar
+ * (see QueueScreen.kt's own comment on the same finding), so this reproduces just the shape-morph
+ * *effect* with stable, ordinary Compose animation APIs instead of guessing blind at an unstable
+ * one. Selected corners round out further (a "puffed" resting shape); pressed corners pull in
+ * tighter (a "squish" the same bouncy spring un-squishes on release). */
+@Composable
+fun rememberMorphingChipShape(
+    index: Int,
+    count: Int,
+    selected: Boolean,
+    interactionSource: androidx.compose.foundation.interaction.InteractionSource,
+    height: Dp = 32.dp,
+): RoundedCornerShape {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val restOuter = height / 2
+    val targetOuter = if (pressed) restOuter * 0.55f else restOuter
+    val targetInner = when {
+        pressed -> 4.dp
+        selected -> 14.dp
+        else -> 8.dp
+    }
+    val animSpec = androidx.compose.animation.core.spring<Dp>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+    )
+    val outer by androidx.compose.animation.core.animateDpAsState(targetOuter, animSpec, label = "chipOuterCorner")
+    val inner by androidx.compose.animation.core.animateDpAsState(targetInner, animSpec, label = "chipInnerCorner")
     return when {
         count <= 1 -> RoundedCornerShape(outer)
         index == 0 -> RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)

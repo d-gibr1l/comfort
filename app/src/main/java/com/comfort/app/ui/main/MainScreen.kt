@@ -400,19 +400,6 @@ private fun FloatingNavBar(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Read via graphicsLayer's deferred block below (not destructured with `by`), so this
-    // continuous animation only re-triggers the settings icon's draw phase, not a recomposition
-    // of the whole nav bar on every frame.
-    val settingsRotation = rememberInfiniteTransition(label = "settingsSpin").animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "settingsRotation",
-    )
-
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -456,17 +443,7 @@ private fun FloatingNavBar(
                             .padding(horizontal = if (selected) 20.dp else 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val iconModifier = Modifier
-                            .size(22.dp)
-                            .then(
-                                if (index == 2) {
-                                    Modifier.graphicsLayer {
-                                        rotationZ = if (selected) settingsRotation.value else 0f
-                                    }
-                                } else {
-                                    Modifier
-                                }
-                            )
+                        val iconModifier = Modifier.size(22.dp)
                         if (index == 1 && activeDownloadsCount > 0) {
                             BadgedBox(badge = {
                                 Badge(containerColor = MaterialTheme.colorScheme.error) {

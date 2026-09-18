@@ -54,11 +54,17 @@
         <activity
             android:name=".ShareActivity"
             android:exported="true"
+            android:label="@string/share_configure_label"
             android:theme="@style/Theme.GalleryDL.Transparent"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
             android:taskAffinity="">
-            <!-- singleTask: at most one instance of this Activity ever exists — a share arriving
+            <!-- android:label distinguishes this from the "Instant" alias below in the
+                 Sharesheet — without an explicit label of its own, this fell back to the
+                 <application> tag's own label ("Comfort"), same as the alias's default would,
+                 leaving both entries showing the exact same name with no way to tell them apart.
+
+                 singleTask: at most one instance of this Activity ever exists — a share arriving
                  while one's already open reuses it (delivered via onNewIntent, see its own doc
                  comment in ShareActivity.kt) instead of creating another one on top. Without this,
                  the default launchMode lets instances pile up indefinitely, one per share — most
@@ -107,6 +113,31 @@
                 <data android:scheme="https" android:host="open.spotify.com" />
             </intent-filter>
         </activity>
+
+        <!-- "Instant" — a second entry for this exact same Activity, not the Sharing
+             Shortcuts/ShortcutManager API (tried that first; per Android's own docs it only
+             surfaces shortcuts published dynamically at runtime, and even a correctly-published
+             one never showed up live on a real device — most likely the Sharesheet's own target
+             cache never picked it up). This is the real mechanism Seal (github.com/JunkFood02/
+             Seal) uses for its own "Quick download" share entry: a second manifest component
+             with the identical intent-filter but a distinct label — Android's Sharesheet groups
+             multiple same-package matches under one icon and offers a tap-to-expand choice
+             between their labels. An activity-alias (not a duplicate Activity class) so this
+             stays wired to ShareActivity's own real implementation; ShareActivity tells the two
+             apart via getIntent().component, which the platform documents as reporting the
+             *alias* actually invoked, not always ShareActivity itself. -->
+        <activity-alias
+            android:name=".QuickDownloadActivity"
+            android:targetActivity=".ShareActivity"
+            android:exported="true"
+            android:label="@string/share_instant_label"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver
             android:name=".worker.DownloadActionReceiver"
