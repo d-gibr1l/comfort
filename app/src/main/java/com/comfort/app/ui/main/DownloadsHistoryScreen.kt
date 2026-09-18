@@ -91,7 +91,19 @@ private enum class LibrarySort(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Unit, isQueueOpen: Boolean = false) {
+fun DownloadsHistoryScreen(
+    viewModel: DownloadsViewModel,
+    onOpenQueue: () -> Unit,
+    isQueueOpen: Boolean = false,
+    // Hoisted up to MainScreen's own outer Box instead of a plain remember { SnackbarHostState() }
+    // here — this screen's own Scaffold draws *before* FloatingNavBar in that Box (it's one of the
+    // three tab contents, composed ahead of the persistent floating pill), so a SnackbarHost
+    // rendered through this screen's own Scaffold silently drew underneath the pill instead of
+    // over it. Reported live: the "Download removed" Undo snackbar peeked out from behind the nav
+    // bar's rounded ends instead of sitting above it. MainScreen now owns this SnackbarHost and
+    // renders it after FloatingNavBar, so this screen only needs the state to trigger it with.
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+) {
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
     val deletedItems by viewModel.deletedFlow.collectAsStateWithLifecycle()
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsStateWithLifecycle()
@@ -122,7 +134,6 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     var gridView by remember { mutableStateOf(GalleryDlPreferences.isLibraryGridView(context)) }
     val selectionMode = selectedIds.isNotEmpty()
 
-    val snackbarHostState = remember { SnackbarHostState() }
     val deleteScope = rememberCoroutineScope()
     // Every delete on this screen (bulk, a single row's "Remove", swipe-to-dismiss) routes through
     // here instead of calling viewModel.deleteDownload directly — better-interface review flagged
@@ -216,7 +227,8 @@ fun DownloadsHistoryScreen(viewModel: DownloadsViewModel, onOpenQueue: () -> Uni
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // No snackbarHost here any more — see this screen's own snackbarHostState parameter doc
+        // comment for why MainScreen now renders it instead.
         topBar = {
             if (selectionMode) {
                 TopAppBar(
