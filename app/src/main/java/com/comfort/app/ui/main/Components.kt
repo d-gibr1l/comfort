@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.comfort.app.R
 import com.comfort.app.data.DownloadEntity
@@ -225,9 +228,9 @@ fun formatEta(seconds: Int): String {
 /** A small tinted pill for a queue card's site badge/format tags — a plain icon+text label read
  * as an afterthought floating in mostly-empty card space, not a deliberate piece of the layout. */
 @Composable
-fun InfoPill(content: @Composable () -> Unit) {
+fun InfoPill(shape: Shape = MaterialTheme.shapes.small, content: @Composable () -> Unit) {
     Surface(
-        shape = MaterialTheme.shapes.small,
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Row(
@@ -235,6 +238,22 @@ fun InfoPill(content: @Composable () -> Unit) {
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             content = { content() },
         )
+    }
+}
+
+/** The M3 Expressive "connected group" shape treatment for a row of adjacent chips/pills sitting
+ * with a small gap between them: fully rounded on the group's own outer ends, a tighter corner on
+ * the sides facing a neighbor — so the row reads as one grouped control rather than N separate
+ * pills. `height` should match the real rendered height of the item (its outer radius is half of
+ * it, i.e. a true pill cap); a lone item (count == 1) is just fully rounded on every corner. */
+fun groupedChipShape(index: Int, count: Int, height: Dp = 32.dp): RoundedCornerShape {
+    val outer = height / 2
+    val inner = 8.dp
+    return when {
+        count <= 1 -> RoundedCornerShape(outer)
+        index == 0 -> RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner)
+        index == count - 1 -> RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer)
+        else -> RoundedCornerShape(inner)
     }
 }
 

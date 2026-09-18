@@ -1019,11 +1019,17 @@ fun QueueItemCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // Format tags, if any, then the site badge — grouped as a single connected
+                    // pill row (same rounded-outer/tight-inner shape as the Pause/Cancel chips
+                    // below): the site badge is always index 0, so this list's own size decides
+                    // where each pill's "outer end" actually falls.
+                    val formatTagList = item.formatTags?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+                    val pillCount = 1 + formatTagList.size
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        InfoPill {
+                        InfoPill(shape = groupedChipShape(0, pillCount, height = 24.dp)) {
                             Icon(
                                 Icons.Outlined.Public,
                                 contentDescription = null,
@@ -1042,8 +1048,8 @@ fun QueueItemCard(
                         // yt_dlp_wrapper.py's own "[format]" signal) — at a glance, no need to
                         // open anything to find out. Gallery-dl-routed downloads never populate
                         // this at all, so the row is just the site badge for those, same as before.
-                        item.formatTags?.split("|")?.filter { it.isNotBlank() }?.forEach { tag ->
-                            InfoPill {
+                        formatTagList.forEachIndexed { i, tag ->
+                            InfoPill(shape = groupedChipShape(i + 1, pillCount, height = 24.dp)) {
                                 Text(
                                     text = tag,
                                     style = MaterialTheme.typography.labelMedium,
@@ -1132,14 +1138,15 @@ fun QueueItemCard(
                 ) {
                     when (item.status) {
                         DownloadStatus.RUNNING -> {
-                            // Real AssistChips (8dp corners, 32dp tall — M3's own chip spec, not
-                            // a pill) instead of the previous icon-only FilledTonalIconButtons — a
-                            // bare glyph made Pause and Cancel hard to tell apart at a glance;
-                            // spelling out the label fixes that without needing color alone to
-                            // carry the distinction.
+                            // Real AssistChips (8dp corners, 32dp tall — M3's own chip spec) with
+                            // the connected-group shape treatment: fully rounded on the pair's own
+                            // outer ends (Pause's left, Cancel's right), a tighter corner where
+                            // they face each other — instead of the previous icon-only
+                            // FilledTonalIconButtons, whose bare glyph made Pause and Cancel hard
+                            // to tell apart at a glance.
                             AssistChip(
                                 onClick = onPauseResume,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = groupedChipShape(0, 2),
                                 border = AssistChipDefaults.assistChipBorder(
                                     enabled = true,
                                     borderColor = MaterialTheme.colorScheme.outline,
@@ -1153,7 +1160,7 @@ fun QueueItemCard(
                             )
                             AssistChip(
                                 onClick = onCancel,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = groupedChipShape(1, 2),
                                 border = AssistChipDefaults.assistChipBorder(
                                     enabled = true,
                                     borderColor = MaterialTheme.colorScheme.error,
