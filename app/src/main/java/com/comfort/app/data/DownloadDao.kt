@@ -80,6 +80,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET liveBytes = :bytes, speedMbs = :speed WHERE id = :id")
     suspend fun updateLiveBytes(id: String, bytes: Long, speed: Float)
 
+    /** Set/cleared from yt_dlp_wrapper.py's own "[phase] audio"/"[phase] video" signal — see
+     * DownloadEntity.downloadingAudioTrack's own doc comment. */
+    @Query("UPDATE downloads SET downloadingAudioTrack = :value WHERE id = :id")
+    suspend fun setDownloadingAudioTrack(id: String, value: Boolean)
+
     /** Known ahead of time only when the download came from the share-sheet item picker (its
      * selection count) or when we enumerate the gallery first via list_items(); otherwise stays 0
      * and the UI falls back to an indeterminate progress indicator. */

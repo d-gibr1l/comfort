@@ -721,9 +721,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # current ease finishes, so the animation reads as continuous motion instead.
     last_progress_emit = [0.0]
     last_emitted_bytes = [0]
-    reported_size = [False]
+    last_reported_total = [None]
     reported_title = [False]
     reported_thumbnail = [False]
+    last_filename = [None]
 
     # Every one of these postprocessors further transforms the file yt-dlp just finished
     # downloading (ExtractAudio changes its extension and deletes the original; the others embed
@@ -775,6 +776,30 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         status = d.get("status")
         if status == "downloading" and callback:
             info = d.get("info_dict") or {}
+            # A "bestvideo+bestaudio" merge fetches two entirely separate sub-files in this same
+            # download() call — reported_size latching after the *first* one (the video) meant the
+            # audio track's own, much smaller total never got reported at all: the card kept
+            # showing "X of <video's size>" straight through the audio phase too, since nothing
+            # ever told it a new, differently-sized file had started. yt-dlp's own "filename" key
+            # changes with each new sub-file (".fXXX.mp4" for video, then ".fXXX-audio-....mp4" for
+            # audio) — reproduced live against a Twitter video: [size] fired once for the ~27MB
+            # video, never again for the ~1.3MB audio track that followed. Resetting reported_size
+            # (and the speed/throttle state, so the audio phase's own rate isn't computed against
+            # the video phase's last sample) on that change lets each sub-file report its own real
+            # size, same as if it were its own separate download.
+            filename = d.get("filename")
+            if filename != last_filename[0]:
+                last_filename[0] = filename
+                last_reported_total[0] = None
+                last_progress_emit[0] = 0.0
+                last_emitted_bytes[0] = 0
+                # Tells the UI which sub-file is actually downloading right now — the audio track
+                # of a video+audio merge looks, from the user's side, like a second download
+                # starting out of nowhere with its own (much smaller) size, easy to mistake for a
+                # stuck/wrong progress bar rather than what it actually is. vcodec == "none" is the
+                # same signal yt-dlp itself uses to mean "this format carries no video at all".
+                is_audio_track = (info.get("vcodec") or "none") == "none"
+                callback(f"[phase] {'audio' if is_audio_track else 'video'}")
             if not reported_title[0]:
                 # Extraction has already happened by the time any "downloading" event fires, so
                 # the real poster/caption are available immediately — sent once, this early,
@@ -813,15 +838,34 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                     callback(f"[album] {album[:200]}")
                 if track:
                     callback(f"[track] {track[:200]}")
-            total = d.get("total_bytes") or d.get("total_bytes_estimate")
-            if total and not reported_size[0]:
-                # Sent once, as soon as it's known — before any bytes have actually moved — so the
-                # UI can show a real size and a byte-accurate progress fraction immediately instead
-                # of only once the download finishes.
-                reported_size[0] = True
-                callback(f"[size] {total}")
+            # When audio_only falls back to a muxed video+audio format (chosen_format's own
+            # "bestaudio.../best" fallback — this site had no separate audio-only stream at all),
+            # `total` here is the video-inclusive download's size, not what FFmpegExtractAudioPP
+            # is about to produce once it strips the video track out. Reporting it as this
+            # download's own expected size showed something like "4MB of 180MB" even once
+            # genuinely finished, since the real final audio file ends up far smaller — reproduced
+            # live against a Twitter video downloaded as audio-only. Suppressing it here (leaving
+            # expectedBytes at 0) falls back to the same "unknown total" indeterminate progress
+            # DownloadWorker/QueueScreen already use elsewhere; the real, correct size still shows
+            # immediately afterward from the finished file's own size on disk (DownloadWorker's
+            # fileSize = candidate.length()), never from this pre-extraction estimate.
+            skip_size = audio_only and (info.get("vcodec") or "none") != "none"
             now = time.monotonic()
             if now - last_progress_emit[0] >= 0.5:
+                # total_bytes_estimate (used by the HLS-native downloader whenever there's no
+                # exact Content-Length, only an average-fragment-size guess — Reddit's native
+                # videos and Twitter/X both stream this way) genuinely changes as more fragments
+                # complete and the average improves — reproduced live: an early estimate can be
+                # well off from where it settles a few seconds in. Reporting it only once (the old
+                # behavior) froze the UI on whatever guess happened to exist at that first tick,
+                # including a wrong one, even though it kept visibly changing on a real terminal.
+                # Re-checked on the same throttle as [progress] below (every 0.5s) so a genuinely
+                # exact total_bytes (a plain Content-Length, which never changes) only gets sent
+                # once in practice anyway — nothing here forces a resend when the value is stable.
+                total = d.get("total_bytes") or d.get("total_bytes_estimate")
+                if total and not skip_size and total != last_reported_total[0]:
+                    last_reported_total[0] = total
+                    callback(f"[size] {total}")
                 downloaded = d.get("downloaded_bytes") or 0
                 # Not d.get("speed") — yt-dlp computes that as a cumulative average over the whole
                 # transfer so far (total bytes ÷ total elapsed time since this file started), not a
