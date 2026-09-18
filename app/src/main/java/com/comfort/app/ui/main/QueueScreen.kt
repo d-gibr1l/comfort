@@ -1132,34 +1132,39 @@ fun QueueItemCard(
                 ) {
                     when (item.status) {
                         DownloadStatus.RUNNING -> {
-                            // Tonal, color-coded rather than plain IconButtons — a bare glyph read
-                            // as an afterthought floating in the card's own empty space, same
-                            // critique as the site badge/format tags above; Pause and Cancel also
-                            // read as visually identical at a glance without some distinction
-                            // between "safe, resumable" and "destructive" beyond the icon shape
-                            // alone. Explicit 40dp rather than the default 48dp for the same
-                            // reason the plain IconButtons here were already shrunk — still well
-                            // within Material's own accepted range for a dense list row.
-                            FilledTonalIconButton(
+                            // Real AssistChips (8dp corners, 32dp tall — M3's own chip spec, not
+                            // a pill) instead of the previous icon-only FilledTonalIconButtons — a
+                            // bare glyph made Pause and Cancel hard to tell apart at a glance;
+                            // spelling out the label fixes that without needing color alone to
+                            // carry the distinction.
+                            AssistChip(
                                 onClick = onPauseResume,
-                                modifier = Modifier.size(40.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                shape = RoundedCornerShape(8.dp),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    enabled = true,
+                                    borderColor = MaterialTheme.colorScheme.outline,
                                 ),
-                            ) {
-                                Icon(Icons.Outlined.Pause, contentDescription = "Pause", modifier = Modifier.size(18.dp))
-                            }
-                            FilledTonalIconButton(
+                                colors = AssistChipDefaults.assistChipColors(
+                                    labelColor = MaterialTheme.colorScheme.onSurface,
+                                    leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                leadingIcon = { Icon(Icons.Outlined.Pause, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                label = { Text("Pause", style = MaterialTheme.typography.labelLarge) },
+                            )
+                            AssistChip(
                                 onClick = onCancel,
-                                modifier = Modifier.size(40.dp),
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                shape = RoundedCornerShape(8.dp),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    enabled = true,
+                                    borderColor = MaterialTheme.colorScheme.error,
                                 ),
-                            ) {
-                                Icon(Icons.Outlined.Close, contentDescription = "Cancel", modifier = Modifier.size(18.dp))
-                            }
+                                colors = AssistChipDefaults.assistChipColors(
+                                    labelColor = MaterialTheme.colorScheme.error,
+                                    leadingIconContentColor = MaterialTheme.colorScheme.error,
+                                ),
+                                leadingIcon = { Icon(Icons.Outlined.Close, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                label = { Text("Cancel", style = MaterialTheme.typography.labelLarge) },
+                            )
                         }
                         DownloadStatus.ERRORED -> {
                             IconButton(onClick = onShowError) {
