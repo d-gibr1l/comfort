@@ -19,6 +19,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -456,11 +457,7 @@ fun DownloadPreviewSheet(
         // against the sheet's own top edge instead of leaving MAIN's dimmed chrome visible above
         // it). graphicsLayer only affects the draw phase, not layout, so the handle keeps occupying
         // the exact same space at every screen — invisible, never absent.
-        dragHandle = {
-            Box(modifier = Modifier.graphicsLayer { alpha = if (screen == PreviewScreen.MAIN) 1f else 0f }) {
-                BottomSheetDefaults.DragHandle()
-            }
-        },
+        dragHandle = null,
     ) {
         // Broken out into its own (non-extension) composable so the AnimatedVisibility calls below
         // aren't lexically inside ModalBottomSheet's ColumnScope receiver — with that receiver in
@@ -590,6 +587,45 @@ private fun PreviewSheetOverlayHost(
     val dragScope = rememberCoroutineScope()
     LaunchedEffect(overlayOpen) { if (overlayOpen) dragOffsetPx = 0f }
 
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val thresholdPx = remember(density) { with(density) { 48.dp.toPx() } }
+    val nestedScrollConnection = remember(scope, onRevertOverlay, thresholdPx) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (available.y < 0 && dragOffsetPx > 0) {
+                    val old = dragOffsetPx
+                    dragOffsetPx = (dragOffsetPx + available.y).coerceAtLeast(0f)
+                    return androidx.compose.ui.geometry.Offset(0f, available.y - (dragOffsetPx - old))
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                if (available.y > 0) {
+                    dragOffsetPx += available.y
+                    return androidx.compose.ui.geometry.Offset(0f, available.y)
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                if (dragOffsetPx > 0f) {
+                    if (available.y > 1000f || dragOffsetPx > thresholdPx) {
+                        onRevertOverlay()
+                    } else {
+                        scope.launch {
+                            androidx.compose.animation.core.animate(dragOffsetPx, 0f) { value, _ -> dragOffsetPx = value }
+                        }
+                    }
+                    return available
+                }
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxWidth()) {
         MainPreviewScreen(
             url = url,
@@ -698,6 +734,7 @@ private fun PreviewSheetOverlayHost(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .nestedScroll(nestedScrollConnection)
                     // Moves the whole panel down with the finger as dragOffsetPx tracks the drag
                     // below — this is what actually makes the drag look like it's moving the
                     // sheet, rather than just quietly counting distance toward a threshold.
@@ -1001,7 +1038,8 @@ private fun MainPreviewScreen(
     // sheet regardless of how short its one item was, showing as a large dead gap between the
     // card and the fixed chips/Download footer (reproduced live, screenshot from the user).
     val isList = song.mode == PreviewMode.SONG_LIST
-    Column(modifier = Modifier.fillMaxWidth().let { if (isList) it.fillMaxHeight() else it }) {
+    Column(modifier = Modifier.fillMaxWidth().let { if (isList) it.fillMaxHeight() else it }.navigationBarsPadding()) {
+        androidx.compose.material3.BottomSheetDefaults.DragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1822,9 +1860,22 @@ private fun TrimVideoScreen(
             modifier = Modifier.padding(start = 16.dp),
         )
 
+        val realDurationMs = durationMs?.takeIf { it > 0L }
+        val effectiveDurationMs = realDurationMs ?: NOMINAL_DURATION_MS
+        // Hard-capped at the real duration once it's known, rather than still widening for
+        // whatever a segment's own endMs/the playhead reach (the old behavior) — that ratchet let
+        // Set Start/Add a segment push a boundary arbitrarily far past the actual video, which
+        // yt_dlp_wrapper.py's _LocalTrimPP then trimmed with no validation, silently replacing an
+        // already-finished download with an empty file (reproduced live). toClipRange() clamps
+        // again right before a download actually starts as the last line of defense regardless of
+        // how a segment got here, but keeping the slider itself from ever going further than the
+        // real video exists is what stops the bogus value from being created in the first place.
+        val maxSliderMs = realDurationMs?.toFloat()
+            ?: maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
+
         Surface(
-            modifier = Modifier.fillMaxWidth().height(176.dp),
-            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+            shape = androidx.compose.ui.graphics.RectangleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -1863,6 +1914,24 @@ private fun TrimVideoScreen(
                         )
                     }
                 }
+
+                if (isDraggingSlider && maxSliderMs > 0f) {
+                    val dragFrac = (playheadMs.toFloat() / maxSliderMs).coerceIn(0f, 1f)
+                    Surface(
+                        modifier = Modifier
+                            .align(androidx.compose.ui.BiasAlignment(dragFrac * 2f - 1f, 1f))
+                            .padding(bottom = 12.dp),
+                        color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            formatTimestamp(playheadMs),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
+                }
             }
         }
 
@@ -1876,43 +1945,7 @@ private fun TrimVideoScreen(
         // last 9 minutes go completely unreachable. NOMINAL_DURATION_MS now only covers the case
         // this was originally written for: no stream/duration resolved at all (see its own doc
         // comment) — there's nothing real to range against yet, so it's the one honest fallback.
-        val realDurationMs = durationMs?.takeIf { it > 0L }
-        val effectiveDurationMs = realDurationMs ?: NOMINAL_DURATION_MS
-        // Hard-capped at the real duration once it's known, rather than still widening for
-        // whatever a segment's own endMs/the playhead reach (the old behavior) — that ratchet let
-        // Set Start/Add a segment push a boundary arbitrarily far past the actual video, which
-        // yt_dlp_wrapper.py's _LocalTrimPP then trimmed with no validation, silently replacing an
-        // already-finished download with an empty file (reproduced live). toClipRange() clamps
-        // again right before a download actually starts as the last line of defense regardless of
-        // how a segment got here, but keeping the slider itself from ever going further than the
-        // real video exists is what stops the bogus value from being created in the first place.
-        val maxSliderMs = realDurationMs?.toFloat()
-            ?: maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
 
-        // A floating readout that tracks the thumb horizontally while the user is actively
-        // dragging it — the video preview box already shows a live timestamp when there's no
-        // playable stream (or ExoPlayer's own controller otherwise), but neither one is anchored
-        // to the Slider itself, so a drag on a long video gave no feedback for exactly where the
-        // thumb currently sits until the user let go. BiasAlignment's horizontal bias (-1 at the
-        // far left, 0 centered, +1 at the far right) maps directly from the drag fraction without
-        // needing to measure the bubble's own width to center it.
-        Box(Modifier.fillMaxWidth().height(40.dp)) {
-            if (isDraggingSlider && maxSliderMs > 0f) {
-                val dragFrac = (playheadMs.toFloat() / maxSliderMs).coerceIn(0f, 1f)
-                Surface(
-                    modifier = Modifier.align(androidx.compose.ui.BiasAlignment(dragFrac * 2f - 1f, 0f)),
-                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.7f),
-                    shape = MaterialTheme.shapes.small,
-                ) {
-                    Text(
-                        formatTimestamp(playheadMs),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.inverseOnSurface,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                }
-            }
-        }
         Slider(
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
