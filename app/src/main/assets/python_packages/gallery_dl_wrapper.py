@@ -1,9 +1,11 @@
 import io
 import shlex
 import sys
+import time
 from contextlib import redirect_stdout, redirect_stderr
 import gallery_dl
 import gallery_dl.job
+import gallery_dl.output
 
 # gallery-dl's own internal yt-dlp delegation (downloader/ytdl.py, used for "ytdl:"-prefixed
 # URLs on sites like Instagram) names each pre-merge DASH stream "...fdash-<id>v.<ext>" (video)
@@ -66,6 +68,45 @@ class CallbackWriter:
         if self.buffer.strip():
             self._emit(self.buffer)
             self.buffer = ""
+
+# gallery-dl's own HTTP downloader already reads each file's real Content-Length and calls
+# self.out.progress(total, downloaded, speed) as it streams (downloader/http.py) — confirmed live
+# this is exactly what shows a real total size/progress on a real terminal. But output.select()
+# (output.py) only picks a real reporting class (TerminalOutput/ColorOutput) when sys.stdout.isatty()
+# — under this app's own non-tty CallbackWriter redirect it silently picks PipeOutput instead,
+# whose progress() is a no-op inherited from NullOutput, so none of this ever reached Kotlin at
+# all. Reproduced live: yt-dlp-routed downloads always report [size]/[progress] (yt_dlp_wrapper.py's
+# own progress_hooks, a first-class yt-dlp option), gallery-dl-routed ones (Reddit, Twitter, most
+# image-board sites) never did, even though gallery-dl had the real byte counts the whole time.
+# This reports them in the exact same [size]/[progress] line shape DownloadWorker.kt already
+# parses, patched in for download() only (see its own use, below) — list_items()'s --dump-json
+# pass never downloads anything, so there's nothing for this to report there.
+class _CallbackOutput:
+    def __init__(self, emit):
+        self._emit = emit
+        self._last_total = None
+        self._last_emit_time = 0.0
+
+    def start(self, path):
+        self._last_total = None  # next progress() call's total belongs to this new file
+
+    def skip(self, path):
+        pass
+
+    def success(self, path):
+        pass
+
+    def progress(self, bytes_total, bytes_downloaded, bytes_per_second):
+        if bytes_total is not None and bytes_total != self._last_total:
+            self._last_total = bytes_total
+            self._emit(f"[size] {bytes_total}")
+        # Same 0.5s throttle yt_dlp_wrapper.py's own progress_hook already uses — gallery-dl's
+        # downloader otherwise calls this several times a second, far more often than the UI
+        # (or a DB write per line) needs.
+        now = time.monotonic()
+        if now - self._last_emit_time >= 0.5:
+            self._last_emit_time = now
+            self._emit(f"[progress] downloaded={bytes_downloaded} speed={bytes_per_second or 0}")
 
 def probe(url):
     # "1" if gallery-dl has a real extractor for url, "0" otherwise (incl. on any error).
@@ -152,6 +193,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     sys.argv = args
     status = "Done"
 
+    original_output_select = gallery_dl.output.select
+    if callback:
+        gallery_dl.output.select = lambda: _CallbackOutput(writer._emit)
+
     with redirect_stdout(writer), redirect_stderr(writer):
         try:
             gallery_dl.main()
@@ -164,6 +209,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             status = f"Error: {e}"
             print(f"Exception: {e}")
         finally:
+            gallery_dl.output.select = original_output_select
             if callback and not (should_cancel is not None and should_cancel()):
                 writer.flush()
             sys.argv = original_argv
