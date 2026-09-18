@@ -826,7 +826,13 @@ fun QueueItemCard(
                     )
                     val statusText = when (item.status) {
                         DownloadStatus.RUNNING -> {
-                            if (item.expectedBytes > 0 || item.totalBytes > 0 || item.liveBytes > 0 || item.totalItems > 0) {
+                            if (item.downloadingAudioTrack) {
+                                // A video+audio merge's own separate audio sub-file looks, from
+                                // the queue card alone, like a second download starting out of
+                                // nowhere with a much smaller size — this is what actually
+                                // distinguishes it from a stuck/wrong progress bar.
+                                "Extracting audio"
+                            } else if (item.expectedBytes > 0 || item.totalBytes > 0 || item.liveBytes > 0 || item.totalItems > 0) {
                                 "Downloading"
                             } else {
                                 "Fetching info..."

@@ -402,6 +402,13 @@ class DownloadWorker(
                                 expectedBytesRef.set(bytes)
                             }
                         }
+                        // Sent once per sub-file (a video+audio merge's own separate audio track,
+                        // or the sole file of an audio_only download) — see
+                        // DownloadEntity.downloadingAudioTrack's own doc comment for why the queue
+                        // card needs to know this at all.
+                        line.startsWith("[phase] ") -> {
+                            dao.setDownloadingAudioTrack(downloadId, line.removePrefix("[phase] ").trim() == "audio")
+                        }
                         line.startsWith("[progress] ") -> {
                             val rest = line.removePrefix("[progress] ")
                             val downloaded = Regex("downloaded=(\\d+)").find(rest)?.groupValues?.get(1)?.toLongOrNull()

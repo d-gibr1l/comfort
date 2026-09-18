@@ -72,6 +72,14 @@ data class DownloadEntity(
     val expectedBytes: Long = 0,
     @ColumnInfo(defaultValue = "0")
     val liveBytes: Long = 0,
+    // Set while yt_dlp_wrapper.py's own progress_hook is downloading a video+audio merge's
+    // separate audio sub-file (or a pure audio_only download) rather than its video track — the
+    // audio phase looks, from the queue card alone, like a second download starting out of
+    // nowhere with a much smaller size, easy to mistake for a stuck/wrong progress bar instead of
+    // what it actually is. Same "stale once RUNNING ends, fine since not read afterward" pattern
+    // as expectedBytes/liveBytes above.
+    @ColumnInfo(defaultValue = "0")
+    val downloadingAudioTrack: Boolean = false,
     // gallery-dl `--filter "num in {...}"` expression, set when the user picked specific items
     // in the share sheet instead of the whole gallery. Persisted so retry/resume re-applies the
     // same selection instead of re-fetching everything.
