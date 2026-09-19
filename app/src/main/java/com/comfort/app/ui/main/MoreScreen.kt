@@ -19,7 +19,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -2870,36 +2869,29 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
         // challenges, and aria2 (Aria2Runtime) doing real multi-connection downloads — none of them
         // previously credited or linked anywhere in the app.
         SettingsSection(title = "Credits", icon = Icons.Outlined.Link) {
-            LinkRow(
-                icon = Icons.Outlined.Code,
-                title = "gallery-dl",
-                url = "https://github.com/mikf/gallery-dl",
-            )
-            LinkRow(
-                icon = Icons.Outlined.Terminal,
-                title = "yt-dlp",
-                url = "https://github.com/yt-dlp/yt-dlp",
-            )
-            LinkRow(
-                icon = Icons.Outlined.Movie,
-                title = "FFmpeg",
-                url = "https://ffmpeg.org",
-            )
-            LinkRow(
-                icon = Icons.Outlined.Memory,
-                title = "QuickJS",
-                url = "https://bellard.org/quickjs/",
-            )
-            LinkRow(
-                icon = Icons.Outlined.Inventory2,
-                title = "YTDLnis Python runtime (curl_cffi build)",
-                url = "https://github.com/deniscerri/ytdlnis-packages",
-            )
-            LinkRow(
-                icon = Icons.Outlined.Bolt,
-                title = "aria2 (multi-connection downloads)",
-                url = "https://aria2.github.io/",
-            )
+            // gallery-dl, QuickJS, and aria2 have no usable real-logo asset (gallery-dl and QuickJS
+            // ship no logo at all; aria2's only asset is a 16x16 favicon too small to read as
+            // anything but a blob at chip size) — those three keep a generic Material icon.
+            // FFmpeg's favicon and the Python community logo (credited project is literally
+            // CPython, via YTDLnis's published interpreter build — see PythonRuntime's own doc
+            // comment) are real, recognizable marks, so those two use their actual artwork instead.
+            val credits = remember {
+                listOf(
+                    CreditEntry(icon = Icons.Outlined.Code, title = "gallery-dl", url = "https://github.com/mikf/gallery-dl"),
+                    CreditEntry(icon = Icons.Outlined.Terminal, title = "yt-dlp", url = "https://github.com/yt-dlp/yt-dlp"),
+                    CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_ffmpeg, title = "FFmpeg", url = "https://ffmpeg.org"),
+                    CreditEntry(icon = Icons.Outlined.Memory, title = "QuickJS", url = "https://bellard.org/quickjs/"),
+                    CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = "Python runtime", url = "https://github.com/deniscerri/ytdlnis-packages"),
+                    CreditEntry(icon = Icons.Outlined.Bolt, title = "aria2", url = "https://aria2.github.io/"),
+                )
+            }
+            credits.chunked(2).forEachIndexed { rowIndex, row ->
+                if (rowIndex > 0) Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    row.forEach { entry -> CreditChip(entry, modifier = Modifier.weight(1f)) }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -3316,15 +3308,7 @@ private fun EngineCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(17.dp))
-                }
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -3403,21 +3387,57 @@ private fun EngineChannelPicker(
     }
 }
 
+// Exactly one of icon/iconRes is set per entry — a plain Material icon for projects with no real
+// logo asset, or a bundled drawable (see the Credits section's own comment) for the ones that have one.
+private data class CreditEntry(
+    val title: String,
+    val url: String,
+    val icon: ImageVector? = null,
+    @androidx.annotation.DrawableRes val iconRes: Int? = null,
+)
+
+// 2-column chip grid for the About screen's Credits section — replaced a plain vertical list of
+// icon+title+raw-URL rows (one credit per line, URL spelled out underneath) with a denser card
+// grid: the URL itself was never useful at a glance (nobody reads out a github.com URL), just an
+// affordance to tap through, so it's dropped from the visible chip and only used as the tap target.
 @Composable
-private fun LinkRow(icon: ImageVector, title: String, url: String) {
+private fun CreditChip(entry: CreditEntry, modifier: Modifier = Modifier) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val haptics = LocalHapticFeedback.current
+    Surface(
+        modifier = modifier
+            .clickable {
+                haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(entry.url))) }
+            },
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
-            Text(url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (entry.iconRes != null) {
+                Image(
+                    androidx.compose.ui.res.painterResource(entry.iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                )
+            } else {
+                Icon(
+                    entry.icon!!,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                entry.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
