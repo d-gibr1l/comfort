@@ -38,20 +38,39 @@ object VideoSiteRouter {
     // videoOnlyHosts below but its own dedicated engine rather than reusing YT_DLP.
     private val spotifyHosts = setOf("open.spotify.com", "spotify.com", "spotify.link")
 
-    fun classify(url: String): DownloadEngine {
-        val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
-            ?: return DownloadEngine.GALLERY_DL
+    // Extracted once and reused everywhere below (classify/isKnownSongHost/alwaysSupplementsVideo/
+    // siteName each used to independently re-run this exact same runCatching{...} expression) —
+    // a future fix to host normalization (stripping a trailing dot, handling IDN/punycode, ...)
+    // now only needs to happen in one place instead of four, with no risk of one call site
+    // silently being missed.
+    private fun normalizedHost(url: String): String? =
+        runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
 
-        if (spotifyHosts.any { host == it || host.endsWith(".$it") }) {
+    // Same reasoning as normalizedHost above — this exact `any { host == it || host.endsWith(
+    // ".$it") }` predicate was copy-pasted at every host-set check site.
+    private fun Set<String>.matchesHost(host: String): Boolean = any { host == it || host.endsWith(".$it") }
+
+    fun classify(url: String): DownloadEngine {
+        val host = normalizedHost(url) ?: return DownloadEngine.GALLERY_DL
+
+        if (spotifyHosts.matchesHost(host)) {
             return DownloadEngine.SPOTIFY
         }
 
-        // Instagram reels are always videos and handle much better in yt-dlp immediately
-        if ((host == "instagram.com" || host.endsWith(".instagram.com")) && url.contains("/reel/")) {
+        // Instagram reels are always videos and handle much better in yt-dlp immediately.
+        // Checked against the URI's own path (lowercased), not a raw substring search over the
+        // whole url — the raw-substring version missed differently-cased links (url itself was
+        // never lowercased, unlike host above) and Instagram's plural "/reels/" path form (which
+        // doesn't contain the literal substring "/reel/"), silently falling through to
+        // gallery-dl's own unconfigured internal yt-dlp delegation for those reels instead.
+        val path = runCatching { URI(url).path }.getOrNull()?.lowercase() ?: ""
+        if ((host == "instagram.com" || host.endsWith(".instagram.com")) &&
+            (path.contains("/reel/") || path.contains("/reels/"))
+        ) {
             return DownloadEngine.YT_DLP
         }
 
-        return if (videoOnlyHosts.any { host == it || host.endsWith(".$it") }) {
+        return if (videoOnlyHosts.matchesHost(host)) {
             DownloadEngine.YT_DLP
         } else {
             DownloadEngine.GALLERY_DL
@@ -67,9 +86,8 @@ object VideoSiteRouter {
     private val songHosts = setOf("music.youtube.com", "soundcloud.com")
 
     fun isKnownSongHost(url: String): Boolean {
-        val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
-            ?: return false
-        return songHosts.any { host == it || host.endsWith(".$it") }
+        val host = normalizedHost(url) ?: return false
+        return songHosts.matchesHost(host)
     }
 
     /** Whether [url] is a known "song" source for the preview sheet's own styling — a Spotify
@@ -99,8 +117,8 @@ object VideoSiteRouter {
      * error; see DownloadWorker's actualCallback default branch) on a genuinely video-less post,
      * so the cost of a wrong guess is a few extra seconds, not a broken download. */
     fun alwaysSupplementsVideo(url: String): Boolean {
-        val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.") ?: return false
-        return alwaysSupplementVideoHosts.any { host == it || host.endsWith(".$it") }
+        val host = normalizedHost(url) ?: return false
+        return alwaysSupplementVideoHosts.matchesHost(host)
     }
 
     // Two-label public suffixes common enough among sites this app actually sees that the plain
@@ -121,8 +139,7 @@ object VideoSiteRouter {
      * is known (see DownloadWorker's derivePosterCaptionTitle), and as the fallback if it never
      * is (a custom filename format, or an engine that never reports one). */
     fun siteName(url: String): String {
-        val host = runCatching { URI(url).host }.getOrNull()?.lowercase()?.removePrefix("www.")
-            ?: return "this link"
+        val host = normalizedHost(url) ?: return "this link"
         val parts = host.split('.')
         val suffixLabels = if (parts.size >= 3 && "${parts[parts.size - 2]}.${parts.last()}" in twoLabelSuffixes) 2 else 1
         val label = parts.getOrNull(parts.size - 1 - suffixLabels) ?: parts.first()

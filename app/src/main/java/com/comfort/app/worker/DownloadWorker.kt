@@ -233,9 +233,19 @@ class DownloadWorker(
                 // already write it to the DB.
                 val totalItemsRef = AtomicInteger(entity?.totalItems ?: 0)
                 var hasVideoItem = false
-                if (engine == DownloadEngine.GALLERY_DL && (entity?.totalItems ?: 0) <= 0 && entity?.itemFilter == null) {
+                // Listing runs whenever itemFilter is null, NOT only when totalItems isn't known
+                // yet — those are two separate concerns that used to share one gate. totalItems
+                // already being known (a resumed/retried download whose first attempt already
+                // wrote it) is a reason to skip *re-writing* it, but it says nothing about
+                // whether hasVideoItem was ever actually determined; hasVideoItem itself is never
+                // persisted, so without this every resume of a paused/interrupted download
+                // silently defaulted it back to false — on a host outside
+                // VideoSiteRouter.alwaysSupplementVideoHosts (Reddit, Twitter/X, ...), that
+                // permanently dropped the yt-dlp video-supplement pass for a mixed post's video on
+                // every subsequent resume, with no error and no trace it had ever been there.
+                if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null) {
                     val listed = GalleryDlListing.listItems(applicationContext, url).items
-                    if (listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
+                    if ((entity?.totalItems ?: 0) <= 0 && listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
                         dao.setTotalItems(downloadId, listed.size)
                         totalItemsRef.set(listed.size)
                     }
@@ -884,7 +894,14 @@ class DownloadWorker(
                         // engine-exclusive link never wastes an attempt on the wrong one.
                         val probe = EngineProbe.probeBoth(applicationContext, url)
 
-                        if (!probe.galleryDlHasExtractor && probe.ytDlpHasExtractor) {
+                        // `== false`/`== true`, not `!probe.x`/plain truthiness — probe.kt's own
+                        // Result fields are Boolean? (null means the probe itself failed to run,
+                        // genuinely unknown), and only a *confirmed* negative on gallery-dl plus a
+                        // *confirmed* positive on yt-dlp justifies skipping gallery-dl entirely.
+                        // Anything involving an unknown (a probe crash) must fall through to the
+                        // normal gallery-dl attempt below instead — a probe subprocess crash is
+                        // not evidence gallery-dl can't handle this URL.
+                        if (probe.galleryDlHasExtractor == false && probe.ytDlpHasExtractor == true) {
                             // gallery-dl has nothing for this URL at all, yt-dlp does — skip the
                             // doomed gallery-dl attempt entirely.
                             runYtDlp()
@@ -910,43 +927,41 @@ class DownloadWorker(
                                 // VideoSiteRouter.alwaysSupplementsVideo's own doc comment for
                                 // which hosts get this always-on attempt and why.
                                 val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
-                                // Only skip the yt-dlp fallback/supplement below when CONFIDENT
-                                // it's doomed: gallery-dl had a real extractor for this URL (so
-                                // its own gap is a content issue, not a wrong-engine issue) AND
-                                // yt-dlp has no extractor at all. A link unknown to BOTH engines
-                                // must still fall through to the unconditional runYtDlp() calls
-                                // below, unchanged — that's today's "unknown link -> default
-                                // system" behavior, which this probe must never alter.
-                                val skipYtDlpFallback = probe.galleryDlHasExtractor && !probe.ytDlpHasExtractor
+                                // Neither branch below gates on the probe's own
+                                // galleryDlHasExtractor/ytDlpHasExtractor result any more — a
+                                // no-network regex probe against the raw, pre-redirect/share URL
+                                // saying yt-dlp has "no extractor" is not trustworthy enough to
+                                // skip a fallback/supplement pass that's already been earned by a
+                                // stronger, real signal (gallery-dl having actually run and found
+                                // something, or its own listing confirming/suspecting a video).
+                                // Originally this WAS gated by a `skipYtDlpFallback` flag — removed
+                                // from the savedCount==0 branch first, after it was reproduced live
+                                // wrongly suppressing the fallback for a Reddit share link (.../s/
+                                // <code>) whose only content was an external redgifs video:
+                                // gallery-dl's own redirect-following extractor found it fine, but
+                                // probe.ytDlpHasExtractor came back false for the *raw, unresolved*
+                                // share link (yt-dlp's dedicated reddit extractor's own regex
+                                // requires "/comments/<id>", which a bare "/s/<code>" redirect
+                                // never has) — even though yt-dlp's generic extractor (deliberately
+                                // excluded from probe()'s "real extractor" check, same "opt-in"
+                                // reasoning as gallery-dl's — see EngineProbe's own doc comment)
+                                // DOES follow that exact redirect and finds the same video fine on
+                                // its own (confirmed live, --simulate). The hasVideoItem/
+                                // alwaysTryVideo branch below was left gated by the same flag at
+                                // first — same underlying probe, same class of false negative, so
+                                // the same fix applies here too.
                                 if (savedCount.get() == 0) {
-                                    // Deliberately NOT gated by skipYtDlpFallback, unlike the
-                                    // hasVideoItem branch below — reproduced live against a Reddit
-                                    // share link (.../s/<code>) whose only content was an external
-                                    // redgifs video: gallery-dl's own redirect-following extractor
-                                    // matched and correctly found it, then excludeVideo=true (above)
-                                    // correctly threw it away for gallery-dl's own pass — but
-                                    // probe.ytDlpHasExtractor came back false for the *raw, un-
-                                    // resolved* share link (yt-dlp's dedicated reddit extractor's
-                                    // own regex requires "/comments/<id>", which a bare "/s/<code>"
-                                    // redirect never has), so skipYtDlpFallback wrongly concluded
-                                    // yt-dlp was doomed too and this branch never ran at all —
-                                    // silent "No downloadable content found", nothing else. In
-                                    // reality yt-dlp's own generic extractor (deliberately excluded
-                                    // from probe()'s "real extractor" check, same "opt-in" reasoning
-                                    // as gallery-dl's — see EngineProbe's own doc comment) DOES
-                                    // follow that exact redirect and finds the same redgifs video
-                                    // fine on its own (confirmed live, --simulate). gallery-dl
-                                    // having already run at all by this point is itself the signal
-                                    // that this URL resolves to *something* real — worth yt-dlp's
-                                    // cheap attempt regardless of what a no-network regex probe on
-                                    // the original, pre-redirect URL alone could ever know.
+                                    // gallery-dl having already run at all by this point is itself
+                                    // the signal that this URL resolves to *something* real —
+                                    // worth yt-dlp's cheap attempt regardless of what the probe
+                                    // alone could ever know.
                                     runYtDlp()
                                 } else if (hasVideoItem || alwaysTryVideo) {
                                     // gallery-dl already grabbed the pictures (video excluded
                                     // from its own pass above); yt-dlp now handles this same
                                     // post's video, since it has real format/quality selection
                                     // gallery-dl doesn't.
-                                    if (!skipYtDlpFallback) runYtDlp()
+                                    runYtDlp()
                                 }
                             }
                         }
