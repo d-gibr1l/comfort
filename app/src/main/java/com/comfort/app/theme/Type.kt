@@ -2,11 +2,17 @@ package com.comfort.app.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.comfort.app.R
 
 private val Default = FontFamily.Default
+
+// Used only for the big page-title headers (Settings root, every Settings sub-page) — not part of
+// the app-wide Typography above, which stays on the platform default for everything else.
+val HeaderFontFamily = FontFamily(Font(R.font.googlesans_bold_subset, FontWeight.Bold))
 
 val Typography = Typography(
     displayLarge = TextStyle(fontFamily = Default, fontWeight = FontWeight.Bold, fontSize = 36.sp, lineHeight = 44.sp, letterSpacing = (-0.25).sp),

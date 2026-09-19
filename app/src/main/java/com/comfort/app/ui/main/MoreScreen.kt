@@ -229,6 +229,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     val hasCookies = remember { GalleryDlPreferences.getCookies(context).isNotBlank() }
 
     var searchQuery by remember { mutableStateOf("") }
+    var searchExpanded by remember { mutableStateOf(false) }
     // Split across Folders/Downloads/Processing (previously all one "Downloads" page) to match
     // YTDLnis's own settings shape — see gallery-dl.md's "Break up the Downloads settings page"
     // entry for why: one page covering filenames+folders+network+scheduling+quality+embedding all
@@ -257,43 +258,76 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    // Bottom-aligned within an explicit, bounded slot (rather than the default
-                    // vertical centering) so the label sits low in the bar, close to the search
-                    // bar just below it, without touching that search bar or anything else on the
-                    // page. fillMaxHeight() here instead of a fixed height measured against
-                    // whatever unbounded height the Scaffold's topBar slot actually passes down —
-                    // reproduced live, the label ended up pushed almost entirely off the bottom of
-                    // the screen. This slot's own height becomes the whole TopAppBar's height (the
-                    // bar wraps to its tallest child), so whatever's reserved above the
-                    // bottom-aligned text here shows up as empty space between the status bar and
-                    // the label — 96dp left a visibly larger gap there than necessary; 72dp still
-                    // comfortably clears this 40sp custom-font text with a little room to spare.
-                    // A few dp start padding to line the label's own left edge up with the search
-                    // bar/list below (the content Column's own 20dp horizontal padding) — the
-                    // TopAppBar's default title inset falls a little short of that on its own.
-                    Box(modifier = Modifier.height(72.dp).padding(start = 4.dp), contentAlignment = Alignment.BottomStart) {
-                        Text("Settings",
-                            fontWeight = FontWeight.Bold,                            fontSize = 36.sp
-                        )
+            // Compact single-row bar (leading page icon, title, trailing search toggle) at rest;
+            // tapping search morphs this same slot into the full search field (crossfade via
+            // AnimatedContent) instead of pushing a second bar into the scrolling content below —
+            // the field visually covers the icon+title exactly where they sat.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 40.dp, bottom = 8.dp),
+            ) {
+                androidx.compose.animation.AnimatedContent(targetState = searchExpanded, label = "settings-top-bar") { expanded ->
+                    if (expanded) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            PillSearchBar(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                modifier = Modifier.weight(1f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    searchExpanded = false
+                                    searchQuery = ""
+                                },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Close,
+                                    contentDescription = "Close search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            // 40dp box around the (non-clickable) leading icon, not just the bare
+                            // 32dp icon — matches the 40dp IconButton every sub-page's back arrow
+                            // sits in (see SettingsSubScaffold), so the title text next to it starts
+                            // at the exact same x position on every Settings page, root included.
+                            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Outlined.SettingsApplications,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp),
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Settings",
+                                style = MaterialTheme.typography.displayMedium,
+                                fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = { searchExpanded = true },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
-                },
-                // Same top-of-screen gradient as Home/Library (primary fading into background)
-                // instead of a flat bar, so Settings matches the rest of the app's header treatment.
-                modifier = Modifier.background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                            MaterialTheme.colorScheme.background,
-                        )
-                    )
-                ),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                )
-            )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
@@ -301,16 +335,10 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding())
                 .verticalScroll(rememberScrollState())
-                // Horizontal/bottom keep the original uniform 20dp; top is its own smaller value
-                // so the search bar sits close under the "Settings" label — which stays exactly
-                // where it is, in the TopAppBar above — instead of leaving the same 20dp gap
-                // below it that the rest of the page's margins use.
                 .padding(horizontal = 20.dp)
-                .padding(top = 4.dp, bottom = 20.dp),
+                .padding(top = 12.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            PillSearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
-
             ExpressiveSettingsList(
                 items = filteredMainItems,
                 emptyMessage = "No settings match \"$searchQuery\"".takeIf {
@@ -565,33 +593,35 @@ private fun SettingsSubScaffold(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        title, 
-                        fontWeight = FontWeight.Bold,                        fontSize = 36.sp
-                    ) 
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                // Same top-of-screen gradient as the Settings root (and Home/Library) instead of a
-                // flat bar, so every sub-page shares the same header treatment as the rest of the app.
-                modifier = Modifier.background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                            MaterialTheme.colorScheme.background,
-                        )
+            // Same icon+title header as the Settings root (identical leading-icon container size,
+            // spacer width, top/horizontal padding and title style) so every Settings page's header
+            // sits at the exact same position — just a back arrow instead of the page icon, and no
+            // search affordance, since search only makes sense at the root's own list.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 40.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp),
                     )
-                ),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.displayMedium,
+                    fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
                 )
-            )
+            }
         }
     ) { paddingValues ->
         CompositionLocalProvider(LocalHighlightState provides highlight) {
