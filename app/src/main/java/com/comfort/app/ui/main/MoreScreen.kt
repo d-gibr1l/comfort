@@ -10,9 +10,15 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -3639,7 +3645,19 @@ private fun IconToggleRow(
         // No tinted circle behind this any more. onSurfaceVariant, not the bare onSurface the
         // circle version used — full onSurface is meant for primary content (titles/body text),
         // not a supporting row icon with nothing behind it to soften the contrast.
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+        // Several call sites pass a different icon depending on `checked` (Wifi/WifiOff, Speed/
+        // Speed2, ...) — crossfade + scale pop between the two instead of a hard cut, so flipping
+        // the switch reads as the icon itself changing state, not a jarring swap.
+        AnimatedContent(
+            targetState = icon,
+            transitionSpec = {
+                (fadeIn(tween(200)) + scaleIn(initialScale = 0.6f, animationSpec = tween(200)))
+                    .togetherWith(fadeOut(tween(150)) + scaleOut(targetScale = 0.6f, animationSpec = tween(150)))
+            },
+            label = "toggle-row-icon",
+        ) { animatedIcon ->
+            Icon(animatedIcon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+        }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
