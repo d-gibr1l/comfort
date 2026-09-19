@@ -14,25 +14,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -67,51 +70,21 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
         ThemeMode.SYSTEM -> systemDark
     }
     // Own scroll state + HighlightController, mirroring SettingsSubScaffold's own copy of this —
-    // this screen has its own separate Scaffold (see its own doc comment) rather than that shared
+    // this screen keeps its own Box/Column (see its own doc comment below) rather than that shared
     // one, so it can't just receive one from there.
     val scrollState = rememberScrollState()
     val highlight = remember(highlightKey) { HighlightController(highlightKey, scrollState) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var maxHeaderHeightPx by remember { mutableStateOf(0) }
+    val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp)
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            // Same icon+title header as every other Settings page (see MoreScreen.kt's
-            // SettingsSubScaffold) — this screen keeps its own Scaffold (its content Column's
-            // manual Spacer rhythm doesn't fit SettingsSubScaffold's spacedBy(24.dp) without
-            // rework), but the header row itself is copied verbatim so its position/style matches.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 40.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "Appearance",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontFamily = com.comfort.app.theme.HeaderFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    ) { paddingValues ->
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalHighlightState provides highlight) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .verticalScroll(scrollState)
+                .padding(top = with(density) { maxHeaderHeightPx.toDp() })
                 .padding(horizontal = 20.dp)
                 .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
         ) {
@@ -224,6 +197,19 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             Spacer(Modifier.height(navBarClearance()))
         }
         }
+        SettingsSubPageHeader(
+            title = "Appearance",
+            onBack = onBack,
+            topPadding = headerState.topPadding,
+            bottomPadding = headerState.bottomPadding,
+            includeHorizontalPadding = true,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .graphicsLayer { alpha = headerState.alpha }
+                .background(MaterialTheme.colorScheme.background)
+                .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
+                .windowInsetsPadding(WindowInsets.statusBars),
+        )
     }
 }
 

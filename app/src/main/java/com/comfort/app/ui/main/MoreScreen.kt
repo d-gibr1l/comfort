@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -39,6 +41,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -230,6 +233,10 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var maxHeaderHeightPx by remember { mutableStateOf(0) }
+    val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp)
     // Split across Folders/Downloads/Processing (previously all one "Downloads" page) to match
     // YTDLnis's own settings shape — see gallery-dl.md's "Break up the Downloads settings page"
     // entry for why: one page covering filenames+folders+network+scheduling+quality+embedding all
@@ -255,86 +262,12 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     // even that when the search bar is empty and this can never show anything anyway.
     val filteredSubpageResults = if (isSearching) SUBPAGE_SEARCH_INDEX.filter { it.matches(searchQuery) } else emptyList()
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            // Compact single-row bar (leading page icon, title, trailing search toggle) at rest;
-            // tapping search morphs this same slot into the full search field (crossfade via
-            // AnimatedContent) instead of pushing a second bar into the scrolling content below —
-            // the field visually covers the icon+title exactly where they sat.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 40.dp, bottom = 8.dp),
-            ) {
-                androidx.compose.animation.AnimatedContent(targetState = searchExpanded, label = "settings-top-bar") { expanded ->
-                    if (expanded) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            PillSearchBar(
-                                query = searchQuery,
-                                onQueryChange = { searchQuery = it },
-                                modifier = Modifier.weight(1f),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            IconButton(
-                                onClick = {
-                                    searchExpanded = false
-                                    searchQuery = ""
-                                },
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Close,
-                                    contentDescription = "Close search",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            // 40dp box around the (non-clickable) leading icon, not just the bare
-                            // 32dp icon — matches the 40dp IconButton every sub-page's back arrow
-                            // sits in (see SettingsSubScaffold), so the title text next to it starts
-                            // at the exact same x position on every Settings page, root included.
-                            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Outlined.SettingsApplications,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(32.dp),
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                "Settings",
-                                style = MaterialTheme.typography.displayMedium,
-                                fontFamily = com.comfort.app.theme.HeaderFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f),
-                            )
-                            IconButton(
-                                onClick = { searchExpanded = true },
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Search,
-                                    contentDescription = "Search",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    ) { paddingValues ->
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
+                .padding(top = with(density) { maxHeaderHeightPx.toDp() })
                 .padding(horizontal = 20.dp)
                 .padding(top = 12.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -376,6 +309,85 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             // on why it overlays instead of reserving Scaffold space) so this list can scroll
             // fully clear of it instead of ending up hidden behind.
             Spacer(Modifier.height(navBarClearance()))
+        }
+
+        // Compact single-row bar (leading page icon, title, trailing search toggle) at rest;
+        // tapping search morphs this same slot into the full search field (crossfade via
+        // AnimatedContent) instead of pushing a second bar into the scrolling content below — the
+        // field visually covers the icon+title exactly where they sat. Same scroll-driven
+        // collapse/expand as every sub-page's own header (see SettingsSubScaffold): scrolls away
+        // like ordinary content, reappears compact on reverse-scroll, and grows back into this
+        // full size as scroll nears the top — search still works in either register since both
+        // branches below live inside the same alpha/padding-driven overlay.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .graphicsLayer { alpha = headerState.alpha }
+                .background(MaterialTheme.colorScheme.background)
+                .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = 20.dp)
+                .padding(top = headerState.topPadding, bottom = headerState.bottomPadding),
+        ) {
+            androidx.compose.animation.AnimatedContent(targetState = searchExpanded, label = "settings-top-bar") { expanded ->
+                if (expanded) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        PillSearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            modifier = Modifier.weight(1f),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                searchExpanded = false
+                                searchQuery = ""
+                            },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "Close search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        // 40dp box around the (non-clickable) leading icon, not just the bare
+                        // 32dp icon — matches the 40dp IconButton every sub-page's back arrow
+                        // sits in (see SettingsSubScaffold), so the title text next to it starts
+                        // at the exact same x position on every Settings page, root included.
+                        Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Outlined.SettingsApplications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Settings",
+                            style = MaterialTheme.typography.displayMedium,
+                            fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = { searchExpanded = true },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -577,7 +589,105 @@ fun highlightRowModifier(title: String): Modifier {
         .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = flash.value * 0.6f), RoundedCornerShape(14.dp))
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// Shared by SettingsSubScaffold's pinned topBar, its own inline/collapsing variant, and the pinned
+// "reappears once you scroll back up" overlay of that variant — all three want the exact same
+// icon+title look, just with different top padding (a tall 40dp at rest, a tight 8dp once it's
+// re-pinned after having scrolled away).
+// Callers that AREN'T already inside a horizontally-padded container (the pinned topBar, and the
+// floating re-pinned overlay) pass includeHorizontalPadding = true for their own 20dp side margin;
+// the inline variant, living inside SettingsSubScaffold's own 20dp-padded Column, passes false so
+// it doesn't end up with 40dp on each side.
+// State for the "header scrolls away like ordinary content, then reappears compact and morphs back
+// into its full size as you scroll the last collapseRangePx back to the top" behavior — shared by
+// every Settings page's header (root included) so they all collapse/expand identically. See
+// SettingsSubScaffold's own doc comment for why this is one continuously-interpolated instance
+// rather than two separate composables crossfading against each other.
+internal data class CollapsingHeaderState(val alpha: Float, val topPadding: androidx.compose.ui.unit.Dp, val bottomPadding: androidx.compose.ui.unit.Dp)
+
+@Composable
+internal fun rememberCollapsingHeaderState(
+    scrollState: ScrollState,
+    expandedTopPadding: androidx.compose.ui.unit.Dp,
+    collapsedTopPadding: androidx.compose.ui.unit.Dp = 8.dp,
+    expandedBottomPadding: androidx.compose.ui.unit.Dp = 20.dp,
+    collapsedBottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
+): CollapsingHeaderState {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val collapseRangePx = remember(density) { with(density) { 32.dp.toPx() } }
+    var visible by remember { mutableStateOf(true) }
+    LaunchedEffect(scrollState) {
+        var previous = scrollState.value
+        snapshotFlow { scrollState.value }.collect { current ->
+            when {
+                current <= collapseRangePx -> visible = true
+                current > previous -> visible = false
+                current < previous -> visible = true
+            }
+            previous = current
+        }
+    }
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, label = "header-visible-alpha")
+    val collapseFraction = (scrollState.value / collapseRangePx).coerceIn(0f, 1f)
+    return CollapsingHeaderState(
+        alpha = alpha,
+        topPadding = androidx.compose.ui.unit.lerp(expandedTopPadding, collapsedTopPadding, collapseFraction),
+        bottomPadding = androidx.compose.ui.unit.lerp(expandedBottomPadding, collapsedBottomPadding, collapseFraction),
+    )
+}
+
+@Composable
+internal fun SettingsSubPageHeader(
+    title: String,
+    onBack: () -> Unit,
+    topPadding: androidx.compose.ui.unit.Dp,
+    includeHorizontalPadding: Boolean,
+    modifier: Modifier = Modifier,
+    bottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (includeHorizontalPadding) Modifier.padding(horizontal = 20.dp) else Modifier)
+            .padding(top = topPadding, bottom = bottomPadding),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // CenterStart, not IconButton's own default Center — the touch target stays a full 40dp
+        // box, but the arrow glyph itself hugs the box's left edge instead of sitting 4dp in from
+        // it, so it lines up with the smaller 14dp section-label icons below (e.g. "SHARING"),
+        // which have no such box around them and start flush at the row's own left edge.
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = androidx.compose.foundation.LocalIndication.current,
+                    onClick = onBack,
+                ),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.primary,
+                // The arrow glyph itself doesn't reach the left edge of its own 24x24 viewBox the
+                // way the section-label icons' artwork does — same bounding box, but the visible
+                // ink still read a few dp further right (reproduced live, side by side with
+                // "SHARING"'s icon). Nudged left to compensate for that difference in the artwork.
+                modifier = Modifier.size(32.dp).offset(x = (-3).dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.displayMedium,
+            fontFamily = com.comfort.app.theme.HeaderFontFamily,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 @Composable
 private fun SettingsSubScaffold(
     title: String,
@@ -590,59 +700,54 @@ private fun SettingsSubScaffold(
 ) {
     val scrollState = rememberScrollState()
     val highlight = remember(highlightKey) { HighlightController(highlightKey, scrollState) }
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            // Same icon+title header as the Settings root (identical leading-icon container size,
-            // spacer width, top/horizontal padding and title style) so every Settings page's header
-            // sits at the exact same position — just a back arrow instead of the page icon, and no
-            // search affordance, since search only makes sense at the root's own list.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 40.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    title,
-                    style = MaterialTheme.typography.displayMedium,
-                    fontFamily = com.comfort.app.theme.HeaderFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    ) { paddingValues ->
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var maxHeaderHeightPx by remember { mutableStateOf(0) }
+    // There's only ever one header composable here, not an inline copy plus a separate pinned one
+    // that crossfades against it — that two-composable version was tried first and reliably showed
+    // both at once for a moment (reproduced live as a double title ghost) because one was fading
+    // out on its own timer while the other was simultaneously scrolling into view underneath it.
+    // Instead this single instance is always pinned, and its own top/bottom padding is continuously
+    // interpolated from scroll position while within the last collapseRangePx of the top — the
+    // compact bar doesn't get replaced by the real header, it *grows into* it, exactly in step with
+    // the finger, which is what "becomes the header" means here (same behavior on every sub-page).
+    val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp)
+
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalHighlightState provides highlight) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
-                .verticalScroll(scrollState)
-                // Extra bottom inset beyond the normal 20dp: the floating nav bar overlays the
-                // bottom of the screen without reserving space, so without this the last section
-                // (e.g. Schedule's Start/End time buttons) scrolls to right underneath it and is
-                // unreachable/unreadable. navBarClearance() (not a flat guess) so this also clears
-                // the real system nav bar inset on devices where it's taller than this app's own
-                // pill assumed — see its own doc comment (MainScreen.kt) for the full story. Used
-                // by every settings sub-page through this one shared scaffold.
-                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + navBarClearance())
-                .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            content = content,
-        )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    // Reserves exactly the header's own resting (fully expanded) height so the
+                    // first section starts right where it visually ends at scroll = 0 — the header
+                    // itself is a pinned overlay below, entirely outside this Column, not one of
+                    // its children.
+                    .padding(top = with(density) { maxHeaderHeightPx.toDp() })
+                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp + navBarClearance())
+                    .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                content = content,
+            )
         }
+        SettingsSubPageHeader(
+            title = title,
+            onBack = onBack,
+            topPadding = headerState.topPadding,
+            bottomPadding = headerState.bottomPadding,
+            includeHorizontalPadding = true,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .graphicsLayer { alpha = headerState.alpha }
+                .background(MaterialTheme.colorScheme.background)
+                // Measuring outside windowInsetsPadding, not inside it — inside, onSizeChanged only
+                // sees the header's own topPadding+row+bottomPadding and never learns about the
+                // status bar inset windowInsetsPadding adds beyond that, so the reserved space below
+                // undercounted by exactly the status bar's height. Reproduced live: the first
+                // section's own label (e.g. "SHARING") rendered a status-bar's-worth of pixels too
+                // high, right underneath the opaque header.
+                .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
+                .windowInsetsPadding(WindowInsets.statusBars),
+        )
     }
 }
 
@@ -722,7 +827,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
 
         SettingsSection(title = "Concurrent downloads", icon = Icons.Outlined.Layers) {
             IconToggleRow(
-                icon = Icons.Outlined.Layers,
+                icon = if (concurrentDownloadsEnabled) Icons.Outlined.Layers else Icons.Outlined.LayersClear,
                 title = "Multiple concurrent downloads",
                 subtitle = "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.",
                 checked = concurrentDownloadsEnabled,
@@ -759,7 +864,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
 
         SettingsSection(title = "Network", icon = Icons.Outlined.Wifi) {
             IconToggleRow(
-                icon = Icons.Outlined.Wifi,
+                icon = if (wifiOnly) Icons.Outlined.Wifi else Icons.Outlined.WifiOff,
                 title = "Wi-Fi only",
                 subtitle = "Queued downloads wait for a Wi-Fi connection instead of using mobile data.",
                 checked = wifiOnly,
@@ -774,7 +879,11 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.ArrowDownward,
+                icon = if (speedLimitEnabled) {
+                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_speed_2)
+                } else {
+                    Icons.Outlined.Speed
+                },
                 title = "Speed limit",
                 subtitle = "Caps download bandwidth for all future downloads.",
                 checked = speedLimitEnabled,
@@ -963,7 +1072,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.Schedule,
+                icon = if (sleepIntervalEnabled) Icons.Outlined.AvTimer else Icons.Outlined.TimerOff,
                 title = "Sleep interval",
                 subtitle = "Adds a random delay before requests to avoid triggering rate limits and bot bans.",
                 checked = sleepIntervalEnabled,
@@ -1052,7 +1161,11 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.Bolt,
+                icon = if (aria2Enabled) {
+                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_bolt_boost)
+                } else {
+                    Icons.Outlined.FlashOff
+                },
                 title = "Multi-connection downloads (aria2c)",
                 subtitle = "Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.",
                 checked = aria2Enabled,
@@ -1230,7 +1343,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.VisibilityOff,
+                icon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_domino_mask),
                 title = "Incognito by default",
                 subtitle = "Downloads are still saved to your device, but won't appear in the app's History or Library.",
                 checked = incognitoDefault,
@@ -1260,7 +1373,11 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.Restore,
+                icon = if (rememberDownloadType) {
+                    Icons.Outlined.HighQuality
+                } else {
+                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_high_quality_off)
+                },
                 title = "Remember last quality",
                 subtitle = "Makes the quality chosen on the download sheet the new default for future downloads.",
                 checked = rememberDownloadType,
@@ -1275,7 +1392,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.Delete,
+                icon = Icons.Outlined.DeleteForever,
                 title = "Clean up leftover downloads",
                 subtitle = "Automatically deletes partial files when a download is cancelled or fails.",
                 checked = deleteLeftoverOnFailure,
@@ -1804,7 +1921,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.Message,
+                icon = if (downloadSubtitles) Icons.Outlined.Subtitles else Icons.Outlined.SubtitlesOff,
                 title = "Download subtitles",
                 subtitle = "Fetch and embed subtitles when they're available.",
                 checked = downloadSubtitles,
@@ -1840,7 +1957,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.Chat,
+                icon = if (saveSubtitleFiles) Icons.Outlined.Subtitles else Icons.Outlined.SubtitlesOff,
                 title = "Save subtitle files",
                 subtitle = "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.",
                 checked = saveSubtitleFiles,
@@ -3205,7 +3322,7 @@ private fun EnginesSection() {
 
     SettingsSection(title = "Engines", icon = Icons.Outlined.Refresh) {
         IconToggleRow(
-            icon = Icons.Outlined.Bolt,
+            icon = Icons.Outlined.SystemUpdateAlt,
             title = "Auto-update",
             subtitle = "Automatically installs newer yt-dlp and gallery-dl updates when found.",
             checked = autoUpdate,
