@@ -327,7 +327,10 @@ def _parse_size(size_str):
     match = re.match(r"^\s*([\d.]+)\s*([kKmMgG]?)\s*$", size_str)
     if not match:
         return None
-    value = float(match.group(1))
+    try:
+        value = float(match.group(1))
+    except ValueError:
+        return None
     unit = match.group(2).lower()
     multiplier = {"": 1, "k": 1024, "m": 1024 * 1024, "g": 1024 * 1024 * 1024}[unit]
     return int(value * multiplier)
