@@ -18,7 +18,15 @@ import kotlinx.coroutines.coroutineScope
  * stale cached result could keep skipping an engine that just gained a matching extractor.
  */
 object EngineProbe {
-    data class Result(val galleryDlHasExtractor: Boolean, val ytDlpHasExtractor: Boolean)
+    // Boolean? (not a plain Boolean), tri-state — null means "the probe itself failed to run, we
+    // genuinely don't know" and is NOT the same thing as "confirmed no extractor." A caller that
+    // conflates the two (checking `!hasExtractor` rather than `hasExtractor == false`) accepts a
+    // probe-subprocess crash as proof of "no extractor" — the exact bug this used to have: a
+    // transient spawn/provisioning failure on one engine's probe, racing against the other
+    // engine's probe genuinely succeeding, made the "fail open, don't skip anything" comment
+    // below false in practice, since returning a bare `false` on failure is indistinguishable
+    // from a real negative result to a caller doing plain boolean logic.
+    data class Result(val galleryDlHasExtractor: Boolean?, val ytDlpHasExtractor: Boolean?)
 
     /** Runs both engines' probes concurrently — neither depends on the other's result — so the
      * added latency is roughly the slower of the two, not their sum. */
@@ -28,7 +36,7 @@ object EngineProbe {
         Result(galleryDl.await(), ytDlp.await())
     }
 
-    private suspend fun runProbe(context: Context, script: String, url: String): Boolean {
+    private suspend fun runProbe(context: Context, script: String, url: String): Boolean? {
         var lastLine: String? = null
         return try {
             PythonRuntime.run(context, script, listOf("probe", url)) { line -> lastLine = line }
@@ -36,7 +44,8 @@ object EngineProbe {
         } catch (e: CancellationException) {
             throw e // a Pause/Cancel mid-probe must still cancel the download immediately
         } catch (e: Exception) {
-            false // provisioning/spawn failure — fail open to "don't skip anything"
+            null // provisioning/spawn failure — genuinely unknown, not a confirmed negative;
+            // callers must treat this as "don't skip anything" themselves, not coerce it to false
         }
     }
 }

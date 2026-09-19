@@ -203,6 +203,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         except SystemExit as e:
             if e.code != 0:
                 status = f"Error: exited with code {e.code}"
+                # Unlike the `except Exception` branch just below, this used to have no live
+                # signal at all — only the final `[__status__] {status}` line printed after this
+                # whole `with` block exits (via _real_stdout directly, bypassing `callback`
+                # entirely). DownloadWorker.kt's error-capturing logic never recognized that
+                # line's shape (it isn't `[error] `, doesn't match gallery-dl's own
+                # `[extractor][error]` pattern, and isn't `Error,`/`Exception:`), so a bare
+                # `sys.exit(N)` from inside gallery-dl with nothing else printed first left the
+                # user with the generic "no downloadable content" message instead of the real
+                # reason. Matching the sibling branch's own already-working "Exception: ..." live
+                # print fixes this at the source instead of widening Kotlin's own line matching.
+                print(f"Exception: exited with code {e.code}")
         except KeyboardInterrupt:
             status = "Cancelled"
         except Exception as e:

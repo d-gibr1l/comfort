@@ -21,6 +21,17 @@ from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 # same as any other yt-dlp error, instead of a guaranteed hard crash.
 _IMPERSONATE_AVAILABLE = importlib.util.find_spec("curl_cffi") is not None
 
+# Same bundled cacert.pem, same reasoning, as spotify_wrapper.py's own _CACERT_PATH: this
+# embedded Python build has no system CA trust store wired into its default SSL context, so any
+# bare urlopen()/create_default_context() call here needs an explicit path to it. Previously
+# recomputed independently at five separate call sites in this file (each its own
+# os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")) — already drifted
+# slightly (some wrapped ssl.create_default_context in try/except, others didn't) purely because
+# nothing tied the copies together. Only the path is unified here; each call site still does its
+# own local `import ssl` and ssl.create_default_context(...) call, matching this file's existing
+# pattern of importing ssl lazily only where it's actually needed.
+_CACERT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
+
 class _Cancelled(Exception):
     pass
 
@@ -72,10 +83,9 @@ def _patch_external_downloader_progress():
     # error aria2c's own GnuTLS stack hit before it got this same file), so a bare urlopen() call
     # needs an explicit context pointed at it just like aria2c needed an explicit flag.
     _probe_ssl_context = None
-    _cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
-    if os.path.exists(_cacert_path):
+    if os.path.exists(_CACERT_PATH):
         try:
-            _probe_ssl_context = ssl.create_default_context(cafile=_cacert_path)
+            _probe_ssl_context = ssl.create_default_context(cafile=_CACERT_PATH)
         except Exception:
             _probe_ssl_context = None
 
@@ -202,11 +212,10 @@ def _patch_embed_thumbnail_fallback():
 
     # Same reasoning as the aria2c size-probe's own SSL context (see _patch_external_downloader_
     # progress): this embedded Python's default SSL context has no CA trust store wired in.
-    _cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
     _ssl_context = None
-    if os.path.exists(_cacert_path):
+    if os.path.exists(_CACERT_PATH):
         try:
-            _ssl_context = ssl.create_default_context(cafile=_cacert_path)
+            _ssl_context = ssl.create_default_context(cafile=_CACERT_PATH)
         except Exception:
             _ssl_context = None
 
@@ -600,8 +609,7 @@ def _itunes_cover_art_url(title, artist):
         import urllib.parse
         import urllib.request
         import ssl
-        cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
-        ssl_context = ssl.create_default_context(cafile=cacert_path) if os.path.exists(cacert_path) else None
+        ssl_context = ssl.create_default_context(cafile=_CACERT_PATH) if os.path.exists(_CACERT_PATH) else None
         query = urllib.parse.quote(f"{artist} {title}")
         req = urllib.request.Request(
             f"https://itunes.apple.com/search?term={query}&media=music&entity=song&limit=1",
@@ -632,10 +640,9 @@ def _apply_cover_art_override(filepath, image_url):
     try:
         import ssl
         import urllib.request
-        cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
         ssl_context = None
-        if os.path.exists(cacert_path):
-            ssl_context = ssl.create_default_context(cafile=cacert_path)
+        if os.path.exists(_CACERT_PATH):
+            ssl_context = ssl.create_default_context(cafile=_CACERT_PATH)
         req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10, context=ssl_context) as resp:
             image_data = resp.read()
@@ -1041,9 +1048,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # signed by known authorities", aria2c's own generic error for "I have literally no CA
         # certificates to check against". cacert.pem sits next to this script itself (copied there
         # by PythonRuntime.ensureProvisioned alongside the wrapper scripts).
-        cacert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
-        if os.path.exists(cacert_path):
-            ydl_opts["external_downloader_args"] = {"aria2c": [f"--ca-certificate={cacert_path}"]}
+        if os.path.exists(_CACERT_PATH):
+            ydl_opts["external_downloader_args"] = {"aria2c": [f"--ca-certificate={_CACERT_PATH}"]}
         _patch_external_downloader_progress()
     if custom_headers:
         # "Header-Name: value" lines, one per header — merged into (not replacing) yt-dlp's own
