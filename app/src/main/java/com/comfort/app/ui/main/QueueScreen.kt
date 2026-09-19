@@ -993,8 +993,8 @@ fun QueueItemCard(
                         )
                     }
                     val speedStr = when {
-                        !isNetworkAvailable -> "0.00 MB/s"
-                        item.speedMbs == 0f -> "0.00 MB/s"
+                        !isNetworkAvailable -> "0.00 KB/s"
+                        item.speedMbs == 0f -> "0.00 KB/s"
                         item.speedMbs < 1f -> String.format(Locale.getDefault(), "%.2f KB/s", item.speedMbs * 1024)
                         else -> String.format(Locale.getDefault(), "%.2f MB/s", item.speedMbs)
                     }
