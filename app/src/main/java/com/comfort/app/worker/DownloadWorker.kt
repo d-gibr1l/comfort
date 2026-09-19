@@ -88,16 +88,16 @@ private object DownloadConcurrencyGate {
     suspend fun acquire(context: Context) {
         while (true) {
             val limit = GalleryDlPreferences.getEffectiveConcurrentDownloads(context).coerceAtLeast(1)
-            // Not perfectly atomic against another waiter passing this same check at the same
-            // moment — worst case briefly overshoots the limit by however many racing waiters all
-            // read a stale "still under limit" value together, and self-corrects on the very next
-            // recheck once their increments are visible. An acceptable trade for not needing a
-            // real lock around a value that has to be re-read fresh from preferences every
-            // iteration anyway (a plain Semaphore can't be resized once constructed).
-            if (active.get() < limit) {
-                active.incrementAndGet()
-                return
+            
+            // Perfectly atomic lock-free compare-and-set loop. Eliminates the previous
+            // race condition where multiple waiters could read a stale "under limit" value
+            // simultaneously and overshoot the cap.
+            while (true) {
+                val current = active.get()
+                if (current >= limit) break
+                if (active.compareAndSet(current, current + 1)) return
             }
+            
             withTimeoutOrNull(POLL_FALLBACK_MS) { slotFreed.first() }
         }
     }
