@@ -21,8 +21,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -31,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.layout
@@ -42,7 +39,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.comfort.app.theme.AppTheme
 import com.comfort.app.theme.DarkColorScheme
 import com.comfort.app.theme.LightColorScheme
@@ -79,26 +75,35 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {},
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                // Same top-of-screen gradient as the rest of Settings (and Home/Library) — this
-                // screen has its own Scaffold/TopAppBar separate from SettingsSubScaffold, so it
-                // was left out when the gradient was added there.
-                modifier = Modifier.background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                            MaterialTheme.colorScheme.background,
-                        )
+            // Same icon+title header as every other Settings page (see MoreScreen.kt's
+            // SettingsSubScaffold) — this screen keeps its own Scaffold (its content Column's
+            // manual Spacer rhythm doesn't fit SettingsSubScaffold's spacedBy(24.dp) without
+            // rework), but the header row itself is copied verbatim so its position/style matches.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 40.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp),
                     )
-                ),
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-            )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Appearance",
+                    style = MaterialTheme.typography.displayMedium,
+                    fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     ) { paddingValues ->
         CompositionLocalProvider(LocalHighlightState provides highlight) {
@@ -110,11 +115,6 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 .padding(horizontal = 20.dp)
                 .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
         ) {
-            Text("Appearance", 
-                fontWeight = FontWeight.Bold,                fontSize = 36.sp
-            )
-            Spacer(Modifier.height(28.dp))
-
             Text(
                 "APP THEME",
                 style = MaterialTheme.typography.labelMedium,
