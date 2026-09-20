@@ -35,6 +35,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
@@ -608,7 +609,12 @@ fun highlightRowModifier(title: String): Modifier {
 // every Settings page's header (root included) so they all collapse/expand identically. See
 // SettingsSubScaffold's own doc comment for why this is one continuously-interpolated instance
 // rather than two separate composables crossfading against each other.
-internal data class CollapsingHeaderState(val alpha: Float, val topPadding: androidx.compose.ui.unit.Dp, val bottomPadding: androidx.compose.ui.unit.Dp)
+internal data class CollapsingHeaderState(
+    val alpha: Float,
+    val topPadding: androidx.compose.ui.unit.Dp,
+    val bottomPadding: androidx.compose.ui.unit.Dp,
+    val collapseFraction: Float,
+)
 
 @Composable
 internal fun rememberCollapsingHeaderState(
@@ -619,7 +625,12 @@ internal fun rememberCollapsingHeaderState(
     collapsedBottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
 ): CollapsingHeaderState {
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val collapseRangePx = remember(density) { with(density) { 32.dp.toPx() } }
+    // 120dp, not the original 32dp — that was fine back when collapsing only meant a padding
+    // change, but now that it also merges the back-button row into the title row and crossfades
+    // the icon, 32dp of scroll (much less than a single normal scroll gesture) made that whole
+    // transformation happen almost the instant a finger touched the list, reproduced live as an
+    // abrupt collapse after barely any scroll at all. 120dp asks for a more deliberate scroll.
+    val collapseRangePx = remember(density) { with(density) { 120.dp.toPx() } }
     var visible by remember { mutableStateOf(true) }
     LaunchedEffect(scrollState) {
         var previous = scrollState.value
@@ -638,65 +649,121 @@ internal fun rememberCollapsingHeaderState(
         alpha = alpha,
         topPadding = androidx.compose.ui.unit.lerp(expandedTopPadding, collapsedTopPadding, collapseFraction),
         bottomPadding = androidx.compose.ui.unit.lerp(expandedBottomPadding, collapsedBottomPadding, collapseFraction),
+        collapseFraction = collapseFraction,
     )
 }
 
 @Composable
 internal fun SettingsSubPageHeader(
     title: String,
+    topicIcon: ImageVector,
     onBack: () -> Unit,
     topPadding: androidx.compose.ui.unit.Dp,
     includeHorizontalPadding: Boolean,
     modifier: Modifier = Modifier,
     bottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
+    // 0 at rest (fully expanded), 1 once fully scrolled/collapsed — see SettingsSubScaffold's own
+    // doc comment on CollapsingHeaderState. Continuous, not a discrete swap at some threshold: the
+    // standalone back-button row above the title shrinks away exactly in step with this, and the
+    // icon beside the title crossfades from the topic icon to the same back icon, so by the time
+    // it's fully collapsed the compact bar is a single row — back icon, title, no space above it,
+    // like every other Android app's compact app bar — with no separate "collapsed layout" to
+    // jump-cut into (that's what caused the double-header ghosting fixed earlier).
+    collapseFraction: Float = 0f,
 ) {
-    Row(
+    val undoIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_undo)
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .then(if (includeHorizontalPadding) Modifier.padding(horizontal = 20.dp) else Modifier)
-            .padding(top = topPadding, bottom = bottomPadding),
-        verticalAlignment = Alignment.CenterVertically,
+            // Shrinks toward 0 as it collapses too, same reasoning as the back-button row below —
+            // 8dp is what puts it right at the top like other apps at rest; a collapsed compact bar
+            // shouldn't keep even that much air above it.
+            .padding(top = androidx.compose.ui.unit.lerp(8.dp, 0.dp, collapseFraction), bottom = bottomPadding),
     ) {
-        // CenterStart, not IconButton's own default Center — the touch target stays a full 40dp
-        // box, but the arrow glyph itself hugs the box's left edge instead of sitting 4dp in from
-        // it, so it lines up with the smaller 14dp section-label icons below (e.g. "SHARING"),
-        // which have no such box around them and start flush at the row's own left edge.
+        // Its own height (not just alpha) shrinks to 0 as collapseFraction approaches 1, so the
+        // compact bar reclaims the space entirely instead of leaving it empty-but-reserved.
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(androidx.compose.foundation.shape.CircleShape)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = androidx.compose.foundation.LocalIndication.current,
-                    onClick = onBack,
-                ),
-            contentAlignment = Alignment.CenterStart,
+                .fillMaxWidth()
+                .height(androidx.compose.ui.unit.lerp(40.dp, 0.dp, collapseFraction))
+                .clipToBounds(),
         ) {
-            Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.primary,
-                // The arrow glyph itself doesn't reach the left edge of its own 24x24 viewBox the
-                // way the section-label icons' artwork does — same bounding box, but the visible
-                // ink still read a few dp further right (reproduced live, side by side with
-                // "SHARING"'s icon). Nudged left to compensate for that difference in the artwork.
-                modifier = Modifier.size(32.dp).offset(x = (-3).dp),
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .graphicsLayer { alpha = 1f - collapseFraction }
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = androidx.compose.foundation.LocalIndication.current,
+                        onClick = onBack,
+                    ),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Icon(
+                    undoIcon,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(topPadding))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    // Only clickable once it's visually closer to the back icon than the topic
+                    // icon — the topic icon itself stays purely decorative at rest, same as before;
+                    // this is a plain on/off flip on an already-invisible property (hit-testing),
+                    // not a visual change, so there's no jump to smooth out here.
+                    .then(
+                        if (collapseFraction > 0.5f) {
+                            Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = androidx.compose.foundation.LocalIndication.current,
+                                onClick = onBack,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                // Both icons occupy the exact same box, just crossfaded by the same collapseFraction
+                // driving everything else here — unlike the double-header bug, there's no risk of
+                // the two disagreeing on position, since they're literally stacked in one Box.
+                Icon(
+                    topicIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp).graphicsLayer { alpha = 1f - collapseFraction },
+                )
+                Icon(
+                    undoIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp).graphicsLayer { alpha = collapseFraction },
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.displayMedium,
+                fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
             )
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.displayMedium,
-            fontFamily = com.comfort.app.theme.HeaderFontFamily,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
     }
 }
 
 @Composable
 private fun SettingsSubScaffold(
     title: String,
+    topicIcon: ImageVector,
     onBack: () -> Unit,
     // Non-null only when this screen was opened from a Settings-search result (see
     // SettingsRootScreen's subpage results list) — see HighlightController's own doc comment for
@@ -737,9 +804,11 @@ private fun SettingsSubScaffold(
         }
         SettingsSubPageHeader(
             title = title,
+            topicIcon = topicIcon,
             onBack = onBack,
             topPadding = headerState.topPadding,
             bottomPadding = headerState.bottomPadding,
+            collapseFraction = headerState.collapseFraction,
             includeHorizontalPadding = true,
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -820,7 +889,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
         ActivityResultContracts.StartActivityForResult()
     ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }
 
-    SettingsSubScaffold(title = "Downloads", onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "Downloads", topicIcon = Icons.Outlined.Download, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Sharing", icon = Icons.Outlined.Share) {
             ShareModeRow(
                 mode = shareMode,
@@ -1517,7 +1586,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         }
     }
 
-    SettingsSubScaffold(title = "Folders", onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "Folders", topicIcon = Icons.Outlined.Folder, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Filename format", icon = Icons.Outlined.TextFields) {
             Text(
                 "Filename format applied to every downloaded file.",
@@ -1731,7 +1800,7 @@ private fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? =
     var saveSubtitleFiles by remember { mutableStateOf(GalleryDlPreferences.isSaveSubtitleFiles(context)) }
     var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
 
-    SettingsSubScaffold(title = "Processing", onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "Processing", topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
             Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
@@ -2079,7 +2148,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
     var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
 
-    SettingsSubScaffold(title = "Advanced", onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "Advanced", topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
             Text(
                 "Extra command-line arguments passed to gallery-dl on every download. For advanced users.",
@@ -2341,7 +2410,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         )
     }
 
-    SettingsSubScaffold(title = "Cookies & Login", onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "Cookies & Login", topicIcon = Icons.Outlined.Lock, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Cookies", icon = Icons.Outlined.Lock) {
             Text(
                 "Sign in through the built-in browser to unlock private/age-restricted content, or paste a cookies.txt below.",
@@ -2976,7 +3045,7 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "—"
     }
 
-    SettingsSubScaffold(title = "About", onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "About", topicIcon = Icons.Outlined.Info, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "App", icon = Icons.Outlined.Info) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
