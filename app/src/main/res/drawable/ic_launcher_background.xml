@@ -4,13 +4,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- White, matching "comfort logo clean.svg" own background rect — the old raster foreground
-         PNG had a white background baked directly into its own pixels (not real transparency), so
-         this adaptive-icon background layer's real color never actually showed through until the
-         foreground became a true vector; #4F46E5 (an unrelated generic default) was hidden the
-         whole time, revealed as a jarring blue the moment the switch happened. White is what was
-         actually visible before, and it's what the source artwork itself specifies. -->
+    <!-- @color/splash_background — same day/night pair the splash screen already uses (light-mode
+         default here, res/values-night/colors.xml overrides it for dark), so the launcher icon and
+         the splash it hands off to always agree instead of introducing a second, separately-tuned
+         color pair for the same visual role. White in light mode matches "comfort logo clean.svg"
+         own background rect — the old raster foreground PNG had a white background baked directly
+         into its own pixels (not real transparency), so this layer's real color never actually
+         showed through until the foreground became a true vector. -->
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="@color/splash_background"
         android:pathData="M0,0h108v108h-108z" />
 </vector>
