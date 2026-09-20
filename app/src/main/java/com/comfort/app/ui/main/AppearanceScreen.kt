@@ -199,9 +199,11 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
         }
         SettingsSubPageHeader(
             title = "Appearance",
+            topicIcon = Icons.Outlined.WbSunny,
             onBack = onBack,
             topPadding = headerState.topPadding,
             bottomPadding = headerState.bottomPadding,
+            collapseFraction = headerState.collapseFraction,
             includeHorizontalPadding = true,
             modifier = Modifier
                 .align(Alignment.TopStart)
