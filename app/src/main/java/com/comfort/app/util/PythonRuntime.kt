@@ -52,7 +52,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "93"
+    private const val PROVISION_VERSION = "94"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
