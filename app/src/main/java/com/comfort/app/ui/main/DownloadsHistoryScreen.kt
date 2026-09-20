@@ -5,10 +5,12 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -40,9 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.Brush
@@ -51,9 +51,11 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import com.comfort.app.theme.FavoriteGold
+import com.comfort.app.theme.HeaderFontFamily
 import com.comfort.app.theme.SuccessGreen40
 import com.comfort.app.util.rememberIsReducedMotionEnabled
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -104,6 +106,9 @@ fun DownloadsHistoryScreen(
     // renders it after FloatingNavBar, so this screen only needs the state to trigger it with.
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    // Library's own topic icon in its header — same role Icons.Outlined.SettingsApplications
+    // plays in the Settings root header (see MoreScreen.kt's SettingsRootScreen).
+    val libraryTopicIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_gallery_thumbnail)
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
     val deletedItems by viewModel.deletedFlow.collectAsStateWithLifecycle()
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsStateWithLifecycle()
@@ -129,6 +134,10 @@ fun DownloadsHistoryScreen(
     var audioOnly by remember { mutableStateOf(false) }
     val duplicateAttempts by viewModel.duplicateAttemptsFlow.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
+    // Toggles the header's title row into the search field, same crossfade-in-place behavior as
+    // the Settings root header's own search icon (see MoreScreen.kt's SettingsRootScreen) — this
+    // replaces the old always-visible PillSearchBar that used to sit permanently below the title.
+    var searchExpanded by remember { mutableStateOf(false) }
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var gridView by remember { mutableStateOf(GalleryDlPreferences.isLibraryGridView(context)) }
@@ -175,28 +184,123 @@ fun DownloadsHistoryScreen(
         }
     }
 
-    // Real nested-scroll-driven collapse instead of polling LazyListState/LazyGridState's own
-    // position after the fact (the previous approach here) — that only ever sees where the list
-    // *ended up* a frame late, coarse and index/offset-based, which is exactly why it needed a
-    // slop threshold hacked in to stop flickering on tiny movements and still never actually
-    // followed the finger, just snapped fully open/closed. TopAppBarScrollBehavior's own
-    // NestedScrollConnection intercepts real scroll deltas as the gesture happens — the same
-    // continuous, finger-following collapse Gmail/most apps' own toolbars use, and reused here
-    // as-is rather than hand-rolling the drag/fling/overscroll edge cases it already handles.
-    // enterAlways (not exitUntilCollapsed): reappears on ANY scroll back up, not only once
-    // already at the very top of the list — matches "chases scroll direction" like a feed's
-    // toolbar, not a page-detail screen's.
-    val topAppBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(topAppBarState)
-    // The header's own natural (fully expanded) height in px — TopAppBarState needs this as its
-    // heightOffsetLimit (how far *down* heightOffset, a value from 0 to this negative limit, can
-    // collapse) to know when it's fully collapsed. Measured off the header's own inner content
-    // (see its Modifier.onGloballyPositioned below), not the outer collapsing Box that wraps it —
-    // that outer Box's own height IS the animated, currently-collapsing value, so measuring it
-    // instead would be measuring its own output, never converging on the header's true full size.
+    // Compact-header behavior ported from the Settings pages' own CollapsingHeaderState (see
+    // MoreScreen.kt's rememberCollapsingHeaderState) rather than Material3's TopAppBarState +
+    // enterAlwaysScrollBehavior — that mechanism re-expands to FULL size on any upward scroll
+    // delta, not only once already back at the list's true top. Reported live against the first
+    // version of this feature: "the header is supposed to completely vanish when I scroll down,
+    // and scrolling up should bring back the COMPACT version, only expanding to the full header
+    // once scrolled all the way back to the top" — three distinct states (hidden / compact /
+    // full) enterAlways can't express on its own, since it only interpolates continuously between
+    // one fully-open and one fully-closed size with no separate "compact, but not at the very top
+    // yet" resting state. This reimplements the same scroll-direction/threshold logic Settings
+    // uses, adapted from a plain ScrollState's single scrollState.value (Settings' pages are all
+    // a fixed verticalScroll Column) to LazyListState/LazyGridState, since Library's content is a
+    // real lazy list.
+    // Ported properly this time: ONE header composable that continuously morphs, exactly like
+    // Settings' own SettingsSubScaffold/SettingsSubPageHeader/rememberCollapsingHeaderState (see
+    // MoreScreen.kt) — not two separate composables (a "full" and a "compact") crossfaded against
+    // each other by alpha. That two-composable version is explicitly what Settings' own code
+    // comment warns against: "that two-composable version was tried first and reliably showed
+    // both at once for a moment (reproduced live as a double title ghost) because one was fading
+    // out on its own timer while the other was simultaneously scrolling into view underneath it."
+    // Reported live here as the exact same symptom — a persistent double-image ghost during a
+    // slow, gradual scroll — for the exact same reason. The fix is architectural, not a tuning
+    // knob: collapse by shrinking sub-elements of ONE instance (the subtitle line and the chip
+    // row, both down to 0 height) rather than by cross-fading two differently-laid-out instances.
+    val density = LocalDensity.current
+    // Chip row's own natural height, hoisted up from LibraryHeader (which measures it) so
+    // collapseRangePx below can be derived from it — see that val's own comment for why.
+    var chipRowHeightPx by remember { mutableFloatStateOf(0f) }
+    // NOT a flat 120dp (what Settings' own collapseRangePx is) — collapseRangePx here has to
+    // equal the header's own real total shrink amount (title row's 76dp->8dp top-padding delta,
+    // the subtitle's 18dp, and the chip row's own height), because topContentPaddingDp below is
+    // reserved at the header's fully-EXPANDED height for the entire scroll, never shrinking.
+    // Settings tolerates a flat 120dp because its own header happens to shrink by roughly that
+    // same amount, so the reserved-but-no-longer-needed space is fully "scrolled through" by the
+    // time the header finishes collapsing. Library's shrink amount is larger than 120dp (subtitle
+    // + chip row + padding delta together), so a flat 120dp finished the collapse ANIMATION well
+    // before scroll had actually consumed that much reserved space — reported live as a large,
+    // constant dead-space block between the compact bar and the first real list row, persisting
+    // no matter how far past that point you scrolled. Deriving collapseRangePx from the same
+    // shrink amount the header itself uses guarantees the two finish together, by construction.
+    val collapseRangePx = (with(density) { 68.dp.toPx() + 18.dp.toPx() } + chipRowHeightPx)
+        .coerceAtLeast(with(density) { 40.dp.toPx() })
+    // A LazyListState/LazyGridState has no single running "total scrolled px" the way
+    // ScrollState.value does (what Settings' own version reads directly) — firstVisibleItemScrollOffset
+    // resets to 0 every time the first visible item's index advances, so it alone can't drive a
+    // threshold/direction comparison the same way. Combining index and offset into one large
+    // monotonic value sidesteps that: collapseRangePx is far smaller than a single row's height
+    // (list rows run ~180dp tall, confirmed live), so by the time the index has advanced past 0
+    // we're already well past collapseRangePx regardless of the exact offset, and multiplying the
+    // index by a value much larger than collapseRangePx keeps that true.
+    val scrollValuePx by remember {
+        derivedStateOf {
+            val index = if (gridView) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex
+            val offset = if (gridView) gridState.firstVisibleItemScrollOffset else listState.firstVisibleItemScrollOffset
+            index * 1_000_000f + offset
+        }
+    }
+    // Same three-way branch as Settings' own LaunchedEffect: within collapseRangePx of the top,
+    // always visible; past it, visible chases scroll direction (down hides, up reveals). Hysteresis
+    // (net movement has to clear 8dp in one direction before flipping, not any nonzero amount)
+    // kept from the earlier two-composable version — it's still worth having with a single header
+    // too, damping the same natural per-frame tremor of a real slow drag that a flip-per-frame
+    // reaction would otherwise chase.
+    val hysteresisPx = remember(density) { with(density) { 8.dp.toPx() } }
+    var headerVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        var previous = scrollValuePx
+        var accumulated = 0f
+        snapshotFlow { scrollValuePx }.collect { current ->
+            val delta = current - previous
+            when {
+                current <= collapseRangePx -> { headerVisible = true; accumulated = 0f }
+                else -> {
+                    accumulated = if (accumulated == 0f || (accumulated > 0f) == (delta > 0f)) accumulated + delta else delta
+                    if (accumulated > hysteresisPx) { headerVisible = false; accumulated = 0f }
+                    else if (accumulated < -hysteresisPx) { headerVisible = true; accumulated = 0f }
+                }
+            }
+            previous = current
+        }
+    }
+    val headerAlpha by animateFloatAsState(if (headerVisible) 1f else 0f, label = "library-header-alpha")
+    // 0 at rest (fully expanded), 1 once fully scrolled/collapsed — see Settings' own
+    // CollapsingHeaderState doc comment. Continuous, not a discrete swap: the subtitle line and
+    // the chip row both shrink away in step with this (see the header composable below), so by
+    // the time it's fully collapsed the compact bar is just icon+title+actions with no space
+    // above or below it, and there's no separate "collapsed layout" to jump-cut into.
+    val collapseFraction = (scrollValuePx / collapseRangePx).coerceIn(0f, 1f)
+
+    // The header's own natural (fully expanded) height in px, tracked maxOf like Settings' own
+    // maxHeaderHeightPx.
     var headerHeightPx by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(headerHeightPx) {
-        if (headerHeightPx > 0f) topAppBarState.heightOffsetLimit = -headerHeightPx
+    var selectionBarHeightPx by remember { mutableFloatStateOf(0f) }
+    // NOT fixed at headerHeightPx for the whole scroll, unlike Settings' own maxHeaderHeightPx
+    // padding — Settings gets away with a fixed reservation because its header's own shrink
+    // amount is a modest fraction of its full height, so the leftover reserved-but-unneeded space
+    // is small enough not to read as a real gap. Library's header sheds a much bigger fraction of
+    // its own height (subtitle + the entire chip row, on top of the title row's own padding
+    // shrink) — reported live as a large, constant blank block sitting between the compact bar
+    // and the first real list row, persisting no matter how far past that point the list was
+    // scrolled, because the reservation never gave back the space the collapse animation had
+    // already finished reclaiming visually. Lerping the reservation itself from the full expanded
+    // height down to (headerHeightPx - collapseRangePx) — the header's own true compact height,
+    // computed algebraically from the exact same shrink amount collapseRangePx already represents,
+    // not a second, separately-measured value that could drift out of sync with it — means the
+    // reserved space and the header's own visible size finish shrinking at exactly the same
+    // moment, by construction.
+    val topContentPaddingDp = with(density) {
+        if (selectionMode) {
+            selectionBarHeightPx.toDp()
+        } else {
+            androidx.compose.ui.unit.lerp(
+                headerHeightPx.toDp(),
+                (headerHeightPx - collapseRangePx).coerceAtLeast(0f).toDp(),
+                collapseFraction,
+            )
+        }
     }
 
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
@@ -224,279 +328,10 @@ fun DownloadsHistoryScreen(
             }
         }
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.background,
-        // No snackbarHost here any more — see this screen's own snackbarHostState parameter doc
-        // comment for why MainScreen now renders it instead.
-        topBar = {
-            if (selectionMode) {
-                TopAppBar(
-                    title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = { selectedIds = emptySet() }) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = {
-                            val selectedItems = historyItems.filter { it.id in selectedIds }
-                            val uris = selectedItems.mapNotNull { it.thumbnailPath?.let { p -> Uri.parse(p) } }
-                            if (uris.isNotEmpty()) {
-                                val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                                    type = "image/*"
-                                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                runCatching { context.startActivity(Intent.createChooser(intent, "Share images")) }
-                            }
-                        }) {
-                            Icon(Icons.Outlined.Share, contentDescription = "Share selected")
-                        }
-                        IconButton(onClick = {
-                            selectedIds.forEach { viewModel.setFavorite(it, true) }
-                            selectedIds = emptySet()
-                        }) {
-                            Icon(Icons.Outlined.Star, contentDescription = "Add selected to favorites")
-                        }
-                        IconButton(onClick = {
-                            requestDelete(selectedIds)
-                            selectedIds = emptySet()
-                        }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Remove selected")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    )
-                )
-            } else {
-                // Modifier.layout, not a plain Box(Modifier.height(...)) wrapping this Surface —
-                // that first version measured the Surface WITH the collapsing height as its own
-                // incoming constraint (a plain Box passes its own constraints straight through to
-                // an unconstrained child), so onGloballyPositioned kept reporting back whatever the
-                // *already-collapsed* height currently was instead of the header's true natural
-                // size. That fed straight back into heightOffsetLimit, which fed back into the
-                // collapsed height itself — a real feedback loop, reproduced live as the header
-                // visibly flickering while scrolling rather than collapsing smoothly. Forcing
-                // maxHeight = Infinity for measurement (ignoring the incoming constraint entirely)
-                // is what breaks that loop: this Surface always measures at its one true natural
-                // size regardless of how much of it is currently visible, and only the *placement*
-                // — what this layout node reports upward to Scaffold's topBar slot, which is what
-                // actually drives every LazyColumn/LazyVerticalGrid's own top content padding via
-                // paddingValues.calculateTopPadding() — shrinks/grows continuously with
-                // scrollBehavior.state.heightOffset. clipToBounds() crops the natural-size content
-                // to that same smaller placed height instead of letting it draw past it.
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clipToBounds()
-                        .layout { measurable, constraints ->
-                            val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
-                            headerHeightPx = placeable.height.toFloat()
-                            val visibleHeight = (placeable.height + scrollBehavior.state.heightOffset)
-                                .coerceIn(0f, placeable.height.toFloat())
-                                .toInt()
-                            layout(placeable.width, visibleHeight) { placeable.placeRelative(0, 0) }
-                        },
-                    color = MaterialTheme.colorScheme.background,
-                    shadowElevation = 3.dp,
-                ) {
-                    Column {
-                        // Title area only: the gradient background sits on this nested Column,
-                        // applied *before* statusBarsPadding (rather than after, on the Row inside
-                        // it) so it still paints from the true top of the screen behind the status
-                        // bar — the same bleed the whole header had before — while stopping right
-                        // after the title instead of also covering the search bar/chips below.
-                        // Confining it to just the title matches the Settings page, where the same
-                        // gradient only ever covers its TopAppBar, never the search bar below it.
-                        // (The header used to bleed *and* cover the whole thing at once; splitting
-                        // it into its own Column here is what lets it keep doing the former without
-                        // the latter — same underlying surfaceContainerHigh color as Settings on
-                        // both, confirmed by sampling the actual rendered pixels, but the search bar
-                        // used to read as a visibly different color purely from that extra green
-                        // context bleeding around it.)
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                                            MaterialTheme.colorScheme.background,
-                                        )
-                                    )
-                                )
-                                .statusBarsPadding()
-                        ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Library",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    fontWeight = FontWeight.Bold,                                    fontSize = 36.sp,
-                                )
-                                Text(
-                                    if (showDuplicatesOnly) {
-                                        "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
-                                    } else {
-                                        "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            // Favorites and the Grid/List toggle moved up here from the scrollable
-                            // chip row below — they're both view-changing controls someone reaches
-                            // for on every visit, not situational filters like Deleted/Duplicates/
-                            // Audio, so they earn a fixed spot in the header instead of living
-                            // wherever the chip row's horizontal scroll happens to leave them.
-                            IconToggleButton(checked = favoritesOnly, onCheckedChange = {
-                                favoritesOnly = it
-                                if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false }
-                            }) {
-                                Icon(
-                                    Icons.Outlined.Star,
-                                    contentDescription = "Favorites only",
-                                    tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            IconButton(onClick = {
-                                gridView = !gridView
-                                GalleryDlPreferences.setLibraryGridView(context, gridView)
-                            }) {
-                                Icon(
-                                    if (gridView) Icons.Outlined.List else Icons.Outlined.GridView,
-                                    contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
-                                )
-                            }
-                            IconButton(onClick = onOpenQueue) {
-                                if (hasActiveDownloads) {
-                                    BadgedBox(
-                                        badge = {
-                                            Badge(containerColor = MaterialTheme.colorScheme.error) {
-                                                Text(activeDownloadsCount.toString())
-                                            }
-                                        }
-                                    ) {
-                                        Icon(Icons.Outlined.Download, contentDescription = "Active downloads")
-                                    }
-                                } else {
-                                    Icon(Icons.Outlined.Download, contentDescription = "Active downloads")
-                                }
-                            }
-                        }
-                        }
-                        // Same pill search bar as the Settings page, in the same position relative
-                        // to its own title — full width, right below it — instead of the old
-                        // "Search" chip that toggled a separate full-screen search bar in its place.
-                        PillSearchBar(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            placeholder = "Search downloads",
-                            modifier = Modifier.padding(horizontal = 20.dp).padding(top = 8.dp),
-                        )
-                        // better-interface review: this row silently overflowed past the last
-                        // couple of chips ("Deleted", Grid/List) on typical phone widths with no
-                        // visible cue that anything more was scrollable. Two earlier attempts (an
-                        // edge fade, then a scrollbar-style track/thumb strip) both worked but the
-                        // user didn't want either look — this is a one-time "nudge" instead: a
-                        // brief auto-scroll-and-back on first appearance, the physical equivalent
-                        // of someone tapping the row and pointing right. Scrolls all the way to
-                        // maxValue (the real end), not a small hinting bump — a fixed small nudge
-                        // (reported live, and true of the analogous Queue-screen fix too) stopped
-                        // short of actually revealing the last chip.
-                        val toolbarScrollState = rememberScrollState()
-                        LaunchedEffect(Unit) {
-                            // Give the static state a beat to register before moving anything —
-                            // also lets the real maxValue (only known post-layout) settle so a
-                            // screen where every chip already fits doesn't nudge toward nothing.
-                            delay(500)
-                            // An automatic scroll the user didn't ask for — same reduce-motion
-                            // gate as the entrance animations above, not just decorative here.
-                            if (!reducedMotion && toolbarScrollState.maxValue > 0) {
-                                toolbarScrollState.animateScrollTo(toolbarScrollState.maxValue, animationSpec = tween(450))
-                                delay(250)
-                                toolbarScrollState.animateScrollTo(0, animationSpec = tween(450))
-                            }
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(toolbarScrollState)
-                                .padding(horizontal = 16.dp)
-                                // Only top grew (2dp -> 8dp) to bring the chips down a little —
-                                // bottom stays 10dp so the thin shadow strip below this row (the
-                                // header Surface's own shadowElevation, visible right above the
-                                // list) doesn't grow along with it.
-                                .padding(top = 8.dp, bottom = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
-                        ) {
-                            Box {
-                                LibraryToolbarChip(
-                                    icon = Icons.Outlined.Tune,
-                                    label = "Sort",
-                                    onClick = { sortMenuExpanded = true },
-                                    groupIndex = 0, groupSize = 4,
-                                )
-                                DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
-                                    LibrarySort.entries.forEach { option ->
-                                        DropdownMenuItem(
-                                            text = { Text(option.label) },
-                                            leadingIcon = if (option == sortOption) {
-                                                { Icon(Icons.Outlined.Check, contentDescription = null) }
-                                            } else null,
-                                            onClick = { sortOption = option; sortMenuExpanded = false },
-                                        )
-                                    }
-                                }
-                            }
-                            LibraryToolbarChip(
-                                icon = Icons.Outlined.Delete,
-                                label = "Deleted",
-                                active = showDeletedOnly,
-                                onClick = {
-                                    showDeletedOnly = !showDeletedOnly
-                                    if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false; audioOnly = false }
-                                },
-                                groupIndex = 1, groupSize = 4,
-                            )
-                            LibraryToolbarChip(
-                                icon = Icons.Outlined.ContentCopy,
-                                label = "Duplicates",
-                                active = showDuplicatesOnly,
-                                count = duplicateAttempts.size,
-                                onClick = {
-                                    showDuplicatesOnly = !showDuplicatesOnly
-                                    if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false; audioOnly = false }
-                                },
-                                groupIndex = 2, groupSize = 4,
-                            )
-                            LibraryToolbarChip(
-                                icon = Icons.Outlined.MusicNote,
-                                label = "Audio",
-                                active = audioOnly,
-                                onClick = {
-                                    audioOnly = !audioOnly
-                                    if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
-                                },
-                                groupIndex = 3, groupSize = 4,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    ) { paddingValues ->
-        // Wraps the whole branch below (previously each ending in its own early return@Scaffold)
-        // so the bottom gradient scrim further down can sit as one unconditional sibling instead
-        // of needing to be duplicated into every branch — see that scrim's own comment for why it
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // Wraps the whole branch below (previously each ending in its own early return) so the
+        // bottom gradient scrim further down can sit as one unconditional sibling instead of
+        // needing to be duplicated into every branch — see that scrim's own comment for why it
         // exists at all.
         Box(modifier = Modifier.fillMaxSize()) {
         if (showDuplicatesOnly) {
@@ -505,12 +340,12 @@ fun DownloadsHistoryScreen(
                     icon = Icons.Outlined.ContentCopy,
                     title = "No duplicates",
                     subtitle = "A link you share in that's already queued, running, or finished lands here instead of starting a second copy.",
-                    modifier = Modifier.padding(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
+                    modifier = Modifier.padding(top = topContentPaddingDp, bottom = navBarClearance()),
                 )
             } else {
                 DuplicatesList(
                     attempts = duplicateAttempts,
-                    contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
+                    contentPadding = PaddingValues(top = topContentPaddingDp, bottom = navBarClearance()),
                     onRedownload = { viewModel.redownloadDuplicate(it) },
                     onDismiss = { viewModel.dismissDuplicateAttempt(it) },
                 )
@@ -521,13 +356,13 @@ fun DownloadsHistoryScreen(
                 icon = if (searching) Icons.Outlined.Search else if (showDeletedOnly) Icons.Outlined.Delete else if (favoritesOnly) Icons.Outlined.Star else Icons.Outlined.Image,
                 title = if (searching) "No matches" else if (showDeletedOnly) "Nothing deleted" else if (favoritesOnly) "No favorites yet" else "Nothing here yet",
                 subtitle = if (searching) "Try a different search." else if (showDeletedOnly) "Pictures you remove from your device gallery will show up here." else if (favoritesOnly) "Star a download to pin it here." else "Downloaded pictures will show up in this gallery.",
-                modifier = Modifier.padding(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
+                modifier = Modifier.padding(top = topContentPaddingDp, bottom = navBarClearance()),
             )
         } else if (gridView) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 state = gridState,
-                contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), start = 8.dp, end = 8.dp, bottom = navBarClearance()),
+                contentPadding = PaddingValues(top = topContentPaddingDp, start = 8.dp, end = 8.dp, bottom = navBarClearance()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize(),
@@ -568,7 +403,7 @@ fun DownloadsHistoryScreen(
         } else {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(top = paddingValues.calculateTopPadding(), bottom = navBarClearance()),
+                contentPadding = PaddingValues(top = topContentPaddingDp, bottom = navBarClearance()),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(visibleItems, key = { it.id }) { item ->
@@ -615,56 +450,35 @@ fun DownloadsHistoryScreen(
             }
         }
 
-        // Mirrors the header's own top gradient (primary fading into background) at the bottom of
-        // the screen instead — the header provided a visual "ceiling" that content faded into near
-        // the status bar; once it collapses away on scroll, content now reaches edge-to-edge with
-        // nothing softening where it meets the floating nav pill either, which read as an abrupt,
-        // unfinished edge rather than an intentional one. Tied directly to the same
-        // scrollBehavior.state.collapsedFraction driving the header's own collapse (0f fully
-        // expanded, 1f fully collapsed) so it fades in exactly as the header fades away, not as a
-        // separate on/off toggle of its own. FloatingNavBar itself (MainScreen.kt) composes after —
-        // on top of — this whole screen, so this scrim sits correctly behind the pill without this
-        // screen needing to know anything about it directly.
+        // A visual "floor" at the bottom mirroring where the header used to fade into the status
+        // bar at the top — once the header's own real content (chip row, subtitle) has shrunk
+        // away, content reaches edge-to-edge with nothing softening where it meets the floating
+        // nav pill either, which read as an abrupt, unfinished edge rather than an intentional
+        // one. Tied to collapseFraction (0 fully expanded, 1 fully collapsed) so it fades in
+        // exactly as the header finishes collapsing. FloatingNavBar itself (MainScreen.kt)
+        // composes after — on top of — this whole screen, so this scrim sits correctly behind the
+        // pill without this screen needing to know anything about it directly.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .height(navBarClearance())
-                .graphicsLayer { alpha = scrollBehavior.state.collapsedFraction }
+                .graphicsLayer { alpha = collapseFraction }
                 .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
         )
 
-        // Same underlying problem at the top: the header's own gradient (bleeding up under the
-        // status bar via its own internal statusBarsPadding) is what currently keeps that area
-        // from being flat, undifferentiated background — once the header collapses away, that
-        // goes with it. This is a real "status bar text protection" scrim now (a Samsung Gallery-
-        // style treatment), not a tinted echo of the header's own primary-colored gradient: pure
-        // black, alpha-blended, fading to fully transparent — legible white status bar icons
-        // against literally any content scrolled underneath, not just this app's own palette.
-        // Extends STATUS_BAR_SCRIM_EXTRA_HEIGHT past the real status bar height rather than
-        // stopping exactly at it, so the fade reads as a soft falloff into whatever's scrolled
-        // there rather than a hard-edged strip — same reasoning Samsung's own implementation uses.
-        //
-        // NOT driven by the raw collapsedFraction the way the bottom scrim is — that produced a
-        // visible hard pop-in, reproduced live: the header's own status-bar-height sliver is the
-        // FIRST part of its content (the statusBarsPadding spacer sits above the title/search/
-        // chips) and the LAST part clipped away, since Modifier.layout's collapsing placement
-        // above keeps the header's top edge fixed and clips from the bottom up. So for nearly the
-        // whole collapse gesture, the header's own real (opaque) status-bar strip is still fully
-        // there occluding this scrim completely regardless of this scrim's own alpha — it only
-        // stops being occluded in the final sliver of the gesture, once the header's own visible
-        // height drops below the status bar's own height. Fading this scrim in across the WHOLE
-        // collapsedFraction range meant it was already most of the way faded in by the time that
-        // occlusion finally lifted, so it suddenly snapped into view instead of easing in. Scoping
-        // the fade to only that final sliver — 0 while the header still fully covers the status
-        // bar, ramping to 1 exactly as the header's own edge reaches the status bar's own height —
-        // makes this scrim's reveal actually match when it becomes physically visible at all.
-        val density = LocalDensity.current
+        // The header is opaque and covers the status bar whenever it's visible at all, same as
+        // Settings' own sub-page headers — but once it's faded away entirely (scrolled down far
+        // enough, past collapseRangePx, in the "hidden" direction), nothing paints behind the
+        // status bar any more. This is a real "status bar text protection" scrim (a Samsung
+        // Gallery-style treatment): pure black, alpha-blended, fading to fully transparent —
+        // legible white status bar icons against literally any content scrolled underneath, not
+        // just this app's own palette. Extends STATUS_BAR_SCRIM_EXTRA_HEIGHT past the real status
+        // bar height rather than stopping exactly at it, so the fade reads as a soft falloff into
+        // whatever's scrolled there rather than a hard-edged strip — same reasoning Samsung's own
+        // implementation uses.
         val statusBarPx = with(density) { WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx() }
-        val visibleHeaderPx = (headerHeightPx + scrollBehavior.state.heightOffset).coerceAtLeast(0f)
-        val statusBarScrimAlpha = if (statusBarPx > 0f) {
-            ((statusBarPx - visibleHeaderPx) / statusBarPx).coerceIn(0f, 1f)
-        } else 0f
+        val statusBarScrimAlpha = 1f - headerAlpha
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -698,6 +512,457 @@ fun DownloadsHistoryScreen(
                 Icon(Icons.Outlined.ArrowUpward, contentDescription = "Scroll to top")
             }
         }
+        }
+
+        if (selectionMode) {
+            TopAppBar(
+                title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { selectedIds = emptySet() }) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        val selectedItems = historyItems.filter { it.id in selectedIds }
+                        val uris = selectedItems.mapNotNull { it.thumbnailPath?.let { p -> Uri.parse(p) } }
+                        if (uris.isNotEmpty()) {
+                            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                type = "image/*"
+                                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            runCatching { context.startActivity(Intent.createChooser(intent, "Share images")) }
+                        }
+                    }) {
+                        Icon(Icons.Outlined.Share, contentDescription = "Share selected")
+                    }
+                    IconButton(onClick = {
+                        selectedIds.forEach { viewModel.setFavorite(it, true) }
+                        selectedIds = emptySet()
+                    }) {
+                        Icon(Icons.Outlined.Star, contentDescription = "Add selected to favorites")
+                    }
+                    IconButton(onClick = {
+                        requestDelete(selectedIds)
+                        selectedIds = emptySet()
+                    }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove selected")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .onSizeChanged { selectionBarHeightPx = it.height.toFloat() },
+            )
+        } else {
+            // Backdrop sized to match topContentPaddingDp exactly (same lerp, same collapseFraction
+            // — not the earlier version's fixed headerHeightPx), faded by the same headerAlpha as
+            // the real header drawn on top of it. NOT derived from measuring the header itself,
+            // unlike an earlier attempt that made the header's own Modifier.layout claim this same
+            // height directly: that measured the header with the *incoming* constraints
+            // unmodified, and something about this Box's position inside a fillMaxSize() parent
+            // fed back into a runaway claimed height, reproduced live as a large, constant blank
+            // gap at the top of the screen. A separate, non-measuring Box has no such feedback
+            // risk. It has to shrink in step with topContentPaddingDp, not stay fixed at the full
+            // expanded height: once that reservation itself started shrinking (see its own
+            // comment on why a fixed reservation was the real bug), a backdrop still fixed at the
+            // old full height would now extend past the (smaller) reserved area and paint over
+            // real list rows that have scrolled up into what used to be reserved space.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .height(topContentPaddingDp)
+                    .graphicsLayer { alpha = headerAlpha }
+                    .background(MaterialTheme.colorScheme.background),
+            )
+            LibraryHeader(
+                libraryTopicIcon = libraryTopicIcon,
+                collapseFraction = collapseFraction,
+                onChipRowHeightChange = { chipRowHeightPx = it },
+                searchExpanded = searchExpanded,
+                onSearchExpandedChange = { searchExpanded = it },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                subtitle = if (showDuplicatesOnly) {
+                    "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
+                } else {
+                    "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}"
+                },
+                favoritesOnly = favoritesOnly,
+                onFavoritesOnlyChange = {
+                    favoritesOnly = it
+                    if (favoritesOnly) { showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false }
+                },
+                gridView = gridView,
+                onToggleGridView = {
+                    gridView = !gridView
+                    GalleryDlPreferences.setLibraryGridView(context, gridView)
+                },
+                hasActiveDownloads = hasActiveDownloads,
+                activeDownloadsCount = activeDownloadsCount,
+                onOpenQueue = onOpenQueue,
+                reducedMotion = reducedMotion,
+                sortMenuExpanded = sortMenuExpanded,
+                onSortMenuExpandedChange = { sortMenuExpanded = it },
+                sortOption = sortOption,
+                onSortOptionChange = { sortOption = it },
+                showDeletedOnly = showDeletedOnly,
+                onToggleShowDeletedOnly = {
+                    showDeletedOnly = !showDeletedOnly
+                    if (showDeletedOnly) { favoritesOnly = false; showDuplicatesOnly = false; audioOnly = false }
+                },
+                showDuplicatesOnly = showDuplicatesOnly,
+                onToggleShowDuplicatesOnly = {
+                    showDuplicatesOnly = !showDuplicatesOnly
+                    if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false; audioOnly = false }
+                },
+                duplicateAttemptsCount = duplicateAttempts.size,
+                audioOnly = audioOnly,
+                onToggleAudioOnly = {
+                    audioOnly = !audioOnly
+                    if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .graphicsLayer { alpha = headerAlpha }
+                    .background(MaterialTheme.colorScheme.background)
+                    .onSizeChanged { headerHeightPx = maxOf(headerHeightPx, it.height.toFloat()) }
+                    .statusBarsPadding(),
+            )
+        }
+    }
+}
+
+/** Library's own single, continuously-morphing header — ported from Settings' own
+ * SettingsSubPageHeader/SettingsSubScaffold (see MoreScreen.kt), which uses exactly one header
+ * instance whose own sub-elements shrink away as [collapseFraction] goes from 0 (fully expanded,
+ * at rest) to 1 (fully collapsed), rather than two separate composables crossfaded by alpha
+ * against each other — see this composable's caller for why that first approach caused a visible
+ * double-image ghost during a slow scroll. Here, the subtitle line and the chip row both shrink
+ * to 0 height (not just alpha) as [collapseFraction] increases; the icon+title+actions row itself
+ * never changes shape, just gains or loses the space those two pieces used to take up around it,
+ * so the compact bar "grows into" the full header (and back) exactly in step with the finger. */
+@Composable
+private fun LibraryHeader(
+    libraryTopicIcon: ImageVector,
+    collapseFraction: Float,
+    onChipRowHeightChange: (Float) -> Unit,
+    searchExpanded: Boolean,
+    onSearchExpandedChange: (Boolean) -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    subtitle: String,
+    favoritesOnly: Boolean,
+    onFavoritesOnlyChange: (Boolean) -> Unit,
+    gridView: Boolean,
+    onToggleGridView: () -> Unit,
+    hasActiveDownloads: Boolean,
+    activeDownloadsCount: Int,
+    onOpenQueue: () -> Unit,
+    reducedMotion: Boolean,
+    sortMenuExpanded: Boolean,
+    onSortMenuExpandedChange: (Boolean) -> Unit,
+    sortOption: LibrarySort,
+    onSortOptionChange: (LibrarySort) -> Unit,
+    showDeletedOnly: Boolean,
+    onToggleShowDeletedOnly: () -> Unit,
+    showDuplicatesOnly: Boolean,
+    onToggleShowDuplicatesOnly: () -> Unit,
+    duplicateAttemptsCount: Int,
+    audioOnly: Boolean,
+    onToggleAudioOnly: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    Box(modifier = modifier.fillMaxWidth()) {
+        // Favorites/Grid-List/Queue, pinned at a fixed top=12dp position independent of the
+        // icon+title/search row below — reported live after they briefly shared that row: sharing
+        // it meant they inherited the row's own 76dp->8dp top-padding lerp meant for the title,
+        // dragging them down to the title's (now lower, Settings-matching) vertical position
+        // instead of staying at their own long-standing spot near the status bar. A separate
+        // overlay row, independent of collapseFraction entirely, keeps them exactly where they
+        // were. Hidden while searching, same as the row below — floating above an otherwise-empty
+        // search field read as leftover clutter, not part of the search UI.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !searchExpanded,
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(150)),
+            modifier = Modifier.align(Alignment.TopEnd),
+        ) {
+            Row(modifier = Modifier.padding(end = 12.dp, top = 12.dp)) {
+                LibraryHeaderActions(
+                    favoritesOnly = favoritesOnly,
+                    onFavoritesOnlyChange = onFavoritesOnlyChange,
+                    gridView = gridView,
+                    onToggleGridView = onToggleGridView,
+                    hasActiveDownloads = hasActiveDownloads,
+                    activeDownloadsCount = activeDownloadsCount,
+                    onOpenQueue = onOpenQueue,
+                )
+            }
+        }
+        Column(modifier = Modifier.fillMaxWidth()) {
+        AnimatedContent(targetState = searchExpanded, label = "library-header-row") { expanded ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // top lerps 76dp -> 8dp, same values Settings' own header uses (see
+                    // rememberCollapsingHeaderState's expandedTopPadding/collapsedTopPadding) —
+                    // previously a fixed 12dp, which reproduced live as two separate complaints:
+                    // the title/search sitting higher than intended, and scrolling not visibly
+                    // "pushing" the header up the way it does on Settings' sub-pages (only the
+                    // subtitle/chip row below it were shrinking; the row itself never moved).
+                    // Continuous with collapseFraction, not a discrete jump, so this row itself
+                    // is what "grows into" the compact bar, exactly like Settings' own title row.
+                    .padding(
+                        start = 20.dp,
+                        end = 12.dp,
+                        top = androidx.compose.ui.unit.lerp(76.dp, 8.dp, collapseFraction),
+                        bottom = 2.dp,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (expanded) {
+                    PillSearchBar(
+                        query = searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                        placeholder = "Search downloads",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            onSearchExpandedChange(false)
+                            onSearchQueryChange("")
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "Close search",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    // 40dp box around the (non-clickable) leading icon, not just the bare 32dp
+                    // icon — matches the 40dp touch target every Settings sub-page's own topic
+                    // icon sits in.
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            libraryTopicIcon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Library",
+                            // Same style declaration as the Settings root header's own "Settings"
+                            // title (see MoreScreen.kt's SettingsRootScreen) — displayMedium (30sp)
+                            // plus the Google Sans HeaderFontFamily.
+                            style = MaterialTheme.typography.displayMedium,
+                            fontFamily = HeaderFontFamily,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        // Shrinks to 0 height (not just alpha) as collapseFraction -> 1, so the
+                        // compact bar reclaims the space entirely instead of leaving it
+                        // empty-but-reserved — same technique as Settings' own back-button row
+                        // (see SettingsSubPageHeader).
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(with(density) { androidx.compose.ui.unit.lerp(18.dp, 0.dp, collapseFraction) })
+                                .clipToBounds(),
+                        ) {
+                            Text(
+                                subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.graphicsLayer { alpha = 1f - collapseFraction },
+                            )
+                        }
+                    }
+                    // Shrinks away (width, not just alpha) as collapseFraction -> 1, same
+                    // reasoning as the subtitle above — the compact bar is title + the 3 icon
+                    // buttons in their own fixed overlay row only, no search, per the original
+                    // scope this compact bar was asked for.
+                    Box(
+                        modifier = Modifier
+                            .width(with(density) { androidx.compose.ui.unit.lerp(40.dp, 0.dp, collapseFraction) })
+                            .clipToBounds(),
+                    ) {
+                        IconButton(
+                            onClick = { onSearchExpandedChange(true) },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .graphicsLayer { alpha = 1f - collapseFraction },
+                        ) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        // Same shrink-to-0-height intent as the subtitle above, but NOT the same
+        // `.height(lerp(measuredPx.toDp(), 0.dp, fraction))` technique — unlike the subtitle's
+        // fixed 18dp target, chipRowHeightPx here is itself derived from measuring this row, and
+        // a plain `.height()` modifier is also an incoming constraint on that same child: at
+        // collapseFraction=0 with chipRowHeightPx still at its initial 0, that constrains the Row
+        // to an exact 0dp, which is also what it then measures and reports back via
+        // onSizeChanged, permanently — a circular deadlock. Reproduced live: the chip row never
+        // appeared at all, even fully expanded at rest. Modifier.layout sidesteps it exactly like
+        // the header's own former collapsing-Surface trick did (see git history): measure the Row
+        // with maxHeight = Infinity so it always reports its one true natural size regardless of
+        // how much is currently visible, and only the *placement* — this node's own reported
+        // height, coerced into [0, natural] by collapseFraction — actually shrinks.
+        // Reported up to the caller via onChipRowHeightChange, not just kept local — the caller
+        // needs this same value to derive collapseRangePx (see its own comment on why a flat
+        // 120dp isn't enough), so the scroll distance needed to finish collapsing and the amount
+        // of reserved space that scroll actually consumes stay exactly in sync.
+        var chipRowHeightPx by remember { mutableFloatStateOf(0f) }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds()
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                    if (placeable.height > chipRowHeightPx) {
+                        chipRowHeightPx = placeable.height.toFloat()
+                        onChipRowHeightChange(chipRowHeightPx)
+                    }
+                    val visibleHeight = (placeable.height * (1f - collapseFraction)).toInt()
+                    layout(placeable.width, visibleHeight) { placeable.placeRelative(0, 0) }
+                },
+        ) {
+            // better-interface review: this row silently overflowed past the last couple of chips
+            // ("Deleted", Grid/List) on typical phone widths with no visible cue that anything
+            // more was scrollable. Two earlier attempts (an edge fade, then a scrollbar-style
+            // track/thumb strip) both worked but the user didn't want either look — this is a
+            // one-time "nudge" instead: a brief auto-scroll-and-back on first appearance, the
+            // physical equivalent of someone tapping the row and pointing right. Scrolls all the
+            // way to maxValue (the real end), not a small hinting bump — a fixed small nudge
+            // (reported live, and true of the analogous Queue-screen fix too) stopped short of
+            // actually revealing the last chip.
+            val toolbarScrollState = rememberScrollState()
+            LaunchedEffect(Unit) {
+                // Give the static state a beat to register before moving anything — also lets the
+                // real maxValue (only known post-layout) settle so a screen where every chip
+                // already fits doesn't nudge toward nothing.
+                delay(500)
+                // An automatic scroll the user didn't ask for — same reduce-motion gate as the
+                // entrance animations elsewhere in this screen, not just decorative here.
+                if (!reducedMotion && toolbarScrollState.maxValue > 0) {
+                    toolbarScrollState.animateScrollTo(toolbarScrollState.maxValue, animationSpec = tween(450))
+                    delay(250)
+                    toolbarScrollState.animateScrollTo(0, animationSpec = tween(450))
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(toolbarScrollState)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp, bottom = 10.dp)
+                    .onSizeChanged { chipRowHeightPx = maxOf(chipRowHeightPx, it.height.toFloat()) },
+                horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
+            ) {
+                Box {
+                    LibraryToolbarChip(
+                        icon = Icons.Outlined.Tune,
+                        label = "Sort",
+                        onClick = { onSortMenuExpandedChange(true) },
+                        groupIndex = 0, groupSize = 4,
+                    )
+                    DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { onSortMenuExpandedChange(false) }) {
+                        LibrarySort.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                leadingIcon = if (option == sortOption) {
+                                    { Icon(Icons.Outlined.Check, contentDescription = null) }
+                                } else null,
+                                onClick = { onSortOptionChange(option); onSortMenuExpandedChange(false) },
+                            )
+                        }
+                    }
+                }
+                LibraryToolbarChip(
+                    icon = Icons.Outlined.Delete,
+                    label = "Deleted",
+                    active = showDeletedOnly,
+                    onClick = onToggleShowDeletedOnly,
+                    groupIndex = 1, groupSize = 4,
+                )
+                LibraryToolbarChip(
+                    icon = Icons.Outlined.ContentCopy,
+                    label = "Duplicates",
+                    active = showDuplicatesOnly,
+                    count = duplicateAttemptsCount,
+                    onClick = onToggleShowDuplicatesOnly,
+                    groupIndex = 2, groupSize = 4,
+                )
+                LibraryToolbarChip(
+                    icon = Icons.Outlined.MusicNote,
+                    label = "Audio",
+                    active = audioOnly,
+                    onClick = onToggleAudioOnly,
+                    groupIndex = 3, groupSize = 4,
+                )
+            }
+        }
+        }
+    }
+}
+
+/** The Favorites toggle, Grid/List view toggle, and Queue button (with its active-downloads
+ * badge) — shared between the full header's own title row and the compact header's title row so
+ * the two stay pixel-identical and can't drift out of sync with each other. */
+@Composable
+private fun LibraryHeaderActions(
+    favoritesOnly: Boolean,
+    onFavoritesOnlyChange: (Boolean) -> Unit,
+    gridView: Boolean,
+    onToggleGridView: () -> Unit,
+    hasActiveDownloads: Boolean,
+    activeDownloadsCount: Int,
+    onOpenQueue: () -> Unit,
+) {
+    IconToggleButton(checked = favoritesOnly, onCheckedChange = onFavoritesOnlyChange) {
+        Icon(
+            Icons.Outlined.Star,
+            contentDescription = "Favorites only",
+            tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    IconButton(onClick = onToggleGridView) {
+        Icon(
+            if (gridView) Icons.Outlined.List else Icons.Outlined.GridView,
+            contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
+        )
+    }
+    IconButton(onClick = onOpenQueue) {
+        if (hasActiveDownloads) {
+            BadgedBox(
+                badge = {
+                    Badge(containerColor = MaterialTheme.colorScheme.error) {
+                        Text(activeDownloadsCount.toString())
+                    }
+                }
+            ) {
+                Icon(Icons.Outlined.Download, contentDescription = "Active downloads")
+            }
+        } else {
+            Icon(Icons.Outlined.Download, contentDescription = "Active downloads")
         }
     }
 }

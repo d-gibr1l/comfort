@@ -531,14 +531,7 @@ fun HomeScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
-                            MaterialTheme.colorScheme.background,
-                        )
-                    )
-                )
+                .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .padding(top = 12.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
         ) {
