@@ -93,8 +93,22 @@ class _CallbackOutput:
     def skip(self, path):
         pass
 
+    # gallery-dl's own default output class (PipeOutput, what a plain non-tty CLI run gets)
+    # does exactly this on a successful file: `stdout_write(f"{path}\n")`. This class replaces
+    # that default (see download()'s own gallery_dl.output.select patch below) so it could also
+    # report [size]/[progress] lines, but never carried over the one line DownloadWorker.kt's own
+    # callback actually depends on: it recognizes "a file was saved" by matching a bare absolute
+    # path that exists inside stagingDir, and increments savedCount from that. Left as `pass`,
+    # gallery-dl silently wrote every real file to disk with no visible signal any of them existed
+    # — savedCount stayed 0 regardless of how many files a download actually produced. Reproduced
+    # live: an Instagram photo carousel where gallery-dl completed with only cosmetic resolution
+    # warnings (no error) and genuinely saved all 5 images to disk, yet the app recorded 0
+    # downloaded items, triggered its savedCount==0 fallback to yt_dlp_wrapper.py, and surfaced
+    # yt-dlp's own "No video formats found!" (correct for a photo-only post, but not the real
+    # problem) as the download's final error — masking that gallery-dl had actually already
+    # succeeded.
     def success(self, path):
-        pass
+        self._emit(path)
 
     def progress(self, bytes_total, bytes_downloaded, bytes_per_second):
         if bytes_total is not None and bytes_total != self._last_total:
