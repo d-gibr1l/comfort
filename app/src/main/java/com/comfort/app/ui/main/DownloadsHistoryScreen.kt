@@ -80,11 +80,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// How far the status bar's own text-protection scrim (see its own comment further down) extends
-// past the real status bar height before fading to fully transparent — matches Samsung Gallery's
-// own version of this same scrim, which doesn't stop exactly at the status bar's own edge either,
-// so the fade reads as a soft falloff into the content behind it rather than a hard-edged strip.
-private val STATUS_BAR_SCRIM_EXTRA_HEIGHT = 24.dp
+
 
 private enum class LibrarySort(val label: String) {
     DATE_NEWEST("Newest first"),
@@ -595,27 +591,6 @@ fun DownloadsHistoryScreen(
                     .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
             )
         }
-
-        // An always-present status-bar text-protection scrim — not tied to showCompactBar's own
-        // threshold. Between the header's title having scrolled away and that threshold being
-        // reached, the header's own trailing chip row (and, once the compact bar hides itself on
-        // a continued downward scroll, any ordinary row) is real content sliding past y=0 with
-        // nothing else protecting it. A flat, opaque, same-color backdrop was tried here first,
-        // but reported live (side by side with a Settings sub-page's own status bar) as visibly
-        // different: Settings lets a soft hint of whatever's scrolled underneath show through its
-        // own status bar rather than blocking it outright. Translucent black fading to
-        // transparent, extending STATUS_BAR_SCRIM_EXTRA_HEIGHT past the real status bar height
-        // rather than stopping exactly at it, reproduces that same soft falloff instead of a hard,
-        // flat cutoff — legible white status bar icons against literally any content scrolled
-        // underneath, same reasoning a Samsung Gallery-style treatment uses.
-        val statusBarPx = with(density) { WindowInsets.statusBars.asPaddingValues().calculateTopPadding().toPx() }
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(with(density) { statusBarPx.toDp() } + STATUS_BAR_SCRIM_EXTRA_HEIGHT)
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.38f), Color.Transparent))),
-        )
 
         val showScrollToTopFab by remember {
             derivedStateOf {
