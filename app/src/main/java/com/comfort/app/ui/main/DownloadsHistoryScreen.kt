@@ -562,35 +562,18 @@ fun DownloadsHistoryScreen(
             }
         }
 
-        // A visual "floor" at the bottom, same idea as before: once the header (now list content)
-        // has scrolled away and real content reaches edge-to-edge, nothing softens where it meets
-        // the floating nav pill, reading as an abrupt edge rather than an intentional one. Faded
-        // in once scrolled at all — a plain threshold, not a collapse fraction, since there's no
-        // collapse any more. FloatingNavBar itself (MainScreen.kt) composes after — on top of —
+        // A visual "floor" at the bottom: nothing softens where it meets
+        // the floating nav pill, reading as an abrupt edge rather than an intentional one.
+        // FloatingNavBar itself (MainScreen.kt) composes after — on top of —
         // this whole screen, so this scrim sits correctly behind the pill without this screen
         // needing to know anything about it directly.
-        val scrolledPastHeader by remember {
-            derivedStateOf {
-                if (gridView) {
-                    gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0
-                } else {
-                    listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
-                }
-            }
-        }
-        AnimatedVisibility(
-            visible = scrolledPastHeader,
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(200)),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(navBarClearance())
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
-            )
-        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(navBarClearance())
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
+        )
 
         val showScrollToTopFab by remember {
             derivedStateOf {
