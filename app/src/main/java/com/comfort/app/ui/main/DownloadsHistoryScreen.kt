@@ -1016,6 +1016,23 @@ private fun LibraryCompactBar(
                 // subtitle of this same style doing the same job.
                 Text(" ", style = MaterialTheme.typography.bodySmall, modifier = Modifier.graphicsLayer { alpha = 0f })
             }
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 12.dp, top = 12.dp)
+                .graphicsLayer {
+                    val maxTranslatePx = (76.dp - 4.dp).toPx()
+                    val rawOffset = headerScrollOffsetPx()
+                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                    // We want to translate UP by 8.dp exactly as offset goes from 0 to maxTranslatePx.
+                    // This smoothly transitions the icons from top=12.dp to a visual top of 4.dp.
+                    val fraction = offset / maxTranslatePx
+                    val endTranslateY = (4.dp - 12.dp).toPx()
+                    translationY = endTranslateY * fraction
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             LibraryHeaderActions(
                 favoritesOnly = favoritesOnly,
                 onFavoritesOnlyChange = onFavoritesOnlyChange,
