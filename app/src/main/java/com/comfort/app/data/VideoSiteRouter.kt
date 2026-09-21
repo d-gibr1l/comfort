@@ -28,6 +28,7 @@ object VideoSiteRouter {
         "cam4.com",
         "bitchute.com",
         "dailymotion.com",
+        "xnxx.com", "xnxx.tv",
     )
 
     // Spotify itself never hosts downloadable audio (its streams are DRM'd) — this app's own
