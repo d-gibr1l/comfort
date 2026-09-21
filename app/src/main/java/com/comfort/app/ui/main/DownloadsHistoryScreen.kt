@@ -348,6 +348,12 @@ fun DownloadsHistoryScreen(
         }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val subtitle = if (showDuplicatesOnly) {
+            "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
+        } else {
+            "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}"
+        }
+
         // Wraps the whole branch below (previously each ending in its own early return) so the
         // bottom gradient scrim further down can sit as one unconditional sibling instead of
         // needing to be duplicated into every branch — see that scrim's own comment for why it
@@ -366,11 +372,7 @@ fun DownloadsHistoryScreen(
                     onSearchExpandedChange = { searchExpanded = it },
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
-                    subtitle = if (showDuplicatesOnly) {
-                        "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
-                    } else {
-                        "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}"
-                    },
+                    subtitle = subtitle,
                     favoritesOnly = favoritesOnly,
                     onFavoritesOnlyChange = {
                         favoritesOnly = it
@@ -694,6 +696,7 @@ fun DownloadsHistoryScreen(
             // transform — with the real header's offset itself read fresh each frame inside
             // LibraryCompactBar's own translation modifier, not read here at composition time.
             LibraryCompactBar(
+                subtitle = subtitle,
                 favoritesOnly = favoritesOnly,
                 onFavoritesOnlyChange = {
                     favoritesOnly = it
@@ -950,6 +953,7 @@ private fun LibraryHeader(
  * to hand-tune a second offset on top of the real one. */
 @Composable
 private fun LibraryCompactBar(
+    subtitle: String,
     favoritesOnly: Boolean,
     onFavoritesOnlyChange: (Boolean) -> Unit,
     gridView: Boolean,
@@ -1010,11 +1014,37 @@ private fun LibraryCompactBar(
                     fontFamily = HeaderFontFamily,
                     fontWeight = FontWeight.Bold,
                 )
-                // Invisible — see this composable's own doc comment for why reserving this exact
-                // line height (not just an arbitrary Spacer) is what makes the title above land at
-                // the same relative position as the real header's own title, which has a real
-                // subtitle of this same style doing the same job.
-                Text(" ", style = MaterialTheme.typography.bodySmall, modifier = Modifier.graphicsLayer { alpha = 0f })
+
+                // The subtitle physically shrinks its layout height to 0 as the header collapses,
+                // which automatically shifts the "Library" title above it vertically down to the exact
+                // true center of the row to align perfectly with the action icons. As it expands,
+                // it smoothly pushes the "Library" title back up into its expanded-header position.
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .graphicsLayer {
+                            val maxTranslatePx = (76.dp - 4.dp).toPx()
+                            val rawOffset = headerScrollOffsetPx()
+                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                            // Fade in as it expands (offset -> 0)
+                            alpha = 1f - (offset / maxTranslatePx)
+                        }
+                        .clipToBounds()
+                        .layout { measurable, constraints ->
+                            val maxTranslatePx = (76.dp - 4.dp).toPx()
+                            val rawOffset = headerScrollOffsetPx()
+                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                            val fraction = offset / maxTranslatePx
+                            
+                            val placeable = measurable.measure(constraints)
+                            val currentHeight = (placeable.height * (1f - fraction)).toInt()
+                            layout(placeable.width, currentHeight) {
+                                placeable.place(0, 0)
+                            }
+                        }
+                )
             }
         }
         Row(
