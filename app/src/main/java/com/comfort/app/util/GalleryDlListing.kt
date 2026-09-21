@@ -4,6 +4,7 @@ import android.content.Context
 import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -126,19 +127,20 @@ object GalleryDlListing {
      * unlocked when the real download wouldn't actually send them either. Writes a temp filtered
      * copy only when something's actually disabled; otherwise just hands back the real file's own
      * path, avoiding pointless I/O on every listing when nothing's toggled off. */
-    private fun effectiveCookiesPath(context: Context): String {
+    private fun effectiveCookiesPath(context: Context): Pair<String, java.io.File?> {
         val cookiesPath = context.filesDir.resolve("cookies.txt")
-        if (!cookiesPath.exists() || cookiesPath.length() <= 0) return ""
+        if (!cookiesPath.exists() || cookiesPath.length() <= 0) return "" to null
         val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
-        if (disabledDomains.isEmpty()) return cookiesPath.absolutePath
+        if (disabledDomains.isEmpty()) return cookiesPath.absolutePath to null
         val filtered = GalleryDlPreferences.filterCookiesByDisabledDomains(
             cookiesPath.readText().replace("\r\n", "\n"), disabledDomains,
         )
-        // Unique per call, not a fixed name — two listing calls (e.g. a paste and a share-sheet
+        // Unique per call, not a fixed name - two listing calls (e.g. a paste and a share-sheet
         // open) can genuinely run concurrently, and a shared filename would let one overwrite the
-        // other mid-read.
-        return java.io.File(context.cacheDir, "cookies-listing-filtered-${System.nanoTime()}.txt")
-            .apply { writeText(filtered) }.absolutePath
+        // other mid-read. Returned back to the caller so it can be deleted after the Python run.
+        val tempFile = java.io.File(context.cacheDir, "cookies-listing-filtered-${System.nanoTime()}.txt")
+        tempFile.writeText(filtered)
+        return tempFile.absolutePath to tempFile
     }
 
     fun sanitizeErrorMessage(raw: String): String? {
@@ -209,51 +211,55 @@ object GalleryDlListing {
     }
 
     private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
-        val cookiesArg = effectiveCookiesPath(context)
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
 
-        // list_items() only ever prints once (see gallery_dl_wrapper.py's __main__), but that one
-        // print can itself contain embedded newlines (the JSON text, plus the warnings marker) —
-        // PythonRuntime.run() delivers it back one line at a time, so it has to be rejoined into
-        // the single block of text list_items() originally returned before parsing it as JSON.
-        val lines = mutableListOf<String>()
-        val rawText = runCatching {
-            PythonRuntime.run(context, "gallery_dl_wrapper.py", listOf("list_items", url, cookiesArg, extraArgs)) { line ->
-                lines.add(line)
+        try {
+            // list_items() only ever prints once (see gallery_dl_wrapper.py's __main__), but that one
+            // print can itself contain embedded newlines (the JSON text, plus the warnings marker) -
+            // PythonRuntime.run() delivers it back one line at a time, so it has to be rejoined into
+            // the single block of text list_items() originally returned before parsing it as JSON.
+            val lines = mutableListOf<String>()
+            val rawText = runCatching {
+                PythonRuntime.run(context, "gallery_dl_wrapper.py", listOf("list_items", url, cookiesArg, extraArgs)) { line ->
+                    lines.add(line)
+                }
+                lines.joinToString("\n")
+            }.onFailure { if (it is CancellationException) throw it }.getOrNull()?.takeIf { it.isNotBlank() } ?: return ListingResult(emptyList())
+    
+            // gallery_dl_wrapper.py's own "nothing on stdout" fallback - whatever gallery-dl said on
+            // stderr (auth required, unsupported URL, network error, ...), prefixed so this side can
+            // tell "genuinely nothing to list" (plain empty string, falls through to the JSON parse
+            // below and comes back as no items/no error) apart from "listing actually failed and here's
+            // why". Checked before the JSON parse, not as a parse-failure fallback - an unrelated JSON
+            // bug should never get silently reinterpreted as this specific error path.
+            if (rawText.startsWith("ERR:")) {
+                val message = rawText.removePrefix("ERR:").trim()
+                // Diagnostic only - this whole branch is gallery-dl's own stderr verbatim (see
+                // gallery_dl_wrapper.py's list_items()), which occasionally turns out to be raw
+                // HTML/CSS from a blocked/redirected response rather than a real error string (seen
+                // live against a Reddit listing) - logged in full so that's visible in logcat instead
+                // of only ever showing up truncated in the picker's own error card.
+                android.util.Log.w("GalleryDlListing", "gallery-dl ERR: fallback while listing $url:\n$message")
+                return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(message))
             }
-            lines.joinToString("\n")
-        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return ListingResult(emptyList())
-
-        // gallery_dl_wrapper.py's own "nothing on stdout" fallback — whatever gallery-dl said on
-        // stderr (auth required, unsupported URL, network error, ...), prefixed so this side can
-        // tell "genuinely nothing to list" (plain empty string, falls through to the JSON parse
-        // below and comes back as no items/no error) apart from "listing actually failed and here's
-        // why". Checked before the JSON parse, not as a parse-failure fallback — an unrelated JSON
-        // bug should never get silently reinterpreted as this specific error path.
-        if (rawText.startsWith("ERR:")) {
-            val message = rawText.removePrefix("ERR:").trim()
-            // Diagnostic only — this whole branch is gallery-dl's own stderr verbatim (see
-            // gallery_dl_wrapper.py's list_items()), which occasionally turns out to be raw
-            // HTML/CSS from a blocked/redirected response rather than a real error string (seen
-            // live against a Reddit listing) — logged in full so that's visible in logcat instead
-            // of only ever showing up truncated in the picker's own error card.
-            android.util.Log.w("GalleryDlListing", "gallery-dl ERR: fallback while listing $url:\n$message")
-            return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(message))
-        }
-
-        val markerIndex = rawText.indexOf(WARNINGS_MARKER)
-        val jsonText: String
-        if (markerIndex >= 0) {
-            jsonText = rawText.substring(0, markerIndex)
-            val warnings = rawText.substring(markerIndex + WARNINGS_MARKER.length).trim()
-            if (warnings.isNotBlank()) {
-                android.util.Log.w("GalleryDlListing", "gallery-dl reported warnings while listing $url:\n$warnings")
+    
+            val markerIndex = rawText.indexOf(WARNINGS_MARKER)
+            val jsonText: String
+            if (markerIndex >= 0) {
+                jsonText = rawText.substring(0, markerIndex)
+                val warnings = rawText.substring(markerIndex + WARNINGS_MARKER.length).trim()
+                if (warnings.isNotBlank()) {
+                    android.util.Log.w("GalleryDlListing", "gallery-dl reported warnings while listing $url:\n$warnings")
+                }
+            } else {
+                jsonText = rawText
             }
-        } else {
-            jsonText = rawText
+    
+            return parseGalleryDlItems(jsonText, url)
+        } finally {
+            tempCookieFile?.delete()
         }
-
-        return parseGalleryDlItems(jsonText, url)
     }
 
     private fun parseGalleryDlItems(jsonText: String, url: String): ListingResult {
@@ -374,22 +380,26 @@ object GalleryDlListing {
     }
 
     private suspend fun runSpotifyListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val cookiesArg = effectiveCookiesPath(context)
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
 
-        val lines = mutableListOf<String>()
-        val lastLine = runCatching {
-            PythonRuntime.run(context, "spotify_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
-                lines.add(line)
-                if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
+        try {
+            val lines = mutableListOf<String>()
+            val lastLine = runCatching {
+                PythonRuntime.run(context, "spotify_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
+                    lines.add(line)
+                    if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
+                }
+                lines.lastOrNull { it.isNotBlank() }
+            }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return null
+    
+            return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
+                android.util.Log.w("GalleryDlListing", "Failed to parse Spotify JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
+                null
             }
-            lines.lastOrNull { it.isNotBlank() }
-        }.getOrNull() ?: return null
-
-        return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
-            android.util.Log.w("GalleryDlListing", "Failed to parse Spotify JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
-            null
+        } finally {
+            tempCookieFile?.delete()
         }
     }
 
@@ -541,7 +551,7 @@ object GalleryDlListing {
     }
 
     private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val cookiesArg = effectiveCookiesPath(context)
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
@@ -558,34 +568,35 @@ object GalleryDlListing {
         // download succeeded with this setting on while its own preview kept failing).
         val impersonateArg = if (GalleryDlPreferences.isImpersonateEnabled(context)) "1" else "0"
 
-        // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
-        // prints (see yt_dlp_wrapper.py) — but PythonRuntime.run() merges the subprocess's stderr
-        // into this same stream (redirectErrorStream(true)), and "no_warnings"/the try/except
-        // inside list_info() only cover yt-dlp's own warnings/exceptions, not everything else that
-        // can land on stderr first (a Python DeprecationWarning, curl_cffi/cffi's own startup
-        // chatter, ...). Reproduced live with expired cookies: extra lines ahead of the real JSON
-        // made the whole-string JSONObject() parse below throw, come back null with no error
-        // message, and get silently treated as "nothing to list" — the picker sheet flashed and
-        // disappeared into an instant whole-gallery download that just failed the same way a
-        // moment later with no explanation. Taking only the *last* non-blank line sidesteps that:
-        // whatever came before it on stderr doesn't matter, only the one guaranteed-last print
-        // does.
-        val lines = mutableListOf<String>()
-        val lastLine = runCatching {
-            PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg)) { line ->
-                lines.add(line)
-                if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
-            }
-            lines.lastOrNull { it.isNotBlank() }
-        }.getOrNull() ?: return null
 
-        return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
-            android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
-            null
+        try {
+            // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
+            // prints (see yt_dlp_wrapper.py) - but PythonRuntime.run() merges the subprocess's stderr
+            // into this same stream (redirectErrorStream(true)), and "no_warnings"/the try/except
+            // inside list_info() only cover yt-dlp's own warnings/exceptions, not everything else that
+            // can land on stderr first (a Python DeprecationWarning, curl_cffi/cffi's own startup
+            // chatter, ...). Reproduced live with expired cookies: extra lines ahead of the real JSON
+            // made the whole-string JSONObject() parse below throw, come back null with no error
+            // message, and get silently treated as "nothing to list" - the picker sheet flashed and
+            // disappeared into an instant whole-gallery download that just failed the same way a
+            // moment later with no explanation. Taking only the *last* non-blank line sidesteps that:
+            // whatever came before it on stderr doesn't matter, only the one guaranteed-last print
+            // does.
+            val lines = mutableListOf<String>()
+            val lastLine = runCatching {
+                PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg)) { line ->
+                    lines.add(line)
+                    if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
+                }
+                lines.lastOrNull { it.isNotBlank() }
+            }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return null
+    
+            return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
+                android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
+                null
+            }
+        } finally {
+            tempCookieFile?.delete()
         }
     }
 }
-
-
-
-
