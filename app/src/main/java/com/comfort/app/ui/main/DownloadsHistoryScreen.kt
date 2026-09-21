@@ -923,15 +923,19 @@ private fun LibraryCompactBar(
     modifier: Modifier = Modifier,
 ) {
     val bgColor = MaterialTheme.colorScheme.background
+    
+    // 45dp is the rough density-independent height of displayMedium (45sp) text.
+    val initialHeight = with(androidx.compose.ui.platform.LocalDensity.current) { 45.dp.toPx() }
+    var libraryHeightPx by remember { mutableFloatStateOf(initialHeight) }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .drawBehind {
                 val maxTranslatePx = (76.dp - 4.dp).toPx()
-                val scrollDistancePx = maxTranslatePx * 2f // 0.5x parallax speed reduction
                 val rawOffset = headerScrollOffsetPx()
-                val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
-                val fraction = 1f - (offset / scrollDistancePx)
+                val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                val fraction = 1f - (offset / maxTranslatePx)
                 val currentTranslate = maxTranslatePx * fraction
                 drawRect(
                     color = bgColor,
@@ -946,10 +950,9 @@ private fun LibraryCompactBar(
                 .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 2.dp)
                 .graphicsLayer {
                     val maxTranslatePx = (76.dp - 4.dp).toPx()
-                    val scrollDistancePx = maxTranslatePx * 2f
                     val rawOffset = headerScrollOffsetPx()
-                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
-                    val fraction = 1f - (offset / scrollDistancePx)
+                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                    val fraction = 1f - (offset / maxTranslatePx)
                     translationY = maxTranslatePx * fraction
                 },
             verticalAlignment = Alignment.CenterVertically,
@@ -963,21 +966,17 @@ private fun LibraryCompactBar(
                 )
             }
             Spacer(Modifier.width(12.dp))
+            // This structure EXACTLY mirrors LibraryRealHeader, guaranteeing the layout heights
+            // perfectly match in the expanded state, preventing background overlap on the chips!
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Library",
-                    // Same displayMedium size as the real header's own title - a smaller
-                    // compact-bar title would read as a distinct thing popping in rather than the
-                    // same title continuing once it's revealed.
                     style = MaterialTheme.typography.displayMedium,
                     fontFamily = HeaderFontFamily,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.onSizeChanged { libraryHeightPx = it.height.toFloat() }
                 )
 
-                // The subtitle physically shrinks its layout height to 0 as the header collapses,
-                // which automatically shifts the "Library" title above it vertically down to the exact
-                // true center of the row to align perfectly with the action icons. As it expands,
-                // it smoothly pushes the "Library" title back up into its expanded-header position.
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -985,19 +984,16 @@ private fun LibraryCompactBar(
                     modifier = Modifier
                         .graphicsLayer {
                             val maxTranslatePx = (76.dp - 4.dp).toPx()
-                            val scrollDistancePx = maxTranslatePx * 2f
                             val rawOffset = headerScrollOffsetPx()
-                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
-                            // Fade in as it expands (offset -> 0)
-                            alpha = 1f - (offset / scrollDistancePx)
+                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                            alpha = 1f - (offset / maxTranslatePx)
                         }
                         .clipToBounds()
                         .layout { measurable, constraints ->
                             val maxTranslatePx = (76.dp - 4.dp).toPx()
-                            val scrollDistancePx = maxTranslatePx * 2f
                             val rawOffset = headerScrollOffsetPx()
-                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
-                            val fraction = offset / scrollDistancePx
+                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                            val fraction = offset / maxTranslatePx
                             
                             val placeable = measurable.measure(constraints)
                             val currentHeight = (placeable.height * (1f - fraction)).toInt()
@@ -1008,19 +1004,35 @@ private fun LibraryCompactBar(
                 )
             }
         }
+        
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(end = 12.dp, top = 12.dp)
+                // Eliminate the 11dp background gap: this row is 60dp tall naturally, which props
+                // open the parent Box when the Main Row shrinks to 51dp. Reporting 0 height lets
+                // the Box perfectly hug the shrinking text block instead.
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, 0) {
+                        placeable.place(0, 0)
+                    }
+                }
                 .graphicsLayer {
                     val maxTranslatePx = (76.dp - 4.dp).toPx()
-                    val scrollDistancePx = maxTranslatePx * 2f
                     val rawOffset = headerScrollOffsetPx()
-                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
-                    // We want to translate UP by 8.dp exactly as offset goes from 0 to scrollDistancePx.
-                    // This smoothly transitions the icons from top=12.dp to a visual top of 4.dp.
-                    val fraction = offset / scrollDistancePx
-                    val endTranslateY = (4.dp - 12.dp).toPx()
+                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                    val fraction = offset / maxTranslatePx
+                    
+                    // We perfectly align the Centers of both bounding boxes.
+                    // In compact state (fraction=1), the Main Row's top is 4dp.
+                    // The center of the Library text layout box is 4dp + (libraryHeightPx / 2).
+                    // To perfectly center the Actions (48dp), we subtract half its height.
+                    // The user requested a tiny manual nudge downward, so we add 3.dp.
+                    val targetScreenTop = 4.dp.toPx() + (libraryHeightPx / 2f) - 24.dp.toPx() + 3.dp.toPx()
+                    
+                    // Natural top is 12.dp, so we translate the difference.
+                    val endTranslateY = targetScreenTop - 12.dp.toPx()
                     translationY = endTranslateY * fraction
                 },
             verticalAlignment = Alignment.CenterVertically,
