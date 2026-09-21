@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -252,20 +253,72 @@ fun DownloadsHistoryScreen(
     // otherwise chase.
     val hysteresisPx = remember(density) { with(density) { 8.dp.toPx() } }
     var showCompactBar by remember { mutableStateOf(false) }
+    // Whether a genuine upward flick has "earned" the near-top transform below — NOT just
+    // `offset < compactBarThresholdPx`. Reported live: scrolling straight DOWN from rest showed
+    // the compact bar's title translating into view and overlapping the real header's own
+    // still-visible title, because offset alone can't distinguish "heading toward the threshold
+    // for the first time" from "coming back from beyond it" — both pass through the same offset
+    // values. Only set true at the exact moment showCompactBar itself flips true (a decisive
+    // upward flick from beyond the threshold), and only while that upward motion continues; a
+    // reversal back into downward movement disarms it immediately, same as scrolling down should
+    // never show the compact bar at all, transformed or not.
+    var nearTopTransformActive by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         var previous = scrollValuePx
         var accumulated = 0f
         snapshotFlow { scrollValuePx }.collect { current ->
             val delta = current - previous
             when {
-                current <= compactBarThresholdPx -> { showCompactBar = false; accumulated = 0f }
+                current <= compactBarThresholdPx -> {
+                    showCompactBar = false
+                    accumulated = 0f
+                    if (delta > 0f) nearTopTransformActive = false
+                    if (current <= 0f) nearTopTransformActive = false
+                }
                 else -> {
                     accumulated = if (accumulated == 0f || (accumulated > 0f) == (delta > 0f)) accumulated + delta else delta
                     if (accumulated > hysteresisPx) { showCompactBar = false; accumulated = 0f }
-                    else if (accumulated < -hysteresisPx) { showCompactBar = true; accumulated = 0f }
+                    else if (accumulated < -hysteresisPx) { showCompactBar = true; nearTopTransformActive = true; accumulated = 0f }
                 }
             }
             previous = current
+        }
+    }
+    // The header's own real scroll offset, for LibraryCompactBar to translate its title against —
+    // NOT scaled against compactBarThresholdPx. An earlier version returned a 0..1 fraction of
+    // *that* distance, which reproduced live as the compact bar's title and the real header's own
+    // title visibly overlapping at two different heights during the transform: threshold (170dp)
+    // has nothing to do with the actual pixel gap between the compact bar's own resting position
+    // and where the real title sits, so interpolating against it moved the compact bar's title at
+    // the wrong rate to ever coincide with the real one except at the very end. The real title's
+    // own screen position is (76dp top padding − offset) below the status bar, and the compact
+    // bar's own resting position is 4dp below it (see LibraryCompactBar's own comment for both
+    // values) — so translationY needs to close exactly a (76dp − 4dp − offset) gap, not some
+    // fraction of an unrelated distance, which LibraryCompactBar computes for itself from this raw
+    // offset. Returns +infinity when there's nothing to track (not armed, or already past index
+    // 0), which coerces to zero translation there. A pure function, not a `derivedStateOf`, and
+    // read directly inside graphicsLayer's own draw-phase lambda (see this composable's own
+    // comment on the shared history), so it's never a frame behind the list's own scroll position.
+    fun currentHeaderScrollOffsetPx(): Float {
+        if (!nearTopTransformActive) return Float.POSITIVE_INFINITY
+        val (index, offset) = if (gridView) {
+            gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+        } else {
+            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        }
+        return if (index > 0) Float.POSITIVE_INFINITY else offset.toFloat()
+    }
+    // Whether LibraryCompactBar composes at all — safe to lag a frame behind (unlike its own
+    // transform fraction), since mount/unmount is coarse either way. True whenever there's
+    // anything to show: the deep-scroll boolean, or an active, still-in-progress near-top reveal.
+    val compactBarMounted by remember {
+        derivedStateOf {
+            val (index, offset) = if (gridView) {
+                gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+            } else {
+                listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+            }
+            showCompactBar || (index == 0 && nearTopTransformActive && offset > 0)
         }
     }
 
@@ -634,9 +687,12 @@ fun DownloadsHistoryScreen(
                     .align(Alignment.TopStart)
                     .onSizeChanged { selectionBarHeightPx = it.height.toFloat() },
             )
-        } else if (showCompactBar) {
+        } else if (compactBarMounted) {
             // The real header is list content (see fullHeaderContent() above); this is only the
-            // compact replacement, pinned once the real header has scrolled fully out of view.
+            // compact replacement. Mounted whenever there's anything to show — either the
+            // deep-scroll direction-based boolean, or an active, still-in-progress near-top
+            // transform — with the real header's offset itself read fresh each frame inside
+            // LibraryCompactBar's own translation modifier, not read here at composition time.
             LibraryCompactBar(
                 favoritesOnly = favoritesOnly,
                 onFavoritesOnlyChange = {
@@ -651,6 +707,7 @@ fun DownloadsHistoryScreen(
                 hasActiveDownloads = hasActiveDownloads,
                 activeDownloadsCount = activeDownloadsCount,
                 onOpenQueue = onOpenQueue,
+                headerScrollOffsetPx = ::currentHeaderScrollOffsetPx,
                 modifier = Modifier.align(Alignment.TopStart),
             )
         }
@@ -876,7 +933,21 @@ private fun LibraryHeader(
 /** The pinned bar that replaces [LibraryHeader] once it has scrolled fully out of view as real
  * list content — see the caller's own `showCompactBar` doc comment for the exact index-based
  * threshold that keeps this from ever being visible at the same time as any part of the real
- * header. Icon + title + Favorites/Grid/Queue only — no subtitle, no search, no chip row. */
+ * header. Icon + title + Favorites/Grid/Queue, all in one row (so they share the exact same
+ * `verticalAlignment` and can't drift out of line with each other) — no search, no chip row.
+ *
+ * [headerScrollOffsetPx] drives a position-matched transform: the whole row translates downward
+ * by exactly (76dp − 4dp − offset), landing on top of where the real header's own title sits by
+ * the time they'd otherwise coincide. An earlier version of this same idea reproduced live as the
+ * two titles visibly overlapping at slightly different heights — not because the translation math
+ * was wrong, but because this bar's own title sat at a different position *within its own row*
+ * than the real header's title does within *its* row: the real header wraps its title in a
+ * Column above a subtitle line, so [CenterVertically][Alignment.CenterVertically] centers that
+ * whole two-line block and the title itself ends up above the row's true center, while this bar's
+ * title — with no subtitle beneath it — was centered directly at its row's true center instead.
+ * The invisible placeholder [Text] below reserves exactly the subtitle's own line height so the
+ * same Column/CenterVertically math lands the title identically in both places, without needing
+ * to hand-tune a second offset on top of the real one. */
 @Composable
 private fun LibraryCompactBar(
     favoritesOnly: Boolean,
@@ -886,45 +957,75 @@ private fun LibraryCompactBar(
     hasActiveDownloads: Boolean,
     activeDownloadsCount: Int,
     onOpenQueue: () -> Unit,
+    headerScrollOffsetPx: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val bgColor = MaterialTheme.colorScheme.background
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .drawBehind {
+                val maxTranslatePx = (76.dp - 4.dp).toPx()
+                val rawOffset = headerScrollOffsetPx()
+                val currentTranslate = if (rawOffset == Float.POSITIVE_INFINITY) 0f else (maxTranslatePx - rawOffset).coerceIn(0f, maxTranslatePx)
+                drawRect(
+                    color = bgColor,
+                    size = size.copy(height = size.height + currentTranslate)
+                )
+            }
+            .statusBarsPadding(),
     ) {
-        Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-            Icon(
-                ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_gallery_thumbnail),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 2.dp)
+                // The one piece of real motion here — see this composable's own doc comment for
+                // exactly what distance this covers. A graphicsLayer translation (computed fresh
+                // every frame from the caller's own function), not an animated padding value,
+                // which would need a full recomposition to update and could lag a frame behind
+                // the list's own scroll position the same way an earlier version's alpha did
+                // before it was moved into graphicsLayer too.
+                .graphicsLayer {
+                    val maxTranslatePx = (76.dp - 4.dp).toPx()
+                    translationY = (maxTranslatePx - headerScrollOffsetPx()).coerceIn(0f, maxTranslatePx)
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_gallery_thumbnail),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Library",
+                    // Same displayMedium size as the real header's own title — a smaller
+                    // compact-bar title would read as a distinct thing popping in rather than the
+                    // same title continuing once it's revealed.
+                    style = MaterialTheme.typography.displayMedium,
+                    fontFamily = HeaderFontFamily,
+                    fontWeight = FontWeight.Bold,
+                )
+                // Invisible — see this composable's own doc comment for why reserving this exact
+                // line height (not just an arbitrary Spacer) is what makes the title above land at
+                // the same relative position as the real header's own title, which has a real
+                // subtitle of this same style doing the same job.
+                Text(" ", style = MaterialTheme.typography.bodySmall, modifier = Modifier.graphicsLayer { alpha = 0f })
+            }
+            LibraryHeaderActions(
+                favoritesOnly = favoritesOnly,
+                onFavoritesOnlyChange = onFavoritesOnlyChange,
+                gridView = gridView,
+                onToggleGridView = onToggleGridView,
+                hasActiveDownloads = hasActiveDownloads,
+                activeDownloadsCount = activeDownloadsCount,
+                onOpenQueue = onOpenQueue,
             )
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            "Library",
-            // Same displayMedium size as the real header's own title — a smaller compact-bar
-            // title would read as a distinct thing popping in rather than the same title
-            // continuing, since the two are never shown mid-transition together to smooth that
-            // difference over (see showCompactBar's own doc comment on the index-based gate).
-            style = MaterialTheme.typography.displayMedium,
-            fontFamily = HeaderFontFamily,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        LibraryHeaderActions(
-            favoritesOnly = favoritesOnly,
-            onFavoritesOnlyChange = onFavoritesOnlyChange,
-            gridView = gridView,
-            onToggleGridView = onToggleGridView,
-            hasActiveDownloads = hasActiveDownloads,
-            activeDownloadsCount = activeDownloadsCount,
-            onOpenQueue = onOpenQueue,
-        )
     }
 }
 
