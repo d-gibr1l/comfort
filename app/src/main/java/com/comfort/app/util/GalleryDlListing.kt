@@ -178,33 +178,34 @@ object GalleryDlListing {
             DownloadEngine.SPOTIFY -> listViaSpotify(context, url)
             DownloadEngine.GALLERY_DL -> {
                 val result = listViaGalleryDl(context, url)
-                when {
-                    result.items.isNotEmpty() -> {
-                        // Only worth the extra process + network round trip when there's actually a
-                        // video item to fix a thumbnail for — most gallery-dl sources are
-                        // image-only galleries and never hit this at all. Enrichment failing (auth,
-                        // network, ...) is treated as a soft miss, not surfaced as an error — the
-                        // primary listing already succeeded, so there's a real gallery to show; the
-                        // affected item(s) just keep gallery-dl's own unfetchable placeholder URL
-                        // instead of a real thumbnail.
-                        if (result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
-                            result.copy(items = enrichVideoThumbnails(context, url, result.items))
-                        } else {
-                            result
-                        }
+                if (result.items.isNotEmpty()) {
+                    // Only worth the extra process + network round trip when there's actually a
+                    // video item to fix a thumbnail for - most gallery-dl sources are
+                    // image-only galleries and never hit this at all. Enrichment failing (auth,
+                    // network, ...) is treated as a soft miss, not surfaced as an error - the
+                    // primary listing already succeeded, so there's a real gallery to show; the
+                    // affected item(s) just keep gallery-dl's own unfetchable placeholder URL
+                    // instead of a real thumbnail.
+                    if (result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
+                        result.copy(items = enrichVideoThumbnails(context, url, result.items))
+                    } else {
+                        result
                     }
-                    result.errorMessage != null -> result
-                    // gallery-dl found nothing to list and reported no error — the real download
-                    // (DownloadWorker) tries yt-dlp as a fallback whenever gallery-dl saves 0
-                    // items, regardless of source, so the picker's own preview needs to match that
-                    // instead of silently declaring this UNAVAILABLE and firing an instant
-                    // whole-gallery download that's just headed for the exact same fallback a
-                    // moment later with zero visible feedback first (reproduced live: a Reddit
-                    // video post's gallery-dl listing came back empty with no error, the sheet
-                    // flashed and vanished with no thumbnail and no user action, and the yt-dlp
-                    // fallback that runs at download time failed with a real, explainable error —
-                    // "Your IP address is unable to access the Reddit API" — the user never saw).
-                    else -> listViaYtDlp(context, url)
+                } else {
+                    // gallery-dl found 0 items - the real download (DownloadWorker) tries yt-dlp
+                    // as a fallback whenever gallery-dl saves 0 items, regardless of whether
+                    // gallery-dl threw an error (like "Unsupported URL") or just came back empty.
+                    // The preview needs to match that, otherwise a site unknown to gallery-dl but
+                    // supported by yt-dlp (like xnxx) will fail in preview but work in download.
+                    val fallback = listViaYtDlp(context, url)
+                    if (fallback.items.isNotEmpty()) {
+                        fallback
+                    } else {
+                        // Both failed. If gallery-dl had an explicit error (like "Login required"),
+                        // keep it rather than yt-dlp's downstream error, as it's usually the root
+                        // cause for domains primarily handled by gallery-dl.
+                        if (result.errorMessage != null) result else fallback
+                    }
                 }
             }
         }
