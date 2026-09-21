@@ -928,8 +928,11 @@ private fun LibraryCompactBar(
             .fillMaxWidth()
             .drawBehind {
                 val maxTranslatePx = (76.dp - 4.dp).toPx()
+                val scrollDistancePx = maxTranslatePx * 2f // 0.5x parallax speed reduction
                 val rawOffset = headerScrollOffsetPx()
-                val currentTranslate = if (rawOffset == Float.POSITIVE_INFINITY) 0f else (maxTranslatePx - rawOffset).coerceIn(0f, maxTranslatePx)
+                val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
+                val fraction = 1f - (offset / scrollDistancePx)
+                val currentTranslate = maxTranslatePx * fraction
                 drawRect(
                     color = bgColor,
                     size = size.copy(height = size.height + currentTranslate)
@@ -941,15 +944,13 @@ private fun LibraryCompactBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = 20.dp, end = 12.dp, top = 4.dp, bottom = 2.dp)
-                // The one piece of real motion here — see this composable's own doc comment for
-                // exactly what distance this covers. A graphicsLayer translation (computed fresh
-                // every frame from the caller's own function), not an animated padding value,
-                // which would need a full recomposition to update and could lag a frame behind
-                // the list's own scroll position the same way an earlier version's alpha did
-                // before it was moved into graphicsLayer too.
                 .graphicsLayer {
                     val maxTranslatePx = (76.dp - 4.dp).toPx()
-                    translationY = (maxTranslatePx - headerScrollOffsetPx()).coerceIn(0f, maxTranslatePx)
+                    val scrollDistancePx = maxTranslatePx * 2f
+                    val rawOffset = headerScrollOffsetPx()
+                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
+                    val fraction = 1f - (offset / scrollDistancePx)
+                    translationY = maxTranslatePx * fraction
                 },
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -965,7 +966,7 @@ private fun LibraryCompactBar(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "Library",
-                    // Same displayMedium size as the real header's own title — a smaller
+                    // Same displayMedium size as the real header's own title - a smaller
                     // compact-bar title would read as a distinct thing popping in rather than the
                     // same title continuing once it's revealed.
                     style = MaterialTheme.typography.displayMedium,
@@ -984,17 +985,19 @@ private fun LibraryCompactBar(
                     modifier = Modifier
                         .graphicsLayer {
                             val maxTranslatePx = (76.dp - 4.dp).toPx()
+                            val scrollDistancePx = maxTranslatePx * 2f
                             val rawOffset = headerScrollOffsetPx()
-                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
+                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
                             // Fade in as it expands (offset -> 0)
-                            alpha = 1f - (offset / maxTranslatePx)
+                            alpha = 1f - (offset / scrollDistancePx)
                         }
                         .clipToBounds()
                         .layout { measurable, constraints ->
                             val maxTranslatePx = (76.dp - 4.dp).toPx()
+                            val scrollDistancePx = maxTranslatePx * 2f
                             val rawOffset = headerScrollOffsetPx()
-                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
-                            val fraction = offset / maxTranslatePx
+                            val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
+                            val fraction = offset / scrollDistancePx
                             
                             val placeable = measurable.measure(constraints)
                             val currentHeight = (placeable.height * (1f - fraction)).toInt()
@@ -1011,11 +1014,12 @@ private fun LibraryCompactBar(
                 .padding(end = 12.dp, top = 12.dp)
                 .graphicsLayer {
                     val maxTranslatePx = (76.dp - 4.dp).toPx()
+                    val scrollDistancePx = maxTranslatePx * 2f
                     val rawOffset = headerScrollOffsetPx()
-                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
-                    // We want to translate UP by 8.dp exactly as offset goes from 0 to maxTranslatePx.
+                    val offset = if (rawOffset == Float.POSITIVE_INFINITY) scrollDistancePx else rawOffset.coerceIn(0f, scrollDistancePx)
+                    // We want to translate UP by 8.dp exactly as offset goes from 0 to scrollDistancePx.
                     // This smoothly transitions the icons from top=12.dp to a visual top of 4.dp.
-                    val fraction = offset / maxTranslatePx
+                    val fraction = offset / scrollDistancePx
                     val endTranslateY = (4.dp - 12.dp).toPx()
                     translationY = endTranslateY * fraction
                 },
