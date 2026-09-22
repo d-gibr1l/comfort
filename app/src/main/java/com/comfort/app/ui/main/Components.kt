@@ -6,6 +6,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +61,50 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.launch
+
+/** [StatusBarScrim]'s opacity at its very top edge. Deliberately well below 1: content scrolling
+ * under the status bar should still show through, just dimmed enough to keep the icons legible. */
+private const val STATUS_BAR_SCRIM_PEAK_ALPHA = 0.6f
+
+/** Status bar scrim for screens whose header scrolls away: a translucent tint behind the status bar,
+ * fading into the content below. [alpha] is read in the draw phase (0 = hidden, 1 = fully shown) so callers can
+ * tie it to their own header state without recomposing every frame.
+ *
+ * The fade is a cosine ease, not a linear ramp or a handful of hand-picked stops: its slope is zero
+ * where it reaches full transparency, so there's no visible line where the scrim ends. It is also
+ * drawn through a native Paint with dithering on, since a fade over a dark background is exactly
+ * where 8-bit color steps show up as bands. */
+@Composable
+fun StatusBarScrim(alpha: () -> Float, modifier: Modifier = Modifier) {
+    val color = MaterialTheme.colorScheme.background
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .windowInsetsTopHeight(WindowInsets.statusBars.add(WindowInsets(top = 24.dp)))
+            .graphicsLayer { this.alpha = alpha() }
+            .drawWithCache {
+                val steps = 32
+                val rgb = color.toArgb() and 0x00FFFFFF
+                val colors = IntArray(steps + 1)
+                val positions = FloatArray(steps + 1)
+                for (i in 0..steps) {
+                    val t = i / steps.toFloat()
+                    val a = STATUS_BAR_SCRIM_PEAK_ALPHA * 0.5f * (1f + cos(PI.toFloat() * t))
+                    colors[i] = rgb or ((a * 255f).roundToInt() shl 24)
+                    positions[i] = t
+                }
+                val paint = android.graphics.Paint().apply {
+                    isDither = true
+                    shader = android.graphics.LinearGradient(
+                        0f, 0f, 0f, size.height, colors, positions, android.graphics.Shader.TileMode.CLAMP,
+                    )
+                }
+                onDrawBehind {
+                    drawContext.canvas.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint)
+                }
+            },
+    )
+}
 
 /** A finished/failed-download toast's own [SnackbarVisuals] — [isSuccess] is read back out in
  * [DownloadEventSnackbarHost] to pick the icon and color, since plain SnackbarHostState.showSnackbar

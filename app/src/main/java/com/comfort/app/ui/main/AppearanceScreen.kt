@@ -197,6 +197,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             Spacer(Modifier.height(navBarClearance()))
         }
         }
+        StatusBarScrim(alpha = { 1f - headerState.alpha }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(
             title = "Appearance",
             topicIcon = Icons.Outlined.WbSunny,

@@ -342,6 +342,15 @@ fun DownloadsHistoryScreen(
                 LibrarySort.SIZE -> list.sortedByDescending { it.totalBytes }
             }
         }
+    // Both the "duplicates, but none right now" and "nothing matches the current filter" branches
+    // below render fullHeaderContent() unconditionally at the top of a plain Column — not as a
+    // real list item behind a scroll-position-driven compact bar. Toggling a filter (e.g. tapping
+    // Favorites while scrolled down, with the compact bar already mounted from before) can land
+    // here directly, and the compact bar's own mount state — tracking scroll position on the
+    // LazyColumn/LazyVerticalGrid these two branches don't even use — has no way to know the
+    // content underneath just changed shape. Reported live as exactly that: the compact bar still
+    // showing, stacked directly on top of this branch's own always-visible full header.
+    val usingStaticFullHeaderBranch = if (showDuplicatesOnly) duplicateAttempts.isEmpty() else visibleItems.isEmpty()
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val subtitle = if (showDuplicatesOnly) {
@@ -603,6 +612,17 @@ fun DownloadsHistoryScreen(
         }
         }
 
+        // Only once the real header has scrolled away (same threshold the compact bar uses), and
+        // never in the static-header branches, whose header can't scroll away at all — the list's
+        // scroll state is left over from before switching into them and doesn't mean anything there.
+        val statusBarScrimVisible = !selectionMode && !usingStaticFullHeaderBranch && scrollValuePx >= compactBarThresholdPx
+        val statusBarScrimAlpha by animateFloatAsState(
+            targetValue = if (statusBarScrimVisible) 1f else 0f,
+            animationSpec = tween(200),
+            label = "library-status-bar-scrim",
+        )
+        StatusBarScrim(alpha = { statusBarScrimAlpha }, modifier = Modifier.align(Alignment.TopStart))
+
         if (selectionMode) {
             TopAppBar(
                 title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
@@ -647,12 +667,17 @@ fun DownloadsHistoryScreen(
                     .align(Alignment.TopStart)
                     .onSizeChanged { selectionBarHeightPx = it.height.toFloat() },
             )
-        } else if (compactBarMounted) {
+        } else if (compactBarMounted && !usingStaticFullHeaderBranch) {
             // The real header is list content (see fullHeaderContent() above); this is only the
             // compact replacement. Mounted whenever there's anything to show — either the
             // deep-scroll direction-based boolean, or an active, still-in-progress near-top
             // transform — with the real header's offset itself read fresh each frame inside
             // LibraryCompactBar's own translation modifier, not read here at composition time.
+            // Suppressed outright while usingStaticFullHeaderBranch — see that val's own comment
+            // for why: those branches always show their own full header regardless of scroll
+            // position, so a compact bar left mounted from before switching into one of them (e.g.
+            // tapping Favorites while scrolled down, landing on 0 results) would stack directly on
+            // top of it.
             LibraryCompactBar(
                 subtitle = subtitle,
                 favoritesOnly = favoritesOnly,
