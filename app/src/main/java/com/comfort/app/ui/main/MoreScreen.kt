@@ -326,6 +326,8 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
         // like ordinary content, reappears compact on reverse-scroll, and grows back into this
         // full size as scroll nears the top — search still works in either register since both
         // branches below live inside the same alpha/padding-driven overlay.
+        // Only shows while the header itself is hidden (the inverse of its own fade).
+        StatusBarScrim(alpha = { 1f - headerState.alpha }, modifier = Modifier.align(Alignment.TopStart))
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -802,6 +804,7 @@ private fun SettingsSubScaffold(
                 content = content,
             )
         }
+        StatusBarScrim(alpha = { 1f - headerState.alpha }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(
             title = title,
             topicIcon = topicIcon,
