@@ -458,6 +458,7 @@ object DownloadDispatcher {
         DownloadNotifications.cancel(context, id)
         File(context.filesDir, "archives/$id.sqlite3").delete()
         File(context.filesDir, "archives/$id.ytdlp.txt").delete()
+        File(context.filesDir, "archives/$id.instaloader.txt").delete()
         deleteStagingDir(context, id)
         dao.clearDownloadedFileRecords(id)
         dao.delete(id)

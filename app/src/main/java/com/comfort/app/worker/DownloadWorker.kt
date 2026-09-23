@@ -217,7 +217,15 @@ class DownloadWorker(
                 // gallery/image support, with yt-dlp used afterward as a fallback or a same-post
                 // video supplement (see below) — including TikTok, whose "photo mode" slideshow
                 // posts are real image galleries, not video (see VideoSiteRouter's own doc comment).
-                val engine = VideoSiteRouter.classify(url)
+                // Instagram posts/reels start on Instaloader when that setting is on (see
+                // VideoSiteRouter.resolveEngine) — except when this download asked for something
+                // only yt-dlp can do: a trimmed clip or an audio-only extraction. Instaloader just
+                // fetches the original file, so it would silently ignore both.
+                val wantsYtDlpOnlyProcessing = !entity?.clipRange.isNullOrBlank() ||
+                    (entity?.videoQuality ?: GalleryDlPreferences.getVideoQuality(applicationContext).name) == VideoQuality.AUDIO_ONLY.name
+                val engine = VideoSiteRouter.resolveEngine(applicationContext, url).let {
+                    if (it == DownloadEngine.INSTALOADER && wantsYtDlpOnlyProcessing) VideoSiteRouter.classify(url) else it
+                }
 
                 // The share-picker flow already knows the total (it enumerated the gallery to
                 // render itself) and passes it in up front; everything else — Home screen,
@@ -423,6 +431,16 @@ class DownloadWorker(
                         // or the sole file of an audio_only download) — see
                         // DownloadEntity.downloadingAudioTrack's own doc comment for why the queue
                         // card needs to know this at all.
+                        // instaloader_wrapper.py's item count (after the picker's filter), known
+                        // before the first file lands — the upfront gallery-dl listing pass that
+                        // normally provides this is skipped for Instaloader-routed downloads.
+                        line.startsWith("[total] ") -> {
+                            val total = line.removePrefix("[total] ").trim().toIntOrNull()
+                            if (total != null && total > 0 && totalItemsRef.get() <= 0) {
+                                dao.setTotalItems(downloadId, total)
+                                totalItemsRef.set(total)
+                            }
+                        }
                         line.startsWith("[phase] ") -> {
                             dao.setDownloadingAudioTrack(downloadId, line.removePrefix("[phase] ").trim() == "audio")
                         }
@@ -695,6 +713,10 @@ class DownloadWorker(
                 val ytDlpArchivePath = File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt")
                     .apply { parentFile?.mkdirs() }
                     .absolutePath
+                // Plain list of "<shortcode>_<n>" keys instaloader_wrapper.py already fetched.
+                val instaloaderArchivePath = File(applicationContext.filesDir, "archives/$downloadId.instaloader.txt")
+                    .apply { parentFile?.mkdirs() }
+                    .absolutePath
                 val limitRate = GalleryDlPreferences.getEffectiveSpeedLimit(applicationContext)
                 val networkRetries = GalleryDlPreferences.getEffectiveNetworkRetries(applicationContext)
                 val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(applicationContext).orEmpty()
@@ -777,7 +799,9 @@ class DownloadWorker(
                 // listing entirely. Left unfiltered here, the supplement pass just fetches every
                 // real video it finds regardless of the checklist selection — an occasional extra
                 // file, never a silently wrong one, which is the safer failure mode of the two.
-                val ytDlpPlaylistItems = if (engine == DownloadEngine.GALLERY_DL) {
+                // INSTALOADER too: its fallback is this same gallery-dl + yt-dlp-supplement path,
+                // and its checklist "num"s are gallery-dl's carousel numbering, not yt-dlp's.
+                val ytDlpPlaylistItems = if (engine == DownloadEngine.GALLERY_DL || engine == DownloadEngine.INSTALOADER) {
                     ""
                 } else {
                     ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
@@ -882,90 +906,120 @@ class DownloadWorker(
                         actualCallback,
                     )
 
-                when (engine) {
-                    DownloadEngine.YT_DLP -> runYtDlp()
-                    DownloadEngine.SPOTIFY -> runSpotify()
-                    DownloadEngine.GALLERY_DL -> {
-                        // classify() only routed here because this host isn't in the hardcoded
-                        // videoOnlyHosts/spotifyHosts fast paths — not because gallery-dl is
-                        // actually known to support it. A live, no-network probe against the
-                        // real bundled packages (see EngineProbe's own doc comment) tells us
-                        // whether either engine has a genuine extractor for this URL, so an
-                        // engine-exclusive link never wastes an attempt on the wrong one.
-                        val probe = EngineProbe.probeBoth(applicationContext, url)
+                // Instagram posts/reels (see VideoSiteRouter.resolveEngine). Same staging dir,
+                // cookies copy and output protocol as the other wrappers, so the callback above
+                // handles its files exactly like gallery-dl's. The picker's itemFilter passes
+                // straight through — its "num"s are the same 1-based carousel positions.
+                suspend fun runInstaloader(): Int =
+                    PythonRuntime.run(
+                        applicationContext, "instaloader_wrapper.py",
+                        listOf(
+                            "download", url, stagingDir.absolutePath, cookiesArg,
+                            entity?.itemFilter.orEmpty(), instaloaderArchivePath,
+                            if (writeInfoFiles) "1" else "0", proxyUrl, socketTimeoutSeconds,
+                        ),
+                        actualCallback,
+                    )
 
-                        // `== false`/`== true`, not `!probe.x`/plain truthiness — probe.kt's own
-                        // Result fields are Boolean? (null means the probe itself failed to run,
-                        // genuinely unknown), and only a *confirmed* negative on gallery-dl plus a
-                        // *confirmed* positive on yt-dlp justifies skipping gallery-dl entirely.
-                        // Anything involving an unknown (a probe crash) must fall through to the
-                        // normal gallery-dl attempt below instead — a probe subprocess crash is
-                        // not evidence gallery-dl can't handle this URL.
-                        if (probe.galleryDlHasExtractor == false && probe.ytDlpHasExtractor == true) {
-                            // gallery-dl has nothing for this URL at all, yt-dlp does — skip the
-                            // doomed gallery-dl attempt entirely.
-                            runYtDlp()
-                        } else {
-                            // Always excluded, not just when hasVideoItem's own listing pass
-                            // happened to succeed: gallery-dl has its own *unconfigured* internal
-                            // yt-dlp delegation for video posts on sites like Instagram (no
-                            // ffmpeg_location, no js_runtimes), which silently produces broken
-                            // split video/audio fragments instead of the one properly-merged file
-                            // our own yt_dlp_wrapper (below) produces. Relying on hasVideoItem
-                            // here would mean any listing failure — Instagram rate-limits this
-                            // extra lookup fairly readily — falls straight through to that broken
-                            // path with no exclusion at all.
-                            runGalleryDl(excludeVideo = true)
-                            if (!isStopped) {
-                                // hasVideoItem reflects gallery-dl's own listing, which uses the
-                                // same extractor code path as the real download pass — a real,
-                                // reproduced case: Instagram's API silently omitted media info for
-                                // exactly the video child of an otherwise-fine photo carousel, so
-                                // gallery-dl's own listing genuinely never saw a video to report,
-                                // and this would otherwise skip yt-dlp entirely with no trace of a
-                                // video ever having existed. See
-                                // VideoSiteRouter.alwaysSupplementsVideo's own doc comment for
-                                // which hosts get this always-on attempt and why.
-                                val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
-                                // Neither branch below gates on the probe's own
-                                // galleryDlHasExtractor/ytDlpHasExtractor result any more — a
-                                // no-network regex probe against the raw, pre-redirect/share URL
-                                // saying yt-dlp has "no extractor" is not trustworthy enough to
-                                // skip a fallback/supplement pass that's already been earned by a
-                                // stronger, real signal (gallery-dl having actually run and found
-                                // something, or its own listing confirming/suspecting a video).
-                                // Originally this WAS gated by a `skipYtDlpFallback` flag — removed
-                                // from the savedCount==0 branch first, after it was reproduced live
-                                // wrongly suppressing the fallback for a Reddit share link (.../s/
-                                // <code>) whose only content was an external redgifs video:
-                                // gallery-dl's own redirect-following extractor found it fine, but
-                                // probe.ytDlpHasExtractor came back false for the *raw, unresolved*
-                                // share link (yt-dlp's dedicated reddit extractor's own regex
-                                // requires "/comments/<id>", which a bare "/s/<code>" redirect
-                                // never has) — even though yt-dlp's generic extractor (deliberately
-                                // excluded from probe()'s "real extractor" check, same "opt-in"
-                                // reasoning as gallery-dl's — see EngineProbe's own doc comment)
-                                // DOES follow that exact redirect and finds the same video fine on
-                                // its own (confirmed live, --simulate). The hasVideoItem/
-                                // alwaysTryVideo branch below was left gated by the same flag at
-                                // first — same underlying probe, same class of false negative, so
-                                // the same fix applies here too.
-                                if (savedCount.get() == 0) {
-                                    // gallery-dl having already run at all by this point is itself
-                                    // the signal that this URL resolves to *something* real —
-                                    // worth yt-dlp's cheap attempt regardless of what the probe
-                                    // alone could ever know.
-                                    runYtDlp()
-                                } else if (hasVideoItem || alwaysTryVideo) {
-                                    // gallery-dl already grabbed the pictures (video excluded
-                                    // from its own pass above); yt-dlp now handles this same
-                                    // post's video, since it has real format/quality selection
-                                    // gallery-dl doesn't.
-                                    runYtDlp()
+                // The routing every link got before Instaloader existed — also the fallback when
+                // Instaloader saves nothing for an Instagram post.
+                suspend fun runClassic(classicEngine: DownloadEngine) {
+                    when (classicEngine) {
+                        DownloadEngine.YT_DLP -> runYtDlp()
+                        DownloadEngine.SPOTIFY -> runSpotify()
+                        DownloadEngine.INSTALOADER -> runInstaloader()
+                        DownloadEngine.GALLERY_DL -> {
+                            // classify() only routed here because this host isn't in the hardcoded
+                            // videoOnlyHosts/spotifyHosts fast paths — not because gallery-dl is
+                            // actually known to support it. A live, no-network probe against the
+                            // real bundled packages (see EngineProbe's own doc comment) tells us
+                            // whether either engine has a genuine extractor for this URL, so an
+                            // engine-exclusive link never wastes an attempt on the wrong one.
+                            val probe = EngineProbe.probeBoth(applicationContext, url)
+
+                            // `== false`/`== true`, not `!probe.x`/plain truthiness — probe.kt's own
+                            // Result fields are Boolean? (null means the probe itself failed to run,
+                            // genuinely unknown), and only a *confirmed* negative on gallery-dl plus a
+                            // *confirmed* positive on yt-dlp justifies skipping gallery-dl entirely.
+                            // Anything involving an unknown (a probe crash) must fall through to the
+                            // normal gallery-dl attempt below instead — a probe subprocess crash is
+                            // not evidence gallery-dl can't handle this URL.
+                            if (probe.galleryDlHasExtractor == false && probe.ytDlpHasExtractor == true) {
+                                // gallery-dl has nothing for this URL at all, yt-dlp does — skip the
+                                // doomed gallery-dl attempt entirely.
+                                runYtDlp()
+                            } else {
+                                // Always excluded, not just when hasVideoItem's own listing pass
+                                // happened to succeed: gallery-dl has its own *unconfigured* internal
+                                // yt-dlp delegation for video posts on sites like Instagram (no
+                                // ffmpeg_location, no js_runtimes), which silently produces broken
+                                // split video/audio fragments instead of the one properly-merged file
+                                // our own yt_dlp_wrapper (below) produces. Relying on hasVideoItem
+                                // here would mean any listing failure — Instagram rate-limits this
+                                // extra lookup fairly readily — falls straight through to that broken
+                                // path with no exclusion at all.
+                                runGalleryDl(excludeVideo = true)
+                                if (!isStopped) {
+                                    // hasVideoItem reflects gallery-dl's own listing, which uses the
+                                    // same extractor code path as the real download pass — a real,
+                                    // reproduced case: Instagram's API silently omitted media info for
+                                    // exactly the video child of an otherwise-fine photo carousel, so
+                                    // gallery-dl's own listing genuinely never saw a video to report,
+                                    // and this would otherwise skip yt-dlp entirely with no trace of a
+                                    // video ever having existed. See
+                                    // VideoSiteRouter.alwaysSupplementsVideo's own doc comment for
+                                    // which hosts get this always-on attempt and why.
+                                    val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
+                                    // Neither branch below gates on the probe's own
+                                    // galleryDlHasExtractor/ytDlpHasExtractor result any more — a
+                                    // no-network regex probe against the raw, pre-redirect/share URL
+                                    // saying yt-dlp has "no extractor" is not trustworthy enough to
+                                    // skip a fallback/supplement pass that's already been earned by a
+                                    // stronger, real signal (gallery-dl having actually run and found
+                                    // something, or its own listing confirming/suspecting a video).
+                                    // Originally this WAS gated by a `skipYtDlpFallback` flag — removed
+                                    // from the savedCount==0 branch first, after it was reproduced live
+                                    // wrongly suppressing the fallback for a Reddit share link (.../s/
+                                    // <code>) whose only content was an external redgifs video:
+                                    // gallery-dl's own redirect-following extractor found it fine, but
+                                    // probe.ytDlpHasExtractor came back false for the *raw, unresolved*
+                                    // share link (yt-dlp's dedicated reddit extractor's own regex
+                                    // requires "/comments/<id>", which a bare "/s/<code>" redirect
+                                    // never has) — even though yt-dlp's generic extractor (deliberately
+                                    // excluded from probe()'s "real extractor" check, same "opt-in"
+                                    // reasoning as gallery-dl's — see EngineProbe's own doc comment)
+                                    // DOES follow that exact redirect and finds the same video fine on
+                                    // its own (confirmed live, --simulate). The hasVideoItem/
+                                    // alwaysTryVideo branch below was left gated by the same flag at
+                                    // first — same underlying probe, same class of false negative, so
+                                    // the same fix applies here too.
+                                    if (savedCount.get() == 0) {
+                                        // gallery-dl having already run at all by this point is itself
+                                        // the signal that this URL resolves to *something* real —
+                                        // worth yt-dlp's cheap attempt regardless of what the probe
+                                        // alone could ever know.
+                                        runYtDlp()
+                                    } else if (hasVideoItem || alwaysTryVideo) {
+                                        // gallery-dl already grabbed the pictures (video excluded
+                                        // from its own pass above); yt-dlp now handles this same
+                                        // post's video, since it has real format/quality selection
+                                        // gallery-dl doesn't.
+                                        runYtDlp()
+                                    }
                                 }
                             }
                         }
                     }
+                }
+
+                if (engine == DownloadEngine.INSTALOADER) {
+                    runInstaloader()
+                    // Nothing saved (private post, rate limit, Instagram changed something, ...):
+                    // hand the same link to the classic path. Its own error only shows if that
+                    // fails too — lastErrorLine is first-wins, so Instaloader's reason is kept.
+                    if (!isStopped && savedCount.get() == 0) runClassic(VideoSiteRouter.classify(url))
+                } else {
+                    runClassic(engine)
                 }
 
                 if (writeInfoFiles || saveThumbnail || saveSubtitleFiles) {

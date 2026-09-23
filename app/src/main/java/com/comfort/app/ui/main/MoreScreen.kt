@@ -35,6 +35,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import compose.icons.FeatherIcons
+import compose.icons.feathericons.Instagram
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
@@ -167,6 +169,7 @@ private val SUBPAGE_SEARCH_INDEX = listOf(
     // Advanced
     SubpageSearchEntry("Extra arguments", "Raw gallery-dl command-line arguments.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Rotate player clients", "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Use Instaloader for Instagram", "Downloads Instagram posts and reels with Instaloader, falling back to gallery-dl and yt-dlp.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Impersonate a browser", "Makes the app look like a real web browser to bypass bot detection on strict websites.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("yt-dlp extractor arguments", "Site-specific extractor options passed straight to yt-dlp.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Format sort", "Custom yt-dlp format-selection priority.", SettingsRoute.ADVANCED),
@@ -185,8 +188,8 @@ private val SUBPAGE_SEARCH_INDEX = listOf(
 
     // About
     SubpageSearchEntry("App update", "Check for a newer version of this app.", SettingsRoute.ABOUT),
-    SubpageSearchEntry("Engines", "Update yt-dlp and gallery-dl independently of an app update.", SettingsRoute.ABOUT),
-    SubpageSearchEntry("Credits", "gallery-dl, yt-dlp, FFmpeg, QuickJS, aria2, and the bundled Python runtime.", SettingsRoute.ABOUT),
+    SubpageSearchEntry("Engines", "Update yt-dlp, gallery-dl and Instaloader independently of an app update.", SettingsRoute.ABOUT),
+    SubpageSearchEntry("Credits", "gallery-dl, yt-dlp, Instaloader, FFmpeg, QuickJS, aria2, and the bundled Python runtime.", SettingsRoute.ABOUT),
 )
 
 /** [route]/[onNavigate] are hoisted up to MainScreen rather than owned here — this composable
@@ -2247,6 +2250,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     var verboseLogging by remember { mutableStateOf(GalleryDlPreferences.isVerboseLogging(context)) }
     var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
     var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
+    var instaloaderForInstagram by remember { mutableStateOf(GalleryDlPreferences.isInstaloaderForInstagram(context)) }
 
     SettingsSubScaffold(title = "Advanced", topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
@@ -2294,6 +2298,19 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 onCheckedChange = {
                     youtubeClientRotation = it
                     GalleryDlPreferences.setYoutubeClientRotationEnabled(context, it)
+                },
+            )
+        }
+
+        SettingsSection(title = "Instagram", icon = FeatherIcons.Instagram) {
+            IconToggleRow(
+                icon = FeatherIcons.Instagram,
+                title = "Use Instaloader for Instagram",
+                subtitle = "Downloads Instagram posts and reels with Instaloader, which handles carousels and captions and works on public posts without cookies. Falls back to gallery-dl and yt-dlp if it can't get a post. Off uses gallery-dl and yt-dlp only.",
+                checked = instaloaderForInstagram,
+                onCheckedChange = {
+                    instaloaderForInstagram = it
+                    GalleryDlPreferences.setInstaloaderForInstagram(context, it)
                 },
             )
         }
@@ -3330,6 +3347,7 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 listOf(
                     CreditEntry(icon = Icons.Outlined.Code, title = "gallery-dl", url = "https://github.com/mikf/gallery-dl"),
                     CreditEntry(icon = Icons.Outlined.Terminal, title = "yt-dlp", url = "https://github.com/yt-dlp/yt-dlp"),
+                    CreditEntry(icon = FeatherIcons.Instagram, title = "Instaloader", url = "https://github.com/instaloader/instaloader"),
                     CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_ffmpeg, title = "FFmpeg", url = "https://ffmpeg.org"),
                     CreditEntry(icon = Icons.Outlined.Memory, title = "QuickJS", url = "https://bellard.org/quickjs/"),
                     CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = "Python runtime", url = "https://github.com/deniscerri/ytdlnis-packages"),
@@ -3599,6 +3617,7 @@ private fun EnginesSection() {
     var autoUpdate by remember { mutableStateOf(GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) }
     var ytDlpChannel by remember { mutableStateOf(GalleryDlPreferences.getYtDlpUpdateChannel(context)) }
     var galleryDlChannel by remember { mutableStateOf(GalleryDlPreferences.getGalleryDlUpdateChannel(context)) }
+    var instaloaderChannel by remember { mutableStateOf(GalleryDlPreferences.getInstaloaderUpdateChannel(context)) }
 
     fun runCheck() {
         checking = true
@@ -3622,13 +3641,13 @@ private fun EnginesSection() {
     // channel preference itself, so switching from Stable to Nightly/Master needs a fresh check
     // against that new source before the row/button below reflect it, same as opening this screen
     // for the first time does.
-    LaunchedEffect(ytDlpChannel, galleryDlChannel) { runCheck() }
+    LaunchedEffect(ytDlpChannel, galleryDlChannel, instaloaderChannel) { runCheck() }
 
     SettingsSection(title = "Engines", icon = Icons.Outlined.Refresh) {
         IconToggleRow(
             icon = Icons.Outlined.SystemUpdateAlt,
             title = "Auto-update",
-            subtitle = "Automatically installs newer yt-dlp and gallery-dl updates when found.",
+            subtitle = "Automatically installs newer yt-dlp, gallery-dl and Instaloader updates when found.",
             checked = autoUpdate,
             onCheckedChange = {
                 autoUpdate = it
@@ -3650,14 +3669,25 @@ private fun EnginesSection() {
             currentStatuses.forEachIndexed { index, status ->
                 EngineCard(
                     status = status,
-                    channel = if (status.engine == EngineUpdater.YT_DLP) ytDlpChannel else galleryDlChannel,
+                    channel = when (status.engine) {
+                        EngineUpdater.YT_DLP -> ytDlpChannel
+                        EngineUpdater.INSTALOADER -> instaloaderChannel
+                        else -> galleryDlChannel
+                    },
                     onChannelChange = { newChannel ->
-                        if (status.engine == EngineUpdater.YT_DLP) {
-                            ytDlpChannel = newChannel
-                            GalleryDlPreferences.setYtDlpUpdateChannel(context, newChannel)
-                        } else {
-                            galleryDlChannel = newChannel
-                            GalleryDlPreferences.setGalleryDlUpdateChannel(context, newChannel)
+                        when (status.engine) {
+                            EngineUpdater.YT_DLP -> {
+                                ytDlpChannel = newChannel
+                                GalleryDlPreferences.setYtDlpUpdateChannel(context, newChannel)
+                            }
+                            EngineUpdater.INSTALOADER -> {
+                                instaloaderChannel = newChannel
+                                GalleryDlPreferences.setInstaloaderUpdateChannel(context, newChannel)
+                            }
+                            else -> {
+                                galleryDlChannel = newChannel
+                                GalleryDlPreferences.setGalleryDlUpdateChannel(context, newChannel)
+                            }
                         }
                     },
                     updating = updatingEngine == status.engine.packageDirName,
@@ -3751,7 +3781,11 @@ private fun EngineCard(
     updating: Boolean,
     onUpdate: () -> Unit,
 ) {
-    val icon = if (status.engine == EngineUpdater.YT_DLP) Icons.Outlined.Terminal else Icons.Outlined.Image
+    val icon = when (status.engine) {
+        EngineUpdater.YT_DLP -> Icons.Outlined.Terminal
+        EngineUpdater.INSTALOADER -> FeatherIcons.Instagram
+        else -> Icons.Outlined.Image
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,

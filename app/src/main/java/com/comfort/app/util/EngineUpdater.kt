@@ -17,7 +17,7 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
 
-/** Checks for newer yt-dlp/gallery-dl releases than whatever's currently unpacked in the bundled
+/** Checks for newer yt-dlp/gallery-dl/Instaloader releases than whatever's currently unpacked in the bundled
  * Python runtime's site-packages, and can install one in place — the in-app equivalent of
  * `pip install --upgrade yt-dlp`. Needed because both engines are bundled as static wheels in
  * assets/python_packages/ (see PythonRuntime's own doc comment) and only get refreshed when this
@@ -60,7 +60,10 @@ object EngineUpdater {
 
     val YT_DLP = EngineInfo("yt-dlp", "yt-dlp", "yt_dlp")
     val GALLERY_DL = EngineInfo("gallery-dl", "gallery-dl", "gallery_dl")
-    val ALL = listOf(YT_DLP, GALLERY_DL)
+    // Instagram posts/reels (see VideoSiteRouter.resolveEngine). STABLE is its PyPI wheel, same as
+    // the other two; BLEEDING_EDGE is its GitHub master branch source — see fetchLatestInstaloaderMaster.
+    val INSTALOADER = EngineInfo("Instaloader", "instaloader", "instaloader")
+    val ALL = listOf(YT_DLP, GALLERY_DL, INSTALOADER)
 
     enum class ArtifactKind { WHEEL, TAR_GZ_SOURCE, GIT_ZIP_SOURCE }
 
@@ -191,8 +194,28 @@ object EngineUpdater {
         FetchResult(version, "https://codeberg.org/mikf/gallery-dl/archive/master.zip", ArtifactKind.GIT_ZIP_SOURCE, null)
     }.getOrNull()
 
-    private fun channelFor(context: Context, engine: EngineInfo): EngineUpdateChannel =
-        if (engine == YT_DLP) GalleryDlPreferences.getYtDlpUpdateChannel(context) else GalleryDlPreferences.getGalleryDlUpdateChannel(context)
+    /** Instaloader's own "bleeding edge": its GitHub master branch (development happens there; its
+     * releases are cut from it onto PyPI). Same shape as [fetchLatestGalleryDlMaster] — a source
+     * zip with no published checksum — but pinned to the exact commit just read rather than the
+     * moving "master" ref, so what gets installed is guaranteed to be the version shown. GitHub
+     * wraps it as `instaloader-<sha>/instaloader/...`, which [installFromGitZip] already handles. */
+    private fun fetchLatestInstaloaderMaster(): FetchResult? = runCatching {
+        val json = httpGetText("https://api.github.com/repos/instaloader/instaloader/branches/master")
+            ?: return@runCatching null
+        val fullSha = JSONObject(json).getJSONObject("commit").getString("sha")
+        FetchResult(
+            "master-${fullSha.take(10)}",
+            "https://github.com/instaloader/instaloader/archive/$fullSha.zip",
+            ArtifactKind.GIT_ZIP_SOURCE,
+            null,
+        )
+    }.getOrNull()
+
+    private fun channelFor(context: Context, engine: EngineInfo): EngineUpdateChannel = when (engine) {
+        YT_DLP -> GalleryDlPreferences.getYtDlpUpdateChannel(context)
+        INSTALOADER -> GalleryDlPreferences.getInstaloaderUpdateChannel(context)
+        else -> GalleryDlPreferences.getGalleryDlUpdateChannel(context)
+    }
 
     suspend fun checkAll(context: Context): List<VersionStatus> = withContext(Dispatchers.IO) {
         ALL.map { engine ->
@@ -200,8 +223,11 @@ object EngineUpdater {
             val installed = installedVersion(context, engine)
             val latest = when (channel) {
                 EngineUpdateChannel.STABLE -> fetchLatestStable(engine)
-                EngineUpdateChannel.BLEEDING_EDGE ->
-                    if (engine == YT_DLP) fetchLatestYtDlpNightly() else fetchLatestGalleryDlMaster()
+                EngineUpdateChannel.BLEEDING_EDGE -> when (engine) {
+                    YT_DLP -> fetchLatestYtDlpNightly()
+                    INSTALOADER -> fetchLatestInstaloaderMaster()
+                    else -> fetchLatestGalleryDlMaster()
+                }
             }
             VersionStatus(engine, channel, installed, latest?.version, latest?.artifactUrl, latest?.artifactKind, latest?.sha256)
         }

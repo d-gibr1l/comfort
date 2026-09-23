@@ -1,8 +1,9 @@
 package com.comfort.app.data
 
+import android.content.Context
 import java.net.URI
 
-enum class DownloadEngine { GALLERY_DL, YT_DLP, SPOTIFY }
+enum class DownloadEngine { GALLERY_DL, YT_DLP, SPOTIFY, INSTALOADER }
 
 /** Decides which engine a URL's *primary* pass should go through. Sites that only ever post
  * video skip gallery-dl entirely (it can't extract them at all); everything else goes through
@@ -77,6 +78,31 @@ object VideoSiteRouter {
             DownloadEngine.GALLERY_DL
         }
     }
+
+    // A single post/reel/IGTV link, optionally under a username ("instagram.com/<user>/p/<code>").
+    // Profiles, stories and highlights aren't matched — those stay on the classic path.
+    private val instagramPostPath = Regex("^/(?:[A-Za-z0-9_.]+/)?(?:p|reel|reels|tv)/[A-Za-z0-9_-]+", RegexOption.IGNORE_CASE)
+
+    fun isInstagramPost(url: String): Boolean {
+        val host = normalizedHost(url) ?: return false
+        if (host != "instagram.com" && !host.endsWith(".instagram.com")) return false
+        val path = runCatching { URI(url).path }.getOrNull() ?: return false
+        return instagramPostPath.containsMatchIn(path)
+    }
+
+    /** The engine a download (and its preview) actually starts with — [classify] plus the one
+     * user setting that changes routing: "Use Instaloader for Instagram" (on by default) sends
+     * single Instagram posts/reels to Instaloader. Tested side by side without cookies, gallery-dl
+     * hit Instagram's login wall on every post while Instaloader fetched public ones anonymously
+     * (all carousel images, reels, captions). DownloadWorker still falls back to [classify]'s
+     * engine whenever Instaloader saves nothing, so turning it on never loses a download the
+     * classic path could have made. */
+    fun resolveEngine(context: Context, url: String): DownloadEngine =
+        if (isInstagramPost(url) && GalleryDlPreferences.isInstaloaderForInstagram(context)) {
+            DownloadEngine.INSTALOADER
+        } else {
+            classify(url)
+        }
 
     // Presentation-only signal for the download preview sheet ("does this URL deserve the
     // song-styled card/track-list instead of the video-styled one?") — deliberately NOT consulted
