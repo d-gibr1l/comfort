@@ -197,7 +197,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             Spacer(Modifier.height(navBarClearance()))
         }
         }
-        StatusBarScrim(alpha = { 1f - headerState.alpha }, modifier = Modifier.align(Alignment.TopStart))
+        StatusBarScrim(alpha = { 1f - headerState.reveal.fraction }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(
             title = "Appearance",
             topicIcon = Icons.Outlined.WbSunny,
@@ -208,7 +208,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             includeHorizontalPadding = true,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .graphicsLayer { alpha = headerState.alpha }
+                .compactHeaderReveal(headerState.reveal)
                 .background(MaterialTheme.colorScheme.background)
                 .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
                 .windowInsetsPadding(WindowInsets.statusBars),

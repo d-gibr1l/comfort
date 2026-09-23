@@ -40,6 +40,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -74,6 +75,7 @@ import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.net.URI
 import java.text.SimpleDateFormat
@@ -240,44 +242,60 @@ fun DownloadsHistoryScreen(
             index * 1_000_000f + offset
         }
     }
-    // Same three-way behavior as Settings' own sub-page headers: within compactBarThresholdPx of
-    // the top, the compact bar stays hidden entirely (the real header is on screen there, same
-    // reasoning as before); past it, showing it chases scroll direction — down hides it, up
-    // reveals it — rather than simply staying visible for the rest of the scroll. Hysteresis (net
-    // movement has to clear 8dp in one direction before flipping, not any nonzero amount) damps
-    // the natural per-frame tremor of a real slow drag that a flip-per-frame reaction would
-    // otherwise chase.
-    val hysteresisPx = remember(density) { with(density) { 8.dp.toPx() } }
-    var showCompactBar by remember { mutableStateOf(false) }
-    // Whether a genuine upward flick has "earned" the near-top transform below — NOT just
+    // Same scroll-linked reveal as Settings' own sub-page headers (see CompactHeaderReveal): within
+    // compactBarThresholdPx of the top, the compact bar stays hidden entirely (the real header is
+    // on screen there, same reasoning as before); past it, the bar slides in and out pixel-for-pixel
+    // with the scroll — up pulls it down into view at the finger's own pace, down pushes it back
+    // out — instead of flipping between shown and hidden. Starts hidden: scrolling down from rest
+    // must never show it. Pixel deltas come from nested scroll (libraryHeaderScrollConnection,
+    // attached to this screen's root Box below), since scrollValuePx jumps by ~1,000,000 whenever
+    // the first visible index changes and can't supply them.
+    val compactBarReveal = remember { CompactHeaderReveal().apply { hide() } }
+    // Whether a genuine upward scroll has "earned" the near-top transform below — NOT just
     // `offset < compactBarThresholdPx`. Reported live: scrolling straight DOWN from rest showed
     // the compact bar's title translating into view and overlapping the real header's own
     // still-visible title, because offset alone can't distinguish "heading toward the threshold
     // for the first time" from "coming back from beyond it" — both pass through the same offset
-    // values. Only set true at the exact moment showCompactBar itself flips true (a decisive
-    // upward flick from beyond the threshold), and only while that upward motion continues; a
-    // reversal back into downward movement disarms it immediately, same as scrolling down should
-    // never show the compact bar at all, transformed or not.
+    // values. Only armed while the bar is at least partly revealed and moving up from beyond the
+    // threshold; a reversal back into downward movement near the top disarms it immediately, same
+    // as scrolling down should never show the compact bar there at all, transformed or not.
     var nearTopTransformActive by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        var previous = scrollValuePx
-        var accumulated = 0f
-        snapshotFlow { scrollValuePx }.collect { current ->
-            val delta = current - previous
-            when {
-                current <= compactBarThresholdPx -> {
-                    showCompactBar = false
-                    accumulated = 0f
-                    if (delta > 0f) nearTopTransformActive = false
-                    if (current <= 0f) nearTopTransformActive = false
+    val libraryHeaderScrollConnection = remember(compactBarThresholdPx) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset {
+                // consumed.y < 0 means the content moved up, i.e. scrolled toward its end.
+                val delta = -consumed.y
+                if (delta == 0f) return androidx.compose.ui.geometry.Offset.Zero
+                val current = scrollValuePx
+                if (current <= compactBarThresholdPx) {
+                    if (delta > 0f || current <= 0f) {
+                        nearTopTransformActive = false
+                        compactBarReveal.hide()
+                    } else if (nearTopTransformActive) {
+                        // Still on the way up from a reveal that started deeper down: keep pulling
+                        // it the rest of the way into view as it transforms into the real header.
+                        compactBarReveal.scrollBy(delta)
+                    } else {
+                        compactBarReveal.hide()
+                    }
+                } else {
+                    compactBarReveal.scrollBy(delta)
+                    if (compactBarReveal.fraction <= 0f) nearTopTransformActive = false
+                    else if (delta < 0f) nearTopTransformActive = true
                 }
-                else -> {
-                    accumulated = if (accumulated == 0f || (accumulated > 0f) == (delta > 0f)) accumulated + delta else delta
-                    if (accumulated > hysteresisPx) { showCompactBar = false; accumulated = 0f }
-                    else if (accumulated < -hysteresisPx) { showCompactBar = true; nearTopTransformActive = true; accumulated = 0f }
-                }
+                return androidx.compose.ui.geometry.Offset.Zero
             }
-            previous = current
+        }
+    }
+    // Programmatic jumps back to the very top (scroll-to-top, reopening the tab) never pass through
+    // nested scroll, so reset from the position itself there.
+    LaunchedEffect(Unit) {
+        snapshotFlow { scrollValuePx <= 0f }.collect { atTop ->
+            if (atTop) { nearTopTransformActive = false; compactBarReveal.hide() }
         }
     }
     // The header's own real scroll offset, for LibraryCompactBar to translate its title against —
@@ -305,8 +323,9 @@ fun DownloadsHistoryScreen(
         return if (index > 0) Float.POSITIVE_INFINITY else offset.toFloat()
     }
     // Whether LibraryCompactBar composes at all — safe to lag a frame behind (unlike its own
-    // transform fraction), since mount/unmount is coarse either way. True whenever there's
-    // anything to show: the deep-scroll boolean, or an active, still-in-progress near-top reveal.
+    // transform fraction), since mount/unmount is coarse either way. Stays composed (slid fully
+    // out of view while hidden) everywhere past the threshold, so its height is already measured
+    // by the time a reveal starts, plus during an active, still-in-progress near-top transform.
     val compactBarMounted by remember {
         derivedStateOf {
             val (index, offset) = if (gridView) {
@@ -314,7 +333,7 @@ fun DownloadsHistoryScreen(
             } else {
                 listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
             }
-            showCompactBar || (index == 0 && nearTopTransformActive && offset > 0)
+            scrollValuePx > compactBarThresholdPx || (index == 0 && nearTopTransformActive && offset > 0)
         }
     }
 
@@ -352,7 +371,12 @@ fun DownloadsHistoryScreen(
     // showing, stacked directly on top of this branch's own always-visible full header.
     val usingStaticFullHeaderBranch = if (showDuplicatesOnly) duplicateAttempts.isEmpty() else visibleItems.isEmpty()
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .nestedScroll(libraryHeaderScrollConnection),
+    ) {
         val subtitle = if (showDuplicatesOnly) {
             "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
         } else {
@@ -694,7 +718,7 @@ fun DownloadsHistoryScreen(
                 activeDownloadsCount = activeDownloadsCount,
                 onOpenQueue = onOpenQueue,
                 headerScrollOffsetPx = ::currentHeaderScrollOffsetPx,
-                modifier = Modifier.align(Alignment.TopStart),
+                modifier = Modifier.align(Alignment.TopStart).compactHeaderReveal(compactBarReveal),
             )
         }
     }
@@ -1127,20 +1151,38 @@ private fun LibraryHeaderActions(
  * was exactly what caused Duplicates' cards to show a permanent colored halo at rest: its
  * background didn't match the rounded, margined Surface it sat behind. */
 @Composable
-private fun SwipeToDeleteCard(
+internal fun SwipeToDeleteCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
     content: @Composable () -> Unit,
 ) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             if (value != SwipeToDismissBoxValue.Settled) {
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
                 onDelete()
             }
             true
         },
     )
+    // A tick the moment a drag crosses the delete threshold (and a lighter one if it's dragged
+    // back under it), so the point of no return is felt, not just seen. targetValue is what flips
+    // at that threshold mid-drag; drop(1) skips its initial Settled emission.
+    LaunchedEffect(dismissState) {
+        snapshotFlow { dismissState.targetValue }
+            .drop(1)
+            .collect { target ->
+                haptics.performHapticFeedback(
+                    if (target != SwipeToDismissBoxValue.Settled) {
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate
+                    } else {
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick
+                    }
+                )
+            }
+    }
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier,
