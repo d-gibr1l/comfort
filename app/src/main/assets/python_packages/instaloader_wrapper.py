@@ -30,6 +30,8 @@ import time
 
 import instaloader
 from instaloader import Instaloader, Post, RateController
+import net_resilience
+net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 _SHORTCODE_RE = re.compile(
     r"instagram\.com/(?:[A-Za-z0-9_.]+/)?(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)", re.IGNORECASE,

@@ -312,6 +312,8 @@ object EngineUpdater {
                     }
                 }
                 tempFile.delete()
+                // The fork server still has the old version imported.
+                PythonRuntime.restartServer()
                 // The new version's modules have no .pyc yet — compile them now, in the background,
                 // instead of on the first preview/download that imports them (see
                 // PythonRuntime.warmUpInBackground for the measured cost).

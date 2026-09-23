@@ -6,6 +6,8 @@ from contextlib import redirect_stdout, redirect_stderr
 import gallery_dl
 import gallery_dl.job
 import gallery_dl.output
+import net_resilience
+net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 # gallery-dl's own internal yt-dlp delegation (downloader/ytdl.py, used for "ytdl:"-prefixed
 # URLs on sites like Instagram) names each pre-merge DASH stream "...fdash-<id>v.<ext>" (video)
