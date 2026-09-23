@@ -276,6 +276,17 @@ object MediaStoreHelper {
         values.clear()
         values.put(MediaStore.MediaColumns.IS_PENDING, 0)
         resolver.update(uri, values, null, null)
+        // Clearing IS_PENDING has MediaStore index the file, which copies "date taken" out of its
+        // own metadata when it has one (an MP4's creation_time, a photo's EXIF date): when the
+        // uploader recorded/encoded it, not when it was downloaded. Galleries sort by that, so
+        // such a download (seen with YouTube and Redgifs videos; most files carry no date) landed
+        // months back among older items instead of with today's. Stamped after that update, since
+        // indexing would overwrite it otherwise.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) runCatching {
+            resolver.update(uri, ContentValues().apply {
+                put(MediaStore.MediaColumns.DATE_TAKEN, System.currentTimeMillis())
+            }, null, null)
+        }
         return uri
     }
 }
