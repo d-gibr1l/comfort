@@ -1514,6 +1514,25 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
                     modifier = Modifier.size(24.dp),
                 )
             }
+            // Picture or video, in a listing that mixes them (an Instagram carousel, say) — the
+            // thumbnails alone don't tell them apart. Nothing when the listing doesn't say.
+            if (track.isVideo != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f))
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                ) {
+                    Icon(
+                        if (track.isVideo) Icons.Outlined.PlayArrow else Icons.Outlined.Image,
+                        contentDescription = if (track.isVideo) "Video" else "Picture",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {

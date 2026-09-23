@@ -62,8 +62,10 @@ data class PreviewInfo(
  * — every track entry carries only title/subtitle/duration, never an image), this is left null
  * here and the UI falls back to the whole collection's own cover art instead (see
  * [PreviewInfo.collectionThumbnail]) rather than fetching one image per track, which doesn't
- * scale to a long playlist. */
-data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null)
+ * scale to a long playlist. [isVideo] marks a picture vs a video in a mixed listing (an
+ * Instagram carousel, say) for the row's badge; null when the listing doesn't say (a song, or a
+ * flat playlist entry with no extension), which shows no badge rather than a guess. */
+data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null, val isVideo: Boolean? = null)
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
@@ -606,6 +608,8 @@ object GalleryDlListing {
                     // blank/placeholder box for something that does have a real image, just not
                     // a per-track one.
                     thumbnail = e.optString("thumbnail").blankToNull() ?: collectionThumbnail,
+                    isVideo = e.optString("ext").blankToNull()?.let { ext -> VideoSiteRouter.isVideoFilename("x.$ext") }
+                        ?: if (e.optDouble("duration", -1.0) > 0.0) true else null,
                 )
             }
         } ?: emptyList()
@@ -644,7 +648,7 @@ object GalleryDlListing {
             val only = items[0]
             return PreviewInfo(title = only.title, uploader = null, thumbnail = only.url, filesizeBytes = null, durationMs = null, streamUrls = listOf(only.url))
         }
-        val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url) }
+        val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url, isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename)) }
         val first = items.first()
         return PreviewInfo(
             title = first.title,
