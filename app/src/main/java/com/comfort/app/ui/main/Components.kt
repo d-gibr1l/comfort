@@ -390,6 +390,11 @@ fun EmptyState(
     }
 }
 
+/** A count badge's text: "99+" past two digits (Material's badge guidance), so the pill stays
+ * compact next to the icon it's on — "123" was wide enough to be cut off at the Library header's
+ * edge and to run over the nav bar's "Library" label. */
+fun badgeCountText(count: Int): String = if (count > 99) "99+" else count.toString()
+
 /** The download thumbnail shape — Material 3 Expressive's 4-sided cookie, for the Library list
  * and Queue thumbnails. One place, so every thumbnail stays the same shape. */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)

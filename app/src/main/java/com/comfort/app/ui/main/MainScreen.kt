@@ -500,7 +500,7 @@ private fun FloatingNavBar(
                         if (index == 1 && activeDownloadsCount > 0) {
                             BadgedBox(badge = {
                                 Badge(containerColor = MaterialTheme.colorScheme.error) {
-                                    Text(activeDownloadsCount.toString())
+                                    Text(badgeCountText(activeDownloadsCount))
                                 }
                             }) {
                                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)

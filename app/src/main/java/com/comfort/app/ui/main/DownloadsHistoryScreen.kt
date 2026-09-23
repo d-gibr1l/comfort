@@ -1135,20 +1135,20 @@ private fun LibraryHeaderActions(
             contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
         )
     }
-    val queueIcon = Icons.Outlined.DownloadForOffline
-    IconButton(onClick = onOpenQueue) {
+    // The badge sits beside the button, not inside it: BadgedBox placed it past the icon's edge,
+    // and inside the button that part was clipped (a 3-digit count was cut off at the screen
+    // edge). Aligned to the button's own top-end corner it always stays within its 48dp area.
+    Box {
+        IconButton(onClick = onOpenQueue) {
+            Icon(Icons.Outlined.DownloadForOffline, contentDescription = "Active downloads")
+        }
         if (hasActiveDownloads) {
-            BadgedBox(
-                badge = {
-                    Badge(containerColor = MaterialTheme.colorScheme.error) {
-                        Text(activeDownloadsCount.toString())
-                    }
-                }
+            Badge(
+                containerColor = MaterialTheme.colorScheme.error,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 2.dp),
             ) {
-                Icon(queueIcon, contentDescription = "Active downloads")
+                Text(badgeCountText(activeDownloadsCount))
             }
-        } else {
-            Icon(queueIcon, contentDescription = "Active downloads")
         }
     }
 }
