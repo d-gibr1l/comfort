@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.verticalScroll
@@ -148,7 +149,7 @@ fun QueueScreen(
     // reduce-motion setting.
     val reducedMotion = rememberIsReducedMotionEnabled()
     var selectedFilter by remember { mutableStateOf("Running") }
-    val filters = listOf("Running", "In Queue", "Scheduled", "Paused", "Errored", "Cancelled")
+    val filters = listOf("Running", "In Queue", "Paused", "Scheduled", "Errored", "Cancelled")
 
     // Multi-select: entered via a long-press on any card's thumbnail (see QueueItemCard/StoppedRow),
     // not a dedicated mode toggle — matches how the request was framed ("make cards selectable by
@@ -1105,6 +1106,37 @@ fun QueueItemCard(
                             }
                         }
                     }
+                    // The link this download came from, in the space the pills leave free — tap
+                    // opens it in the browser. Shown without the scheme/"www." and cut off with an
+                    // ellipsis, so it never pushes the pills or the ETA around.
+                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+                    val shortLink = remember(item.url) {
+                        item.url.substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/')
+                    }
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable(onClickLabel = "Open link") { runCatching { uriHandler.openUri(item.url) } }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Link,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = shortLink,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     if (byteProgress != null && item.speedMbs > 0f) {
                         val remainingBytes = item.expectedBytes - (item.totalBytes + item.liveBytes)
                         val remainingSeconds = (remainingBytes / (item.speedMbs * 1024f * 1024f)).toInt()
@@ -1191,23 +1223,11 @@ fun QueueItemCard(
                             // they face each other — instead of the previous icon-only
                             // FilledTonalIconButtons, whose bare glyph made Pause and Cancel hard
                             // to tell apart at a glance.
-                            AssistChip(
-                                onClick = onPauseResume,
-                                shape = groupedChipShape(0, 2),
-                                border = AssistChipDefaults.assistChipBorder(
-                                    enabled = true,
-                                    borderColor = MaterialTheme.colorScheme.outline,
-                                ),
-                                colors = AssistChipDefaults.assistChipColors(
-                                    labelColor = MaterialTheme.colorScheme.onSurface,
-                                    leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
-                                ),
-                                leadingIcon = { Icon(Icons.Outlined.PausePresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                label = { Text("Pause", style = MaterialTheme.typography.labelLarge) },
-                            )
+                            // Cancel first, Pause last (swapped on request) — Pause now sits on the
+                            // right edge, where the Queued cards' own primary action also is.
                             AssistChip(
                                 onClick = onCancel,
-                                shape = groupedChipShape(1, 2),
+                                shape = groupedChipShape(0, 2),
                                 border = AssistChipDefaults.assistChipBorder(
                                     enabled = true,
                                     borderColor = MaterialTheme.colorScheme.error,
@@ -1218,6 +1238,20 @@ fun QueueItemCard(
                                 ),
                                 leadingIcon = { Icon(Icons.Outlined.CancelPresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                 label = { Text("Cancel", style = MaterialTheme.typography.labelLarge) },
+                            )
+                            AssistChip(
+                                onClick = onPauseResume,
+                                shape = groupedChipShape(1, 2),
+                                border = AssistChipDefaults.assistChipBorder(
+                                    enabled = true,
+                                    borderColor = MaterialTheme.colorScheme.outline,
+                                ),
+                                colors = AssistChipDefaults.assistChipColors(
+                                    labelColor = MaterialTheme.colorScheme.onSurface,
+                                    leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                leadingIcon = { Icon(Icons.Outlined.PausePresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                label = { Text("Pause", style = MaterialTheme.typography.labelLarge) },
                             )
                         }
                         DownloadStatus.ERRORED -> {
@@ -1247,14 +1281,17 @@ fun QueueItemCard(
                             }
                         }
                         DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
-                            TextButton(onClick = onStartNow) {
-                                Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Start now")
-                            }
-                            IconButton(onClick = onCancel) {
-                                Icon(Icons.Outlined.Close, contentDescription = "Cancel")
-                            }
+                            // Same split button as Settings' edit sheets: "Up next" moves this
+                            // download to the front of the line (skipping any schedule wait) —
+                            // it doesn't run alongside what's already downloading; cancel on the
+                            // trailing half.
+                            ConfirmCancelSplitButton(
+                                label = "Up next",
+                                icon = Icons.Outlined.KeyboardDoubleArrowUp,
+                                onConfirm = onStartNow,
+                                onCancel = onCancel,
+                                cancelDescription = "Cancel download",
+                            )
                         }
                         else -> {}
                     }

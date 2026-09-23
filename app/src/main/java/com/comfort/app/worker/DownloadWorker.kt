@@ -85,20 +85,41 @@ private object DownloadConcurrencyGate {
     // waiter that's about to recheck anyway doesn't need every past release queued up for it.
     private val slotFreed = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    suspend fun acquire(context: Context) {
-        while (true) {
-            val limit = GalleryDlPreferences.getEffectiveConcurrentDownloads(context).coerceAtLeast(1)
-            
-            // Perfectly atomic lock-free compare-and-set loop. Eliminates the previous
-            // race condition where multiple waiters could read a stale "under limit" value
-            // simultaneously and overshoot the cap.
+    // Everyone currently waiting for a slot, with their place in line — same ordering the Queue
+    // screen shows (queueOrder ASC, then dateAdded ASC). Slots used to go to whichever waiter
+    // happened to re-check first, so several downloads moved up with "Up next" (see
+    // DownloadDispatcher.startNow) raced each other at random instead of going in the order the
+    // queue promises. Now only the front of this line may take a free slot.
+    private data class Place(val queueOrder: Int, val dateAdded: Long)
+    private val waiting = java.util.concurrent.ConcurrentHashMap<String, Place>()
+    private val lineOrder = compareBy<Map.Entry<String, Place>>({ it.value.queueOrder }, { it.value.dateAdded }, { it.key })
+
+    suspend fun acquire(context: Context, downloadId: String, queueOrder: Int, dateAdded: Long) {
+        waiting[downloadId] = Place(queueOrder, dateAdded)
+        try {
             while (true) {
-                val current = active.get()
-                if (current >= limit) break
-                if (active.compareAndSet(current, current + 1)) return
+                val limit = GalleryDlPreferences.getEffectiveConcurrentDownloads(context).coerceAtLeast(1)
+                val myTurn = waiting.entries.minWithOrNull(lineOrder)?.key == downloadId
+
+                // Perfectly atomic lock-free compare-and-set loop. Eliminates the previous
+                // race condition where multiple waiters could read a stale "under limit" value
+                // simultaneously and overshoot the cap.
+                while (myTurn) {
+                    val current = active.get()
+                    if (current >= limit) break
+                    if (active.compareAndSet(current, current + 1)) {
+                        waiting.remove(downloadId)
+                        // The next in line may also fit (concurrency limit above 1).
+                        slotFreed.tryEmit(Unit)
+                        return
+                    }
+                }
+
+                withTimeoutOrNull(POLL_FALLBACK_MS) { slotFreed.first() }
             }
-            
-            withTimeoutOrNull(POLL_FALLBACK_MS) { slotFreed.first() }
+        } finally {
+            // Cancelled while waiting (paused/cancelled): leave the line so it can't block others.
+            waiting.remove(downloadId)
         }
     }
 
@@ -190,7 +211,11 @@ class DownloadWorker(
             // its own try/finally right below, not this outer one — so that if acquire() itself
             // throws/gets cancelled before ever incrementing the counter, release() correctly never
             // runs for a slot this worker never actually took.
-            DownloadConcurrencyGate.acquire(applicationContext)
+            DownloadConcurrencyGate.acquire(
+                applicationContext, downloadId,
+                queueOrder = entity?.queueOrder ?: 0,
+                dateAdded = entity?.dateAdded ?: System.currentTimeMillis(),
+            )
             try {
             return withContext(Dispatchers.IO) {
                 try {

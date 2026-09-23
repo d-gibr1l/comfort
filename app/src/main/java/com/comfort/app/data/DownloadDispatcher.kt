@@ -546,7 +546,9 @@ object DownloadDispatcher {
     }
 
     /** Jumps a still-waiting download (QUEUED or SCHEDULED) to the front of the queue and past
-     * the schedule window's delay, if one was blocking it — the "Start now" action. Negative
+     * the schedule window's delay, if one was blocking it — the Queue card's "Up next" action. It
+     * takes the next free download slot (DownloadWorker's concurrency gate hands slots out in this
+     * same queueOrder), never an extra one alongside what's already running. Negative
      * seconds-since-epoch so a later "Start now" tap always outranks an earlier one (more negative
      * = sorts first in getQueueFlow's `queueOrder ASC`), safely within Int range for decades. */
     suspend fun startNow(context: Context, id: String) {
