@@ -525,7 +525,7 @@ fun SharePickerScreen(
                                         .padding(6.dp)
                                         .size(22.dp)
                                         .clip(CircleShape)
-                                        .background(if (selected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.4f)),
+                                        .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f)),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     if (selected) {
@@ -538,13 +538,13 @@ fun SharePickerScreen(
                                             .align(Alignment.Center)
                                             .size(34.dp)
                                             .clip(CircleShape)
-                                            .background(Color.Black.copy(alpha = 0.45f)),
+                                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Icon(
                                             Icons.Outlined.PlayArrow,
                                             contentDescription = "Video",
-                                            tint = Color.White,
+                                            tint = MaterialTheme.colorScheme.onSurface,
                                             // Nudged right so the triangle's own visual weight
                                             // (its point sits left of the glyph's bounding box)
                                             // actually looks centered inside the circle.

@@ -143,6 +143,31 @@ object GalleryDlListing {
         return tempFile.absolutePath to tempFile
     }
 
+    /** Where a preview's full yt-dlp extraction for [url] is saved (yt_dlp_wrapper.py list_info's
+     * info_cache_path) and where the real download looks for it (download()'s info_json_path) —
+     * so tapping Download on a loaded preview doesn't extract the whole thing again. One file per
+     * URL, replaced by each new preview; the wrapper ignores it once it's too old. */
+    fun ytDlpInfoCacheFile(context: Context, url: String): java.io.File = previewCacheFile(context, "ytdlp-info", url)
+
+    /** Same idea for Instaloader: the preview's fetched post, saved by instaloader_wrapper.py
+     * list_items and loaded back by its download(), so the metadata request isn't made twice. */
+    fun instaloaderInfoCacheFile(context: Context, url: String): java.io.File = previewCacheFile(context, "instaloader-info", url)
+
+    private fun previewCacheFile(context: Context, dir: String, url: String): java.io.File {
+        val digest = java.security.MessageDigest.getInstance("SHA-1").digest(url.toByteArray())
+        val name = digest.joinToString("") { "%02x".format(it) }
+        return java.io.File(context.cacheDir, "$dir/$name.json")
+    }
+
+    // The last successful listing per URL, for a short while. A download started from a preview
+    // re-lists the same link in DownloadWorker (item count + "is there a video in here?") — for a
+    // gallery-dl link that meant fetching the whole gallery again right after the preview just did
+    // (reported live as the download "starting all over"). Same 20-minute window the saved
+    // yt-dlp/Instaloader extractions use. Only non-empty results are kept; failures always retry.
+    private data class CachedListing(val result: ListingResult, val atMs: Long)
+    private val listingCache = java.util.concurrent.ConcurrentHashMap<String, CachedListing>()
+    private const val LISTING_CACHE_MS = 20 * 60 * 1000L
+
     fun sanitizeErrorMessage(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
@@ -167,16 +192,25 @@ object GalleryDlListing {
      * silently in that case. A non-null errorMessage means listing actually failed (needs login,
      * network error, ...) and should be shown, not silently swallowed into the same fallback. */
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
+        listingCache[url]?.let { cached ->
+            if (System.currentTimeMillis() - cached.atMs < LISTING_CACHE_MS) return@withContext cached.result
+        }
+        listItemsUncached(context, url).also { result ->
+            if (result.items.isNotEmpty()) listingCache[url] = CachedListing(result, System.currentTimeMillis())
+        }
+    }
+
+    private suspend fun listItemsUncached(context: Context, url: String): ListingResult {
         if (VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER) {
             val result = listViaInstaloader(context, url)
-            if (result.items.isNotEmpty()) return@withContext result
+            if (result.items.isNotEmpty()) return result
             // Same fallback the real download makes (DownloadWorker): Instaloader coming back
             // empty hands the link to the classic engines. Its own error is kept only if they
             // fail too — it's usually the clearer explanation for an Instagram post.
             val classic = listClassic(context, url)
-            return@withContext if (classic.items.isEmpty() && result.errorMessage != null) result else classic
+            return if (classic.items.isEmpty() && result.errorMessage != null) result else classic
         }
-        listClassic(context, url)
+        return listClassic(context, url)
     }
 
     private suspend fun listClassic(context: Context, url: String): ListingResult =
@@ -239,6 +273,7 @@ object GalleryDlListing {
                         "list", url, cookiesArg,
                         GalleryDlPreferences.getEffectiveProxyUrl(context),
                         GalleryDlPreferences.getEffectiveSocketTimeoutSeconds(context),
+                        instaloaderInfoCacheFile(context, url).absolutePath,
                     ),
                 ) { line -> lines.add(line) }
                 // Last non-blank line only, same reasoning as runYtDlpListInfo: anything the
@@ -629,7 +664,10 @@ object GalleryDlListing {
             // does.
             val lines = mutableListOf<String>()
             val lastLine = runCatching {
-                PythonRuntime.run(context, "yt_dlp_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg)) { line ->
+                PythonRuntime.run(
+                    context, "yt_dlp_wrapper.py",
+                    listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg, ytDlpInfoCacheFile(context, url).absolutePath),
+                ) { line ->
                     lines.add(line)
                     if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
                 }

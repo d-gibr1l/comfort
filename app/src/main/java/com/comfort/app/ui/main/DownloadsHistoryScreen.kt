@@ -53,9 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import com.comfort.app.theme.FavoriteGold
 import com.comfort.app.theme.HeaderFontFamily
-import com.comfort.app.theme.SuccessGreen40
 import com.comfort.app.util.rememberIsReducedMotionEnabled
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
@@ -1477,13 +1475,13 @@ private fun HistoryGridItem(
                     .align(Alignment.BottomStart)
                     .padding(5.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.55f))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f))
                     .padding(horizontal = 5.dp, vertical = 2.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                    Icon(Icons.Outlined.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(10.dp))
                     Spacer(Modifier.width(3.dp))
-                    Text("${item.downloadedItems}", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    Text("${item.downloadedItems}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -1495,10 +1493,10 @@ private fun HistoryGridItem(
                     .padding(5.dp)
                     .size(18.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.55f)),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
+                Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
             }
         }
 
@@ -1525,12 +1523,13 @@ private fun HistoryGridItem(
 }
 
 /** Small circular success/failure badge shared by both the grid and list history rows —
- * FINISHED gets a green check, ERRORED a red alert; every other status (DELETED, CANCELLED)
+ * FINISHED gets a check in the theme's primary color, ERRORED an alert in its error color (on a
+ * themed surface pill — the fixed green/black versions ignored the selected theme); every other status (DELETED, CANCELLED)
  * already reads clearly enough from its own placeholder icon not to need one. */
 @Composable
 private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
     val (icon, tint, description) = when (status) {
-        DownloadStatus.FINISHED -> Triple(Icons.Outlined.CheckCircle, SuccessGreen40, "Succeeded")
+        DownloadStatus.FINISHED -> Triple(Icons.Outlined.CheckCircle, MaterialTheme.colorScheme.primary, "Succeeded")
         DownloadStatus.ERRORED -> Triple(Icons.Outlined.Error, MaterialTheme.colorScheme.error, "Failed")
         else -> return
     }
@@ -1538,7 +1537,7 @@ private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
         modifier = modifier
             .size(18.dp)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.55f)),
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(12.dp))
@@ -1652,13 +1651,13 @@ private fun HistoryRow(
                             .align(Alignment.BottomStart)
                             .padding(5.dp)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.55f))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f))
                             .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
+                            Icon(Icons.Outlined.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(10.dp))
                             Spacer(Modifier.width(3.dp))
-                            Text("${item.downloadedItems}", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            Text("${item.downloadedItems}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -1670,10 +1669,10 @@ private fun HistoryRow(
                             .padding(5.dp)
                             .size(18.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.55f)),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = FavoriteGold, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
                     }
                 }
 

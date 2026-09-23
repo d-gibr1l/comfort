@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.CheckCircle as FilledCheckCircle
 import androidx.compose.ui.graphics.luminance
-import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -1746,7 +1745,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
 
             if (filenameFormatSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Filename format saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Filename format saved", tint = MaterialTheme.colorScheme.primary)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -1894,7 +1893,7 @@ private fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             }
             if (cacheCleared) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cache cleared", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cache cleared", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -2300,7 +2299,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             if (saved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extra arguments saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extra arguments saved", tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -2377,7 +2376,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             if (extractorArgsSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extractor arguments saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extractor arguments saved", tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -2417,7 +2416,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             if (formatSortSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Format sort saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Format sort saved", tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -2454,7 +2453,7 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             if (customHeadersSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Headers saved", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Headers saved", tint = MaterialTheme.colorScheme.primary)
             }
         }
 
@@ -2586,7 +2585,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
 
             if (extractedCookies.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies extracted successfully", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies extracted successfully", tint = MaterialTheme.colorScheme.primary)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -2660,7 +2659,7 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
 
             if (savedConfirmation) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies saved and applied", tint = SuccessGreen40)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies saved and applied", tint = MaterialTheme.colorScheme.primary)
             }
             pasteError?.let { message ->
                 Spacer(Modifier.height(8.dp))
@@ -3637,7 +3636,7 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloading: Boolean, 
             status.latestVersion != null -> Text(
                 "Up to date",
                 style = MaterialTheme.typography.labelMedium,
-                color = SuccessGreen40,
+                color = MaterialTheme.colorScheme.primary,
             )
             else -> Text(
                 "Couldn't check",
@@ -3887,7 +3886,7 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
             status.latestVersion != null -> Text(
                 "Up to date",
                 style = MaterialTheme.typography.labelMedium,
-                color = SuccessGreen40,
+                color = MaterialTheme.colorScheme.primary,
             )
             else -> Text(
                 "Couldn't check",
@@ -3941,12 +3940,12 @@ private fun EngineCard(
                     ) { Text("Update to ${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
                     status.latestVersion != null -> Surface(
                         shape = MaterialTheme.shapes.small,
-                        color = SuccessGreen40.copy(alpha = 0.15f),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                     ) {
                         Text(
                             "Up to date",
                             style = MaterialTheme.typography.labelSmall,
-                            color = SuccessGreen40,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         )
                     }
