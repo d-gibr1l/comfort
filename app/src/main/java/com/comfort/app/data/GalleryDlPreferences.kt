@@ -97,6 +97,7 @@ object GalleryDlPreferences {
     const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
     const val KEY_YTDLP_UPDATE_CHANNEL = "ytdlp_update_channel"
     const val KEY_GALLERYDL_UPDATE_CHANNEL = "gallerydl_update_channel"
+    const val KEY_INSTALOADER_UPDATE_CHANNEL = "instaloader_update_channel"
     const val KEY_FORCE_IPV4 = "force_ipv4"
     const val KEY_CONCURRENT_FRAGMENTS = "concurrent_fragments"
     const val KEY_NO_CHECK_CERTIFICATES = "no_check_certificates"
@@ -135,6 +136,7 @@ object GalleryDlPreferences {
     const val KEY_FORMAT_ID_OVERRIDE = "format_id_override"
     const val KEY_YOUTUBE_CLIENT_ROTATION_ENABLED = "youtube_client_rotation_enabled"
     const val KEY_IMPERSONATE_ENABLED = "impersonate_enabled"
+    const val KEY_INSTALOADER_FOR_INSTAGRAM = "instaloader_for_instagram"
     const val KEY_ARIA2_ENABLED = "aria2_enabled"
     // yt-dlp's own built-in default for --fragment-retries, kept separate from
     // DEFAULT_NETWORK_RETRIES below (see getEffectiveFragmentRetries) so a merge download's
@@ -652,6 +654,15 @@ object GalleryDlPreferences {
         prefs(context).edit().putString(KEY_GALLERYDL_UPDATE_CHANNEL, channel.name).apply()
     }
 
+    fun getInstaloaderUpdateChannel(context: Context): EngineUpdateChannel {
+        val stored = prefs(context).getString(KEY_INSTALOADER_UPDATE_CHANNEL, EngineUpdateChannel.STABLE.name)
+        return runCatching { EngineUpdateChannel.valueOf(stored ?: EngineUpdateChannel.STABLE.name) }.getOrDefault(EngineUpdateChannel.STABLE)
+    }
+
+    fun setInstaloaderUpdateChannel(context: Context, channel: EngineUpdateChannel) {
+        prefs(context).edit().putString(KEY_INSTALOADER_UPDATE_CHANNEL, channel.name).apply()
+    }
+
     /** How many times a failed request (extraction, or an individual file/fragment fetch) gets
      * retried before the download actually fails. Shared by both engines — see
      * yt_dlp_wrapper.py's retries/fragment_retries and gallery_dl_wrapper.py's
@@ -801,6 +812,16 @@ object GalleryDlPreferences {
 
     fun setImpersonateEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_IMPERSONATE_ENABLED, enabled).apply()
+    }
+
+    /** Single Instagram posts/reels go to Instaloader first (see VideoSiteRouter.resolveEngine).
+     * On by default — off restores the classic gallery-dl + yt-dlp routing exactly. */
+    fun isInstaloaderForInstagram(context: Context): Boolean {
+        return prefs(context).getBoolean(KEY_INSTALOADER_FOR_INSTAGRAM, true)
+    }
+
+    fun setInstaloaderForInstagram(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_INSTALOADER_FOR_INSTAGRAM, enabled).apply()
     }
 
     /** yt-dlp only — real multi-connection segmented downloading of a single file via a bundled

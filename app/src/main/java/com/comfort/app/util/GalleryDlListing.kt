@@ -167,6 +167,19 @@ object GalleryDlListing {
      * silently in that case. A non-null errorMessage means listing actually failed (needs login,
      * network error, ...) and should be shown, not silently swallowed into the same fallback. */
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
+        if (VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER) {
+            val result = listViaInstaloader(context, url)
+            if (result.items.isNotEmpty()) return@withContext result
+            // Same fallback the real download makes (DownloadWorker): Instaloader coming back
+            // empty hands the link to the classic engines. Its own error is kept only if they
+            // fail too — it's usually the clearer explanation for an Instagram post.
+            val classic = listClassic(context, url)
+            return@withContext if (classic.items.isEmpty() && result.errorMessage != null) result else classic
+        }
+        listClassic(context, url)
+    }
+
+    private suspend fun listClassic(context: Context, url: String): ListingResult =
         when (VideoSiteRouter.classify(url)) {
             // Video-only sources (Reels, YouTube, ...) skip gallery-dl's listing entirely, same as
             // the real download does — gallery-dl either can't parse them at all, or (Instagram
@@ -208,6 +221,33 @@ object GalleryDlListing {
                     }
                 }
             }
+            // Never produced by classify() — only by resolveEngine(), handled in listItems().
+            DownloadEngine.INSTALOADER -> ListingResult(emptyList())
+        }
+
+    /** instaloader_wrapper.py's `list` prints one line of JSON in gallery-dl's own --dump-json
+     * shape (see that file's doc comment), so the existing gallery-dl parser reads it unchanged —
+     * same item numbering, same video detection by extension, same [-1, {...}] error entry. */
+    private suspend fun listViaInstaloader(context: Context, url: String): ListingResult {
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
+        try {
+            val lines = mutableListOf<String>()
+            val lastLine = runCatching {
+                PythonRuntime.run(
+                    context, "instaloader_wrapper.py",
+                    listOf(
+                        "list", url, cookiesArg,
+                        GalleryDlPreferences.getEffectiveProxyUrl(context),
+                        GalleryDlPreferences.getEffectiveSocketTimeoutSeconds(context),
+                    ),
+                ) { line -> lines.add(line) }
+                // Last non-blank line only, same reasoning as runYtDlpListInfo: anything the
+                // interpreter printed to stderr first (merged into this stream) isn't the JSON.
+                lines.lastOrNull { it.isNotBlank() }
+            }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return ListingResult(emptyList())
+            return parseGalleryDlItems(lastLine, url)
+        } finally {
+            tempCookieFile?.delete()
         }
     }
 
@@ -458,7 +498,11 @@ object GalleryDlListing {
         // own numbering of the same post, so deselecting a video risked telling gallery-dl's real
         // --filter to keep/drop the wrong items entirely (reproduced live: missing photo thumbnails
         // is what surfaced this). See fetchGalleryDlPreviewInfo's own doc comment for the rest.
-        if (VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL) {
+        // Instaloader-routed Instagram posts too: their checklist numbering is the same 1-based
+        // carousel order gallery-dl uses, and listItems() already handles their fallback.
+        if (VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL ||
+            VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER
+        ) {
             return@withContext fetchGalleryDlPreviewInfo(context, url)
         }
         val json = when (VideoSiteRouter.classify(url)) {
