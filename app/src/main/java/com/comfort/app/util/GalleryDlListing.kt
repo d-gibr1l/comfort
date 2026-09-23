@@ -143,6 +143,33 @@ object GalleryDlListing {
         return tempFile.absolutePath to tempFile
     }
 
+    /** Deletes per-run cookie copies left in cacheDir by runs that never reached their `finally`:
+     * the listing copies above and DownloadWorker's `cookies-normalized-<id>.txt`. Both are
+     * deleted in a `finally` normally, but not when the app process is killed mid-run (swiped
+     * away, killed in the background, reinstalled) — dozens had built up. They hold live session
+     * tokens, so they shouldn't outlive their run. Anything older than an hour goes, except a
+     * download copy whose download is still RUNNING (a long download legitimately keeps its own).
+     * Never reads the files. Called once per launch. */
+    suspend fun sweepStaleCookieCopies(context: Context) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - 60 * 60 * 1000L
+        val stale = context.cacheDir.listFiles { f ->
+            f.isFile && f.lastModified() < cutoff &&
+                (f.name.startsWith("cookies-listing-filtered-") || f.name.startsWith("cookies-normalized-")) &&
+                f.name.endsWith(".txt")
+        } ?: return@withContext
+        if (stale.isEmpty()) return@withContext
+        val dao = com.comfort.app.data.AppDatabase.getDatabase(context).downloadDao()
+        var deleted = 0
+        for (file in stale) {
+            if (file.name.startsWith("cookies-normalized-")) {
+                val downloadId = file.name.removePrefix("cookies-normalized-").removeSuffix(".txt")
+                if (dao.getById(downloadId)?.status == com.comfort.app.data.DownloadStatus.RUNNING) continue
+            }
+            if (file.delete()) deleted++
+        }
+        android.util.Log.i("GalleryDlListing", "deleted $deleted stale cookie copies")
+    }
+
     /** Where a preview's full yt-dlp extraction for [url] is saved (yt_dlp_wrapper.py list_info's
      * info_cache_path) and where the real download looks for it (download()'s info_json_path) —
      * so tapping Download on a loaded preview doesn't extract the whole thing again. One file per
@@ -287,9 +314,9 @@ object GalleryDlListing {
     }
 
     private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
-        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
 
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         try {
             // list_items() only ever prints once (see gallery_dl_wrapper.py's __main__), but that one
             // print can itself contain embedded newlines (the JSON text, plus the warnings marker) -
@@ -456,10 +483,10 @@ object GalleryDlListing {
     }
 
     private suspend fun runSpotifyListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
 
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         try {
             val lines = mutableListOf<String>()
             val lastLine = runCatching {
@@ -631,7 +658,6 @@ object GalleryDlListing {
     }
 
     private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         val extraArgs = GalleryDlPreferences.getExtraArgs(context)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
@@ -649,6 +675,7 @@ object GalleryDlListing {
         val impersonateArg = if (GalleryDlPreferences.isImpersonateEnabled(context)) "1" else "0"
 
 
+        val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         try {
             // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
             // prints (see yt_dlp_wrapper.py) - but PythonRuntime.run() merges the subprocess's stderr
