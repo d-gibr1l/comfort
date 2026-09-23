@@ -138,6 +138,9 @@ class MainActivity : ComponentActivity() {
         // Same idea, for QUEUED/SCHEDULED rows — see repairOrphanedQueue's own doc comment for
         // why this needed a startup call too, not just its existing reactive ones.
         DownloadDispatcher.repairOrphanedQueue(context)
+        // After the repairs above, so a download a dead process left "RUNNING" no longer protects
+        // its cookie copy from the sweep.
+        com.comfort.app.util.GalleryDlListing.sweepStaleCookieCopies(context)
       }
 
       // (Re)applies the "Clean-up leftover downloads" interval every cold start — a
