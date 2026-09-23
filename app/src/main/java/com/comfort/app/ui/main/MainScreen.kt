@@ -250,10 +250,21 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         }
         // Opening the Queue plays the push, the mirror of its back (see animateEnter).
         val openQueue = { if (!showQueueScreen) queueBack.animateEnter { showQueueScreen = true } }
+        // The tab being left during a switch between two tabs (Library <-> Settings): kept on
+        // screen as the page behind, so it slides out like any page does. Without it the old tab
+        // vanished at once and the screen was empty for ~80ms before the new one came in (Home,
+        // the usual page behind, is hidden while another tab is up). Cleared when the switch ends.
+        var outgoingTab by remember { mutableStateOf<Int?>(null) }
         // Everything under the Queue (Home + the current tab) — it's what closing the Queue
         // reveals, so it trails/fades in as one layer (see predictiveBackBehind).
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
-        Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(tabBack, active = selectedTab != 0)) {
+        Box(
+            modifier = Modifier.fillMaxSize().then(
+                // Between two tabs Home stays hidden; the outgoing tab is the page behind instead.
+                if (outgoingTab != null) Modifier.graphicsLayer { alpha = 0f }
+                else Modifier.predictiveBackBehind(tabBack, active = selectedTab != 0)
+            )
+        ) {
             HomeScreen(
                 onConfigure = { url -> routingUrl = url },
                 viewModel = viewModel,
@@ -262,20 +273,30 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             )
         }
 
-        // Only the non-Home tabs, on top of the Home above (see its comment).
-        if (selectedTab != 0) Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(tabBack)) {
-            when (selectedTab) {
-                1 -> DownloadsHistoryScreen(
-                    viewModel = viewModel,
-                    onOpenQueue = openQueue,
-                    isQueueOpen = showQueueScreen,
-                    snackbarHostState = librarySnackbarHostState,
+        // Only the non-Home tabs, on top of the Home above (see its comment) — plus, during a
+        // tab-to-tab switch, the tab being left, underneath the new one. Keyed per tab so the
+        // outgoing tab keeps its composed instance (rebuilding it would stall the frame).
+        val shownTabs = listOfNotNull(outgoingTab, selectedTab.takeIf { it != 0 }).distinct()
+        for (tab in shownTabs) key(tab) {
+            Box(
+                modifier = Modifier.fillMaxSize().then(
+                    if (tab == selectedTab) Modifier.predictiveBackReveal(tabBack)
+                    else Modifier.predictiveBackBehind(tabBack, active = true)
                 )
-                2 -> MoreScreen(
-                    route = settingsRoute,
-                    highlightKey = settingsHighlightKey,
-                    onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
-                )
+            ) {
+                when (tab) {
+                    1 -> DownloadsHistoryScreen(
+                        viewModel = viewModel,
+                        onOpenQueue = openQueue,
+                        isQueueOpen = showQueueScreen,
+                        snackbarHostState = librarySnackbarHostState,
+                    )
+                    2 -> MoreScreen(
+                        route = settingsRoute,
+                        highlightKey = settingsHighlightKey,
+                        onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
+                    )
+                }
             }
         }
         }
@@ -300,9 +321,16 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     index == selectedTab -> Unit
                     // Home is the page every other tab sits on: going there is a back.
                     index == 0 -> tabBack.animateBack()
-                    // Another tab opens with the push. Coming from Home, Home slides away behind
-                    // it; between two tabs Home is already hidden, so only the new tab moves.
-                    else -> tabBack.animateEnter(behindVisible = selectedTab == 0) { selectedTab = index }
+                    // Another tab opens with the push, the page it covers sliding away behind it:
+                    // Home, or when switching between two tabs, the tab being left (outgoingTab).
+                    selectedTab == 0 -> tabBack.animateEnter { selectedTab = index }
+                    else -> {
+                        val leaving = selectedTab
+                        tabBack.animateEnter(onFinished = { outgoingTab = null }) {
+                            outgoingTab = leaving
+                            selectedTab = index
+                        }
+                    }
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter),

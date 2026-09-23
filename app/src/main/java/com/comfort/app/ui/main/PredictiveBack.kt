@@ -11,6 +11,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -71,9 +72,10 @@ class BackRevealState internal constructor(
      * set, in the same frame, so the page never shows for a frame at rest first.
      * [behindVisible] is false when the page behind is already hidden (switching between two
      * pages that both sit on top of it, e.g. Library to Settings), so only the new page moves. */
-    fun animateEnter(behindVisible: Boolean = true, change: () -> Unit) {
+    fun animateEnter(behindVisible: Boolean = true, onFinished: () -> Unit = {}, change: () -> Unit) {
         if (finishing) {
             change()
+            onFinished()
             return
         }
         finishing = true
@@ -85,6 +87,13 @@ class BackRevealState internal constructor(
                 behindAlpha.snapTo(if (behindVisible) 1f else 0f)
                 shadow.snapTo(0f)
                 change()
+                // The new page's first frame is a long one (it's composed from scratch — Settings
+                // took ~70ms on-device), and an animation started now would spend its first
+                // ~150ms of 200 inside it: recorded live, the page jumped in over ~3 frames. So
+                // wait out that frame, and start the clock on the first normal one after it. The
+                // page sits at the start values (invisible, to the right) meanwhile.
+                withFrameNanos { }
+                withFrameNanos { }
                 val spec = tween<Float>(ENTER_MS, easing = ACCELERATE_DECELERATE)
                 coroutineScope {
                     launch { frontX.animateTo(0f, spec) }
@@ -94,6 +103,7 @@ class BackRevealState internal constructor(
                 }
             } finally {
                 finishing = false
+                onFinished()
             }
         }
     }
