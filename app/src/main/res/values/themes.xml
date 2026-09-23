@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <style name="Theme.GalleryDL" parent="android:Theme.Material.Light.NoActionBar" />
 
@@ -13,6 +13,11 @@
         <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_logo</item>
         <item name="windowSplashScreenAnimationDuration">700</item>
         <item name="postSplashScreenTheme">@style/Theme.GalleryDL</item>
+        <!-- Without this, the system picks icon vs. icon-less (solid color) splash from who first
+             launched the activity record — so reopening from Recents after the process was killed
+             showed just the background color whenever the app had last been opened by anything
+             other than the launcher (a notification, the share sheet, adb). Always use the icon. -->
+        <item name="android:windowSplashScreenBehavior" tools:targetApi="33">icon_preferred</item>
     </style>
 
     <!-- Used only by ShareActivity: a fullscreen but see-through window so the app it was
