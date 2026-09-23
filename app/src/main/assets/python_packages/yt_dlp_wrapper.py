@@ -9,6 +9,8 @@ from yt_dlp.postprocessor.common import PostProcessor
 from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
+import net_resilience
+net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 # curl_cffi is the only impersonate backend this bundled yt-dlp ships with (see
 # PythonRuntime.kt's own comment on where it comes from) — and it's only bundled for the

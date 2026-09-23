@@ -52,7 +52,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "98"
+    private const val PROVISION_VERSION = "100"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -123,7 +123,7 @@ object PythonRuntime {
         // go through Android's system trust store transparently), so every aria2c-downloaded
         // HTTPS URL failed with "SSL/TLS handshake failure: not signed by known authorities"
         // until yt_dlp_wrapper.py started passing --ca-certificate=<this file> explicitly.
-        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py", "cacert.pem")) {
+        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py", SERVER_SCRIPT, "net_resilience.py", "cacert.pem")) {
             context.assets.open("python_packages/$name").use { input ->
                 File(root, name).outputStream().use { input.copyTo(it) }
             }
@@ -154,8 +154,173 @@ object PythonRuntime {
             kotlinx.coroutines.delay(4_000)
             if (!ensureProvisioned(appContext)) return@launch
             val marker = File(runtimeRoot(appContext), PRECOMPILE_MARKER)
-            if (runCatching { marker.readText() }.getOrNull() == PROVISION_VERSION) return@launch
-            if (precompile(appContext, sitePackagesDir(appContext))) marker.writeText(PROVISION_VERSION)
+            if (runCatching { marker.readText() }.getOrNull() != PROVISION_VERSION &&
+                precompile(appContext, sitePackagesDir(appContext))) {
+                marker.writeText(PROVISION_VERSION)
+            }
+            // After compiling, so the server imports from .pyc instead of compiling in memory.
+            startServer(appContext)
+        }
+    }
+
+    // ---- Fork server (assets/python_packages/py_server.py) -------------------------------------
+    // One long-lived interpreter with yt-dlp/gallery-dl/Instaloader already imported; each job is a
+    // fork() of it. Measured on-device: a yt-dlp probe job went from ~550ms (2s+ cold) as its own
+    // interpreter to ~100ms. Jobs are still separate processes, exactly as isolated as before; the
+    // server is only an optimisation: whenever it isn't up (still starting, idled out after 10 min,
+    // killed, or just restarted by an engine update), run() spawns the interpreter directly.
+
+    // Off for now. It was switched off over stalled downloads, but an in-app A/B test (same requests
+    // run directly, forked, directly again) showed the direct runs stalling just the same: the
+    // cause was the network dropping connections (see net_resilience.py), not the fork. Cancel
+    // was also confirmed to kill a forked job together with its child process.
+    private const val USE_FORK_SERVER = false
+    private const val SERVER_SCRIPT = "py_server.py"
+    private const val SERVER_SOCKET = "pyserver.sock"
+    private const val CONTROL = '\u0001'
+
+    @Volatile private var server: Process? = null
+    private val serverStarting = java.util.concurrent.atomic.AtomicBoolean(false)
+    // So a server that can't start (a broken engine update, say) isn't retried alongside every job.
+    @Volatile private var serverFailedAt = 0L
+
+    /** Starts the fork server unless it's already running or starting. Returns once it's ready (or
+     * has failed to start). */
+    private suspend fun startServer(context: Context) {
+        if (!USE_FORK_SERVER) return
+        if (server?.isAlive == true || System.currentTimeMillis() - serverFailedAt < 5 * 60_000) return
+        if (!serverStarting.compareAndSet(false, true)) return
+        serverFailedAt = System.currentTimeMillis() // cleared below once it's ready
+        try {
+            if (!ensureProvisioned(context)) return
+            val root = runtimeRoot(context)
+            val process = pythonProcess(
+                context,
+                listOf(File(root, SERVER_SCRIPT).absolutePath, File(root, SERVER_SOCKET).absolutePath),
+            ).start()
+            // stdin is deliberately left open: the server exits when it closes, i.e. when this app
+            // process dies, so it can never outlive the app (or serve a newer version of it).
+            val started = System.currentTimeMillis()
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val ready = withContext(Dispatchers.IO) {
+                var line = reader.readLine()
+                while (line != null && line != "${CONTROL}ready") line = reader.readLine()
+                line != null
+            }
+            if (!ready) {
+                android.util.Log.w("PythonRuntime", "fork server exited before becoming ready")
+                return
+            }
+            server = process
+            serverFailedAt = 0L
+            android.util.Log.i("PythonRuntime", "fork server ready in ${System.currentTimeMillis() - started}ms")
+            // Drain anything else it prints (warnings) so its pipe never fills, and forget it once
+            // it exits (idle timeout, killed).
+            backgroundScope.launch {
+                runCatching { reader.use { while (it.readLine() != null) Unit } }
+                if (server === process) server = null
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PythonRuntime", "fork server failed to start", e)
+        } finally {
+            serverStarting.set(false)
+        }
+    }
+
+    /** Stops the fork server so the next job starts a fresh one. EngineUpdater calls this after
+     * replacing an engine, whose old version the server still has in memory. Running jobs are
+     * separate processes and are unaffected. */
+    fun restartServer() {
+        server?.destroy()
+        server = null
+        serverFailedAt = 0L
+    }
+
+    private fun pythonProcess(context: Context, args: List<String>): ProcessBuilder {
+        val nativeLibDir = helperNativeLibDir(context)
+            ?: error("App nativeLibraryDir not found (this should never happen)")
+        val root = runtimeRoot(context)
+        return ProcessBuilder(listOf(File(nativeLibDir, "libpython.so").absolutePath) + args)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["PYTHONHOME"] = File(root, "usr").absolutePath
+                environment()["LD_LIBRARY_PATH"] = File(root, "usr/lib").absolutePath
+                environment()["PYTHONPATH"] = sitePackagesDir(context).absolutePath
+            }
+    }
+
+    /** Runs a job through the fork server. Null if the server couldn't take it (nothing ran), in
+     * which case the caller runs it directly instead. */
+    private suspend fun runViaServer(
+        context: Context,
+        script: String,
+        args: List<String>,
+        onLine: suspend (String) -> Unit,
+    ): Int? = withContext(Dispatchers.IO) {
+        val socket = android.net.LocalSocket()
+        try {
+            try {
+                socket.connect(
+                    android.net.LocalSocketAddress(
+                        File(runtimeRoot(context), SERVER_SOCKET).absolutePath,
+                        android.net.LocalSocketAddress.Namespace.FILESYSTEM,
+                    )
+                )
+                val request = org.json.JSONObject()
+                    .put("script", script)
+                    .put("args", org.json.JSONArray(args))
+                socket.outputStream.write("$request\n".toByteArray())
+                socket.outputStream.flush()
+            } catch (e: java.io.IOException) {
+                return@withContext null
+            }
+            val reader = BufferedReader(InputStreamReader(socket.inputStream))
+            val pid = runCatching { reader.readLine() }.getOrNull()
+                ?.takeIf { it.startsWith("${CONTROL}pid ") }
+                ?.substringAfter(' ')?.toIntOrNull()
+                ?: return@withContext null
+
+            // From here on the job is running: its result is final, never retried directly.
+            var exitCode: Int? = null
+            val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+            coroutineScope {
+                // Same reason as run()'s killer below: the read loop blocks without suspending. The
+                // job runs in its own process group (py_server.py), so this also takes down any
+                // ffmpeg/aria2c it started.
+                val killer = launch {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        if (!finished.get()) {
+                            runCatching { Os.kill(-pid, android.system.OsConstants.SIGKILL) }
+                            runCatching { Os.kill(pid, android.system.OsConstants.SIGKILL) }
+                        }
+                        runCatching { socket.close() }
+                    }
+                }
+                try {
+                    var line = reader.readLine()
+                    while (line != null) {
+                        if (line.startsWith("${CONTROL}exit ")) {
+                            exitCode = line.substringAfter(' ').toIntOrNull()
+                        } else {
+                            onLine(line)
+                        }
+                        line = reader.readLine()
+                    }
+                } catch (e: java.io.IOException) {
+                    // The socket was closed under us by the killer (cancellation, rethrown below).
+                } finally {
+                    finished.set(true)
+                }
+                killer.cancel()
+            }
+            android.util.Log.d("PythonRuntime", "$script ${args.firstOrNull()} via fork server: exit=$exitCode")
+            // No exit line: the job was killed or crashed natively. Same as a direct run killed
+            // by a signal — a nonzero code, which every caller already treats as a failure.
+            exitCode ?: 137
+        } finally {
+            runCatching { socket.close() }
         }
     }
 
@@ -265,25 +430,27 @@ object PythonRuntime {
         args: List<String>,
         onLine: suspend (String) -> Unit,
     ): Int = withContext(Dispatchers.IO) {
-        val nativeLibDir = helperNativeLibDir(context)
-            ?: error("App nativeLibraryDir not found (this should never happen)")
         if (!ensureProvisioned(context)) {
             error("Failed to provision the Python runtime")
         }
-        val root = runtimeRoot(context)
-        val interpreter = File(nativeLibDir, "libpython.so")
-        val scriptFile = File(root, script)
+        if (USE_FORK_SERVER && server?.isAlive == true) {
+            runViaServer(context, script, args, onLine)?.let { return@withContext it }
+            restartServer() // it didn't take the job; start over below
+        }
+        // Not up: bring it up for the next job, but don't make this one wait for it.
+        backgroundScope.launch { startServer(context.applicationContext) }
+        runDirect(context, script, args, onLine)
+    }
 
-        val command = mutableListOf(interpreter.absolutePath, scriptFile.absolutePath).apply { addAll(args) }
-
-        val process = ProcessBuilder(command)
-            .redirectErrorStream(true)
-            .apply {
-                environment()["PYTHONHOME"] = File(root, "usr").absolutePath
-                environment()["LD_LIBRARY_PATH"] = File(root, "usr/lib").absolutePath
-                environment()["PYTHONPATH"] = sitePackagesDir(context).absolutePath
-            }
-            .start()
+    /** One job as its own fresh interpreter process. */
+    private suspend fun runDirect(
+        context: Context,
+        script: String,
+        args: List<String>,
+        onLine: suspend (String) -> Unit,
+    ): Int = withContext(Dispatchers.IO) {
+        val scriptFile = File(runtimeRoot(context), script)
+        val process = pythonProcess(context, listOf(scriptFile.absolutePath) + args).start()
 
         try {
             var exitCode = 0
