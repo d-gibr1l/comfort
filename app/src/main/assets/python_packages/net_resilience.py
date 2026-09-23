@@ -11,9 +11,15 @@ attempts on fresh sockets within the caller's own timeout. Call install() once, 
 engines are imported.
 
 Measured on that network, 10 fresh connections each through requests: 233s and 293s stock (single
-connects hanging 20-62s), 73s and 4.8s with this. curl_cffi (yt-dlp's impersonation path) is left
-alone: libcurl already splits its connect timeout across addresses and races IPv4 against IPv6
-(its stalls were 10-19s, not 20-62s), and shortening its attempts too made one request fail.
+connects hanging 20-62s), 73s and 4.8s with this.
+
+curl_cffi (yt-dlp's path when impersonation is on) gets the same treatment with longer attempts
+(4s, 6s, 8s): libcurl already splits each attempt across a host's addresses, and 3s attempts made
+a request fail in a first try. Measured with requests alternating stock/fixed so both saw the
+same network, 25 each, twice: 87.1s vs 57.9s total (worst 13.7s vs 8.2s), then 17.8s vs 9.7s
+(worst 5.4s vs 0.9s), no failures either way. For a download (stream=True) its stall limit is
+also brought back to yt-dlp's own timeout: curl_cffi turns yt-dlp's (timeout, timeout) into a
+40s no-data limit (connect + read), so a connection that died mid-file sat 40s before a retry.
 """
 import socket
 import time
@@ -21,6 +27,8 @@ import time
 # Per-attempt connect timeouts in seconds; the last one repeats. A good connect took <1s on the
 # bad network and ~2.5s at worst, so a 3s attempt only gives up on a connection that isn't coming.
 _ATTEMPT_TIMEOUTS = (3.0, 4.0, 6.0)
+# curl_cffi's attempts: longer, since libcurl divides each one between a host's addresses.
+_CURL_ATTEMPT_TIMEOUTS = (4.0, 6.0, 8.0)
 # Upper bound when the caller asked for no timeout at all.
 _NO_TIMEOUT_BUDGET = 60.0
 
@@ -128,6 +136,41 @@ def _patch_yt_dlp():
             module.create_connection = create_connection
 
 
+def _patch_curl_cffi():
+    import sys
+    if "curl_cffi.requests" not in sys.modules:
+        return  # not loaded in this job (only yt-dlp's impersonation uses it)
+    from curl_cffi.requests import Session
+
+    original = Session.request
+
+    def request(self, *args, **kwargs):
+        timeout = kwargs.get("timeout")
+        # yt-dlp always passes (connect, read); anything else is left exactly as it was.
+        if not (isinstance(timeout, tuple) and len(timeout) == 2 and timeout[0] and timeout[1]):
+            return original(self, *args, **kwargs)
+        connect_budget, read = timeout
+        # curl_cffi's no-data limit is connect + read. For a download keep it at yt-dlp's read
+        # timeout; for other requests (a total-time limit there) keep curl_cffi's own sum.
+        stall_limit = read if kwargs.get("stream") else connect_budget + read
+        deadline = time.monotonic() + connect_budget
+        attempt = 0
+        while True:
+            remaining = deadline - time.monotonic()
+            attempt_timeout = min(_CURL_ATTEMPT_TIMEOUTS[min(attempt, len(_CURL_ATTEMPT_TIMEOUTS) - 1)], max(remaining, 0.5))
+            kwargs["timeout"] = (attempt_timeout, max(stall_limit - attempt_timeout, 1.0))
+            try:
+                return original(self, *args, **kwargs)
+            except Exception as e:  # noqa: BLE001
+                # Only a connect that got no answer; "refused"/"unreachable" won't change on retry.
+                stalled_connect = getattr(e, "code", None) == 28 and "Connection timed out" in str(e)
+                if not stalled_connect or time.monotonic() >= deadline:
+                    raise
+            attempt += 1
+
+    Session.request = request
+
+
 _installed = False
 
 
@@ -136,7 +179,7 @@ def install():
     if _installed:
         return
     _installed = True
-    for patch in (_patch_stdlib, _patch_urllib3, _patch_yt_dlp):
+    for patch in (_patch_stdlib, _patch_urllib3, _patch_yt_dlp, _patch_curl_cffi):
         try:
             patch()
         except Exception:  # noqa: BLE001
