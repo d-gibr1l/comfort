@@ -25,6 +25,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -410,6 +411,13 @@ class DownloadWorker(
                 // constraint (unlike Chaquopy's old synchronous callback), so every DB write below
                 // is a direct, awaited suspend call instead of a fire-and-launch job collected into
                 // a separate list and joined afterward.
+                // When data last arrived, and when the engine itself last reported progress (only
+                // yt-dlp does) — see the transfer monitor around the engine run below.
+                val lastDataAt = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
+                val lastProgressLineAt = java.util.concurrent.atomic.AtomicLong(0L)
+                // That monitor's measured speed (MB/s), so a file landing doesn't overwrite it with a
+                // whole-download average.
+                val measuredSpeedMbs = java.util.concurrent.atomic.AtomicReference(0f)
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     android.util.Log.d("DownloadEngine", "Python output: $line")
 
@@ -479,6 +487,8 @@ class DownloadWorker(
                             val downloaded = Regex("downloaded=(\\d+)").find(rest)?.groupValues?.get(1)?.toLongOrNull()
                             val speedBps = Regex("speed=([\\d.]+)").find(rest)?.groupValues?.get(1)?.toFloatOrNull()
                             if (downloaded != null) {
+                                lastDataAt.set(System.currentTimeMillis())
+                                lastProgressLineAt.set(System.currentTimeMillis())
                                 val speedMbs = (speedBps ?: 0f) / (1024f * 1024f)
                                 dao.updateLiveBytes(downloadId, downloaded, speedMbs)
                                 currentFileBytesRef.set(downloaded)
@@ -646,6 +656,7 @@ class DownloadWorker(
                                         applicationContext, candidate, forceAudioMime = isAudioFile,
                                     )
                                     if (savedUri != null) {
+                                        lastDataAt.set(System.currentTimeMillis())
                                         candidate.delete()
                                         val count = savedCount.incrementAndGet()
                                         val totalBytes = bytesSoFar.addAndGet(fileSize)
@@ -655,7 +666,8 @@ class DownloadWorker(
                                         // everything the previous file already contributed.
                                         currentFileBytesRef.set(0)
                                         val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
-                                        val speedMbs = (totalBytes / (1024f * 1024f)) / elapsedSeconds
+                                        val speedMbs = measuredSpeedMbs.get().takeIf { it > 0f }
+                                            ?: ((totalBytes / (1024f * 1024f)) / elapsedSeconds)
                                         dao.updateLiveProgress(downloadId, count, speedMbs)
                                         // savedUri (the audio file's own content Uri) has no frame
                                         // Coil can decode as an image, unlike video — pull the
@@ -1042,14 +1054,72 @@ class DownloadWorker(
                     }
                 }
 
-                if (engine == DownloadEngine.INSTALOADER) {
-                    runInstaloader()
-                    // Nothing saved (private post, rate limit, Instagram changed something, ...):
-                    // hand the same link to the classic path. Its own error only shows if that
-                    // fails too — lastErrorLine is first-wins, so Instaloader's reason is kept.
-                    if (!isStopped && savedCount.get() == 0) runClassic(VideoSiteRouter.classify(url))
-                } else {
-                    runClassic(engine)
+                // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl
+                // and Instaloader only announce a file once it's complete, so their speed used to
+                // change only between files, and sat on the last number through a stall (e.g.
+                // "167 KB/s" for 2 minutes). All three write in-progress files into the staging
+                // folder, so the bytes arriving there (plus the files already saved out of it) are
+                // the real transfer — measured once a second, smoothed, and zeroed when nothing
+                // has arrived for STALL_AFTER_MS. Once an engine reports progress itself (yt-dlp),
+                // only the stall check applies: measuring its folder would count its ffmpeg merge
+                // output as download speed.
+                kotlinx.coroutines.coroutineScope {
+                    val stallWatchdog = launch {
+                        var previousTotal = -1L
+                        var previousAt = 0L
+                        var smoothed = 0f
+                        var zeroed = false
+                        while (true) {
+                            kotlinx.coroutines.delay(1_000)
+                            val now = System.currentTimeMillis()
+                            val staged = runCatching {
+                                stagingDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                            }.getOrDefault(0L)
+                            val total = bytesSoFar.get() + staged
+                            if (previousTotal >= 0 && total > previousTotal) lastDataAt.set(now)
+                            val engineReporting = lastProgressLineAt.get() > 0L
+                            if (previousTotal >= 0 && !engineReporting) {
+                                val seconds = ((now - previousAt) / 1000f).coerceAtLeast(0.2f)
+                                // A saved file leaves staging a moment before bytesSoFar counts it,
+                                // which reads as a dip; never negative.
+                                val instant = ((total - previousTotal).coerceAtLeast(0L) / (1024f * 1024f)) / seconds
+                                smoothed = if (smoothed == 0f) instant else smoothed * 0.6f + instant * 0.4f
+                                if (now - lastDataAt.get() > STALL_AFTER_MS) {
+                                    smoothed = 0f
+                                    measuredSpeedMbs.set(0f)
+                                    if (!zeroed) dao.resetSpeed(downloadId)
+                                    zeroed = true
+                                } else if (smoothed > 0f) {
+                                    zeroed = false
+                                    measuredSpeedMbs.set(smoothed)
+                                    dao.updateSpeed(downloadId, smoothed)
+                                    DownloadNotifications.updateProgress(
+                                        applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
+                                        speedMbs = smoothed, currentBytes = total, expectedBytes = expectedBytesRef.get(),
+                                    )
+                                }
+                            } else if (engineReporting) {
+                                val stalled = now - lastDataAt.get() > STALL_AFTER_MS
+                                if (stalled && !zeroed) dao.resetSpeed(downloadId)
+                                zeroed = stalled
+                            }
+                            previousTotal = total
+                            previousAt = now
+                        }
+                    }
+                    try {
+                        if (engine == DownloadEngine.INSTALOADER) {
+                            runInstaloader()
+                            // Nothing saved (private post, rate limit, Instagram changed something, ...):
+                            // hand the same link to the classic path. Its own error only shows if that
+                            // fails too — lastErrorLine is first-wins, so Instaloader's reason is kept.
+                            if (!isStopped && savedCount.get() == 0) runClassic(VideoSiteRouter.classify(url))
+                        } else {
+                            runClassic(engine)
+                        }
+                    } finally {
+                        stallWatchdog.cancel()
+                    }
                 }
 
                 if (writeInfoFiles || saveThumbnail || saveSubtitleFiles) {
@@ -1229,3 +1299,6 @@ private val GALLERY_DL_NO_RESULTS_LINE = Regex("^\\[[\\w.]+\\]\\[info\\] No resu
 // picker never set one at all) just yields an empty string, same as any other unset arg here.
 private val ITEM_FILTER_NUMS_RE = Regex("""\{([\d,]+)\}""")
 
+
+/** No data for this long counts as stalled; see the stall watchdog in doWork(). */
+private const val STALL_AFTER_MS = 6_000L

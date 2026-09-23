@@ -106,8 +106,11 @@ def _new_loader(session_cookies, proxy_url, timeout_seconds):
         quiet=True,
         download_pictures=False, download_videos=False, download_video_thumbnails=False,
         save_metadata=False, compress_json=False,
-        max_connection_attempts=2,
-        request_timeout=float(timeout_seconds) if timeout_seconds else 60.0,
+        # 20s of silence (yt-dlp's default too) already means a dead connection; 60s here showed
+        # up as a download frozen for 2 minutes (a stalled read, then a retry that stalled too).
+        # One more attempt instead, each on a fresh connection.
+        max_connection_attempts=3,
+        request_timeout=float(timeout_seconds) if timeout_seconds else 20.0,
         rate_controller=lambda ctx: _FailFastRateController(ctx),
     )
     if session_cookies and session_cookies.get("sessionid"):
