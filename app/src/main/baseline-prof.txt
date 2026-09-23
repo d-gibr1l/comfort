@@ -1,0 +1,11 @@
+# Baseline profile: tells ART to AOT-compile these at install time instead of interpreting them
+# on first use. Measured on the benchmark build (release, R8), Library scroll right after a cold
+# start: 1.3-2.2% janky frames / p99 24-27ms / 2-9 slow UI-thread frames as installed, vs
+# 0.3-0.8% / 19ms / 0 fully precompiled. Compose, Material 3, WorkManager etc. ship their own
+# profiles; this covers the app's own code (all of it — small enough that precompiling everything
+# is cheap) and Coil, which drives every thumbnail. AGP rewrites these names through R8, and
+# androidx.profileinstaller (already a transitive dependency) applies it for sideloaded installs.
+HSPLcom/comfort/app/**->**(**)**
+Lcom/comfort/app/**;
+HSPLcoil/**->**(**)**
+Lcoil/**;
