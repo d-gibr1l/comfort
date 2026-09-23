@@ -424,7 +424,7 @@ fun QueueScreen(
                 if (!selectionMode) {
                     SettingsSubPageHeader(
                         title = "Queue",
-                        topicIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_video_frame_save),
+                        topicIcon = Icons.Outlined.DownloadForOffline,
                         onBack = onBack,
                         topPadding = headerState.topPadding,
                         bottomPadding = headerState.bottomPadding,
@@ -705,7 +705,7 @@ private fun StoppedRow(
             SelectableThumbnail(
                 selectionMode = selectionMode,
                 selected = selected,
-                modifier = Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.size(76.dp).clip(thumbnailShape()).background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 if (hasThumbnail) {
                     QueueThumbnail(item = item, modifier = Modifier.fillMaxSize())
@@ -853,7 +853,7 @@ fun QueueItemCard(
                 SelectableThumbnail(
                     selectionMode = selectionMode,
                     selected = selected,
-                    modifier = Modifier.size(40.dp).clip(MaterialTheme.shapes.small).background(
+                    modifier = Modifier.size(40.dp).clip(thumbnailShape()).background(
                         if (isErrored) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
                     ),
                 ) {

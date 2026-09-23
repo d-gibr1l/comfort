@@ -581,12 +581,14 @@ fun DownloadsHistoryScreen(
                         // appeared, same as QueueScreen.kt's own reduced-motion fix.
                         enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
                         exit = ExitTransition.None,
-                        modifier = Modifier.animateItem(),
+                        // Inset rounded cards (same 16dp side margin and 20dp corners as the
+                        // Queue's cards) rather than edge-to-edge rows on one continuous band.
+                        modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
                         if (selectionMode) {
                             row()
                         } else {
-                            SwipeToDeleteCard(onDelete = { requestDelete(setOf(item.id)) }) {
+                            SwipeToDeleteCard(onDelete = { requestDelete(setOf(item.id)) }, shape = LIBRARY_CARD_SHAPE) {
                                 row()
                             }
                         }
@@ -639,7 +641,11 @@ fun DownloadsHistoryScreen(
         // Only once the real header has scrolled away (same threshold the compact bar uses), and
         // never in the static-header branches, whose header can't scroll away at all — the list's
         // scroll state is left over from before switching into them and doesn't mean anything there.
-        val statusBarScrimVisible = !selectionMode && !usingStaticFullHeaderBranch && scrollValuePx >= compactBarThresholdPx
+        // derivedStateOf: scrollValuePx changes on every scrolled pixel, and reading it directly
+        // here made the whole Library screen recompose on every scroll frame (a real source of the
+        // scroll jank reported live). Only the crossing of the threshold matters.
+        val pastHeader by remember { derivedStateOf { scrollValuePx >= compactBarThresholdPx } }
+        val statusBarScrimVisible = !selectionMode && !usingStaticFullHeaderBranch && pastHeader
         val statusBarScrimAlpha by animateFloatAsState(
             targetValue = if (statusBarScrimVisible) 1f else 0f,
             animationSpec = tween(200),
@@ -1131,7 +1137,7 @@ private fun LibraryHeaderActions(
             contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
         )
     }
-    val queueIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_video_frame_save)
+    val queueIcon = Icons.Outlined.DownloadForOffline
     IconButton(onClick = onOpenQueue) {
         if (hasActiveDownloads) {
             BadgedBox(
@@ -1571,6 +1577,7 @@ private fun HistoryRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(LIBRARY_CARD_SHAPE)
             // "background" is the top-level scaffold/page role, not a role for a row sitting on
             // top of it as its own distinct surface — this row now reads as a real MD3 surface
             // (surfaceContainer, same tone the Queue screen's own cards use) instead of blending
@@ -1608,16 +1615,17 @@ private fun HistoryRow(
                 },
                 onLongClick = onLongPress,
             )
-            // 8dp, not 10dp — MD3's spacing system is built on an 8dp grid.
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            // 8dp, not 10dp — MD3's spacing system is built on an 8dp grid. 12dp sides now that
+            // the card itself is inset 16dp from the screen edge.
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.size(76.dp)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    // shapes.large (16dp) — 14dp was a magic number matching no real shape token.
-                    .clip(MaterialTheme.shapes.large)
+                    // The shared Arch thumbnail shape (Components.kt thumbnailShape).
+                    .clip(thumbnailShape())
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 if (hasThumbnail) {
@@ -1821,3 +1829,6 @@ private fun MetaRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text:
 }
 
 
+
+/** Library list-view card shape — same 20dp corners as the Download Queue's cards. */
+private val LIBRARY_CARD_SHAPE = RoundedCornerShape(20.dp)
