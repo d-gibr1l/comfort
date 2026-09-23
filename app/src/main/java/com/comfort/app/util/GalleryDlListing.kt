@@ -316,7 +316,7 @@ object GalleryDlListing {
     }
 
     private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
-        val extraArgs = GalleryDlPreferences.getExtraArgs(context)
+        val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.GALLERY_DL)
 
         val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         try {
@@ -485,7 +485,7 @@ object GalleryDlListing {
     }
 
     private suspend fun runSpotifyListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val extraArgs = GalleryDlPreferences.getExtraArgs(context)
+        val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.YT_DLP)
         val jsRuntimeArg = QuickJsRuntime.getExecutablePath(context).orEmpty()
 
         val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
@@ -662,7 +662,7 @@ object GalleryDlListing {
     }
 
     private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
-        val extraArgs = GalleryDlPreferences.getExtraArgs(context)
+        val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.YT_DLP)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
         // just returning fewer fields, which was silently sending every one of these listings

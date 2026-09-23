@@ -248,6 +248,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         val queueBack = rememberBackRevealState(enabled = showQueueScreen) {
             showQueueScreen = false
         }
+        // Opening the Queue plays the push, the mirror of its back (see animateEnter).
+        val openQueue = { if (!showQueueScreen) queueBack.animateEnter { showQueueScreen = true } }
         // Everything under the Queue (Home + the current tab) — it's what closing the Queue
         // reveals, so it trails/fades in as one layer (see predictiveBackBehind).
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
@@ -256,7 +258,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 onConfigure = { url -> routingUrl = url },
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
-                onOpenQueue = { showQueueScreen = true },
+                onOpenQueue = openQueue,
             )
         }
 
@@ -265,7 +267,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             when (selectedTab) {
                 1 -> DownloadsHistoryScreen(
                     viewModel = viewModel,
-                    onOpenQueue = { showQueueScreen = true },
+                    onOpenQueue = openQueue,
                     isQueueOpen = showQueueScreen,
                     snackbarHostState = librarySnackbarHostState,
                 )
@@ -286,7 +288,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 when {
                     // Tapping the already-selected Library tab again jumps to the Queue, matching
                     // the "tap again for more" pattern used elsewhere in the app.
-                    index == 1 && selectedTab == 1 -> showQueueScreen = true
+                    index == 1 && selectedTab == 1 -> openQueue()
                     // Tapping the already-selected Settings tab again backs all the way out to the
                     // main Settings list, instead of leaving whatever subpage was open in place —
                     // selectedTab is already 2 here, so a bare `selectedTab = index` wouldn't have
@@ -295,7 +297,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         settingsRoute = SettingsRoute.ROOT
                         settingsHighlightKey = null
                     }
-                    else -> selectedTab = index
+                    index == selectedTab -> Unit
+                    // Home is the page every other tab sits on: going there is a back.
+                    index == 0 -> tabBack.animateBack()
+                    // Another tab opens with the push. Coming from Home, Home slides away behind
+                    // it; between two tabs Home is already hidden, so only the new tab moves.
+                    else -> tabBack.animateEnter(behindVisible = selectedTab == 0) { selectedTab = index }
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -803,20 +810,26 @@ fun HomeScreen(
         }
     }
 
-        clipboardSuggestion?.let { suggestion ->
-            ExtendedFloatingActionButton(
-                onClick = {
-                    url = suggestion
-                    ClipboardSuggestionState.lastHandled = suggestion
+        // Always here now that the card's own Paste button became Configure: reads the clipboard
+        // at tap time (so a link copied after Home opened works too), and says "Paste copied link"
+        // when a fresh link was already spotted on open.
+        ExtendedFloatingActionButton(
+            onClick = {
+                val clipText = clipboardSuggestion ?: clipboardManager.getText()?.text?.trim()
+                if (clipText.isNullOrBlank()) {
+                    android.widget.Toast.makeText(homeContext, "Nothing to paste", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    url = clipText
+                    ClipboardSuggestionState.lastHandled = clipText
                     clipboardSuggestion = null
-                },
-                icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = null) },
-                text = { Text("Paste copied link") },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = navBarClearance(), end = 24.dp),
-            )
-        }
+                }
+            },
+            icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = null) },
+            text = { Text(if (clipboardSuggestion != null) "Paste copied link" else "Paste") },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = navBarClearance(), end = 24.dp),
+        )
     }
 }
 

@@ -52,7 +52,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "101"
+    private const val PROVISION_VERSION = "102"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -170,11 +170,11 @@ object PythonRuntime {
     // server is only an optimisation: whenever it isn't up (still starting, idled out after 10 min,
     // killed, or just restarted by an engine update), run() spawns the interpreter directly.
 
-    // Off for now. It was switched off over stalled downloads, but an in-app A/B test (same requests
-    // run directly, forked, directly again) showed the direct runs stalling just the same: the
-    // cause was the network dropping connections (see net_resilience.py), not the fork. Cancel
-    // was also confirmed to kill a forked job together with its child process.
-    private const val USE_FORK_SERVER = false
+    // Briefly switched off over stalled downloads, but an in-app A/B test (same requests run
+    // directly, forked, directly again) showed the direct runs stalling just the same: the cause
+    // was the network dropping connections (see net_resilience.py), not the fork. Cancel was also
+    // confirmed to kill a forked job together with its child process.
+    private const val USE_FORK_SERVER = true
     private const val SERVER_SCRIPT = "py_server.py"
     private const val SERVER_SOCKET = "pyserver.sock"
     private const val CONTROL = '\u0001'
