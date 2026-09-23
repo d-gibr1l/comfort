@@ -29,10 +29,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -305,35 +311,37 @@ fun QueueScreen(
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
-            } else {
-                TopAppBar(
-                    title = { Text("Download Queue", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
             }
+            // Outside selection mode the header is the Settings-style collapsing overlay drawn
+            // inside the content below, not a Scaffold topBar.
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                // Only the top inset from Scaffold — same reasoning as Library's own Scaffold
-                // (DownloadsHistoryScreen.kt), which this used to differ from. Applying the whole
-                // paddingValues here (including its own bottom inset, auto-reserved to clear the
-                // floatingActionButton) and then ALSO adding navBarClearance() as the LazyColumn's
-                // own bottom contentPadding below double-reserved bottom space — reproduced live:
-                // the last card ended up sitting much further from the Retry All FAB than Library's
-                // own last row sits from its floating nav bar, for no visual reason. The
-                // LazyColumn's own bottom contentPadding is the sole source of bottom clearance now.
-                .padding(top = paddingValues.calculateTopPadding())
-        ) {
+        // Same header concept as the Settings sub-pages (see SettingsSubScaffold): one pinned
+        // overlay — back button above a large icon + title — that collapses into a compact bar
+        // over the first stretch of scroll, hides while scrolling down, reappears on the way back
+        // up, with the content reserving exactly its fully-expanded height. The filter chips ride
+        // inside that overlay, right under the title, so they stay reachable in the compact bar
+        // too — hence the small bottom padding (the chip row brings its own spacing).
+        val listState = rememberLazyListState()
+        val headerState = rememberLazyCollapsingHeaderState(
+            listState,
+            expandedTopPadding = 76.dp,
+            expandedBottomPadding = 0.dp,
+            collapsedBottomPadding = 0.dp,
+        )
+        var maxHeaderHeightPx by remember { mutableStateOf(0) }
+        var selectionHeaderHeightPx by remember { mutableStateOf(0) }
+        // Only the top inset is taken from Scaffold (in selection mode, its TopAppBar, measured
+        // together with the chips under it); bottom clearance comes solely from the LazyColumn's
+        // own contentPadding, since reserving Scaffold's FAB-driven bottom inset as well
+        // double-counted it.
+        val topReserve = with(LocalDensity.current) {
+            (if (selectionMode) selectionHeaderHeightPx else maxHeaderHeightPx).toDp()
+        }
+        // A new tab starts from the top, with the header fully expanded again, rather than
+        // inheriting the previous tab's scroll position (possibly past the new tab's end).
+        LaunchedEffect(selectedFilter) { listState.scrollToItem(0) }
+        Box(modifier = Modifier.fillMaxSize().nestedScroll(headerState.nestedScrollConnection!!)) {
             // better-interface review: this filter row (6 chips: Running/In Queue/Scheduled/
             // Paused/Errored/Cancelled) has the same undiscoverable-overflow problem the Library
             // toolbar row had — nothing on screen hints that "Cancelled" sits off past the visible
@@ -358,6 +366,71 @@ fun QueueScreen(
                     filterListState.animateScrollBy(-filterNudgePx, animationSpec = tween(450))
                 }
             }
+            if (filteredItems.isEmpty()) {
+                // Outside the list, centered in the space actually left below the header (and
+                // above the bottom nav), so it moves down along with the taller header.
+                // Tab-specific copy — "Paste a link on Home to start one" only actually helps on
+                // the tabs that describe genuinely-no-work-at-all (Running/In Queue/Scheduled);
+                // Paused/Errored/Cancelled describe downloads that already went through some other
+                // state, so the same generic line there read as a non sequitur (reported live:
+                // the Paused tab said "No downloads in queue" while Errored/Cancelled next to it
+                // had real counts, which read as those two other tabs error being wrong).
+                val (emptyTitle, emptySubtitle) = when (selectedFilter) {
+                    "Paused" -> "No paused downloads" to "Downloads you pause will show up here."
+                    "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
+                    "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
+                    "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
+                    else -> "No downloads in queue" to "Paste a link on Home to start one."
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = topReserve, bottom = navBarClearance()),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EmptyState(icon = Icons.Outlined.Inbox, title = emptyTitle, subtitle = emptySubtitle)
+                }
+            }
+
+            // The pinned overlay: the Settings-style header plus the filter chips under it, one
+            // unit that collapses and hides/reappears together. In selection mode the header part
+            // gives way to Scaffold's selection TopAppBar, but the chips stay. zIndex keeps it (and
+            // the scrim) drawn above the list declared after it.
+            if (!selectionMode) {
+                StatusBarScrim(
+                    alpha = { 1f - headerState.reveal.fraction },
+                    modifier = Modifier.align(Alignment.TopStart).zIndex(2f),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .zIndex(1f)
+                    .fillMaxWidth()
+                    .then(if (selectionMode) Modifier else Modifier.compactHeaderReveal(headerState.reveal))
+                    .background(MaterialTheme.colorScheme.background)
+                    .then(
+                        if (selectionMode) Modifier
+                            .onSizeChanged { selectionHeaderHeightPx = it.height }
+                            .padding(top = paddingValues.calculateTopPadding())
+                        // Measured outside the status bar inset (same as SettingsSubScaffold) so
+                        // the reserved space includes it.
+                        else Modifier
+                            .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
+                            .windowInsetsPadding(WindowInsets.statusBars)
+                    ),
+            ) {
+                if (!selectionMode) {
+                    SettingsSubPageHeader(
+                        title = "Queue",
+                        topicIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_video_frame_save),
+                        onBack = onBack,
+                        topPadding = headerState.topPadding,
+                        bottomPadding = headerState.bottomPadding,
+                        collapseFraction = headerState.collapseFraction,
+                        includeHorizontalPadding = true,
+                    )
+                }
             LazyRow(
                 state = filterListState,
                 // contentPadding (not an outer Modifier.padding) so the scrollable viewport spans
@@ -365,7 +438,9 @@ fun QueueScreen(
                 // clipped mid-chip right at an inset boundary, which read as "cut off."
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    // No top padding: it sits tight under the title. The count badges poking above
+                    // the chips still show, since a horizontal row only clips left/right.
+                    .padding(bottom = 8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -399,43 +474,21 @@ fun QueueScreen(
                     }
                 }
             }
+            }
 
-            if (filteredItems.isEmpty()) {
-                // Tab-specific copy — "Paste a link on Home to start one" only actually helps on
-                // the tabs that describe genuinely-no-work-at-all (Running/In Queue/Scheduled);
-                // Paused/Errored/Cancelled describe downloads that already went through some other
-                // state, so the same generic line there read as a non sequitur (reported live:
-                // the Paused tab said "No downloads in queue" while Errored/Cancelled next to it
-                // had real counts, which read as those two other tabs error being wrong).
-                val (emptyTitle, emptySubtitle) = when (selectedFilter) {
-                    "Paused" -> "No paused downloads" to "Downloads you pause will show up here."
-                    "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
-                    "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
-                    "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
-                    else -> "No downloads in queue" to "Paste a link on Home to start one."
-                }
-                EmptyState(
-                    icon = Icons.Outlined.Inbox,
-                    title = emptyTitle,
-                    subtitle = emptySubtitle,
-                    // weight(1f): without it, this Column child requests the Column's full height
-                    // rather than just what's left below the filter row, so its centered content
-                    // sat well below true middle. Bottom padding excludes the floating nav pill.
-                    modifier = Modifier.weight(1f).padding(bottom = navBarClearance()),
-                )
-            } else {
-                LazyColumn(
-                    // Extra bottom inset beyond the normal 16dp: the Pause/Resume/Retry All FAB
-                    // floats over the content rather than reserving space for itself, so without
-                    // this the last card(s) end up scrolled underneath it, partly unreadable and
-                    // with their own action buttons unreachable. navBarClearance() (not a flat
-                    // 100dp guess) so this also clears the real system nav bar inset on devices
-                    // where it's taller than this app's own FAB assumed — see its doc comment
-                    // (MainScreen.kt) for the full story.
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = navBarClearance()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
+            LazyColumn(
+                state = listState,
+                // Extra bottom inset beyond the normal 16dp: the Pause/Resume/Retry All FAB floats
+                // over the content rather than reserving space for itself, so without this the
+                // last card(s) end up scrolled underneath it, partly unreadable and with their own
+                // action buttons unreachable. navBarClearance() (not a flat 100dp guess) so this
+                // also clears the real system nav bar inset on devices where it's taller than this
+                // app's own FAB assumed — see its doc comment (MainScreen.kt) for the full story.
+                // Cards get their 16dp horizontal inset individually (see animateItem below).
+                contentPadding = PaddingValues(top = topReserve + 8.dp, bottom = navBarClearance()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
                     items(filteredItems, key = { it.id }) { item ->
                         // Slide-up + fade-in on first appearance (a newly queued download, or one
                         // scrolling into view for the first time) — targetState flips true right
@@ -489,7 +542,7 @@ fun QueueScreen(
                             // appeared, same as better-accessibility's own guidance distinguishes.
                             enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
                             exit = ExitTransition.None,
-                            modifier = Modifier.animateItem(),
+                            modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                         ) {
                         // Swipe-to-delete is only offered for downloads that are already stopped
                         // for good (errored or cancelled) — everything still active or resumable
@@ -498,28 +551,11 @@ fun QueueScreen(
                         // list while multi-select is active — a swipe gesture competing with
                         // tap-to-toggle-selection on the same cards would be janky either way.
                         if (!selectionMode && (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.ERRORED)) {
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value != SwipeToDismissBoxValue.Settled) {
-                                        requestDelete(setOf(item.id))
-                                    }
-                                    true
-                                },
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                backgroundContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(MaterialTheme.colorScheme.errorContainer)
-                                            .padding(horizontal = 24.dp),
-                                        contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
-                                    ) {
-                                        Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
-                                    }
-                                },
+                            // Library's shared swipe card (same reveal background, plus its swipe
+                            // haptics), with this card's own rounded shape.
+                            SwipeToDeleteCard(
+                                onDelete = { requestDelete(setOf(item.id)) },
+                                shape = RoundedCornerShape(20.dp),
                             ) {
                                 row()
                             }
@@ -528,7 +564,6 @@ fun QueueScreen(
                         }
                         }
                     }
-                }
             }
         }
     }

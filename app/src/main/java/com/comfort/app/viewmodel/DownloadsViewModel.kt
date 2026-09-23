@@ -61,6 +61,21 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isGloballyPaused = MutableStateFlow(GalleryDlPreferences.isGloballyPaused(application))
     val isGloballyPaused: StateFlow<Boolean> = _isGloballyPaused.asStateFlow()
 
+    // Keeps _isGloballyPaused in step with the stored flag when something other than
+    // pauseAll()/resumeAll() changes it — DownloadDispatcher.enqueueWork() clears it when the
+    // user starts a single download (a card's Continue, or the paused notification's Resume with
+    // no Activity around). Held in a field: SharedPreferences only keeps listeners weakly.
+    private val globalPauseListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        _isGloballyPaused.value = GalleryDlPreferences.isGloballyPaused(application)
+    }
+    private val globalPausePrefs = application.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        .also { it.registerOnSharedPreferenceChangeListener(globalPauseListener) }
+
+    override fun onCleared() {
+        globalPausePrefs.unregisterOnSharedPreferenceChangeListener(globalPauseListener)
+        super.onCleared()
+    }
+
     /** Drives the "ongoing download" badge on the Library tab and the Queue icon. */
     val hasActiveDownloads: StateFlow<Boolean> = queueFlow
         .map { list -> list.any { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
@@ -183,7 +198,8 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val context = getApplication<Application>()
             val entity = dao.getById(id) ?: return@launch
-            DownloadDispatcher.enqueueWork(context, entity.id, entity.url)
+            // A tap on this one card — starts it even while "Pause All" holds everything else.
+            DownloadDispatcher.enqueueWork(context, entity.id, entity.url, userInitiated = true)
         }
     }
 

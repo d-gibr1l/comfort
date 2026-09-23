@@ -41,6 +41,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -326,13 +327,13 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
         // like ordinary content, reappears compact on reverse-scroll, and grows back into this
         // full size as scroll nears the top — search still works in either register since both
         // branches below live inside the same alpha/padding-driven overlay.
-        // Only shows while the header itself is hidden (the inverse of its own fade).
-        StatusBarScrim(alpha = { 1f - headerState.alpha }, modifier = Modifier.align(Alignment.TopStart))
+        // Only shows while the header itself is hidden (the inverse of how far it's slid away).
+        StatusBarScrim(alpha = { 1f - headerState.reveal.fraction }, modifier = Modifier.align(Alignment.TopStart))
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .fillMaxWidth()
-                .graphicsLayer { alpha = headerState.alpha }
+                .compactHeaderReveal(headerState.reveal)
                 .background(MaterialTheme.colorScheme.background)
                 .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
                 .windowInsetsPadding(WindowInsets.statusBars)
@@ -612,11 +613,44 @@ fun highlightRowModifier(title: String): Modifier {
 // SettingsSubScaffold's own doc comment for why this is one continuously-interpolated instance
 // rather than two separate composables crossfading against each other.
 internal data class CollapsingHeaderState(
-    val alpha: Float,
+    val reveal: CompactHeaderReveal,
     val topPadding: androidx.compose.ui.unit.Dp,
     val bottomPadding: androidx.compose.ui.unit.Dp,
     val collapseFraction: Float,
+    // Lazy lists only (see rememberLazyCollapsingHeaderState) — attach to an ancestor of the list.
+    val nestedScrollConnection: androidx.compose.ui.input.nestedscroll.NestedScrollConnection? = null,
 )
+
+/** How far a pinned compact header has slid up out of view, driven 1:1 by scroll distance instead
+ * of a timed show/hide: scrolling toward the end pushes it up by exactly as many pixels as the
+ * content moved, scrolling back pulls it down by the same amount, and it can rest part-way if the
+ * finger stops there — so it "shows itself" at the pace of the scroll rather than snapping in.
+ * Hidden amounts are clamped to the header's own measured height ([heightPx], fed by
+ * [compactHeaderReveal]); [hide] parks it fully hidden even before that height is known. */
+@androidx.compose.runtime.Stable
+internal class CompactHeaderReveal {
+    var heightPx by androidx.compose.runtime.mutableFloatStateOf(0f)
+    private var rawHiddenPx by androidx.compose.runtime.mutableFloatStateOf(0f)
+    val hiddenPx: Float get() = rawHiddenPx.coerceIn(0f, heightPx)
+    /** 1 = fully shown, 0 = fully hidden. */
+    val fraction: Float get() = when {
+        heightPx > 0f -> 1f - hiddenPx / heightPx
+        rawHiddenPx > 0f -> 0f
+        else -> 1f
+    }
+    /** [deltaPx] > 0 = content scrolled toward its end (hides), < 0 = back toward the start (reveals). */
+    fun scrollBy(deltaPx: Float) { rawHiddenPx = (hiddenPx + deltaPx).coerceIn(0f, heightPx) }
+    fun show() { rawHiddenPx = 0f }
+    fun hide() { rawHiddenPx = Float.POSITIVE_INFINITY }
+}
+
+/** Slides the header up by [reveal]'s hidden amount and reports its full size back to it. Place it
+ * before any status-bar inset padding so the measured height includes the inset. Deliberately not
+ * clipped at the status bar: while part-way, the header slides straight in over it (chosen live
+ * over an emerge-from-under-the-status-bar variant). */
+internal fun Modifier.compactHeaderReveal(reveal: CompactHeaderReveal): Modifier = this
+    .graphicsLayer { translationY = -reveal.hiddenPx }
+    .onSizeChanged { reveal.heightPx = it.height.toFloat() }
 
 @Composable
 internal fun rememberCollapsingHeaderState(
@@ -633,26 +667,87 @@ internal fun rememberCollapsingHeaderState(
     // transformation happen almost the instant a finger touched the list, reproduced live as an
     // abrupt collapse after barely any scroll at all. 120dp asks for a more deliberate scroll.
     val collapseRangePx = remember(density) { with(density) { 120.dp.toPx() } }
-    var visible by remember { mutableStateOf(true) }
+    val reveal = remember { CompactHeaderReveal() }
     LaunchedEffect(scrollState) {
         var previous = scrollState.value
         snapshotFlow { scrollState.value }.collect { current ->
-            when {
-                current <= collapseRangePx -> visible = true
-                current > previous -> visible = false
-                current < previous -> visible = true
-            }
+            if (current <= collapseRangePx) reveal.show() else reveal.scrollBy((current - previous).toFloat())
             previous = current
         }
     }
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, label = "header-visible-alpha")
     val collapseFraction = (scrollState.value / collapseRangePx).coerceIn(0f, 1f)
     return CollapsingHeaderState(
-        alpha = alpha,
+        reveal = reveal,
         topPadding = androidx.compose.ui.unit.lerp(expandedTopPadding, collapsedTopPadding, collapseFraction),
         bottomPadding = androidx.compose.ui.unit.lerp(expandedBottomPadding, collapsedBottomPadding, collapseFraction),
         collapseFraction = collapseFraction,
     )
+}
+
+/** [rememberCollapsingHeaderState] for a LazyColumn (the Download Queue) instead of a
+ * verticalScroll Column. A LazyListState has no single running scroll total the way
+ * ScrollState.value does, so this combines index and offset into one monotonic value (the index
+ * weighted far above any single item's height) for the direction comparison, and reads the offset
+ * alone while still on item 0 — exact there, which is the only range the collapse itself spans.
+ * That combined value jumps by ~1,000,000 whenever the index changes, though, so it can't supply
+ * the pixel deltas the scroll-linked reveal needs; those come from [CollapsingHeaderState.nestedScrollConnection]
+ * instead, which the caller attaches to an ancestor of the list. */
+@Composable
+internal fun rememberLazyCollapsingHeaderState(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    expandedTopPadding: androidx.compose.ui.unit.Dp,
+    collapsedTopPadding: androidx.compose.ui.unit.Dp = 8.dp,
+    expandedBottomPadding: androidx.compose.ui.unit.Dp = 20.dp,
+    collapsedBottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
+): CollapsingHeaderState {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val collapseRangePx = remember(density) { with(density) { 120.dp.toPx() } }
+    val reveal = remember { CompactHeaderReveal() }
+    fun nearTop() = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= collapseRangePx
+    val connection = remember(listState, collapseRangePx) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset {
+                // consumed.y < 0 means the content moved up, i.e. scrolled toward its end.
+                if (nearTop()) reveal.show() else reveal.scrollBy(-consumed.y)
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    // Programmatic jumps (e.g. scrollToItem(0) on a tab switch) never pass through nested scroll.
+    LaunchedEffect(listState) {
+        snapshotFlow { nearTop() }.collect { if (it) reveal.show() }
+    }
+    val collapseFraction = if (listState.firstVisibleItemIndex > 0) 1f
+        else (listState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+    return CollapsingHeaderState(
+        reveal = reveal,
+        topPadding = androidx.compose.ui.unit.lerp(expandedTopPadding, collapsedTopPadding, collapseFraction),
+        bottomPadding = androidx.compose.ui.unit.lerp(expandedBottomPadding, collapsedBottomPadding, collapseFraction),
+        collapseFraction = collapseFraction,
+        nestedScrollConnection = connection,
+    )
+}
+
+/** The extra controls a Settings toggle reveals under itself (a slider, a size field, ...), expanding
+ * open / collapsing shut instead of popping in and out. Collapses toward the toggle above it so the
+ * content visibly folds back into it. With the OS reduce-motion setting on, it only fades, since the
+ * height change is exactly the kind of movement that setting asks to avoid. */
+@Composable
+private fun ColumnScope.ToggleReveal(visible: Boolean, content: @Composable ColumnScope.() -> Unit) {
+    val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = if (reducedMotion) fadeIn(tween(200)) else
+            androidx.compose.animation.expandVertically(tween(250), expandFrom = Alignment.Top) + fadeIn(tween(250)),
+        exit = if (reducedMotion) fadeOut(tween(150)) else
+            androidx.compose.animation.shrinkVertically(tween(200), shrinkTowards = Alignment.Top) + fadeOut(tween(150)),
+    ) {
+        Column(content = content)
+    }
 }
 
 @Composable
@@ -804,7 +899,7 @@ private fun SettingsSubScaffold(
                 content = content,
             )
         }
-        StatusBarScrim(alpha = { 1f - headerState.alpha }, modifier = Modifier.align(Alignment.TopStart))
+        StatusBarScrim(alpha = { 1f - headerState.reveal.fraction }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(
             title = title,
             topicIcon = topicIcon,
@@ -815,7 +910,7 @@ private fun SettingsSubScaffold(
             includeHorizontalPadding = true,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .graphicsLayer { alpha = headerState.alpha }
+                .compactHeaderReveal(headerState.reveal)
                 .background(MaterialTheme.colorScheme.background)
                 // Measuring outside windowInsetsPadding, not inside it — inside, onSizeChanged only
                 // sees the header's own topPadding+row+bottomPadding and never learns about the
@@ -915,7 +1010,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
                 },
             )
-            if (concurrentDownloadsEnabled) {
+            ToggleReveal(concurrentDownloadsEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SettingsSlider(
                     value = concurrentDownloads,
@@ -971,7 +1066,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
                 },
             )
-            if (speedLimitEnabled) {
+            ToggleReveal(speedLimitEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SizeSheetField(
                     currentValue = speedLimit,
@@ -1003,7 +1098,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setNetworkRetriesEnabled(context, it)
                 },
             )
-            if (networkRetriesEnabled) {
+            ToggleReveal(networkRetriesEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SettingsSlider(
                     value = networkRetries,
@@ -1030,7 +1125,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setFragmentRetriesEnabled(context, it)
                 },
             )
-            if (fragmentRetriesEnabled) {
+            ToggleReveal(fragmentRetriesEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SettingsSlider(
                     value = fragmentRetries,
@@ -1058,7 +1153,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
                 },
             )
-            if (proxyEnabled) {
+            ToggleReveal(proxyEnabled) {
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = proxyUrl,
@@ -1130,7 +1225,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setConcurrentFragmentsEnabled(context, it)
                 },
             )
-            if (concurrentFragmentsEnabled) {
+            ToggleReveal(concurrentFragmentsEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SettingsSlider(
                     value = concurrentFragments,
@@ -1159,7 +1254,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setSleepIntervalEnabled(context, it)
                 },
             )
-            if (sleepIntervalEnabled) {
+            ToggleReveal(sleepIntervalEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SettingsSlider(
                     value = sleepIntervalSeconds,
@@ -1189,7 +1284,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setSocketTimeoutEnabled(context, it)
                 },
             )
-            if (socketTimeoutEnabled) {
+            ToggleReveal(socketTimeoutEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SettingsSlider(
                     value = socketTimeoutSeconds,
@@ -1216,7 +1311,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setBufferSizeEnabled(context, it)
                 },
             )
-            if (bufferSizeEnabled) {
+            ToggleReveal(bufferSizeEnabled) {
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = if (bufferSizeKb > 0) bufferSizeKb.toString() else "",
@@ -1309,7 +1404,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 },
             )
 
-            if (scheduleEnabled) {
+            ToggleReveal(scheduleEnabled) {
                 Spacer(Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1370,7 +1465,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 },
             )
 
-            if (maxFilesizeEnabled) {
+            ToggleReveal(maxFilesizeEnabled) {
                 Spacer(Modifier.height(16.dp))
                 SizeSheetField(
                     currentValue = maxFilesize,
@@ -1398,7 +1493,7 @@ private fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 },
             )
 
-            if (downloadDelayEnabled) {
+            ToggleReveal(downloadDelayEnabled) {
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = if (downloadDelaySeconds > 0) downloadDelaySeconds.toString() else "",
@@ -2390,6 +2485,8 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
     // straight from their own onClick, so neither can wipe a saved login from one stray tap with no
     // way back.
     var pendingDelete by remember { mutableStateOf<PendingCookieDelete?>(null) }
+    // Non-null while a site's cookie viewer/editor sheet is open (tapping its row).
+    var viewingSite by remember { mutableStateOf<SiteCookies?>(null) }
     // The per-site "use these cookies" toggle's own state — kept and used just like the real
     // save file above (read once, mutated in place, never re-read from disk mid-screen) since
     // this is the only place in the app that changes it.
@@ -2567,7 +2664,11 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 cookieSites.forEachIndexed { index, site ->
                     val enabled = site.rootDomain !in disabledDomains
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { viewingSite = site }
+                            .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Delete stays at the lead position; Copy moved to sit right beside the
@@ -2656,6 +2757,28 @@ private fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                 }
             }
         }
+    }
+
+    viewingSite?.let { site ->
+        SiteCookiesSheet(
+            site = site,
+            onCopy = { label, text ->
+                scope.launch {
+                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(label, text)))
+                }
+            },
+            onSave = { editedValues ->
+                // Only the edited cookies' lines change, and only their value field — everything
+                // else in the file (other sites, flags, expiry) is written back exactly as it was.
+                // Header re-added for the same reason as the Save/delete paths above.
+                val updated = parsedCookies.map { cookie ->
+                    editedValues[cookie]?.let { cookie.withValue(it) } ?: cookie
+                }
+                persist((listOf("# Netscape HTTP Cookie File") + updated.map { it.rawLine }).joinToString("\n"))
+                viewingSite = null
+            },
+            onDismiss = { viewingSite = null },
+        )
     }
 
     pendingDelete?.let { pending ->
@@ -2750,7 +2873,101 @@ private data class ParsedCookie(
     val name: String,
     val expiryEpochSeconds: Long,
     val rawLine: String,
-)
+) {
+    /** The value field — the 7th tab-separated field. Splitting the whole raw line (a leading
+     * "#HttpOnly_" stays attached to the first field) with limit = 7 keeps a value that itself
+     * contains tabs intact. */
+    val value: String get() = rawLine.split("\t", limit = 7).getOrElse(6) { "" }
+
+    /** Same line with only the value replaced. Tabs and line breaks are stripped from the new value
+     * since either would corrupt the one-cookie-per-line, tab-separated format. */
+    fun withValue(newValue: String): ParsedCookie {
+        val fields = rawLine.split("\t", limit = 7).toMutableList()
+        if (fields.size < 7) return this
+        fields[6] = newValue.replace(Regex("[\\t\\r\\n]"), "")
+        return copy(rawLine = fields.joinToString("\t"))
+    }
+}
+
+/** Viewer/editor for one site's saved cookies: each cookie's name with its value in an editable
+ * field and its own copy button, plus Copy all and Save. Save only reports the cookies whose value
+ * actually changed; the caller rewrites just those lines. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SiteCookiesSheet(
+    site: SiteCookies,
+    onCopy: (label: String, text: String) -> Unit,
+    onSave: (Map<ParsedCookie, String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val edits = remember(site) { mutableStateMapOf<ParsedCookie, String>() }
+    fun currentValue(cookie: ParsedCookie) = edits[cookie] ?: cookie.value
+    val changed = edits.filter { (cookie, value) -> value != cookie.value }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).imePadding()) {
+            Text(site.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "${site.cookies.size} cookie${if (site.cookies.size == 1) "" else "s"} · ${formatCookieExpiry(site.soonestExpiryEpochSeconds)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                site.cookies.forEach { cookie ->
+                    OutlinedTextField(
+                        value = currentValue(cookie),
+                        onValueChange = { edits[cookie] = it },
+                        label = { Text(cookie.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                        maxLines = 4,
+                        shape = MaterialTheme.shapes.medium,
+                        trailingIcon = {
+                            IconButton(onClick = { onCopy("${cookie.name} cookie", currentValue(cookie)) }) {
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${cookie.name}", modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        val text = site.cookies.joinToString("\n") { cookie ->
+                            (edits[cookie]?.let { cookie.withValue(it) } ?: cookie).rawLine
+                        }
+                        onCopy("${site.label} cookies", text)
+                    },
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Copy all")
+                }
+                Button(
+                    onClick = { onSave(changed) },
+                    enabled = changed.isNotEmpty(),
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save")
+                }
+            }
+        }
+    }
+}
 
 /** Real comment lines start with "#" and nothing else meaningful follows on that line; a
  * "#HttpOnly_"-prefixed line (a real convention plenty of cookies.txt exports — Chrome's own
@@ -3058,19 +3275,26 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 // the actual wordmark. This used to be a separate static ic_app_logo.png export
                 // that silently drifted out of sync with the real launcher icon once it changed
                 // (reported live: "still using the old app icon") — rendering the *same* vector
-                // the launcher itself uses guarantees they can't drift again. Fixed black/white
-                // rather than theme-reactive, matching ic_launcher_foreground.xml's own reasoning:
-                // this is a copy of the real launcher icon, which never follows the in-app theme.
+                // the launcher itself uses guarantees they can't drift again.
+                // Colors come from the in-app theme, not @color/splash_icon (which the foreground
+                // vector's own fill references): resources resolve against the *system* night
+                // mode, so with the app's own Light/Dark setting overriding it the wordmark could
+                // end up black-on-dark or the tile a stray white block. Light keeps the launcher's
+                // own white tile and black wordmark; dark inverts to a raised dark tile.
+                val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                val tileColor = if (darkTheme) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
+                val logoColor = if (darkTheme) MaterialTheme.colorScheme.onSurface else Color.Black
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(MaterialTheme.shapes.medium)
-                        .background(Color.White),
+                        .background(tileColor),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         imageVector = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_launcher_foreground),
                         contentDescription = null,
+                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(logoColor),
                         modifier = Modifier.size(40.dp),
                     )
                 }

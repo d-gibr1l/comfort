@@ -201,8 +201,17 @@ object DownloadDispatcher {
 
     /** (Re-)submits a WorkManager job for an existing download entry. gallery-dl's own download
      * archive (keyed by the download id) means a retry only fetches what's still missing.
-     * [forceImmediate] skips the schedule-window delay entirely — see [startNow]. */
-    suspend fun enqueueWork(context: Context, id: String, url: String, forceImmediate: Boolean = false) = withDownloadLock(id) {
+     * [forceImmediate] skips the schedule-window delay entirely — see [startNow].
+     * [userInitiated] marks an explicit tap on this one download (a card's Continue/Retry, the
+     * paused notification's Resume, Start now), which starts it even while "Pause All" is on and
+     * ends that global hold — see the global-pause gate below. */
+    suspend fun enqueueWork(
+        context: Context,
+        id: String,
+        url: String,
+        forceImmediate: Boolean = false,
+        userInitiated: Boolean = false,
+    ) = withDownloadLock(id) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         // Cancel whatever job is already associated with this id first, atomically with the new
         // submission below — closes the race where a second caller for the same id would
@@ -219,6 +228,15 @@ object DownloadDispatcher {
         // actually hold for every entry point instead of just the one enqueueDownload guards.
         // suspendForSchedule/rescheduleQueuedDownloads/restartRunningDownloads/repairIfJobDead
         // already bail before ever reaching here while paused, so this is a no-op for them.
+        // Except [userInitiated]: tapping Continue on one specific paused card after "Pause All"
+        // silently wrote PAUSED straight back and did nothing (reported live). An explicit
+        // request to start *this* download ends the global hold instead — the user is resuming
+        // activity, so the Queue FAB flips back to "Pause" (it kept saying "Resume", reported
+        // live) and new links start normally again. Every other PAUSED row stays PAUSED: clearing
+        // the flag doesn't dispatch anything by itself, and "Resume All" still picks them up.
+        if (userInitiated && GalleryDlPreferences.isGloballyPaused(context)) {
+            GalleryDlPreferences.setGloballyPaused(context, false)
+        }
         if (GalleryDlPreferences.isGloballyPaused(context)) {
             dao.updateStatus(id, DownloadStatus.PAUSED)
             return@withDownloadLock
@@ -523,7 +541,7 @@ object DownloadDispatcher {
     suspend fun resumeDownload(context: Context, id: String) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
-        enqueueWork(context, id, entity.url)
+        enqueueWork(context, id, entity.url, userInitiated = true)
     }
 
     /** Jumps a still-waiting download (QUEUED or SCHEDULED) to the front of the queue and past
@@ -534,7 +552,7 @@ object DownloadDispatcher {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
         dao.setQueueOrder(id, -(System.currentTimeMillis() / 1000L).toInt())
-        enqueueWork(context, id, entity.url, forceImmediate = true)
+        enqueueWork(context, id, entity.url, forceImmediate = true, userInitiated = true)
         repairOrphanedQueue(context)
     }
 
