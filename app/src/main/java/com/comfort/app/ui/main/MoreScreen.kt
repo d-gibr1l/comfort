@@ -43,6 +43,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.filled.CheckCircle as FilledCheckCircle
 import androidx.compose.ui.graphics.luminance
 import com.comfort.app.theme.SuccessGreen40
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,6 +53,9 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -429,18 +433,20 @@ fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: S
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             Box(modifier = Modifier.weight(1f)) {
+                // bodyLarge (16sp), MD3's own search-bar text size — bodyMedium read as too small
+                // in a 56dp bar (reported live).
                 if (query.isEmpty()) {
-                    Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 BasicTextField(
                     value = query,
                     onValueChange = onQueryChange,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 )
             }
@@ -2964,7 +2970,9 @@ private fun SiteCookiesSheet(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Copy all stays its own button on the left; Save / Cancel is the same split button
+            // as Settings' other edit sheets, on the right.
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(
                     onClick = {
                         val text = site.cookies.joinToString("\n") { cookie ->
@@ -2972,23 +2980,19 @@ private fun SiteCookiesSheet(
                         }
                         onCopy("${site.label} cookies", text)
                     },
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
                 ) {
                     Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Copy all")
                 }
-                Button(
-                    onClick = { onSave(changed) },
-                    enabled = changed.isNotEmpty(),
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Save")
-                }
+                Spacer(Modifier.weight(1f))
+                ConfirmCancelSplitButton(
+                    label = "Save",
+                    icon = Icons.Outlined.Save,
+                    onConfirm = { onSave(changed) },
+                    onCancel = onDismiss,
+                    confirmEnabled = changed.isNotEmpty(),
+                )
             }
         }
     }
@@ -3089,13 +3093,18 @@ private fun formatCookieExpiry(epochSeconds: Long): String {
     return java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
 }
 
-/** Shared by the Cookies & Login settings screen and the Queue's per-download "Add cookies"
- * error-card action — a real navigable browser (URL bar, back/forward/refresh) starting at
- * [loginUrl] so the user can sign in normally, or browse anywhere else the site sends them
- * (an OAuth redirect, a "verify it's you" subdomain, ...) without getting stuck on one fixed
- * page. The single FAB extracts whatever CookieManager captured for the page currently on screen
- * and merges it into the saved cookies.txt (replacing only that site's prior lines, not the whole
- * file), then closes. */
+/** Shared by the Cookies & Login settings screen, the Queue's per-download "Add cookies" error-card
+ * action and the share picker — a real navigable browser starting at [loginUrl] so the user can
+ * sign in normally, or browse anywhere else the site sends them (an OAuth redirect, a "verify it's
+ * you" subdomain, ...) without getting stuck on one fixed page.
+ *
+ * Layout (redesigned): close + a pill address bar on top (lock + site name at rest, the full URL
+ * selected for editing once tapped, reload/stop inside it) and a real-progress bar under it. The
+ * system back gesture walks the page history before closing. The "Extract cookies" FAB can be
+ * dragged anywhere on the page (it snaps to the nearest side on release) so it never
+ * has to sit on top of the one button a login page needs; a plain tap still extracts whatever
+ * CookieManager captured for the page on screen and merges it into cookies.txt (replacing only
+ * that site's prior lines), then closes. */
 @Composable
 fun CookieLoginDialog(
     loginUrl: String,
@@ -3103,15 +3112,41 @@ fun CookieLoginDialog(
     onCookiesSaved: (String) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var addressBarText by remember { mutableStateOf(loginUrl) }
-    // The single source of truth for what's actually loaded — addressBarText tracks the user's
-    // in-progress edits separately so typing a new URL doesn't fight with the WebView's own
-    // onPageStarted/onPageFinished updates overwriting the field mid-edit.
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    // The single source of truth for what's actually loaded — the address field keeps the user's
+    // in-progress edit separately, so typing a new URL doesn't fight the WebView's own page
+    // callbacks overwriting the field mid-edit.
     var currentUrl by remember { mutableStateOf(loginUrl) }
+    var addressField by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(loginUrl)) }
+    var editingAddress by remember { mutableStateOf(false) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+
+    fun navigateTo(input: String) {
+        val target = normalizeBrowserAddress(input)
+        currentUrl = target
+        webView?.loadUrl(target)
+        focusManager.clearFocus()
+    }
+
+    fun extractCookies() {
+        val host = runCatching { java.net.URI(currentUrl).host }.getOrNull()
+        val cookieHeader = CookieManager.getInstance().getCookie(currentUrl)
+        if (host != null && !cookieHeader.isNullOrBlank()) {
+            val sharedPreferences = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            val existing = sharedPreferences.getString(GalleryDlPreferences.KEY_COOKIES, "") ?: ""
+            val merged = mergeNetscapeCookies(existing, host, cookieHeader)
+            sharedPreferences.edit().putString(GalleryDlPreferences.KEY_COOKIES, merged).apply()
+            java.io.File(context.filesDir, "cookies.txt").writeText(merged)
+            onCookiesSaved(merged)
+        } else {
+            onDismiss()
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -3120,63 +3155,105 @@ fun CookieLoginDialog(
         // this makes the window itself the full screen instead of just the content inside it.
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Surface(modifier = Modifier.fillMaxSize(), shape = androidx.compose.ui.graphics.RectangleShape) {
+        // Back walks the page history first; only an empty history closes the browser.
+        androidx.activity.compose.BackHandler(enabled = canGoBack) { webView?.goBack() }
+
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            shape = androidx.compose.ui.graphics.RectangleShape,
+            color = MaterialTheme.colorScheme.background,
+        ) {
             Column {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                        .padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Close")
+                        Icon(Icons.Outlined.Close, contentDescription = "Close browser")
                     }
-                    IconButton(onClick = { webView?.goBack() }, enabled = canGoBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    val secure = currentUrl.startsWith("https://")
+                    val host = remember(currentUrl) {
+                        runCatching { java.net.URI(currentUrl).host }.getOrNull()?.removePrefix("www.") ?: currentUrl
                     }
-                    IconButton(onClick = { webView?.goForward() }, enabled = canGoForward) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Forward")
-                    }
-                    OutlinedTextField(
-                        value = addressBarText,
-                        onValueChange = { addressBarText = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        // shapes.small (8dp) — the spec's own text-field token; 24dp matched
-                        // nothing on the shape scale.
-                        shape = MaterialTheme.shapes.small,
-                        trailingIcon = {
-                            IconButton(onClick = {
-                                val target = normalizeBrowserAddress(addressBarText)
-                                currentUrl = target
-                                webView?.loadUrl(target)
-                            }) {
-                                Icon(Icons.Outlined.ArrowCircleRight, contentDescription = "Go")
+                    Surface(
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize().padding(start = 16.dp, end = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                if (secure) Icons.Outlined.Lock else Icons.Outlined.Public,
+                                contentDescription = if (secure) "Secure connection" else null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                BasicTextField(
+                                    // At rest the pill reads as just the site; once focused it
+                                    // holds the full URL, all selected, ready to type over.
+                                    value = if (editingAddress) addressField else androidx.compose.ui.text.input.TextFieldValue(host),
+                                    onValueChange = { addressField = it },
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Uri,
+                                        imeAction = androidx.compose.ui.text.input.ImeAction.Go,
+                                    ),
+                                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onGo = { navigateTo(addressField.text) }),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged { state ->
+                                            if (state.isFocused && !editingAddress) {
+                                                addressField = androidx.compose.ui.text.input.TextFieldValue(
+                                                    currentUrl, selection = androidx.compose.ui.text.TextRange(0, currentUrl.length),
+                                                )
+                                            }
+                                            editingAddress = state.isFocused
+                                        },
+                                )
                             }
-                        },
-                    )
-                    IconButton(onClick = { webView?.reload() }) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Reload")
+                            IconButton(onClick = { if (isLoading) webView?.stopLoading() else webView?.reload() }) {
+                                Icon(
+                                    if (isLoading) Icons.Outlined.Close else Icons.Outlined.Refresh,
+                                    contentDescription = if (isLoading) "Stop loading" else "Reload",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
-                if (isLoading) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                } else {
-                    Spacer(Modifier.height(4.dp))
+                // Real page progress rather than an endless spinner; reserves its 3dp either way
+                // so the page below doesn't jump when loading starts/stops.
+                Box(Modifier.fillMaxWidth().height(3.dp)) {
+                    if (isLoading) {
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize())
+                    }
                 }
 
-                Box(modifier = Modifier.weight(1f)) {
+                BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
-                                // Force a Desktop Chrome User-Agent. Instagram's mobile site often sends intent:// redirects 
+                                // Force a Desktop Chrome User-Agent. Instagram's mobile site often sends intent:// redirects
                                 // to force opening their native app, which causes WebViews to go completely blank.
                                 // The desktop site works flawlessly and doesn't try to deep-link you away.
                                 settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                                 android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                webChromeClient = object : android.webkit.WebChromeClient() {
+                                    override fun onProgressChanged(view: WebView, newProgress: Int) {
+                                        progress = newProgress / 100f
+                                    }
+                                }
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(view: WebView, request: android.webkit.WebResourceRequest): Boolean {
                                         val url = request.url.toString()
@@ -3189,20 +3266,14 @@ fun CookieLoginDialog(
 
                                     override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                                         isLoading = true
-                                        if (url != null) {
-                                            currentUrl = url
-                                            addressBarText = url
-                                        }
+                                        if (url != null) currentUrl = url
                                         canGoBack = view.canGoBack()
                                         canGoForward = view.canGoForward()
                                     }
 
                                     override fun onPageFinished(view: WebView, url: String?) {
                                         isLoading = false
-                                        if (url != null) {
-                                            currentUrl = url
-                                            addressBarText = url
-                                        }
+                                        if (url != null) currentUrl = url
                                         canGoBack = view.canGoBack()
                                         canGoForward = view.canGoForward()
                                     }
@@ -3214,26 +3285,61 @@ fun CookieLoginDialog(
                         modifier = Modifier.fillMaxSize(),
                     )
 
+                    // Draggable "Extract cookies" FAB. Positioned by its own top-left offset
+                    // within this box; starts bottom-right above the system nav bar, can't be
+                    // dragged off-screen, and snaps to the nearer side on release.
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val navBarBottomPx = WindowInsets.navigationBars.getBottom(density)
+                    val marginPx = with(density) { 16.dp.toPx() }
+                    val toolbarReservePx = marginPx + navBarBottomPx
+                    val boxWidthPx = constraints.maxWidth.toFloat()
+                    val boxHeightPx = constraints.maxHeight.toFloat()
+                    var fabSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+                    val fabX = remember { Animatable(0f) }
+                    val fabY = remember { Animatable(0f) }
+                    var fabPlaced by remember { mutableStateOf(false) }
+                    val maxX = (boxWidthPx - fabSize.width - marginPx).coerceAtLeast(marginPx)
+                    val maxY = (boxHeightPx - fabSize.height - toolbarReservePx).coerceAtLeast(marginPx)
+                    LaunchedEffect(fabSize, boxWidthPx, boxHeightPx) {
+                        if (fabSize == androidx.compose.ui.unit.IntSize.Zero) return@LaunchedEffect
+                        if (!fabPlaced) {
+                            fabX.snapTo(maxX)
+                            fabY.snapTo(maxY)
+                            fabPlaced = true
+                        } else {
+                            // Keep it on screen if the space changes (keyboard, rotation).
+                            fabX.snapTo(fabX.value.coerceIn(marginPx, maxX))
+                            fabY.snapTo(fabY.value.coerceIn(marginPx, maxY))
+                        }
+                    }
                     ExtendedFloatingActionButton(
-                        onClick = {
-                            val host = runCatching { java.net.URI(currentUrl).host }.getOrNull()
-                            val cookieHeader = CookieManager.getInstance().getCookie(currentUrl)
-                            if (host != null && !cookieHeader.isNullOrBlank()) {
-                                val sharedPreferences = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
-                                val existing = sharedPreferences.getString(GalleryDlPreferences.KEY_COOKIES, "") ?: ""
-                                val merged = mergeNetscapeCookies(existing, host, cookieHeader)
-                                sharedPreferences.edit().putString(GalleryDlPreferences.KEY_COOKIES, merged).apply()
-                                java.io.File(context.filesDir, "cookies.txt").writeText(merged)
-                                onCookiesSaved(merged)
-                            } else {
-                                onDismiss()
-                            }
-                        },
-                        icon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
+                        onClick = { extractCookies() },
+                        icon = { Icon(Icons.Outlined.Cookie, contentDescription = null) },
                         text = { Text("Extract cookies") },
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(16.dp),
+                            .onSizeChanged { fabSize = it }
+                            .offset { androidx.compose.ui.unit.IntOffset(fabX.value.roundToInt(), fabY.value.roundToInt()) }
+                            .graphicsLayer { alpha = if (fabPlaced) 1f else 0f }
+                            .pointerInput(maxX, maxY) {
+                                detectDragGestures(
+                                    onDrag = { change, drag ->
+                                        change.consume()
+                                        scope.launch {
+                                            fabX.snapTo((fabX.value + drag.x).coerceIn(marginPx, maxX))
+                                            fabY.snapTo((fabY.value + drag.y).coerceIn(marginPx, maxY))
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        val snapLeft = fabX.value + fabSize.width / 2f < boxWidthPx / 2f
+                                        scope.launch {
+                                            fabX.animateTo(
+                                                if (snapLeft) marginPx else maxX,
+                                                androidx.compose.animation.core.spring(dampingRatio = 0.75f, stiffness = 400f),
+                                            )
+                                        }
+                                    },
+                                )
+                            },
                     )
                 }
             }
@@ -3951,19 +4057,26 @@ private fun CreditChip(entry: CreditEntry, modifier: Modifier = Modifier) {
 @Composable
 private fun SettingsSection(title: String, icon: ImageVector? = null, content: @Composable ColumnScope.() -> Unit) {
     Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Google Sans Bold (the same face as each page's big title) at 14sp with a little tracking,
+        // rather than the default 12sp semibold label — the section names read as too faint to
+        // anchor each group (reported live). The icon scales with it.
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
             if (icon != null) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
             }
             Text(
                 title.uppercase(),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    letterSpacing = 0.6.sp,
+                ),
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
             )
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
         Surface(
             modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
             shape = MaterialTheme.shapes.large,
@@ -4203,7 +4316,7 @@ private val FILESIZE_UNITS = listOf("KB" to "k", "MB" to "m", "GB" to "g")
  * "2M") — the string format both Speed limit and Max file size share, and that both engines'
  * own config parsers accept directly. Blank/zero numeric input means unlimited, matching both
  * preferences' own convention. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SizeSheetField(
     modifier: Modifier = Modifier,
@@ -4214,12 +4327,13 @@ private fun SizeSheetField(
 ) {
     var showSheet by remember { mutableStateOf(false) }
 
-    val displayValue = if (currentValue.isBlank()) "Unlimited" else {
-        val num = currentValue.filter { it.isDigit() || it == '.' }
-        val suffix = currentValue.filter { it.isLetter() }.lowercase()
+    fun format(value: String): String = if (value.isBlank()) "Unlimited" else {
+        val num = value.filter { it.isDigit() || it == '.' }
+        val suffix = value.filter { it.isLetter() }.lowercase()
         val unitLabel = units.firstOrNull { it.second == suffix }?.first ?: units[0].first
         "$num $unitLabel"
     }
+    val displayValue = format(currentValue)
 
     OutlinedButton(
         modifier = modifier.fillMaxWidth(),
@@ -4287,18 +4401,65 @@ private fun SizeSheetField(
                     }
                 }
                 Spacer(Modifier.height(24.dp))
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        onValueChange(if (numberText.isBlank()) "" else "$numberText${units[unitIndex].second}")
-                        showSheet = false
-                    },
-                ) {
-                    Text("Done")
+                val commitTyped = {
+                    onValueChange(if (numberText.isBlank()) "" else "$numberText${units[unitIndex].second}")
+                    showSheet = false
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    ConfirmCancelSplitButton(
+                        label = "Done",
+                        icon = Icons.Filled.FilledCheckCircle,
+                        onConfirm = commitTyped,
+                        onCancel = { showSheet = false },
+                    )
                 }
             }
         }
     }
+}
+
+/** M3 Expressive split button: the leading half confirms ([label] — Done, Save, Start now, ...),
+ * the trailing half is a separate secondary action, a cancel ✕ by default. Default Small (40dp)
+ * size — Medium read as oversized (reported live). Shared by Settings' edit sheets and the
+ * Queue's waiting-download cards. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun ConfirmCancelSplitButton(
+    label: String,
+    icon: ImageVector,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+    confirmEnabled: Boolean = true,
+    cancelDescription: String = "Cancel",
+    // Every split button's look (settled live on the Queue cards, then applied everywhere): the
+    // confirm half outline-only, the ✕ half in the light green of a selected filter chip.
+    colors: ButtonColors = ButtonDefaults.buttonColors(
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ),
+    outlinedConfirm: Boolean = true,
+) {
+    SplitButtonLayout(
+        modifier = modifier,
+        leadingButton = {
+            val content: @Composable RowScope.() -> Unit = {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize))
+                Spacer(Modifier.width(8.dp))
+                Text(label)
+            }
+            if (outlinedConfirm) {
+                SplitButtonDefaults.OutlinedLeadingButton(onClick = onConfirm, enabled = confirmEnabled, content = content)
+            } else {
+                SplitButtonDefaults.LeadingButton(onClick = onConfirm, enabled = confirmEnabled, colors = colors, content = content)
+            }
+        },
+        trailingButton = {
+            SplitButtonDefaults.TrailingButton(onClick = onCancel, colors = colors) {
+                Icon(Icons.Outlined.Close, contentDescription = cancelDescription, modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize))
+            }
+        },
+    )
 }
 
 
