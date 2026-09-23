@@ -896,6 +896,9 @@ class DownloadWorker(
                             ffmpegLibDir,
                             overrideTitle,
                             overrideArtist,
+                            // The preview sheet's saved extraction of this same URL, if any —
+                            // reused instead of extracting again (see yt_dlp_wrapper.download).
+                            GalleryDlListing.ytDlpInfoCacheFile(applicationContext, url).absolutePath,
                         ),
                         actualCallback,
                     )
@@ -942,6 +945,8 @@ class DownloadWorker(
                             "download", url, stagingDir.absolutePath, cookiesArg,
                             entity?.itemFilter.orEmpty(), instaloaderArchivePath,
                             if (writeInfoFiles) "1" else "0", proxyUrl, socketTimeoutSeconds,
+                            // The preview's saved post, reused instead of fetching it again.
+                            GalleryDlListing.instaloaderInfoCacheFile(applicationContext, url).absolutePath,
                         ),
                         actualCallback,
                     )

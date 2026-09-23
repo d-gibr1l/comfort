@@ -41,6 +41,9 @@ _BAD_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
 # sitting at "Downloading..." with nothing happening. Failing fast hands it to the classic
 # gallery-dl/yt-dlp fallback instead.
 _MAX_RATE_LIMIT_WAIT_SECONDS = 20
+# How long a preview's saved post (list_items' info_cache_path) is trusted by download(), same
+# window as yt_dlp_wrapper's. A saved media link that no longer works just triggers a fresh fetch.
+_INFO_CACHE_MAX_AGE_SECONDS = 20 * 60
 
 
 class _RateLimited(Exception):
@@ -129,19 +132,46 @@ def _friendly_error(exc):
     return f"{type(exc).__name__}: {exc}"
 
 
-def _fetch_post(url, cookies_path, proxy_url, timeout_seconds):
-    """(loader, post). Tries the saved Instagram session first when there is one, then anonymously
-    — an expired session fails outright where a public post would have worked without it."""
+def _fresh_cache(path):
+    return bool(path) and os.path.isfile(path) and time.time() - os.path.getmtime(path) < _INFO_CACHE_MAX_AGE_SECONDS
+
+
+def _save_post(post, path):
+    """Best-effort: a failure only means the download fetches the post again, same as before."""
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        instaloader.save_structure_to_file(post, tmp)
+        os.replace(tmp, path)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _fetch_post(url, cookies_path, proxy_url, timeout_seconds, info_cache_path=None):
+    """(loader, post, from_cache). Uses the preview's saved post when it's recent (see
+    _INFO_CACHE_MAX_AGE_SECONDS) — skipping the metadata request entirely — otherwise tries the
+    saved Instagram session first when there is one, then anonymously: an expired session fails
+    outright where a public post would have worked without it."""
     shortcode = shortcode_of(url)
     if not shortcode:
         raise ValueError("Not an Instagram post or reel link")
     session = _read_instagram_cookies(cookies_path)
+    if _fresh_cache(info_cache_path):
+        try:
+            loader = _new_loader(session if session.get("sessionid") else None, proxy_url, timeout_seconds)
+            post = instaloader.load_structure_from_file(loader.context, info_cache_path)
+            if isinstance(post, Post) and post.shortcode == shortcode:
+                return loader, post, True
+        except Exception:  # noqa: BLE001 — unreadable cache: just fetch normally
+            pass
     attempts = [session, None] if session.get("sessionid") else [None]
     last_exc = None
     for cookies in attempts:
         loader = _new_loader(cookies, proxy_url, timeout_seconds)
         try:
-            return loader, Post.from_shortcode(loader.context, shortcode)
+            return loader, Post.from_shortcode(loader.context, shortcode), False
         except _RateLimited:
             raise
         except Exception as exc:  # noqa: BLE001 — every failure is reported, not just Instaloader's
@@ -200,9 +230,10 @@ def _append_archive(path, key):
 
 
 def download(url, download_dir, cookies_path=None, item_filter=None, archive_path=None,
-             write_info_files=False, proxy_url=None, socket_timeout_seconds=None, emit=print):
+             write_info_files=False, proxy_url=None, socket_timeout_seconds=None, emit=print,
+             info_cache_path=None):
     try:
-        loader, post = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds)
+        loader, post, from_cache = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds, info_cache_path)
         items = _media_items(post)
     except Exception as exc:  # noqa: BLE001
         emit(f"[error] ERROR: {_friendly_error(exc)}")
@@ -226,6 +257,7 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
     # so DownloadWorker's derivePosterCaptionTitle recovers the same display title from it.
     safe_title = _clean(title, 90) or shortcode
     saved = 0
+    fresh_urls = {}  # filled only if saved links turn out to be expired, see below
     for num, is_video, media_url, _preview in items:
         key = f"{shortcode}_{num}" if multi else shortcode
         if key in done:
@@ -238,7 +270,19 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
             for leftover in (base + ext for ext in (".mp4", ".jpg", ".png", ".webp", ".heic")):
                 if os.path.isfile(leftover):
                     os.remove(leftover)
-            loader.download_pic(base, media_url, post.date_utc)
+            media_url = fresh_urls.get(num, media_url)
+            try:
+                loader.download_pic(base, media_url, post.date_utc)
+            except Exception:  # noqa: BLE001
+                if not from_cache:
+                    raise
+                # The preview's saved media links didn't work (expired): fetch the post fresh
+                # once and use its links for this item and every one after it (fresh_urls is
+                # looked up per item above — the loop itself keeps iterating the original list).
+                loader, post, from_cache = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds)
+                fresh_urls.update({n: m for n, _v, m, _p in _media_items(post)})
+                media_url = fresh_urls.get(num, media_url)
+                loader.download_pic(base, media_url, post.date_utc)
         except Exception as exc:  # noqa: BLE001
             emit(f"[error] ERROR: {_friendly_error(exc)}")
             continue
@@ -263,10 +307,12 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
     return "ok" if saved or not any((f"{shortcode}_{n}" if multi else shortcode) not in done for n, *_ in items) else "error"
 
 
-def list_items(url, cookies_path=None, proxy_url=None, socket_timeout_seconds=None):
+def list_items(url, cookies_path=None, proxy_url=None, socket_timeout_seconds=None, info_cache_path=None):
     try:
-        _loader, post = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds)
+        _loader, post, _cached = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds)
         items = _media_items(post)
+        # After _media_items, so the full metadata it may have fetched is saved along with it.
+        _save_post(post, info_cache_path)
     except Exception as exc:  # noqa: BLE001
         message = _friendly_error(exc)
         return json.dumps([[-1, {"error": type(exc).__name__, "message": message}]])
@@ -301,18 +347,19 @@ if __name__ == "__main__":
         sys.exit(2)
 
     _cmd, _rest = sys.argv[1], sys.argv[2:]
-    _rest += [""] * (8 - len(_rest))
+    _rest += [""] * (9 - len(_rest))
     if _cmd == "download":
         _status = download(
             url=_rest[0], download_dir=_rest[1], cookies_path=_s(_rest[2]),
             item_filter=_s(_rest[3]), archive_path=_s(_rest[4]),
             write_info_files=(_rest[5] == "1"), proxy_url=_s(_rest[6]),
             socket_timeout_seconds=_s(_rest[7]), emit=_emit,
+            info_cache_path=_s(_rest[8]),
         )
         print(f"[__status__] {_status}", flush=True)
     elif _cmd == "list":
         print(list_items(url=_rest[0], cookies_path=_s(_rest[1]), proxy_url=_s(_rest[2]),
-                         socket_timeout_seconds=_s(_rest[3])), flush=True)
+                         socket_timeout_seconds=_s(_rest[3]), info_cache_path=_s(_rest[4])), flush=True)
     else:
         print(f"Unknown command: {_cmd}", file=sys.stderr)
         sys.exit(2)

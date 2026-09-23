@@ -648,7 +648,7 @@ private fun SelectableThumbnail(
                     .padding(4.dp)
                     .size(20.dp)
                     .clip(CircleShape)
-                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.85f)),
+                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (selected) {

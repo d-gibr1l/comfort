@@ -702,6 +702,12 @@ def probe(url):
     except Exception:
         return "0"
 
+# How long a preview's saved extraction (see list_info's info_cache_path) is trusted by
+# download(). Site stream links typically last hours; this stays well inside that, and yt-dlp
+# re-extracts on its own if a reused link fails anyway.
+_INFO_JSON_MAX_AGE_SECONDS = 20 * 60
+
+
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
              extra_args=None, archive_path=None, limit_rate=None, format_selector=None,
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
@@ -715,7 +721,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
-             override_title=None, override_artist=None):
+             override_title=None, override_artist=None, info_json_path=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1339,7 +1345,18 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 ydl.add_post_processor(
                     _FinalFilePP(ydl, callback, override_title, override_artist, source_url=url), when="post_process",
                 )
-            ydl.download([url])
+            # The preview sheet already ran this exact extraction a moment ago (list_info saves
+            # its full result to info_json_path). Reusing it skips the whole "extracting" phase
+            # instead of starting over from the page (reported live). Format selection, playlist
+            # items, trimming etc. still run fresh against it with *this* download's options.
+            # yt-dlp's download_with_info_file() itself falls back to a normal extraction from the
+            # page if the saved stream links no longer work, so an old file can't break a download;
+            # the age check just avoids trying links that have most likely expired.
+            if info_json_path and os.path.isfile(info_json_path) and \
+                    time.time() - os.path.getmtime(info_json_path) < _INFO_JSON_MAX_AGE_SECONDS:
+                ydl.download_with_info_file(info_json_path)
+            else:
+                ydl.download([url])
         return "Done"
     except _Cancelled:
         return "Cancelled"
@@ -1348,7 +1365,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             callback(f"[error] {e}")
         return f"Error: {e}"
 
-def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, impersonate=False):
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, impersonate=False, info_cache_path=None):
     """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
     item picker's preview, specifically to get a *real*, directly fetchable thumbnail image URL
     for video items. gallery-dl's own listing gives every video item an internal "ytdl:"-prefixed
@@ -1484,6 +1501,18 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            # The full extraction, for download() to reuse if the user goes ahead and downloads
+            # this — see download()'s info_json_path. Best-effort: a failure here only means
+            # the download extracts again, same as before.
+            if info_cache_path and info is not None:
+                try:
+                    os.makedirs(os.path.dirname(info_cache_path), exist_ok=True)
+                    tmp = info_cache_path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump(ydl.sanitize_info(info), f)
+                    os.replace(tmp, info_cache_path)
+                except Exception:
+                    pass
     except Exception as e:
         return json.dumps({"error": str(e)})
 
@@ -1526,6 +1555,7 @@ if __name__ == "__main__":
         print(list_info(
             url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3]),
             impersonate=_b(a[4]) if len(a) > 4 else False,
+            info_cache_path=_s(a[5]) if len(a) > 5 else None,
         ), flush=True)
         _sys.exit(0)
 
@@ -1572,5 +1602,6 @@ if __name__ == "__main__":
         ffmpeg_lib_dir=(_s(a[45]) if len(a) > 45 else None),
         override_title=(_s(a[46]) if len(a) > 46 else None),
         override_artist=(_s(a[47]) if len(a) > 47 else None),
+        info_json_path=(_s(a[48]) if len(a) > 48 else None),
     )
     print(f"[__status__] {status}", flush=True)
