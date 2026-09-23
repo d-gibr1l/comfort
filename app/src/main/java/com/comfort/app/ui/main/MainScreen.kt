@@ -233,12 +233,24 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // content scroll underneath the pill's transparent padding for real, which is what "floating"
     // is supposed to look like.
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Home is what a non-Home tab's back gesture reveals — kept composed underneath whenever
-        // we're not already on it, purely so predictiveBackReveal below has something real to
-        // peek at mid-swipe instead of empty background. Never rendered at the same time as the
-        // `when` block's own Home case (that one only fires when selectedTab == 0), so this isn't
-        // a duplicate/live second copy of Home.
-        if (selectedTab != 0) {
+        // Home is always composed here, underneath, as the one and only Home: it's what a
+        // non-Home tab's back reveals, and it's simply the visible page on tab 0. There used to be
+        // a second Home inside the animated box below for tab 0 — so every back to Home threw this
+        // copy away and built a brand-new one mid-transition, which showed as a flicker at the end
+        // of the back animation (reported live). Now back just removes the page on top.
+        // Back from a non-Home tab returns to Home first, matching standard bottom-nav behavior,
+        // instead of immediately falling through to the empty nav backstack and quitting the app.
+        // Disabled while QueueScreen is up — its own predictive-back handler below takes over.
+        val tabBack = rememberBackRevealState(enabled = !showQueueScreen && selectedTab != 0) {
+            selectedTab = 0
+        }
+        val queueBack = rememberBackRevealState(enabled = showQueueScreen) {
+            showQueueScreen = false
+        }
+        // Everything under the Queue (Home + the current tab) — it's what closing the Queue
+        // reveals, so it trails/fades in as one layer (see predictiveBackBehind).
+        Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
+        Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(tabBack, active = selectedTab != 0)) {
             HomeScreen(
                 onDownload = { url -> routingUrl = url },
                 viewModel = viewModel,
@@ -247,20 +259,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             )
         }
 
-        // Back from a non-Home tab returns to Home first, matching standard bottom-nav behavior,
-        // instead of immediately falling through to the empty nav backstack and quitting the app.
-        // Disabled while QueueScreen is up — its own predictive-back handler below takes over.
-        val tabBackProgress = rememberPredictiveBackProgress(enabled = !showQueueScreen && selectedTab != 0) {
-            selectedTab = 0
-        }
-        Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(tabBackProgress)) {
+        // Only the non-Home tabs, on top of the Home above (see its comment).
+        if (selectedTab != 0) Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(tabBack)) {
             when (selectedTab) {
-                0 -> HomeScreen(
-                    onDownload = { url -> routingUrl = url },
-                    viewModel = viewModel,
-                    onOpenLibrary = { selectedTab = 1 },
-                    onOpenQueue = { showQueueScreen = true },
-                )
                 1 -> DownloadsHistoryScreen(
                     viewModel = viewModel,
                     onOpenQueue = { showQueueScreen = true },
@@ -273,6 +274,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
                 )
             }
+        }
         }
 
         FloatingNavBar(
@@ -315,13 +317,11 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // underneath is actually visible while mid-swipe — an early-return here (the previous
         // approach) would mean there's nothing behind QueueScreen to peek at during the gesture.
         if (showQueueScreen) {
-            val queueBackProgress = rememberPredictiveBackProgress(enabled = showQueueScreen) {
-                showQueueScreen = false
-            }
-            Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(queueBackProgress)) {
+            Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(queueBack)) {
                 QueueScreen(
                     viewModel = viewModel,
-                    onBack = { showQueueScreen = false }
+                    // Same peel-away as the back gesture, not an instant jump back.
+                    onBack = { queueBack.animateBack() },
                 )
             }
         }

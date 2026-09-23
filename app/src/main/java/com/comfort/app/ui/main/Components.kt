@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.toShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
@@ -388,3 +389,10 @@ fun EmptyState(
         }
     }
 }
+
+/** The download thumbnail shape — Material 3 Expressive's Arch (rounded dome top, softly rounded
+ * bottom corners), chosen live for the Library list and Queue thumbnails. One place, so every
+ * thumbnail stays the same shape. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun thumbnailShape(): Shape = androidx.compose.material3.MaterialShapes.Arch.toShape()

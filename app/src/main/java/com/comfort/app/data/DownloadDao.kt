@@ -42,6 +42,23 @@ interface DownloadDao {
     """)
     fun getQueueFlow(): Flow<List<DownloadEntity>>
 
+    /** One-shot, in queue order: everything running, waiting or paused — Pause All / Resume All
+     * read this (not the UI's StateFlow, which can be stale with no subscriber) to keep the order. */
+    @Query("""
+        SELECT * FROM downloads
+        WHERE status IN ('RUNNING', 'QUEUED', 'SCHEDULED', 'PAUSED')
+        ORDER BY queueOrder ASC, dateAdded ASC
+    """)
+    suspend fun getActiveInQueueOrderOnce(): List<DownloadEntity>
+
+    /** Sends a retried download to the back of the queue, as if it had just been added: the queue
+     * (and DownloadWorker's concurrency gate) order by queueOrder then dateAdded, so without this a
+     * retry kept its original, usually older dateAdded and was *listed* near the top while
+     * WorkManager actually ran it last, behind everything already queued. Also drops any old
+     * "Up next" mark (negative queueOrder). */
+    @Query("UPDATE downloads SET queueOrder = 0, dateAdded = :now WHERE id = :id")
+    suspend fun moveToQueueEnd(id: String, now: Long)
+
     /** Bumps a still-waiting download to the front of the queue — see [DownloadDispatcher.startNow]. */
     @Query("UPDATE downloads SET queueOrder = :order WHERE id = :id")
     suspend fun setQueueOrder(id: String, order: Int)

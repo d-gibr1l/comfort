@@ -208,27 +208,30 @@ private val SUBPAGE_SEARCH_INDEX = listOf(
 @Composable
 fun MoreScreen(route: SettingsRoute, highlightKey: String?, onNavigate: (SettingsRoute, String?) -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // The root settings list is what a sub-screen's back gesture reveals — kept composed
-        // underneath whenever we're not already on it, same reasoning as MainScreen's Home-behind-
-        // a-tab treatment, purely so there's something real to peek at mid-swipe.
-        if (route != SettingsRoute.ROOT) {
-            SettingsRootScreen(onNavigate = onNavigate)
-        }
-
-        val backProgress = rememberPredictiveBackProgress(enabled = route != SettingsRoute.ROOT) {
+        // The one and only root settings list, always composed underneath: it's what a
+        // sub-screen's back reveals, and simply the visible page on ROOT. A second copy used to
+        // live inside the animated box below for ROOT, so every back threw this one away and built
+        // a fresh list mid-transition (header not measured yet, so it jumped for a frame) — the
+        // flicker at the end of the back animation (reported live). Same fix as MainScreen's Home.
+        val back = rememberBackRevealState(enabled = route != SettingsRoute.ROOT) {
             onNavigate(SettingsRoute.ROOT, null)
         }
-        Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(backProgress)) {
+        Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(back, active = route != SettingsRoute.ROOT)) {
+            SettingsRootScreen(onNavigate = onNavigate)
+        }
+        // Each sub-page's own back button plays the same peel-away as the gesture, then returns.
+        val onBack = { back.animateBack() }
+        if (route != SettingsRoute.ROOT) Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(back)) {
             when (route) {
-                SettingsRoute.ROOT -> SettingsRootScreen(onNavigate = onNavigate)
-                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.FOLDERS -> FoldersSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.UPDATES -> UpdatesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
-                SettingsRoute.ABOUT -> AboutScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.ROOT -> Unit
+                SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.FOLDERS -> FoldersSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.UPDATES -> UpdatesSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.ABOUT -> AboutScreen(onBack = onBack, highlightKey = highlightKey)
             }
         }
     }
