@@ -60,7 +60,15 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
-            
+
+        }
+        // Release-optimised (R8, not debuggable) but signed with the debug key, so it installs over
+        // the everyday debug build as a plain update — same package, same signature, data kept —
+        // for measuring real performance. Profileable via src/benchmark/AndroidManifest.xml.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
         }
     }
     compileOptions {
