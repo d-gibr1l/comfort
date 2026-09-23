@@ -87,7 +87,7 @@ object EngineUpdateSignal {
 
 /** Same shape as [EngineUpdateSignal], for AppUpdater's own GitHub Releases check on the app
  * itself instead of PyPI on yt-dlp/gallery-dl — kept as a separate signal (not folded into the one
- * above) since About > App Update and About > Engines are separate sections a user acts on
+ * above) since Updates > App update and Updates > Engines are separate sections a user acts on
  * independently; the nav-bar dot itself still just ORs the two together (see FloatingNavBar's call
  * site) since it means "something in Settings needs attention," not specifically which. */
 object AppUpdateSignal {
@@ -190,7 +190,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         val lastCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
         if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
         var statuses = EngineUpdater.checkAll(context)
-        // On by default (Settings > About > Engines): install whatever this check found instead
+        // On by default (Settings > Updates > Engines): install whatever this check found instead
         // of only flagging it for the user to apply by hand later. Best-effort per engine — a
         // failed download/verify (network hiccup, PyPI momentarily unreachable) just leaves that
         // one engine's own outdated status in place, still surfaced normally via the dot/quick
