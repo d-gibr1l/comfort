@@ -1623,7 +1623,7 @@ private fun HistoryRow(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    // The shared Arch thumbnail shape (Components.kt thumbnailShape).
+                    // The shared thumbnail shape (Components.kt thumbnailShape).
                     .clip(thumbnailShape())
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
