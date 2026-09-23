@@ -1645,23 +1645,8 @@ private fun HistoryRow(
                     }
                 }
 
-                if (item.downloadedItems > 1) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(5.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(10.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text("${item.downloadedItems}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-
+                // No item-count or status overlay here (unlike the grid): the row's own text beside
+                // the thumbnail already shows both.
                 if (item.isFavorite) {
                     Box(
                         modifier = Modifier
@@ -1675,8 +1660,6 @@ private fun HistoryRow(
                         Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
                     }
                 }
-
-                StatusBadge(status = item.status, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp))
             }
 
             if (selected) {
