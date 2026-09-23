@@ -485,10 +485,22 @@ fun QueueScreen(
                 // also clears the real system nav bar inset on devices where it's taller than this
                 // app's own FAB assumed — see its doc comment (MainScreen.kt) for the full story.
                 // Cards get their 16dp horizontal inset individually (see animateItem below).
-                contentPadding = PaddingValues(top = topReserve + 8.dp, bottom = navBarClearance()),
+                contentPadding = PaddingValues(bottom = navBarClearance()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
+                // The header's reserved space as a real item 0, not top contentPadding: the
+                // header's collapse is driven by item 0's own scroll offset (see
+                // rememberLazyCollapsingHeaderState), which is only exact while item 0 is still on
+                // screen. With the first *card* as item 0, a card shorter than the 120dp collapse
+                // range scrolled off part-way through, the index ticked to 1, and collapseFraction
+                // jumped straight to 1 — reported live as the header snapping into its compact form.
+                // This spacer is always taller than that range. Minus the 12dp item spacing that
+                // follows it, so the first card still starts exactly topReserve + 8dp down.
+                item(key = "queue-header-space") {
+                    // Clamped: topReserve is 0 until the header's first measure.
+                    Spacer(Modifier.height((topReserve + 8.dp - 12.dp).coerceAtLeast(0.dp)))
+                }
                     items(filteredItems, key = { it.id }) { item ->
                         // Slide-up + fade-in on first appearance (a newly queued download, or one
                         // scrolling into view for the first time) — targetState flips true right

@@ -688,7 +688,9 @@ internal fun rememberCollapsingHeaderState(
  * verticalScroll Column. A LazyListState has no single running scroll total the way
  * ScrollState.value does, so this combines index and offset into one monotonic value (the index
  * weighted far above any single item's height) for the direction comparison, and reads the offset
- * alone while still on item 0 — exact there, which is the only range the collapse itself spans.
+ * alone while still on item 0 — exact there, which is the only range the collapse itself spans,
+ * *provided item 0 is taller than the 120dp collapse range* (the Queue makes its header's reserved
+ * space item 0 for exactly this; a shorter item 0 makes the collapse snap shut once it scrolls off).
  * That combined value jumps by ~1,000,000 whenever the index changes, though, so it can't supply
  * the pixel deltas the scroll-linked reveal needs; those come from [CollapsingHeaderState.nestedScrollConnection]
  * instead, which the caller attaches to an ancestor of the list. */

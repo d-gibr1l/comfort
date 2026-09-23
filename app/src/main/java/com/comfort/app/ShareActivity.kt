@@ -105,6 +105,18 @@ class ShareActivity : ComponentActivity() {
 
     private var isQuickDownload by mutableStateOf(false)
 
+    // True when this share came through the Sharesheet's "Configure" entry (a SEND to this
+    // Activity itself, not the "Instant" alias). In Always ask mode that alias is enabled (see
+    // GalleryDlPreferences.syncQuickDownloadAliasEnabled), so the OS has already made the user
+    // pick between "Configure" and "Instant" — asking "Download this how?" again on top of that
+    // was a second, redundant question (reported live: tapping "Configure" in the OS popup still
+    // opened the in-app Instant/Configure sheet). Direct link taps (ACTION_VIEW) never went
+    // through that OS choice, so they still get the in-app one.
+    private fun isConfigureEntry(intent: Intent): Boolean =
+        intent.action == Intent.ACTION_SEND && !isQuickDownloadAlias(intent)
+
+    private var isConfigureShare by mutableStateOf(false)
+
     /** while(find()), not a single if — used to stop at the first match, so sharing a block of
      * text with two separate links (e.g. a text message with two TikTok URLs) silently discarded
      * the second one. Every match is collected the same way, in the order they appear in the
@@ -144,6 +156,7 @@ class ShareActivity : ComponentActivity() {
 
         sharedUrls = parseUrls(intent)
         isQuickDownload = isQuickDownloadAlias(intent)
+        isConfigureShare = isConfigureEntry(intent)
         if (sharedUrls.isEmpty()) {
             finish()
             return
@@ -191,7 +204,7 @@ class ShareActivity : ComponentActivity() {
                                 url = urls[0],
                                 onFinished = { finish() },
                             )
-                            GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
+                            !isConfigureShare && GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
                                 onFinished = { finish() },
                             )
@@ -223,6 +236,7 @@ class ShareActivity : ComponentActivity() {
         setIntent(intent)
         val urls = parseUrls(intent)
         isQuickDownload = isQuickDownloadAlias(intent)
+        isConfigureShare = isConfigureEntry(intent)
         if (urls.isEmpty()) {
             // Only close if nothing else is in flight — a URL-less intent (e.g. sharing a photo
             // with no link right after a real share) used to call finish() unconditionally here,

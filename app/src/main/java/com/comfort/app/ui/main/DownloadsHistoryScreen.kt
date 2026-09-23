@@ -1031,13 +1031,19 @@ private fun LibraryCompactBar(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
+                        // Fades in whole rather than being uncovered: its layout height still grows
+                        // with the transform below (that's what lands the title on the real
+                        // header's), but the text itself is no longer clipped to that growing
+                        // height — clipping it read as a sliced, half-height line (reported
+                        // live). Alpha only starts rising halfway through, so the line isn't
+                        // visible yet while its slot is still too short and it's overlapping.
                         .graphicsLayer {
                             val maxTranslatePx = (76.dp - 4.dp).toPx()
                             val rawOffset = headerScrollOffsetPx()
                             val offset = if (rawOffset == Float.POSITIVE_INFINITY) maxTranslatePx else rawOffset.coerceIn(0f, maxTranslatePx)
-                            alpha = 1f - (offset / maxTranslatePx)
+                            val progress = 1f - (offset / maxTranslatePx)
+                            alpha = ((progress - 0.5f) / 0.5f).coerceIn(0f, 1f)
                         }
-                        .clipToBounds()
                         .layout { measurable, constraints ->
                             val maxTranslatePx = (76.dp - 4.dp).toPx()
                             val rawOffset = headerScrollOffsetPx()
