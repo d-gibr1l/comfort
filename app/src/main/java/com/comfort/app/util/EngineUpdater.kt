@@ -312,6 +312,10 @@ object EngineUpdater {
                     }
                 }
                 tempFile.delete()
+                // The new version's modules have no .pyc yet — compile them now, in the background,
+                // instead of on the first preview/download that imports them (see
+                // PythonRuntime.warmUpInBackground for the measured cost).
+                PythonRuntime.precompileInBackground(context, java.io.File(PythonRuntime.sitePackagesDir(context), engine.packageDirName))
 
                 installedVersion(context, engine) ?: error("Update installed but its version couldn't be read back")
             }
