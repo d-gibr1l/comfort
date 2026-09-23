@@ -23,6 +23,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -47,7 +48,6 @@ object DownloadDispatcher {
     // subprocess — gallery-dl/yt-dlp calls used to all be serialized through one shared embedded
     // interpreter (PythonEngineLock, since removed) regardless of how many queues this spread
     // them across.)
-    private val nextQueueSlot = AtomicInteger(0)
 
     // Serializes cancel+enqueue for a given download id. Without this, two callers racing for the
     // same id (e.g. rescheduleQueuedDownloads() firing twice from a quick double-toggle, or
@@ -75,11 +75,40 @@ object DownloadDispatcher {
         locks.remove(id)
     }
 
-    private fun cancelWorkManagerJob(context: Context, workRequestId: String?) {
-        workRequestId?.let { runCatching { UUID.fromString(it) } }?.getOrNull()?.let { uuid ->
-            WorkManager.getInstance(context).cancelWorkById(uuid)
+    /** Cancels one download's job, then has the queue checked for downloads that lost theirs.
+     *
+     * Downloads used to wait in WorkManager lanes (chains), where cancelling a job that other jobs
+     * were chained after cancelled all of those too — then the next download added to that lane
+     * found cancelled jobs, and APPEND_OR_REPLACE deleted the whole chain. Their rows stayed
+     * QUEUED pointing at nothing, forever: deleting 2 queued downloads in a burst of ~200 left 121
+     * stuck (found live, 2026-09-23). Each download has its own job now (see [enqueueWork]), but this
+     * still waits for the cancellation to actually land, then
+     * asks for [repairOrphanedQueue] — asynchronously, since callers hold [withDownloadLock] and
+     * the repair re-enqueues through it, and debounced, so a burst of cancels repairs once. */
+    private suspend fun cancelWorkManagerJob(context: Context, workRequestId: String?) {
+        val uuid = workRequestId?.let { runCatching { UUID.fromString(it) }.getOrNull() } ?: return
+        val operation = WorkManager.getInstance(context).cancelWorkById(uuid)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { operation.result.get(5, TimeUnit.SECONDS) }
+        }
+        requestQueueRepair(context)
+    }
+
+    private val repairScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private var pendingRepair: kotlinx.coroutines.Job? = null
+
+    /** [repairOrphanedQueue] shortly after the last of a burst of calls. */
+    @Synchronized
+    private fun requestQueueRepair(context: Context) {
+        val appContext = context.applicationContext
+        pendingRepair?.cancel()
+        pendingRepair = repairScope.launch {
+            kotlinx.coroutines.delay(QUEUE_REPAIR_DEBOUNCE_MS)
+            repairOrphanedQueue(appContext)
         }
     }
+
+    private const val QUEUE_REPAIR_DEBOUNCE_MS = 600L
 
     /** DownloadWorker's own staging area for [id] (`cacheDir/gallery-dl-staging/<id>/`) — where a
      * download's files sit while in progress before each one gets copied out to the real gallery/
@@ -278,15 +307,21 @@ object DownloadDispatcher {
         // flips this correctly for anything rescheduleQueuedDownloads() re-submits.
         dao.updateStatus(id, if (delayMillis > 0) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED)
 
-        val concurrentDownloads = GalleryDlPreferences.getEffectiveConcurrentDownloads(context)
-        val slot = nextQueueSlot.getAndUpdate { (it + 1) % concurrentDownloads }
-        
-        val uniqueName = if (forceImmediate) "gallery_dl_now_$id" else "gallery_dl_queue_$slot"
-        val policy = if (forceImmediate) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE
-        
+        // One job per download, not a slot in a chain. Downloads used to be appended round-robin
+        // to one WorkManager chain per concurrency slot ("gallery_dl_queue_N"), which ran each
+        // chain one job at a time. A download's lane was fixed when it was queued, so once lanes
+        // went uneven (fast failures in one, slow downloads in the other, deletions) one sat idle
+        // while the other still had a backlog: "downloading one at a time instead of 2" (found
+        // live, 2026-09-23 - one lane empty, the other holding 12). Chains also cascaded: cancelling
+        // a waiting job cancelled everything chained after it (see cancelWorkManagerJob).
+        // DownloadWorker's DownloadConcurrencyGate already enforces both the concurrency limit and
+        // queue order (including "Up next") for every worker that reaches it, so every queued
+        // download now simply waits there for the next free slot. REPLACE only ever replaces this
+        // same download's own previous job, which is cancelled above anyway.
+        val uniqueName = if (forceImmediate) "gallery_dl_now_$id" else "gallery_dl_download_$id"
         WorkManager.getInstance(context).enqueueUniqueWork(
             uniqueName,
-            policy,
+            ExistingWorkPolicy.REPLACE,
             workRequest,
         )
     }
