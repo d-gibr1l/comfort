@@ -192,11 +192,6 @@ class DownloadWorker(
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
             )
         )
-        // The real, per-download notification the user actually reads — posted as a plain notify()
-        // to its own id, entirely separate from the foreground-service one above, so it's always
-        // freely updatable/cancellable regardless of that service's lifecycle.
-        DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, entity?.downloadedItems ?: 0, initialPercent)
-
         // Reproduced live: WorkManager's own teardown of the shared foreground notification once
         // this (or every concurrently running) worker finishes isn't reliable on this device/OS
         // build — dumpsys still showed it stuck with ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE
@@ -206,9 +201,9 @@ class DownloadWorker(
         // hits zero — not tied to (or trusting) WorkManager's own foreground-service bookkeeping.
         DownloadNotifications.markForegroundStarted()
         try {
-            // Blocks here (not a hard failure) until a concurrency slot is actually free — see
-            // DownloadConcurrencyGate's own doc comment for why this exists alongside the
-            // round-robin unique-work-chain system rather than trusting that alone. release() is in
+            // Blocks here (not a hard failure) until a concurrency slot is actually free. Every
+            // queued download's worker waits here in line (one job per download, see
+            // DownloadDispatcher.enqueueWork) — this is what enforces the limit and the order. release() is in
             // its own try/finally right below, not this outer one — so that if acquire() itself
             // throws/gets cancelled before ever incrementing the counter, release() correctly never
             // runs for a slot this worker never actually took.
@@ -217,6 +212,13 @@ class DownloadWorker(
                 queueOrder = entity?.queueOrder ?: 0,
                 dateAdded = entity?.dateAdded ?: System.currentTimeMillis(),
             )
+            // The real, per-download notification the user actually reads - posted as a plain
+            // notify() to its own id, entirely separate from the foreground-service one above, so
+            // it's always freely updatable/cancellable regardless of that service's lifecycle.
+            // Only once this download has a slot: every queued download's worker now waits at the
+            // gate (one job per download, see DownloadDispatcher.enqueueWork), and posting before
+            // it gave each waiting one its own "downloading" notification.
+            DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, entity?.downloadedItems ?: 0, initialPercent)
             try {
             return withContext(Dispatchers.IO) {
                 try {
