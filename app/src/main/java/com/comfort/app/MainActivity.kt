@@ -93,6 +93,9 @@ class MainActivity : ComponentActivity() {
     // state can silently reset to the manifest default across a reinstall/update, and there's no
     // other hook that would ever re-sync it otherwise.
     GalleryDlPreferences.setShareMode(applicationContext, GalleryDlPreferences.getShareMode(applicationContext))
+    // Unpack + precompile the Python engines ahead of the first preview/download (no-op once done
+    // for this build) — see PythonRuntime.warmUpInBackground.
+    com.comfort.app.util.PythonRuntime.warmUpInBackground(applicationContext)
 
     setContent {
       val notificationPermissionLauncher = rememberLauncherForActivityResult(

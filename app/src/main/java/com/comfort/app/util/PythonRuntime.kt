@@ -94,6 +94,7 @@ object PythonRuntime {
         val zipSo = File(nativeLibDir, "libpython.zip.so")
         if (!zipSo.exists()) return@withLock false
 
+        val provisionStarted = System.currentTimeMillis()
         root.deleteRecursively()
         root.mkdirs()
         zipSo.inputStream().use { unzipStreamTo(it, root) }
@@ -129,7 +130,72 @@ object PythonRuntime {
         }
 
         marker.writeText(PROVISION_VERSION)
+        android.util.Log.i("PythonRuntime", "provisioned $PROVISION_VERSION in ${System.currentTimeMillis() - provisionStarted}ms")
         true
+    }
+
+    private const val PRECOMPILE_MARKER = "precompiled.txt"
+    private val warmUpStarted = java.util.concurrent.atomic.AtomicBoolean(false)
+    // Outlives any one Activity (a rotation shouldn't cancel a half-done compile).
+    private val backgroundScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
+    /** Gets the runtime ready before the user needs it: unpacks it if an app update invalidated it,
+     * then compiles every engine module to .pyc. Without this, the first preview after an update
+     * paid for the whole unpack *and* Python compiling each module it imported — measured on-device
+     * (Samsung, Python 3.14): importing yt-dlp took 2.4–3.1s with no bytecode cache vs ~0.5s with
+     * one, Instaloader 1.0s vs 0.18s, gallery-dl 0.7s vs 0.21s; and Python only caches what's
+     * actually imported, so each yt-dlp site module compiled lazily on first use too.
+     * Delayed and run at low CPU priority (one process) so it doesn't compete with the first
+     * screens. Idempotent per [PROVISION_VERSION] (marker file), safe to call on every launch. */
+    fun warmUpInBackground(context: Context) {
+        if (!warmUpStarted.compareAndSet(false, true)) return
+        val appContext = context.applicationContext
+        backgroundScope.launch {
+            kotlinx.coroutines.delay(4_000)
+            if (!ensureProvisioned(appContext)) return@launch
+            val marker = File(runtimeRoot(appContext), PRECOMPILE_MARKER)
+            if (runCatching { marker.readText() }.getOrNull() == PROVISION_VERSION) return@launch
+            if (precompile(appContext, sitePackagesDir(appContext))) marker.writeText(PROVISION_VERSION)
+        }
+    }
+
+    /** [precompile] without waiting on it — EngineUpdater uses this so an engine's Update button
+     * isn't held up by compiling the new version. */
+    fun precompileInBackground(context: Context, dir: File) {
+        val appContext = context.applicationContext
+        backgroundScope.launch { precompile(appContext, dir) }
+    }
+
+    /** Compiles [dir] to .pyc with the bundled interpreter (compileall, quiet, single process,
+     * `nice`d). Also used by EngineUpdater after it replaces one engine's package. Concurrent
+     * Python runs are fine meanwhile: .pyc files are written atomically, and a module that isn't
+     * compiled yet is simply compiled by whoever imports it first, as before. */
+    suspend fun precompile(context: Context, dir: File): Boolean = withContext(Dispatchers.IO) {
+        val nativeLibDir = helperNativeLibDir(context) ?: return@withContext false
+        val root = runtimeRoot(context)
+        val interpreter = File(nativeLibDir, "libpython.so").absolutePath
+        val started = System.currentTimeMillis()
+        val result = runCatching {
+            val process = ProcessBuilder(
+                "/system/bin/nice", "-n", "10",
+                // Single process: compileall's -j uses multiprocessing, whose SemLock needs
+                // /dev/shm, which Android doesn't have (FileNotFoundError, found live). ~8s for the
+                // whole tree on-device at nice 10, in the background.
+                interpreter, "-m", "compileall", "-q", dir.absolutePath,
+            )
+                .redirectErrorStream(true)
+                .apply {
+                    environment()["PYTHONHOME"] = File(root, "usr").absolutePath
+                    environment()["LD_LIBRARY_PATH"] = File(root, "usr/lib").absolutePath
+                    environment()["PYTHONPATH"] = sitePackagesDir(context).absolutePath
+                }
+                .start()
+            process.inputStream.bufferedReader().use { it.readText() }
+            process.waitFor()
+        }
+        val ok = result.getOrNull() == 0
+        android.util.Log.i("PythonRuntime", "precompile ${dir.name}: ok=$ok in ${System.currentTimeMillis() - started}ms")
+        ok
     }
 
     // internal, not private — EngineUpdater.kt reuses this to unpack a freshly downloaded engine
