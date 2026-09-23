@@ -926,6 +926,8 @@ private fun PreviewChip(
 private val VideoQuality.chipLabel: String
     get() = when (this) {
         VideoQuality.BEST -> "Best Available"
+        VideoQuality.P2160 -> "4K"
+        VideoQuality.P1440 -> "1440"
         VideoQuality.P1080 -> "1080"
         VideoQuality.P720 -> "720"
         VideoQuality.P480 -> "480"
@@ -1645,7 +1647,7 @@ private fun buildPreviewCommand(
     filenameTemplate?.takeIf { it.isNotBlank() }?.let { parts += "-o \"$it\"" }
 
     // ── Global extra args (Settings > Advanced) ───────────────────────────────
-    val globalExtra = GalleryDlPreferences.getExtraArgs(context)
+    val globalExtra = GalleryDlPreferences.getExtraArgsFor(context, com.comfort.app.data.DownloadEngine.YT_DLP)
     if (globalExtra.isNotBlank()) parts += globalExtra
 
     // ── Per-download extra commands ───────────────────────────────────────────

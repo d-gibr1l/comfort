@@ -215,8 +215,16 @@ fun MoreScreen(route: SettingsRoute, highlightKey: String?, onNavigate: (Setting
         val back = rememberBackRevealState(enabled = route != SettingsRoute.ROOT) {
             onNavigate(SettingsRoute.ROOT, null)
         }
+        // Opening a sub-page from the root list plays the push (see animateEnter).
+        val navigate: (SettingsRoute, String?) -> Unit = { target, key ->
+            if (route == SettingsRoute.ROOT && target != SettingsRoute.ROOT) {
+                back.animateEnter { onNavigate(target, key) }
+            } else {
+                onNavigate(target, key)
+            }
+        }
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(back, active = route != SettingsRoute.ROOT)) {
-            SettingsRootScreen(onNavigate = onNavigate)
+            SettingsRootScreen(onNavigate = navigate)
         }
         // Each sub-page's own back button plays the same peel-away as the gesture, then returns.
         val onBack = { back.animateBack() }
@@ -2253,8 +2261,6 @@ private fun TimePickerButton(
 private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
-    var extraArgs by remember { mutableStateOf(GalleryDlPreferences.getExtraArgs(context)) }
-    var saved by remember { mutableStateOf(false) }
     var extractorArgs by remember { mutableStateOf(GalleryDlPreferences.getExtractorArgs(context)) }
     var extractorArgsSaved by remember { mutableStateOf(false) }
     var formatSort by remember { mutableStateOf(GalleryDlPreferences.getFormatSort(context)) }
@@ -2269,38 +2275,12 @@ private fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     SettingsSubScaffold(title = "Advanced", topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
             Text(
-                "Extra command-line arguments passed to gallery-dl on every download. For advanced users.",
+                "Extra command-line arguments added to every download. For advanced users.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = extraArgs,
-                onValueChange = { extraArgs = it; saved = false },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                label = { Text("e.g. --write-metadata --no-mtime") },
-                shape = MaterialTheme.shapes.medium,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    sharedPreferences.edit().putString(GalleryDlPreferences.KEY_EXTRA_ARGS, extraArgs).apply()
-                    saved = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Save arguments")
-            }
-
-            if (saved) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extra arguments saved", tint = MaterialTheme.colorScheme.primary)
-            }
+            ExtraArgsSheetField()
         }
 
         SettingsSection(title = "YouTube", icon = Icons.Outlined.Memory) {
@@ -4428,6 +4408,148 @@ private fun SizeSheetField(
             }
         }
     }
+}
+
+/** Advanced > Extra arguments: an on/off toggle, and one button (summarising what's set) that
+ * opens a sheet with the three sets — one for both engines, one each for yt-dlp and gallery-dl
+ * only (see GalleryDlPreferences.getExtraArgsFor for how they combine). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExtraArgsSheetField() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var enabled by remember { mutableStateOf(GalleryDlPreferences.isExtraArgsEnabled(context)) }
+    var bothArgs by remember { mutableStateOf(GalleryDlPreferences.getExtraArgs(context)) }
+    var ytDlpArgs by remember { mutableStateOf(GalleryDlPreferences.getYtDlpExtraArgs(context)) }
+    var galleryDlArgs by remember { mutableStateOf(GalleryDlPreferences.getGalleryDlExtraArgs(context)) }
+    var showSheet by remember { mutableStateOf(false) }
+
+    IconToggleRow(
+        icon = Icons.Outlined.Terminal,
+        title = "Use extra arguments",
+        subtitle = "Off keeps them saved but adds none to downloads.",
+        checked = enabled,
+        onCheckedChange = {
+            enabled = it
+            GalleryDlPreferences.setExtraArgsEnabled(context, it)
+        },
+    )
+    Spacer(Modifier.height(12.dp))
+
+    val setCount = listOf(bothArgs, ytDlpArgs, galleryDlArgs).count { it.isNotBlank() }
+    val summary = when {
+        setCount == 0 -> "None"
+        else -> listOfNotNull(
+            "both".takeIf { bothArgs.isNotBlank() },
+            "yt-dlp".takeIf { ytDlpArgs.isNotBlank() },
+            "gallery-dl".takeIf { galleryDlArgs.isNotBlank() },
+        ).joinToString(", ", prefix = "Set for ")
+    }
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        enabled = enabled,
+        onClick = { showSheet = true },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
+                Text("Extra arguments", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(summary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+
+    if (showSheet) {
+        // Seeded once when the sheet opens; only Save writes anything back.
+        var draftBoth by remember { mutableStateOf(bothArgs) }
+        var draftYtDlp by remember { mutableStateOf(ytDlpArgs) }
+        var draftGalleryDl by remember { mutableStateOf(galleryDlArgs) }
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text("Extra arguments", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Real command-line flags. Each engine gets the \"Both\" set plus its own.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ExtraArgsSection(
+                    title = "Both",
+                    subtitle = "Passed to yt-dlp and gallery-dl. Only flags both understand.",
+                    value = draftBoth,
+                    onValueChange = { draftBoth = it },
+                    placeholder = "e.g. --no-mtime",
+                )
+                ExtraArgsSection(
+                    title = "yt-dlp",
+                    subtitle = "Passed to yt-dlp only.",
+                    value = draftYtDlp,
+                    onValueChange = { draftYtDlp = it },
+                    placeholder = "e.g. --extractor-args \"youtube:player_client=web\"",
+                )
+                ExtraArgsSection(
+                    title = "gallery-dl",
+                    subtitle = "Passed to gallery-dl only.",
+                    value = draftGalleryDl,
+                    onValueChange = { draftGalleryDl = it },
+                    placeholder = "e.g. --write-metadata",
+                )
+                Text(
+                    "Instaloader has none: it runs as a library here, not a command line.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                Spacer(Modifier.height(24.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    ConfirmCancelSplitButton(
+                        label = "Save",
+                        icon = Icons.Filled.FilledCheckCircle,
+                        onConfirm = {
+                            bothArgs = draftBoth.trim()
+                            ytDlpArgs = draftYtDlp.trim()
+                            galleryDlArgs = draftGalleryDl.trim()
+                            GalleryDlPreferences.setExtraArgs(context, bothArgs)
+                            GalleryDlPreferences.setYtDlpExtraArgs(context, ytDlpArgs)
+                            GalleryDlPreferences.setGalleryDlExtraArgs(context, galleryDlArgs)
+                            showSheet = false
+                        },
+                        onCancel = { showSheet = false },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExtraArgsSection(
+    title: String,
+    subtitle: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+) {
+    Spacer(Modifier.height(20.dp))
+    Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.height(8.dp))
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
+        placeholder = { Text(placeholder) },
+        shape = MaterialTheme.shapes.medium,
+    )
 }
 
 /** M3 Expressive split button: the leading half confirms ([label] — Done, Save, Start now, ...),

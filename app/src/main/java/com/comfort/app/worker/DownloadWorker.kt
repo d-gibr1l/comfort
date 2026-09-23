@@ -736,10 +736,14 @@ class DownloadWorker(
                 // The sheet's extra commands are appended to (not a replacement for) the global
                 // Advanced > Extra arguments field, so a per-download tweak doesn't silently drop
                 // whatever the user configured globally for every download.
-                val extraArgs = listOfNotNull(
-                    GalleryDlPreferences.getExtraArgs(applicationContext).takeIf { it.isNotBlank() },
+                // Advanced > Extra arguments: each engine gets the "both" set plus its own (see
+                // GalleryDlPreferences.getExtraArgsFor) — the two take different flags.
+                fun extraArgsFor(engine: DownloadEngine) = listOfNotNull(
+                    GalleryDlPreferences.getExtraArgsFor(applicationContext, engine).takeIf { it.isNotBlank() },
                     entity?.extraCommands?.takeIf { it.isNotBlank() },
                 ).joinToString(" ")
+                val extraArgs = extraArgsFor(DownloadEngine.GALLERY_DL)
+                val ytDlpExtraArgs = extraArgsFor(DownloadEngine.YT_DLP)
                 // Tracks already-fetched item IDs across retries, so pausing/retrying a download
                 // resumes where it left off instead of starting the whole gallery over. Separate
                 // files per engine — gallery-dl's archive is a sqlite db, yt-dlp's is a plain text
@@ -871,14 +875,14 @@ class DownloadWorker(
                     ""
                 }
                 suspend fun runYtDlp(): Int =
-                    // Neither gallery-dl's filename-format template syntax nor its extra-args
-                    // string mean anything to yt-dlp, so those two aren't passed through — cookies
-                    // and the speed limit use compatible formats for both engines and are shared.
+                    // gallery-dl's filename-format template syntax means nothing to yt-dlp, so
+                    // it isn't passed; extra arguments are yt-dlp's own set (ytDlpExtraArgs, real
+                    // yt-dlp flags). Cookies and the speed limit are shared.
                     PythonRuntime.run(
                         applicationContext, "yt_dlp_wrapper.py",
                         listOf(
                             "download", url, stagingDir.absolutePath, cookiesArg,
-                            "", "", ytDlpArchivePath, limitRate, formatIdOverride,
+                            "", ytDlpExtraArgs, ytDlpArchivePath, limitRate, formatIdOverride,
                             jsRuntimePath, ffmpegPath,
                             if (audioOnly) "1" else "0", if (downloadSubtitles) "1" else "0", subtitleLangs,
                             if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",

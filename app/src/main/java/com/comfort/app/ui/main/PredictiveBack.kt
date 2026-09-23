@@ -39,6 +39,7 @@ import kotlin.math.roundToInt
  *    front page carries on to +20% and fades out while the page behind slides into place and
  *    fades fully in, over up to 150ms, decelerating;
  *  - a cancelled gesture eases everything back.
+ * Opening a page plays J2K's push, the mirror image (see [BackRevealState.animateEnter]).
  *
  * Callers apply [Modifier.predictiveBackReveal] to the page in front and
  * [Modifier.predictiveBackBehind] to the page it reveals, and must keep that page composed
@@ -62,6 +63,39 @@ class BackRevealState internal constructor(
         if (finishing) return
         finishing = true
         scope.launch { commit() }
+    }
+
+    /** Opens the page in front — J2K's push, the mirror of its back: the new page comes in from
+     * 20% to the right while fading in, and the page behind slides 20% left while fading out, over
+     * 200ms. [change] is what makes the new page appear; it runs after the starting values are
+     * set, in the same frame, so the page never shows for a frame at rest first.
+     * [behindVisible] is false when the page behind is already hidden (switching between two
+     * pages that both sit on top of it, e.g. Library to Settings), so only the new page moves. */
+    fun animateEnter(behindVisible: Boolean = true, change: () -> Unit) {
+        if (finishing) {
+            change()
+            return
+        }
+        finishing = true
+        scope.launch {
+            try {
+                frontX.snapTo(ENTER_FROM_X)
+                frontAlpha.snapTo(0f)
+                behindX.snapTo(0f)
+                behindAlpha.snapTo(if (behindVisible) 1f else 0f)
+                shadow.snapTo(0f)
+                change()
+                val spec = tween<Float>(ENTER_MS, easing = ACCELERATE_DECELERATE)
+                coroutineScope {
+                    launch { frontX.animateTo(0f, spec) }
+                    launch { frontAlpha.animateTo(1f, spec) }
+                    launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
+                    launch { behindAlpha.animateTo(0f, spec) }
+                }
+            } finally {
+                finishing = false
+            }
+        }
     }
 
     internal suspend fun track(progress: Float) {
@@ -89,25 +123,29 @@ class BackRevealState internal constructor(
     }
 
     private suspend fun commit() {
-        // Time scales with the distance still to cover, like CrossFadeChangeHandler's pop.
-        val remaining = ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f)
-        val spec = tween<Float>((remaining * COMMIT_MS).roundToInt().coerceAtLeast(60), easing = DECELERATE)
-        coroutineScope {
-            launch { frontX.animateTo(EXIT_X, spec) }
-            launch { frontAlpha.animateTo(0f, spec) }
-            launch { behindX.animateTo(0f, spec) }
-            launch { behindAlpha.animateTo(1f, spec) }
-            launch { shadow.animateTo(0f, spec) }
+        try {
+            // Time scales with the distance still to cover, like CrossFadeChangeHandler's pop.
+            val remaining = ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f)
+            val spec = tween<Float>((remaining * COMMIT_MS).roundToInt().coerceAtLeast(60), easing = DECELERATE)
+            coroutineScope {
+                launch { frontX.animateTo(EXIT_X, spec) }
+                launch { frontAlpha.animateTo(0f, spec) }
+                launch { behindX.animateTo(0f, spec) }
+                launch { behindAlpha.animateTo(1f, spec) }
+                launch { shadow.animateTo(0f, spec) }
+            }
+            // The state change and the reset below land in the same recomposition, so the page
+            // behind (now the visible page) is already back to identity when the front one goes.
+            onBack.value()
+            frontX.snapTo(0f)
+            frontAlpha.snapTo(1f)
+            behindX.snapTo(-BEHIND_OFFSET)
+            behindAlpha.snapTo(0f)
+            shadow.snapTo(0f)
+        } finally {
+            // Always: a stuck flag made every later animateEnter()/animateBack() skip its motion.
+            finishing = false
         }
-        // The state change and the reset below land in the same recomposition, so the page
-        // behind (now the visible page) is already back to identity when the front one goes.
-        onBack.value()
-        frontX.snapTo(0f)
-        frontAlpha.snapTo(1f)
-        behindX.snapTo(-BEHIND_OFFSET)
-        behindAlpha.snapTo(0f)
-        shadow.snapTo(0f)
-        finishing = false
     }
 
     private companion object {
@@ -118,6 +156,11 @@ class BackRevealState internal constructor(
         const val CANCEL_MS = 150
         // LinearOutSlowIn — CrossFadeChangeHandler's own fallback when there's no fling velocity.
         val DECELERATE = CubicBezierEasing(0f, 0f, 0.2f, 1f)
+        // Push: CrossFadeChangeHandler's 200ms with the Animator default interpolator
+        // (AccelerateDecelerate, approximated as a cubic).
+        const val ENTER_FROM_X = 0.2f
+        const val ENTER_MS = 200
+        val ACCELERATE_DECELERATE = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
     }
 }
 

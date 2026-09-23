@@ -710,6 +710,58 @@ def probe(url):
 _INFO_JSON_MAX_AGE_SECONDS = 20 * 60
 
 
+
+def _apply_extra_args(ydl_opts, extra_args, emit=None):
+    """Settings > Advanced > Extra arguments (and a download's own extra commands) for yt-dlp.
+
+    Real yt-dlp command-line flags ("--user-agent ...", "--extractor-args ...") are parsed with
+    yt-dlp's own option parser, and only what they change from its defaults is applied, merged
+    into the options already built here: a nested option (the output template, HTTP headers)
+    gains just the changed keys, and extra post-processors are added after the app's own rather
+    than replacing them. Text with no flags at all keeps the old "key=value" form (raw option
+    names). A flag yt-dlp doesn't know is reported as a warning and the rest of the download
+    goes ahead without the extra arguments."""
+    if not extra_args or not extra_args.strip():
+        return
+    import shlex
+    try:
+        tokens = shlex.split(extra_args)
+    except ValueError:
+        tokens = extra_args.split()
+    if not any(t.startswith("-") for t in tokens):
+        for token in tokens:
+            if "=" in token:
+                key, _, value = token.partition("=")
+                ydl_opts[key] = value
+        return
+    import contextlib
+    import io
+    try:
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            defaults = yt_dlp.parse_options([]).ydl_opts
+            parsed = yt_dlp.parse_options(tokens).ydl_opts
+    except BaseException as e:  # noqa: BLE001 - optparse raises OptParseError/SystemExit
+        message = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
+        line = f"[warning] Ignoring extra arguments: {message}"
+        (emit or print)(line)
+        return
+    for key, value in parsed.items():
+        default = defaults.get(key)
+        if value == default:
+            continue
+        if key == "postprocessors" and isinstance(value, list):
+            added = [pp for pp in value if pp not in (default or [])]
+            ydl_opts[key] = list(ydl_opts.get(key) or []) + added
+        elif isinstance(value, dict) and isinstance(default, dict):
+            changed = {k: v for k, v in value.items() if default.get(k) != v}
+            base = ydl_opts.get(key)
+            if key == "outtmpl" and isinstance(base, str):
+                base = {"default": base}
+            ydl_opts[key] = {**base, **changed} if isinstance(base, dict) else changed
+        else:
+            ydl_opts[key] = value
+
+
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
              extra_args=None, archive_path=None, limit_rate=None, format_selector=None,
              should_cancel=None, js_runtime_path=None, ffmpeg_path=None,
@@ -1320,14 +1372,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # clip_ranges was already parsed earlier (feeds custom_pp_keys above) — _LocalTrimPP itself is
     # registered below, once the YoutubeDL instance exists to construct it with.
 
-    if extra_args:
-        # yt-dlp has no CLI-args-string constructor, so only a small, safe subset of raw options
-        # is supported this way: "key=value" pairs matching real yt_dlp option names, one per line
-        # or space-separated. Anything unrecognized is ignored rather than raising.
-        for token in extra_args.split():
-            if "=" in token:
-                key, _, value = token.partition("=")
-                ydl_opts[key] = value
+    _apply_extra_args(ydl_opts, extra_args, callback)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -1438,11 +1483,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         # all, on any host, regardless of the toggle. This makes the preview honor the same global
         # setting the real download already does, rather than reviving a Reddit-only special case.
         ydl_opts["impersonate"] = ImpersonateTarget()
-    if extra_args:
-        for token in extra_args.split():
-            if "=" in token:
-                key, _, value = token.partition("=")
-                ydl_opts[key] = value
+    _apply_extra_args(ydl_opts, extra_args)
 
     def _pick(entry):
         if not entry:

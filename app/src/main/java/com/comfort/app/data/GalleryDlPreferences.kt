@@ -5,6 +5,9 @@ import android.net.Uri
 
 enum class VideoQuality(val label: String) {
     BEST("Best available"),
+    // Stored by name (see getVideoQuality), so adding entries leaves saved choices intact.
+    P2160("4K"),
+    P1440("1440p"),
     P1080("1080p"),
     P720("720p"),
     P480("480p"),
@@ -22,6 +25,8 @@ enum class VideoQuality(val label: String) {
      * degrading if nothing fits" (see their README's "Sorting Formats" section). */
     fun resolutionCap(): Int? = when (this) {
         BEST, AUDIO_ONLY -> null
+        P2160 -> 2160
+        P1440 -> 1440
         P1080 -> 1080
         P720 -> 720
         P480 -> 480
@@ -62,6 +67,9 @@ object GalleryDlPreferences {
     const val KEY_COOKIES = "cookies"
     const val KEY_FILENAME_FORMAT = "filename_format"
     const val KEY_EXTRA_ARGS = "extra_args"
+    const val KEY_EXTRA_ARGS_YT_DLP = "extra_args_yt_dlp"
+    const val KEY_EXTRA_ARGS_GALLERY_DL = "extra_args_gallery_dl"
+    const val KEY_EXTRA_ARGS_ENABLED = "extra_args_enabled"
     const val KEY_CONCURRENT_DOWNLOADS = "concurrent_downloads"
     const val KEY_WIFI_ONLY = "wifi_only"
     const val KEY_SCHEDULE_ENABLED = "schedule_enabled"
@@ -191,6 +199,45 @@ object GalleryDlPreferences {
 
     fun getExtraArgs(context: Context): String {
         return prefs(context).getString(KEY_EXTRA_ARGS, "") ?: ""
+    }
+
+    fun setExtraArgs(context: Context, args: String) {
+        prefs(context).edit().putString(KEY_EXTRA_ARGS, args).apply()
+    }
+
+    // Advanced > Extra arguments has three sets: [getExtraArgs] (KEY_EXTRA_ARGS, the original
+    // single field) goes to both engines, and these two to one engine each — the engines take
+    // different flags, so a flag for one used to make the other fail.
+    fun getYtDlpExtraArgs(context: Context): String = prefs(context).getString(KEY_EXTRA_ARGS_YT_DLP, "") ?: ""
+
+    fun setYtDlpExtraArgs(context: Context, args: String) {
+        prefs(context).edit().putString(KEY_EXTRA_ARGS_YT_DLP, args).apply()
+    }
+
+    fun getGalleryDlExtraArgs(context: Context): String = prefs(context).getString(KEY_EXTRA_ARGS_GALLERY_DL, "") ?: ""
+
+    fun setGalleryDlExtraArgs(context: Context, args: String) {
+        prefs(context).edit().putString(KEY_EXTRA_ARGS_GALLERY_DL, args).apply()
+    }
+
+    /** Turns all three sets off without clearing them. On by default, as they always applied. */
+    fun isExtraArgsEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_EXTRA_ARGS_ENABLED, true)
+
+    fun setExtraArgsEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_EXTRA_ARGS_ENABLED, enabled).apply()
+    }
+
+    /** What one engine gets: the "both" set plus its own, or nothing while switched off. Spotify
+     * downloads through yt-dlp, so it gets yt-dlp's; Instaloader runs as a Python library here,
+     * not a command line, so it never gets any. */
+    fun getExtraArgsFor(context: Context, engine: DownloadEngine): String {
+        if (!isExtraArgsEnabled(context)) return ""
+        val own = when (engine) {
+            DownloadEngine.GALLERY_DL -> getGalleryDlExtraArgs(context)
+            DownloadEngine.YT_DLP, DownloadEngine.SPOTIFY -> getYtDlpExtraArgs(context)
+            DownloadEngine.INSTALOADER -> return ""
+        }
+        return listOf(getExtraArgs(context), own).filter { it.isNotBlank() }.joinToString(" ")
     }
 
     /** yt-dlp CLI-syntax --extractor-args string(s), e.g. "youtube:player_client=android,web".
