@@ -136,6 +136,26 @@ private val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+// Adds downloadingAudioTrack — whether the file currently transferring is a video+audio merge's
+// separate audio track (yt_dlp_wrapper.py's "[phase]" signal), so the queue card can say so.
+// Introduced with the schema bump to 19 (commit c94a34b) but shipped without a migration, which
+// left 18 -> 19 to fallbackToDestructiveMigration() — wiping history/queue on upgrade. Same
+// NOT NULL DEFAULT 0 shape as isAudio above, matching the entity's @ColumnInfo(defaultValue = "0").
+private val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN downloadingAudioTrack INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+// Adds formatTags — the queue card's "1080p | MP4"-style pills (yt_dlp_wrapper.py's "[format]"
+// signal). Introduced with the schema bump to 20 (commit ecb95b4), likewise without a migration
+// until now. Nullable, no default — same shape as overrideTitle/overrideArtist above.
+private val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN formatTags TEXT")
+    }
+}
+
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
     version = 20,
@@ -155,6 +175,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
+                        MIGRATION_18_19, MIGRATION_19_20,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration
