@@ -3244,6 +3244,16 @@ fun CookieLoginDialog(
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
+                                // MATCH_PARENT, not AndroidView's default WRAP_CONTENT: with a
+                                // wrap-content height the WebView can't resolve CSS viewport units,
+                                // so 100vh/dvh/svh all computed to 0px. Instagram sizes its "Log into
+                                // your Meta Account" sheet as calc(100vh - padding), so it collapsed
+                                // to zero height and only its dark backdrop showed (found live via the
+                                // WebView devtools: max-height 0px, 100vh = 0).
+                                layoutParams = android.view.ViewGroup.LayoutParams(
+                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                )
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 // Force a Desktop Chrome User-Agent. Instagram's mobile site often sends intent:// redirects
