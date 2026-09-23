@@ -86,6 +86,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET speedMbs = 0 WHERE id = :id")
     suspend fun resetSpeed(id: String)
 
+    /** Live speed measured from the staging folder, for engines that don't report progress
+     * themselves (gallery-dl, Instaloader) — see DownloadWorker's transfer monitor. */
+    @Query("UPDATE downloads SET speedMbs = :speed WHERE id = :id")
+    suspend fun updateSpeed(id: String, speed: Float)
+
     /** yt-dlp reports a file's total size before any bytes move — set once per item as soon as
      * it's known, so the UI can show a real size and a byte-accurate progress fraction instead of
      * an item-count-only one. */
