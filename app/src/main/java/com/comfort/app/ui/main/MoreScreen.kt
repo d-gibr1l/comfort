@@ -85,7 +85,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 
-enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, ABOUT }
+enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, ABOUT }
 
 private fun SettingsRoute.displayName(): String = when (this) {
     SettingsRoute.ROOT -> "Settings"
@@ -95,6 +95,7 @@ private fun SettingsRoute.displayName(): String = when (this) {
     SettingsRoute.PROCESSING -> "Processing"
     SettingsRoute.ADVANCED -> "Advanced"
     SettingsRoute.COOKIES -> "Cookies & Login"
+    SettingsRoute.UPDATES -> "Updates"
     SettingsRoute.ABOUT -> "About"
 }
 
@@ -106,6 +107,7 @@ private fun SettingsRoute.icon(): ImageVector = when (this) {
     SettingsRoute.PROCESSING -> Icons.Outlined.Movie
     SettingsRoute.ADVANCED -> Icons.Outlined.Terminal
     SettingsRoute.COOKIES -> Icons.Outlined.Lock
+    SettingsRoute.UPDATES -> Icons.Outlined.Update
     SettingsRoute.ABOUT -> Icons.Outlined.Info
 }
 
@@ -187,8 +189,8 @@ private val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry("Dark theme", "Pick this app's dark-mode color scheme.", SettingsRoute.APPEARANCE),
 
     // About
-    SubpageSearchEntry("App update", "Check for a newer version of this app.", SettingsRoute.ABOUT),
-    SubpageSearchEntry("Engines", "Update yt-dlp, gallery-dl and Instaloader independently of an app update.", SettingsRoute.ABOUT),
+    SubpageSearchEntry("App update", "Check for a newer version of this app.", SettingsRoute.UPDATES),
+    SubpageSearchEntry("Engines", "Update yt-dlp, gallery-dl and Instaloader independently of an app update.", SettingsRoute.UPDATES),
     SubpageSearchEntry("Credits", "gallery-dl, yt-dlp, Instaloader, FFmpeg, QuickJS, aria2, and the bundled Python runtime.", SettingsRoute.ABOUT),
 )
 
@@ -221,6 +223,7 @@ fun MoreScreen(route: SettingsRoute, highlightKey: String?, onNavigate: (Setting
                 SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
                 SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
                 SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
+                SettingsRoute.UPDATES -> UpdatesSettingsScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
                 SettingsRoute.ABOUT -> AboutScreen(onBack = { onNavigate(SettingsRoute.ROOT, null) }, highlightKey = highlightKey)
             }
         }
@@ -247,7 +250,9 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     val scrollState = rememberScrollState()
     val density = androidx.compose.ui.platform.LocalDensity.current
     var maxHeaderHeightPx by remember { mutableStateOf(0) }
-    val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp)
+    // 4dp under the header (not the sub-pages' 20dp) plus the list's own 8dp top padding below —
+    // the combined ~32dp gap between the title and the first card read as too loose (reported live).
+    val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp, expandedBottomPadding = 4.dp)
     // Split across Folders/Downloads/Processing (previously all one "Downloads" page) to match
     // YTDLnis's own settings shape — see gallery-dl.md's "Break up the Downloads settings page"
     // entry for why: one page covering filenames+folders+network+scheduling+quality+embedding all
@@ -260,6 +265,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             SettingsItemSpec(Icons.Outlined.Movie, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
             SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
             SettingsItemSpec(Icons.Outlined.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
+            SettingsItemSpec(Icons.Outlined.Update, "Updates", "App, yt-dlp, gallery-dl & Instaloader", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
         )
     }
     val aboutItems = remember {
@@ -280,7 +286,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                 .verticalScroll(scrollState)
                 .padding(top = with(density) { maxHeaderHeightPx.toDp() })
                 .padding(horizontal = 20.dp)
-                .padding(top = 12.dp, bottom = 20.dp),
+                .padding(top = 8.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             ExpressiveSettingsList(
@@ -3277,6 +3283,16 @@ fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): 
     return (header + keptExisting + newLines).joinToString("\n").trim()
 }
 
+/** The app's own update check plus the download engines' (yt-dlp, gallery-dl, Instaloader) —
+ * moved out of About into their own page so updating isn't buried under version info and credits. */
+@Composable
+private fun UpdatesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
+    SettingsSubScaffold(title = "Updates", topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
+        AppUpdateSection()
+        EnginesSection()
+    }
+}
+
 @Composable
 private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -3324,10 +3340,6 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 }
             }
         }
-
-        AppUpdateSection()
-
-        EnginesSection()
 
         // gallery-dl was the only credit here before — a real gap for an app that's really built on
         // six separately-licensed open-source projects, not one: yt-dlp does just as much of the
@@ -3419,7 +3431,7 @@ private fun QuickAppUpdateSection() {
     }
 }
 
-/** Persistent panel for About > this app's own update check — mirrors EnginesSection() below (a
+/** Persistent panel for Updates > this app's own update check — mirrors EnginesSection() below (a
  * persistent "Checking…"/"Up to date" utility panel, unlike QuickAppUpdateSection above which only
  * ever shows up as news) but for one thing, not a list. Always does its own fresh check regardless
  * of the cached flag/interval MainScreen's periodic one respects, same as EnginesSection. */
@@ -3528,7 +3540,7 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloading: Boolean, 
 }
 
 /** Compact teaser on the Settings root list, so an available engine update is both visible and
- * actionable without drilling into About > Engines first — mirrors that section's own check/update
+ * actionable without drilling into Updates > Engines first — mirrors that section's own check/update
  * logic (see EnginesSection() below) but renders nothing at all when everything's already current,
  * rather than always showing a "Checking…"/"Up to date" panel the way the About page's version
  * does (appropriate there as a persistent utility panel; here it should only ever appear as news,
@@ -3538,12 +3550,15 @@ private fun QuickEngineUpdateSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var statuses by remember { mutableStateOf<List<EngineUpdater.VersionStatus>?>(null) }
-    var updatingEngine by remember { mutableStateOf<String?>(null) }
+    // A set, not one engine: updates run concurrently, and a single slot made tapping a second
+    // engine's Update look like it stopped the first (its spinner reverted to an Update button),
+    // then the first to finish cleared the other's spinner too.
+    var updatingEngines by remember { mutableStateOf(emptySet<String>()) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         var result = EngineUpdater.checkAll(context)
-        // Same auto-update behavior as MainScreen's own periodic check (Settings > About > Engines
+        // Same auto-update behavior as MainScreen's own periodic check (Settings > Updates > Engines
         // > Auto-update, on by default) — opening Settings shouldn't need a manual tap either when
         // it's enabled.
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
@@ -3570,14 +3585,14 @@ private fun QuickEngineUpdateSection() {
         outdated.forEachIndexed { index, status ->
             EngineUpdateRow(
                 status = status,
-                updating = updatingEngine == status.engine.packageDirName,
+                updating = status.engine.packageDirName in updatingEngines,
                 onUpdate = {
                     if (status.artifactUrl == null) return@EngineUpdateRow
-                    updatingEngine = status.engine.packageDirName
+                    updatingEngines = updatingEngines + status.engine.packageDirName
                     errorText = null
                     scope.launch {
                         val result = EngineUpdater.update(context, status)
-                        updatingEngine = null
+                        updatingEngines = updatingEngines - status.engine.packageDirName
                         result.onSuccess { newVersion ->
                             val updated = statuses.orEmpty().map {
                                 if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
@@ -3612,7 +3627,10 @@ private fun EnginesSection() {
     val scope = rememberCoroutineScope()
     var statuses by remember { mutableStateOf<List<EngineUpdater.VersionStatus>?>(null) }
     var checking by remember { mutableStateOf(false) }
-    var updatingEngine by remember { mutableStateOf<String?>(null) }
+    // A set, not one engine: updates run concurrently, and a single slot made tapping a second
+    // engine's Update look like it stopped the first (its spinner reverted to an Update button),
+    // then the first to finish cleared the other's spinner too.
+    var updatingEngines by remember { mutableStateOf(emptySet<String>()) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var autoUpdate by remember { mutableStateOf(GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) }
     var ytDlpChannel by remember { mutableStateOf(GalleryDlPreferences.getYtDlpUpdateChannel(context)) }
@@ -3690,16 +3708,19 @@ private fun EnginesSection() {
                             }
                         }
                     },
-                    updating = updatingEngine == status.engine.packageDirName,
+                    updating = status.engine.packageDirName in updatingEngines,
                     onUpdate = {
                         if (status.artifactUrl == null) return@EngineCard
-                        updatingEngine = status.engine.packageDirName
+                        updatingEngines = updatingEngines + status.engine.packageDirName
                         errorText = null
                         scope.launch {
                             val result = EngineUpdater.update(context, status)
-                            updatingEngine = null
+                            updatingEngines = updatingEngines - status.engine.packageDirName
                             result.onSuccess { newVersion ->
-                                val updated = currentStatuses.map {
+                                // The live list, not the currentStatuses snapshot from when Update was
+                                // tapped — with two updates in flight, writing back that stale copy let
+                                // whichever finished second erase the first one's new version.
+                                val updated = statuses.orEmpty().map {
                                     if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
                                 }
                                 statuses = updated
