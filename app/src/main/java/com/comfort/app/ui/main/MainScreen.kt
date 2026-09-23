@@ -58,6 +58,7 @@ import compose.icons.FeatherIcons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
+import kotlinx.coroutines.launch
 import compose.icons.feathericons.*
 import com.comfort.app.viewmodel.DownloadsViewModel
 
@@ -252,7 +253,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(tabBack, active = selectedTab != 0)) {
             HomeScreen(
-                onDownload = { url -> routingUrl = url },
+                onConfigure = { url -> routingUrl = url },
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = { showQueueScreen = true },
@@ -497,12 +498,30 @@ private object ClipboardSuggestionState {
 
 @Composable
 fun HomeScreen(
-    onDownload: (String) -> Unit,
+    // Opens the preview/picker sheets (per-download quality, items, trim, ...) for the link.
+    onConfigure: (String) -> Unit,
     viewModel: DownloadsViewModel,
     onOpenLibrary: () -> Unit = {},
     onOpenQueue: () -> Unit = {},
 ) {
     var url by remember { mutableStateOf("") }
+    val homeContext = androidx.compose.ui.platform.LocalContext.current
+    val homeScope = androidx.compose.runtime.rememberCoroutineScope()
+    // Download: starts right away with the default settings — the same thing sharing a link into
+    // the "Instant" Sharesheet entry does (ShareActivity's InstantShareHandler), duplicate handling
+    // and message included. Configure is the other button.
+    fun downloadNow(link: String) {
+        homeScope.launch {
+            val result = com.comfort.app.data.DownloadDispatcher.enqueueDownload(
+                homeContext, link, "Downloading from ${com.comfort.app.data.VideoSiteRouter.siteName(link)}",
+            )
+            android.widget.Toast.makeText(
+                homeContext,
+                if (result is com.comfort.app.data.EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
     var clipboardSuggestion by remember { mutableStateOf<String?>(null) }
     val queueItems by viewModel.queueFlow.collectAsStateWithLifecycle()
@@ -616,21 +635,24 @@ fun HomeScreen(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                val clipText = clipboardManager.getText()?.text
-                                if (!clipText.isNullOrBlank()) url = clipText
+                                if (url.isNotBlank()) {
+                                    onConfigure(url.trim())
+                                    url = ""
+                                }
                             },
                             modifier = Modifier.weight(1f).height(52.dp),
                             shape = MaterialTheme.shapes.extraLarge,
+                            enabled = url.isNotBlank(),
                         ) {
-                            Icon(Icons.Outlined.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Paste")
+                            Text("Configure")
                         }
 
                         Button(
                             onClick = {
                                 if (url.isNotBlank()) {
-                                    onDownload(url)
+                                    downloadNow(url.trim())
                                     url = ""
                                 }
                             },
