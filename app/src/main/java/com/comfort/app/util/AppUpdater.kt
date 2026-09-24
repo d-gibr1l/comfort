@@ -20,9 +20,9 @@ import java.net.URL
  * artifact here is a whole new APK, not a wheel dropped into site-packages, so "installing" one
  * means handing it to Android's own package installer rather than unzipping it in place.
  *
- * Releases are expected to be tagged like "v1.2.0" (a leading "v" is stripped) with a universal
- * release APK attached as an asset ending ".apk" — publish a GitHub Release with that shape on
- * REPO for this to pick up. */
+ * Releases are expected to be tagged like "v1.2.0" (a leading "v" is stripped) with the release
+ * APKs attached, named like the build's own splits: "Comfort-1.2.0-arm64-v8a.apk", ...,
+ * "Comfort-1.2.0-universal.apk" — see fetchLatest for how one is picked. */
 object AppUpdater {
     private const val REPO = "d-gibr1l/comfort"
 
@@ -76,13 +76,16 @@ object AppUpdater {
         val version = root.getString("tag_name").removePrefix("v")
         val notes = root.optString("body").takeIf { it.isNotBlank() }
         val assets: JSONArray = root.getJSONArray("assets")
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            if (asset.getString("name").endsWith(".apk")) {
-                return@runCatching Triple(version, asset.getString("browser_download_url"), notes)
-            }
-        }
-        null
+        val apks = (0 until assets.length()).map { assets.getJSONObject(it) }
+            .filter { it.getString("name").endsWith(".apk") }
+            .associate { it.getString("name") to it.getString("browser_download_url") }
+        // A release carries the split APKs (Comfort-<version>-arm64-v8a.apk, ...-universal.apk, ...),
+        // so take the one built for this phone's CPU, then the universal one, then any APK — the
+        // first .apk alone could be another CPU's build, which the installer rejects.
+        val preferred = android.os.Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi -> apks.entries.firstOrNull { it.key.endsWith("-$abi.apk") } }
+            ?: apks.entries.firstOrNull { it.key.endsWith("-universal.apk") }
+            ?: apks.entries.firstOrNull()
+        preferred?.let { Triple(version, it.value, notes) }
     }.getOrNull()
 
     suspend fun check(context: Context): UpdateStatus = withContext(Dispatchers.IO) {

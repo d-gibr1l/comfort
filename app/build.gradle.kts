@@ -19,8 +19,8 @@ android {
         // update at all. versionCode has no reader of its own in this app (it's the Play Store's
         // own install/upgrade key, not used here) but real Android tooling still expects it to move
         // in step, so bump it anyway on principle.
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
     }
 
     signingConfigs {
