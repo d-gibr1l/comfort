@@ -3406,7 +3406,14 @@ private fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
     }
 
     SettingsSubScaffold(title = "About", topicIcon = Icons.Outlined.Info, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "App", icon = Icons.Outlined.Info) {
+        SettingsSection(
+            title = "App", 
+            icon = Icons.Outlined.Info,
+            onClick = {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/d-gibr1l/comfort"))
+                context.startActivity(intent)
+            }
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
                 // AdaptiveIconDrawable, not a plain vector/raster) — composed by hand here from
@@ -4021,7 +4028,7 @@ private fun CreditChip(entry: CreditEntry, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SettingsSection(title: String, icon: ImageVector? = null, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsSection(title: String, icon: ImageVector? = null, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Column {
         // Google Sans Bold (the same face as each page's big title) at 14sp with a little tracking,
         // rather than the default 12sp semibold label — the section names read as too faint to
@@ -4047,6 +4054,8 @@ private fun SettingsSection(title: String, icon: ImageVector? = null, content: @
             modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainer,
+            onClick = onClick ?: {},
+            enabled = onClick != null,
         ) {
             Column(modifier = Modifier.padding(16.dp), content = content)
         }
