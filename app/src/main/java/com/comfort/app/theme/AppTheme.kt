@@ -78,15 +78,20 @@ private fun buildLight(primary: Color, onPrimary: Color, primaryContainer: Color
     onBackground = Neutral10,
     surface = surface,
     onSurface = Neutral10,
-    surfaceVariant = Neutral95,
-    onSurfaceVariant = Neutral50,
+    // Tone 90 (Material's surfaceVariant), not the cards' own Neutral95: pills drawn in it (the queue
+    // card's site badge) were exactly the card's color and invisible.
+    surfaceVariant = Neutral90,
+    onSurfaceVariant = Neutral45,
     surfaceContainerLowest = Color.White,
     surfaceContainerLow = background,
     surfaceContainer = Neutral95,
     surfaceContainerHigh = Neutral90,
     surfaceContainerHighest = Neutral80,
-    outline = Neutral80,
-    outlineVariant = Neutral90,
+    // Were Neutral80/Neutral90 — Material's outlineVariant/next tone, not outline: ~1.5:1 and ~1.2:1
+    // on these pages, so chip and button outlines barely showed (reported live on Yang). Now
+    // ~4.5-4.8:1 and ~2.3-2.5:1, in line with Expressive Purple's hand-made scheme.
+    outline = Neutral50,
+    outlineVariant = Neutral70,
     error = Red40,
     onError = Color.White,
     errorContainer = Red90,
@@ -111,15 +116,17 @@ private fun buildDark(primary: Color, onPrimary: Color, primaryContainer: Color,
     onBackground = Neutral90,
     surface = surface,
     onSurface = Neutral90,
-    surfaceVariant = Neutral20,
+    surfaceVariant = Neutral30,
     onSurfaceVariant = Neutral80,
     surfaceContainerLowest = background,
     surfaceContainerLow = surface,
     surfaceContainer = Neutral10,
     surfaceContainerHigh = Neutral20,
     surfaceContainerHighest = Neutral30,
-    outline = Neutral30,
-    outlineVariant = Neutral20,
+    // Were Neutral30/Neutral20 (~1.9:1 / ~1.4:1 on these near-black pages); Material's dark outline
+    // is tone 60 and outlineVariant tone 30.
+    outline = Neutral60,
+    outlineVariant = Neutral30,
     error = Red80,
     onError = Red10,
     errorContainer = Color(0xFF7F1D1D),
@@ -153,7 +160,8 @@ enum class AppTheme(
         lightLabel = "Sunset Coral",
         darkLabel = "Ember Night",
         light = buildLight(
-            primary = AccentRed, onPrimary = Color.White,
+            // Slightly darker than AccentRed (same hue): as link/accent text it was 4.13:1 on cards.
+            primary = Color(0xFFA85523), onPrimary = Color.White,
             primaryContainer = AccentCream, onPrimaryContainer = AccentRedDark,
             secondary = AccentRedDark,
             background = Color(0xFFFFF6F0), surface = Color.White,
@@ -169,7 +177,8 @@ enum class AppTheme(
         lightLabel = "Spring Blossom",
         darkLabel = "Midnight Dusk",
         light = buildLight(
-            primary = Color(0xFFC43C97), onPrimary = Color.White,
+            // Was 0xFFC43C97 (same hue): 4.18:1 as accent text on cards, now 4.61.
+            primary = Color(0xFFB9388E), onPrimary = Color.White,
             primaryContainer = Color(0xFFFCDCF0), onPrimaryContainer = Color(0xFF5C1147),
             // Darkened from 0xFFF02475 (same hue) — better-colors review: paired with fixed-white
             // text/icons (see buildLight's own onSecondary), that measured 4.03:1, under WCAG AA's
@@ -188,7 +197,8 @@ enum class AppTheme(
         lightLabel = "Teal Tide",
         darkLabel = "Sapphire Dusk",
         light = buildLight(
-            primary = Teal40, onPrimary = Color.White,
+            // Slightly darker than Teal40 (same hue): 4.04:1 as accent text on cards, now 4.72.
+            primary = Color(0xFF0B786E), onPrimary = Color.White,
             primaryContainer = Teal90, onPrimaryContainer = Color(0xFF00201C),
             secondary = Color(0xFF0369A1),
             background = Color(0xFFEFF8F7), surface = Color.White,
@@ -239,7 +249,8 @@ enum class AppTheme(
         lightLabel = "Lime Fizz",
         darkLabel = "Flat Lime",
         light = buildLight(
-            primary = Color(0xFF12803B), onPrimary = Color.White,
+            // Was 0xFF12803B (same hue): 4.44:1 as accent text on cards, now 4.68.
+            primary = Color(0xFF117C39), onPrimary = Color.White,
             primaryContainer = Color(0xFFD9F2DF), onPrimaryContainer = Color(0xFF0A3D1D),
             // Darkened from 0xFF65A30D (same hue) — better-colors review: paired with fixed-white
             // text/icons (see buildLight's own onSecondary), that measured 3.09:1, the worst
