@@ -12,6 +12,8 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Checks GitHub Releases on the app's own open-source repo for a newer build than what's
  * installed, and can download + launch the system installer for one — this app isn't on the Play
@@ -99,19 +101,74 @@ object AppUpdater {
      * here unlike EngineUpdater.update: GitHub only publishes one over plain HTTPS from this
      * project's own repo, without the separate published-digest EngineUpdater cross-checks PyPI's
      * wheels against. */
-    suspend fun downloadApk(context: Context, downloadUrl: String): Result<File> = withContext(Dispatchers.IO) {
-        runCatching {
-            val tempFile = File(context.cacheDir, "app_update.apk")
-            (URL(downloadUrl).openConnection() as HttpURLConnection).run {
-                connectTimeout = 10_000
-                readTimeout = 30_000
-                try {
-                    inputStream.use { input -> tempFile.outputStream().use { output -> input.copyTo(output) } }
-                } finally {
-                    disconnect()
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    val downloadProgress = kotlinx.coroutines.flow.MutableStateFlow<Float?>(null)
+    val downloadError = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    fun startDownload(context: Context, status: UpdateStatus) {
+        if (downloadProgress.value != null) return // Already downloading
+        val downloadUrl = status.downloadUrl ?: return
+        
+        // Clean up any old updates (both incomplete .tmp and old .apk files) so they don't waste space
+        context.cacheDir.listFiles()?.filter { it.name.startsWith("Comfort-") && it.name != "Comfort-${status.latestVersion}.apk" }?.forEach { it.delete() }
+        
+        val apkFile = File(context.cacheDir, "Comfort-${status.latestVersion}.apk")
+        
+        if (apkFile.exists() && apkFile.length() > 0L) {
+            promptInstall(context, apkFile)
+            return
+        }
+
+        downloadProgress.value = 0f
+        downloadError.value = null
+        
+        val appContext = context.applicationContext
+        
+        scope.launch {
+            runCatching {
+                val tempFile = File(appContext.cacheDir, "Comfort-${status.latestVersion}.apk.tmp")
+                (URL(downloadUrl).openConnection() as HttpURLConnection).run {
+                    connectTimeout = 10_000
+                    readTimeout = 30_000
+                    try {
+                        val totalBytes = contentLength
+                        var downloadedBytes = 0L
+                        inputStream.use { input ->
+                            tempFile.outputStream().use { output -> 
+                                val buffer = ByteArray(8192)
+                                var bytes = input.read(buffer)
+                                while (bytes >= 0) {
+                                    output.write(buffer, 0, bytes)
+                                    downloadedBytes += bytes
+                                    if (totalBytes > 0) {
+                                        downloadProgress.value = (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f)
+                                    }
+                                    bytes = input.read(buffer)
+                                }
+                            }
+                        }
+                    } finally {
+                        disconnect()
+                    }
                 }
+                tempFile.renameTo(apkFile)
+                downloadProgress.value = null
+                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    promptInstall(appContext, apkFile)
+                }
+            }.onFailure { e ->
+                downloadError.value = "Couldn't download update: ${e.message}"
+                downloadProgress.value = null
             }
-            tempFile
+        }
+    }
+    
+    private fun promptInstall(context: Context, apkFile: File) {
+        if (canInstall(context)) {
+            installApk(context, apkFile)
+        } else {
+            downloadError.value = "Allow installing from this app in the settings screen that just opened, then tap Update again."
+            requestInstallPermission(context)
         }
     }
 
