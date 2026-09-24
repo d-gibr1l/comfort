@@ -56,8 +56,14 @@ val Neutral99 = Color(0xFFFAFAFC)
 val Neutral95 = Color(0xFFF1F0F7)
 val Neutral90 = Color(0xFFE4E2ED)
 val Neutral80 = Color(0xFFC9C7D6)
+// Between Neutral80 and Neutral60: light themes' faint outlines (outlineVariant), ~2.3-2.5:1 on
+// their pages and cards, like Expressive Purple's; Neutral80 was ~1.2 (chip borders vanished).
+val Neutral70 = Color(0xFFA4A2B2)
 val Neutral60 = Color(0xFF908E9F)
 val Neutral50 = Color(0xFF706E7E)
+// Light themes' secondary text (onSurfaceVariant): Neutral50 was 4.39:1 on cards and 3.89 on
+// surfaceVariant pills, under WCAG AA's 4.5; this is 5.26 and 4.66.
+val Neutral45 = Color(0xFF646270)
 val Neutral30 = Color(0xFF423F52)
 val Neutral20 = Color(0xFF2A2836)
 val Neutral10 = Color(0xFF1B1A24)
@@ -85,16 +91,16 @@ val LightColorScheme = lightColorScheme(
 
     surface = Color.White,
     onSurface = Neutral10,
-    surfaceVariant = Neutral95,
-    onSurfaceVariant = Neutral50,
+    surfaceVariant = Neutral90,
+    onSurfaceVariant = Neutral45,
     surfaceContainerLowest = Color.White,
     surfaceContainerLow = Neutral99,
     surfaceContainer = Neutral95,
     surfaceContainerHigh = Neutral90,
     surfaceContainerHighest = Neutral80,
 
-    outline = Neutral80,
-    outlineVariant = Neutral90,
+    outline = Neutral50,
+    outlineVariant = Neutral70,
 
     error = Red40,
     onError = Color.White,
@@ -123,7 +129,7 @@ val DarkColorScheme = darkColorScheme(
 
     surface = Neutral05,
     onSurface = Neutral90,
-    surfaceVariant = Neutral20,
+    surfaceVariant = Neutral30,
     onSurfaceVariant = Neutral80,
     surfaceContainerLowest = Neutral00,
     surfaceContainerLow = Neutral05,
@@ -131,8 +137,8 @@ val DarkColorScheme = darkColorScheme(
     surfaceContainerHigh = Neutral20,
     surfaceContainerHighest = Neutral30,
 
-    outline = Neutral30,
-    outlineVariant = Neutral20,
+    outline = Neutral60,
+    outlineVariant = Neutral30,
 
     error = Red80,
     onError = Red10,
