@@ -206,7 +206,7 @@ object DownloadDispatcher {
                 errorMessage = null,
                 dateAdded = System.currentTimeMillis(),
                 itemFilter = itemFilter,
-                videoQuality = videoQuality?.name,
+                videoQuality = videoQuality?.name ?: if (VideoSiteRouter.isSongSource(url)) VideoQuality.AUDIO_ONLY.name else null,
                 clipRange = clipRange,
                 extraCommands = extraCommands,
                 outputFormat = outputFormat?.name,
