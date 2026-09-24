@@ -255,6 +255,17 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // vanished at once and the screen was empty for ~80ms before the new one came in (Home,
         // the usual page behind, is hidden while another tab is up). Cleared when the switch ends.
         var outgoingTab by remember { mutableStateOf<Int?>(null) }
+        // Settings stays composed once built, hidden when not shown, instead of being thrown away
+        // on every tab switch. Measured on-device: every open cost one ~87ms frame (~47ms
+        // composing the page, ~38ms layout+draw) — rebuilt from scratch each time, which also
+        // re-ran its "Updates available" engine check. It's nearly static, so keeping it costs
+        // little. Built ~2s after launch while idle, so even the first open only has to draw it.
+        // (Library isn't kept: it recomposes on every download progress tick, and costs ~35-50ms.)
+        var keepSettings by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(2_000)
+            keepSettings = true
+        }
         // Everything under the Queue (Home + the current tab) — it's what closing the Queue
         // reveals, so it trails/fades in as one layer (see predictiveBackBehind).
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
@@ -277,11 +288,20 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // tab-to-tab switch, the tab being left, underneath the new one. Keyed per tab so the
         // outgoing tab keeps its composed instance (rebuilding it would stall the frame).
         val shownTabs = listOfNotNull(outgoingTab, selectedTab.takeIf { it != 0 }).distinct()
-        for (tab in shownTabs) key(tab) {
+        val keptTabs = (shownTabs + listOfNotNull(2.takeIf { keepSettings })).distinct()
+        for (tab in keptTabs) key(tab) {
             Box(
                 modifier = Modifier.fillMaxSize().then(
-                    if (tab == selectedTab) Modifier.predictiveBackReveal(tabBack)
-                    else Modifier.predictiveBackBehind(tabBack, active = true)
+                    when (tab) {
+                        selectedTab -> Modifier.predictiveBackReveal(tabBack)
+                        outgoingTab -> Modifier.predictiveBackBehind(tabBack, active = true)
+                        // Kept but not shown: measured (so showing it only has to draw) but not
+                        // placed — so not drawn and not hit-testable.
+                        else -> Modifier.layout { measurable, constraints ->
+                            measurable.measure(constraints)
+                            layout(0, 0) {}
+                        }
+                    }
                 )
             ) {
                 when (tab) {
@@ -295,6 +315,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         route = settingsRoute,
                         highlightKey = settingsHighlightKey,
                         onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
+                        isVisible = selectedTab == 2,
                     )
                 }
             }
