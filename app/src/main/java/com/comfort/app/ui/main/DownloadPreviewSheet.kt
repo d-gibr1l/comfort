@@ -480,7 +480,12 @@ fun DownloadPreviewSheet(
             previewThumbnail = preview?.thumbnail,
             previewStreamUrls = preview?.streamUrls ?: emptyList(),
             previewDurationMs = preview?.durationMs,
-            previewFilesize = preview?.filesizeBytes,
+            // The selected chip's own size when the preview reported per-quality sizes (it used to
+            // always show the best format's — 718 MB with 720 selected); nothing rather than a
+            // wrong number when that one choice's size is unknown.
+            previewFilesize = preview?.let { p ->
+                if (p.sizesByQuality.isEmpty()) p.filesizeBytes else p.sizesByQuality["${(if (isSongSource) VideoQuality.AUDIO_ONLY else quality).name}|${outputFormat.extension}"]
+            },
             previewLoading = previewLoading,
             previewStatus = previewStatus,
             song = SongPreviewState(

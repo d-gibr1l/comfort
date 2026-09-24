@@ -32,6 +32,10 @@ data class PreviewInfo(
     /** Bytes, from yt-dlp's own filesize/filesize_approx. Null when the extractor doesn't report
      * either - common enough that the preview card just omits the size rather than guessing. */
     val filesizeBytes: Long?,
+    /** What each quality chip would download, keyed "<VideoQuality name>|<extension>" ("P720|mkv")
+     * — yt_dlp_wrapper.py list_info's sizes_by_quality. Empty when yt-dlp didn't report sizes
+     * (or for anything it didn't list); [filesizeBytes] is the best format's size. */
+    val sizesByQuality: Map<String, Long> = emptyMap(),
     val durationMs: Long?,
     val streamUrls: List<String>,
     /** Real track artist/album, for the download preview sheet's own song-styled card — populated
@@ -619,6 +623,9 @@ object GalleryDlListing {
             uploader = entry.optString("uploader").blankToNull(),
             thumbnail = entry.optString("thumbnail").blankToNull(),
             filesizeBytes = entry.optLong("filesize", 0L).takeIf { it > 0L } ?: entry.optLong("filesize_approx", 0L).takeIf { it > 0L },
+            sizesByQuality = entry.optJSONObject("sizes_by_quality")?.let { sizes ->
+                sizes.keys().asSequence().mapNotNull { key -> sizes.optLong(key, 0L).takeIf { it > 0L }?.let { key to it } }.toMap()
+            } ?: emptyMap(),
             durationMs = entry.optDouble("duration", -1.0).takeIf { it > 0.0 }?.let { (it * 1000).toLong() },
             streamUrls = streamUrls,
             artist = (entry.optString("artist").blankToNull() ?: entry.optString("uploader").blankToNull()),
