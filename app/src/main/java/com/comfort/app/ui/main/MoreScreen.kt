@@ -205,14 +205,21 @@ private val SUBPAGE_SEARCH_INDEX = listOf(
  * back on the root list instead of Downloads). Hoisting to MainScreen (which stays composed for
  * the app's whole lifetime) is what actually survives a tab switch. */
 @Composable
-fun MoreScreen(route: SettingsRoute, highlightKey: String?, onNavigate: (SettingsRoute, String?) -> Unit) {
+fun MoreScreen(
+    route: SettingsRoute,
+    highlightKey: String?,
+    onNavigate: (SettingsRoute, String?) -> Unit,
+    // False while MainScreen keeps this composed but hidden (see its keptTabs): the back gesture
+    // must then belong to whatever is on screen, not a sub-page nobody can see.
+    isVisible: Boolean = true,
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         // The one and only root settings list, always composed underneath: it's what a
         // sub-screen's back reveals, and simply the visible page on ROOT. A second copy used to
         // live inside the animated box below for ROOT, so every back threw this one away and built
         // a fresh list mid-transition (header not measured yet, so it jumped for a frame) — the
         // flicker at the end of the back animation (reported live). Same fix as MainScreen's Home.
-        val back = rememberBackRevealState(enabled = route != SettingsRoute.ROOT) {
+        val back = rememberBackRevealState(enabled = isVisible && route != SettingsRoute.ROOT) {
             onNavigate(SettingsRoute.ROOT, null)
         }
         // Opening a sub-page from the root list plays the push (see animateEnter).
