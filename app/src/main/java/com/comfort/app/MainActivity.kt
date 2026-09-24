@@ -73,17 +73,30 @@ class MainActivity : ComponentActivity() {
     // reaching onNewIntent, which only fires for an already-running singleTask instance.
     consumeOpenQueueExtra(intent)
 
-    // The androidx compat SplashScreen dismisses as soon as the first frame is drawn — for a
-    // lightweight Compose screen like this one that can happen well before the 700ms staggered
-    // entrance (COM/FOR/arrow) has actually finished playing, cutting the animation short
-    // (reproduced live: it visibly vanished mid-animation). windowSplashScreenAnimationDuration in
-    // the theme is only used for the library's own exit-transition bookkeeping — it does not by
-    // itself hold the splash up. Holding it here with a real elapsed-time check is the officially
-    // documented fix for exactly this gap.
-    val splashStartTime = System.currentTimeMillis()
-    val splashMinDurationMs = 700L
-    splashScreen.setKeepOnScreenCondition {
-      System.currentTimeMillis() - splashStartTime < splashMinDurationMs
+    // The splash is released as soon as the first frame is ready. The logo's staggered entrance
+    // (COM/FOR/arrow, 680ms — windowSplashScreenAnimationDuration says 700) used to be protected
+    // by a fixed 700ms hold counted from here, but Android starts that animation when the app is
+    // tapped, before this runs — so the splash then sat still after the animation for however long
+    // the process took to start. Now, on Android 12+, it waits only for whatever of the animation
+    // is actually left (measured from when the system really started it), then fades out.
+    // Android 7-11 can't animate the icon at all (core-splashscreen shows it static there), so
+    // there's nothing to wait for: the logo shows only while the app is really starting.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      splashScreen.setOnExitAnimationListener { provider ->
+        val animationEnd = provider.iconAnimationStartMillis + provider.iconAnimationDurationMillis
+        // On Android 12+ core-splashscreen reports the start as a wall-clock time (the platform
+        // SplashScreenView's Instant), not uptime: subtracting uptimeMillis gave a delay of decades
+        // and the splash never went away (found live). Pick the clock by magnitude, and never wait
+        // longer than the whole animation whatever the numbers say.
+        val now = if (animationEnd > 1_000_000_000_000L) System.currentTimeMillis() else android.os.SystemClock.uptimeMillis()
+        val remaining = (animationEnd - now).coerceIn(0L, 700L)
+        provider.view.animate()
+          .alpha(0f)
+          .setStartDelay(remaining)
+          .setDuration(200L)
+          .withEndAction { provider.remove() }
+          .start()
+      }
     }
 
     AppImageLoader.install(applicationContext)
