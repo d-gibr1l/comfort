@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.pow
@@ -57,13 +58,22 @@ class BackRevealState internal constructor(
     internal val behindX = Animatable(-BEHIND_OFFSET)
     internal val behindAlpha = Animatable(0f)
     internal val shadow = Animatable(0f)
-    private var finishing = false
+    // The one transition in progress (open, back, a gesture's finish/cancel). Starting another
+    // cancels it first, and every transition ends in a consistent state (fully open, fully back or
+    // at rest) — so the newest action always wins. This replaced a "finishing" flag: a back
+    // gesture that ended while it was set (e.g. started during the Queue's opening animation) was
+    // ignored after it had already moved the pages, leaving the Queue frozen ~90% opaque over the
+    // page behind (reported live, 2026-09-24).
+    private var running: Job? = null
+
+    private fun startExclusive(block: suspend CoroutineScope.() -> Unit) {
+        running?.cancel()
+        running = scope.launch(block = block)
+    }
 
     /** An on-screen back button: the same transition as releasing a back swipe, from the start. */
     fun animateBack() {
-        if (finishing) return
-        finishing = true
-        scope.launch { commit() }
+        startExclusive { commit() }
     }
 
     /** Opens the page in front — J2K's push, the mirror of its back: the new page comes in from
@@ -73,13 +83,7 @@ class BackRevealState internal constructor(
      * [behindVisible] is false when the page behind is already hidden (switching between two
      * pages that both sit on top of it, e.g. Library to Settings), so only the new page moves. */
     fun animateEnter(behindVisible: Boolean = true, onFinished: () -> Unit = {}, change: () -> Unit) {
-        if (finishing) {
-            change()
-            onFinished()
-            return
-        }
-        finishing = true
-        scope.launch {
+        startExclusive {
             try {
                 frontX.snapTo(ENTER_FROM_X)
                 frontAlpha.snapTo(0f)
@@ -102,13 +106,15 @@ class BackRevealState internal constructor(
                     launch { behindAlpha.animateTo(0f, spec) }
                 }
             } finally {
-                finishing = false
                 onFinished()
             }
         }
     }
 
     internal suspend fun track(progress: Float) {
+        // A gesture takes over from whatever was animating (an opening still in progress, say).
+        running?.cancel()
+        running = null
         val q = ((progress.takeIf { it > 0.001f } ?: 0f) * 0.5f).pow(0.6f)
         frontX.snapTo(q * FRONT_DRAG)
         frontAlpha.snapTo(1f - q)
@@ -117,45 +123,47 @@ class BackRevealState internal constructor(
         shadow.snapTo(1f)
     }
 
-    internal suspend fun finishFromGesture() {
-        if (finishing) return
-        finishing = true
-        commit()
+    /** The gesture was completed: always go back, from wherever the pages are now. Runs in this
+     * state's own scope, not the gesture handler's — see [cancelGesture]. */
+    internal fun finishFromGesture() {
+        startExclusive { commit() }
     }
 
-    internal suspend fun cancelGesture() = coroutineScope {
-        val spec = tween<Float>(CANCEL_MS, easing = DECELERATE)
-        launch { frontX.animateTo(0f, spec) }
-        launch { frontAlpha.animateTo(1f, spec) }
-        launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
-        launch { behindAlpha.animateTo(0f, spec) }
-        launch { shadow.animateTo(0f, spec) }
+    /** The gesture was abandoned: always ease back to rest. This is called from the handler's
+     * catch of the gesture's cancellation, i.e. inside a coroutine that's already cancelled —
+     * animating there failed instantly and left the pages wherever the finger let go (the Queue
+     * stuck half-transparent over Library after a swipe that wasn't completed, reported live
+     * twice). So it animates in this state's own scope instead. */
+    internal fun cancelGesture() {
+        startExclusive {
+            val spec = tween<Float>(CANCEL_MS, easing = DECELERATE)
+            launch { frontX.animateTo(0f, spec) }
+            launch { frontAlpha.animateTo(1f, spec) }
+            launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
+            launch { behindAlpha.animateTo(0f, spec) }
+            launch { shadow.animateTo(0f, spec) }
+        }
     }
 
     private suspend fun commit() {
-        try {
-            // Time scales with the distance still to cover, like CrossFadeChangeHandler's pop.
-            val remaining = ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f)
-            val spec = tween<Float>((remaining * COMMIT_MS).roundToInt().coerceAtLeast(60), easing = DECELERATE)
-            coroutineScope {
-                launch { frontX.animateTo(EXIT_X, spec) }
-                launch { frontAlpha.animateTo(0f, spec) }
-                launch { behindX.animateTo(0f, spec) }
-                launch { behindAlpha.animateTo(1f, spec) }
-                launch { shadow.animateTo(0f, spec) }
-            }
-            // The state change and the reset below land in the same recomposition, so the page
-            // behind (now the visible page) is already back to identity when the front one goes.
-            onBack.value()
-            frontX.snapTo(0f)
-            frontAlpha.snapTo(1f)
-            behindX.snapTo(-BEHIND_OFFSET)
-            behindAlpha.snapTo(0f)
-            shadow.snapTo(0f)
-        } finally {
-            // Always: a stuck flag made every later animateEnter()/animateBack() skip its motion.
-            finishing = false
+        // Time scales with the distance still to cover, like CrossFadeChangeHandler's pop.
+        val remaining = ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f)
+        val spec = tween<Float>((remaining * COMMIT_MS).roundToInt().coerceAtLeast(60), easing = DECELERATE)
+        coroutineScope {
+            launch { frontX.animateTo(EXIT_X, spec) }
+            launch { frontAlpha.animateTo(0f, spec) }
+            launch { behindX.animateTo(0f, spec) }
+            launch { behindAlpha.animateTo(1f, spec) }
+            launch { shadow.animateTo(0f, spec) }
         }
+        // The state change and the reset below land in the same recomposition, so the page
+        // behind (now the visible page) is already back to identity when the front one goes.
+        onBack.value()
+        frontX.snapTo(0f)
+        frontAlpha.snapTo(1f)
+        behindX.snapTo(-BEHIND_OFFSET)
+        behindAlpha.snapTo(0f)
+        shadow.snapTo(0f)
     }
 
     private companion object {
