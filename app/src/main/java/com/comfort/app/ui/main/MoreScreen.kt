@@ -3534,7 +3534,6 @@ private fun AppUpdateSection() {
 
     fun runCheck() {
         checking = true
-        errorText = null
         scope.launch {
             val result = AppUpdater.check(context)
             status = result
@@ -3665,8 +3664,7 @@ private fun QuickEngineUpdateSection() {
                 onUpdate = {
                     if (status.artifactUrl == null) return@EngineUpdateRow
                     updatingEngines = updatingEngines + status.engine.packageDirName
-                    errorText = null
-                    scope.launch {
+                                scope.launch {
                         val result = EngineUpdater.update(context, status)
                         updatingEngines = updatingEngines - status.engine.packageDirName
                         result.onSuccess { newVersion ->
@@ -3715,7 +3713,6 @@ private fun EnginesSection() {
 
     fun runCheck() {
         checking = true
-        errorText = null
         scope.launch {
             val result = EngineUpdater.checkAll(context)
             statuses = result
@@ -3788,8 +3785,7 @@ private fun EnginesSection() {
                     onUpdate = {
                         if (status.artifactUrl == null) return@EngineCard
                         updatingEngines = updatingEngines + status.engine.packageDirName
-                        errorText = null
-                        scope.launch {
+                                        scope.launch {
                             val result = EngineUpdater.update(context, status)
                             updatingEngines = updatingEngines - status.engine.packageDirName
                             result.onSuccess { newVersion ->
