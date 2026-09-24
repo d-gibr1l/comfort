@@ -75,6 +75,10 @@ interface DownloadDao {
     @Query("UPDATE downloads SET status = :status, errorMessage = :errorMessage, erroredAt = :erroredAt WHERE id = :id")
     suspend fun updateError(id: String, status: DownloadStatus, errorMessage: String?, erroredAt: Long = System.currentTimeMillis())
 
+    /** Each engine's own error for a failed download (see DownloadEntity.errorDetails). */
+    @Query("UPDATE downloads SET errorDetails = :details WHERE id = :id")
+    suspend fun setErrorDetails(id: String, details: String?)
+
     @Query("UPDATE downloads SET downloadStartTime = :startTime WHERE id = :id")
     suspend fun setStartTime(id: String, startTime: Long)
 
