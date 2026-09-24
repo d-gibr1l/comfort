@@ -1301,6 +1301,18 @@ fun QueueItemCard(
     }
 }
 
+/** DownloadEntity.errorDetails as (engine, message) pairs; empty when absent or unreadable. */
+private fun parseEngineErrors(json: String?): List<Pair<String, String>> {
+    if (json.isNullOrBlank()) return emptyList()
+    return runCatching {
+        val array = org.json.JSONArray(json)
+        (0 until array.length()).map { i ->
+            val entry = array.getJSONObject(i)
+            entry.optString("engine") to entry.optString("message")
+        }
+    }.getOrDefault(emptyList())
+}
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ErrorDetailsSheet(
@@ -1324,18 +1336,46 @@ private fun ErrorDetailsSheet(
                 Text("Error details", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
             }
             Spacer(Modifier.height(10.dp))
-            Text(
-                item.errorMessage ?: "Unknown error",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.verticalScroll(rememberScrollState())
-            )
+            // Each engine's own error, in the order they ran (DownloadEntity.errorDetails) — the
+            // card only shows one summary line, which could be a fallback engine's less relevant
+            // message. Older failures have none: the summary is shown instead.
+            val engineErrors = remember(item.errorDetails) { parseEngineErrors(item.errorDetails) }
+            Column(
+                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (engineErrors.isEmpty()) {
+                    Text(
+                        item.errorMessage ?: "Unknown error",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    engineErrors.forEach { (engine, message) ->
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(engine, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+                                Spacer(Modifier.height(4.dp))
+                                Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(
                     onClick = {
                         scope.launch {
-                            val clipData = android.content.ClipData.newPlainText("Error message", item.errorMessage ?: "")
+                            val text = parseEngineErrors(item.errorDetails)
+                                .takeIf { it.isNotEmpty() }
+                                ?.joinToString("\n\n") { (engine, message) -> "$engine: $message" }
+                                ?: item.errorMessage.orEmpty()
+                            val clipData = android.content.ClipData.newPlainText("Error message", text)
                             clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clipData))
                             android.widget.Toast.makeText(context, "Error copied", android.widget.Toast.LENGTH_SHORT).show()
                         }

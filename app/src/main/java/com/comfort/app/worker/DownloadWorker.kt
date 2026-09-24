@@ -373,6 +373,33 @@ class DownloadWorker(
                 // gets saved, so a real cause (blocked, login required, no formats found, ...) is
                 // visible instead of every failure looking identical.
                 val lastErrorLine = java.util.concurrent.atomic.AtomicReference<String?>(null)
+                // Each engine's own error, for the errored card's info sheet (lastErrorLine above is
+                // the one-line summary). Keyed by engine name in the order the engines ran; an
+                // engine that ran without an error is listed too (see errorDetailsJson below).
+                val engineErrors = java.util.Collections.synchronizedMap(LinkedHashMap<String, String>())
+                val attemptedEngines = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+                val currentEngine = java.util.concurrent.atomic.AtomicReference<String?>(null)
+                fun recordEngineError(message: String) {
+                    val engine = currentEngine.get() ?: return
+                    // First error per engine wins, unless it's the unusable kind (see
+                    // sanitizeErrorMessage) — same rule as lastErrorLine.
+                    engineErrors.merge(engine, message) { current, new ->
+                        if (GalleryDlListing.sanitizeErrorMessage(current) != current) new else current
+                    }
+                }
+                fun errorDetailsJson(extra: Pair<String, String>? = null): String? {
+                    val entries = org.json.JSONArray()
+                    synchronized(attemptedEngines) {
+                        for (engine in attemptedEngines) {
+                            val message = engineErrors[engine] ?: "Ran, but found nothing to download (no error reported)"
+                            entries.put(org.json.JSONObject().put("engine", engine).put("message", message.take(2000)))
+                        }
+                    }
+                    extra?.let { (engine, message) ->
+                        entries.put(org.json.JSONObject().put("engine", engine).put("message", message.take(2000)))
+                    }
+                    return if (entries.length() == 0) null else entries.toString()
+                }
 
                 // The placeholder title set at enqueue time (see DownloadDispatcher) always starts
                 // this way — used below to tell "still showing the placeholder" apart from "the
@@ -585,6 +612,7 @@ class DownloadWorker(
                                 lastErrorLine.getAndUpdate { current ->
                                     if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) candidate else current
                                 }
+                                recordEngineError(candidate)
                             }
                         }
                         // gallery-dl's own "no results" outcome — not an [error] line at all (just
@@ -599,6 +627,7 @@ class DownloadWorker(
                         // correctly keeps this over yt-dlp's less relevant fallback error, the same
                         // way a genuine gallery-dl [error] line already would.
                         GALLERY_DL_NO_RESULTS_LINE.containsMatchIn(line) -> {
+                            recordEngineError("No content found at this link (gallery-dl found no results)")
                             lastErrorLine.getAndUpdate { current ->
                                 if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) {
                                     "No content found at this link — it may need cookies for a logged-in session, or be unavailable"
@@ -773,6 +802,16 @@ class DownloadWorker(
                 // (gallery-dl mutating process-global sys.argv/stdout across concurrent calls)
                 // doesn't apply here, so downloads now run genuinely concurrently up to the
                 // "Concurrent downloads" setting instead of being serialized behind one lock.
+                // Wraps actualCallback so every line is filed under the engine that printed it (see
+                // engineErrors). Created as each runner starts, which also marks that engine as run.
+                fun callbackFor(engine: String): suspend (String) -> Unit {
+                    attemptedEngines.add(engine)
+                    return { line ->
+                        currentEngine.set(engine)
+                        actualCallback(line)
+                    }
+                }
+
                 suspend fun runGalleryDl(excludeVideo: Boolean): Int =
                     PythonRuntime.run(
                         applicationContext, "gallery_dl_wrapper.py",
@@ -783,7 +822,7 @@ class DownloadWorker(
                             networkRetries, maxFilesize, if (writeInfoFiles) "1" else "0", proxyUrl,
                             socketTimeoutSeconds,
                         ),
-                        actualCallback,
+                        callbackFor("gallery-dl"),
                     )
 
                 // Bundled as jniLibs/<abi>/libqjs.so and libffmpeg.so respectively — see
@@ -918,7 +957,7 @@ class DownloadWorker(
                             // reused instead of extracting again (see yt_dlp_wrapper.download).
                             GalleryDlListing.ytDlpInfoCacheFile(applicationContext, url).absolutePath,
                         ),
-                        actualCallback,
+                        callbackFor("yt-dlp"),
                     )
 
                 // Always audio-only (Spotify links have no video concept at all — see
@@ -949,7 +988,7 @@ class DownloadWorker(
                             overrideTitle,
                             overrideArtist,
                         ),
-                        actualCallback,
+                        callbackFor("Spotify"),
                     )
 
                 // Instagram posts/reels (see VideoSiteRouter.resolveEngine). Same staging dir,
@@ -966,7 +1005,7 @@ class DownloadWorker(
                             // The preview's saved post, reused instead of fetching it again.
                             GalleryDlListing.instaloaderInfoCacheFile(applicationContext, url).absolutePath,
                         ),
-                        actualCallback,
+                        callbackFor("Instaloader"),
                     )
 
                 // The routing every link got before Instaloader existed — also the fallback when
@@ -1196,6 +1235,7 @@ class DownloadWorker(
                     val errorMsg = GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: "No downloadable content found at this link")
                         ?: "No downloadable content found at this link"
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
+                    dao.setErrorDetails(downloadId, errorDetailsJson())
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
                     DownloadDispatcher.forgetLock(downloadId)
                     // Result.success(), not failure() — see the isStopped branch above for why:
@@ -1236,6 +1276,9 @@ class DownloadWorker(
                 } else {
                     val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it) }
                     dao.updateError(downloadId, DownloadStatus.ERRORED, sanitized)
+                    // Not an engine's error (the app itself failed), and the per-engine record is out
+                    // of scope here: clear any older details so the sheet shows this message.
+                    dao.setErrorDetails(downloadId, null)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, sanitized)
                     // Imported from YTDLnis's own "Cleanup leftover downloads" setting — a genuine
                     // failure here (unlike the savedCount==0 branch above, which already ran the

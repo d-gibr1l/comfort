@@ -161,6 +161,11 @@ data class DownloadEntity(
     // override_artist params for exactly where each is and isn't applied).
     val overrideTitle: String? = null,
     val overrideArtist: String? = null,
+    /** Each engine's own error when this download failed, as a JSON array of
+     * {"engine": ..., "message": ...} in the order the engines ran — shown by the errored card's
+     * info sheet. [errorMessage] stays the one-line summary. Null for failures from before this
+     * existed, or where no engine ran. */
+    val errorDetails: String? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for
