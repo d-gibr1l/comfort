@@ -284,7 +284,7 @@ private fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             SettingsItemSpec(Icons.Outlined.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
             SettingsItemSpec(Icons.Outlined.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
             SettingsItemSpec(Icons.Outlined.Movie, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
-            SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra gallery-dl arguments", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
+            SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra arguments for each engine", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
             SettingsItemSpec(Icons.Outlined.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
             SettingsItemSpec(Icons.Outlined.Update, "Updates", "App, yt-dlp, gallery-dl & Instaloader", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
         )
