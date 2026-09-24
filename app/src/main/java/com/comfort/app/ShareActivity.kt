@@ -451,12 +451,20 @@ private fun ShareRouter(url: String, onFinished: () -> Unit) {
                         context = context,
                         url = url,
                         title = "Downloading from ${VideoSiteRouter.siteName(url)}",
+                        // The sheet's item checklist (a carousel's one picked image, say) and its
+                        // edited title/artist: these were dropped here, unlike Home's own preview
+                        // sheet call, so a shared carousel always downloaded every item (found
+                        // live, 2026-09-24: one item picked, all 13 saved).
+                        itemFilter = options.itemFilter,
+                        totalItems = options.totalItems,
                         videoQuality = options.quality,
                         clipRange = options.clipRange,
                         extraCommands = options.extraCommands,
                         outputFormat = options.outputFormat,
                         filenameTemplate = options.filenameTemplate,
                         saveThumbnail = options.saveThumbnail,
+                        overrideTitle = options.overrideTitle,
+                        overrideArtist = options.overrideArtist,
                         forceDuplicate = true,
                     )
                     Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
