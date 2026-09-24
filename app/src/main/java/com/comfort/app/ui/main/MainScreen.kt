@@ -733,11 +733,13 @@ fun HomeScreen(
             )
             Spacer(Modifier.height(12.dp))
 
+            // All four in primary: alternating primary/secondary looked mismatched in themes whose
+            // secondary is a near-grey (reported live: Pixiv and "+ hundreds more" went grey).
             val sources = listOf(
                 Triple("Twitter / X", FeatherIcons.Twitter, MaterialTheme.colorScheme.primary),
-                Triple("Pixiv", Icons.Outlined.Image, MaterialTheme.colorScheme.secondary),
+                Triple("Pixiv", Icons.Outlined.Image, MaterialTheme.colorScheme.primary),
                 Triple("Instagram", FeatherIcons.Instagram, MaterialTheme.colorScheme.primary),
-                Triple("+ hundreds more", Icons.Outlined.Public, MaterialTheme.colorScheme.secondary),
+                Triple("+ hundreds more", Icons.Outlined.Public, MaterialTheme.colorScheme.primary),
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

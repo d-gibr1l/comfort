@@ -1,8 +1,3 @@
 <resources>
     <string name="app_name">Comfort</string>
-    <!-- The two Sharesheet entries for ShareActivity/its ".QuickDownloadActivity" alias — see
-         AndroidManifest.xml's own comment on the alias for what this is. Distinct from app_name
-         so the Sharesheet doesn't just show "Comfort" twice with no way to tell them apart. -->
-    <string name="share_configure_label">Configure</string>
-    <string name="share_instant_label">Instant</string>
 </resources>

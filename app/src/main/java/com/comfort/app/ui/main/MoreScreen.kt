@@ -131,7 +131,7 @@ private data class SubpageSearchEntry(val title: String, val subtitle: String, v
 // changes. Order doesn't matter — this is only ever filtered, never displayed as-is.
 private val SUBPAGE_SEARCH_INDEX = listOf(
     // Downloads
-    SubpageSearchEntry("Sharing mode", "Configure, Instant, or Always ask — what the Sharesheet's default entry does with a shared link.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry("Sharing mode", "Configure, Instant, or Always ask — what Comfort does with a link shared to it.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Multiple concurrent downloads", "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Wi-Fi only", "Queued downloads wait for a Wi-Fi connection instead of using mobile data.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Speed limit", "Caps download bandwidth for all future downloads.", SettingsRoute.DOWNLOADS),
@@ -4150,10 +4150,8 @@ private fun IconToggleRow(
     }
 }
 
-/** What tapping the Sharesheet's default "Configure" entry does — mirrors the three ways of
- * sharing into the app: "Configure" (open the picker/preview sheet), "Instant" (download right
- * away, same as picking the Sharesheet's own separate "Instant" entry), or "Always ask" (a small
- * sheet asking which, per share). A 3-segment chip row (same connected-group shape as the Queue
+/** What sharing a link to Comfort does: "Configure" (open the picker/preview sheet), "Instant"
+ * (download right away), or "Always ask" (a small sheet asking which, per share). A 3-segment chip row (same connected-group shape as the Queue
  * card's Pause/Cancel chips) rather than a Switch — this replaced a plain on/off toggle once a
  * genuine third option (Always ask) existed that a boolean couldn't represent. */
 @Composable
@@ -4162,7 +4160,7 @@ private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (co
         Text("Sharing mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(2.dp))
         Text(
-            "What the Sharesheet's default \"Configure\" entry does. Its separate \"Instant\" entry always downloads right away.",
+            "What happens when you share a link to Comfort.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

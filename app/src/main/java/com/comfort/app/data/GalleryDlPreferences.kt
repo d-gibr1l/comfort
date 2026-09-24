@@ -38,10 +38,8 @@ enum class OutputFormat(val label: String, val extension: String) {
     MP4("MP4", "mp4"),
 }
 
-/** What a shared link does when opened through ShareActivity's default "Configure" Sharesheet
- * entry (the ".QuickDownloadActivity" alias — labeled "Instant" in the Sharesheet — always
- * downloads instantly regardless of this, since picking that entry by name is already an
- * explicit one-tap request for it). */
+/** What a link shared to Comfort does: open the picker/preview sheet, download right away, or ask
+ * which in a small sheet (ShareActivity's AskShareModeHandler). */
 enum class ShareMode(val label: String) {
     CONFIGURE("Configure"),
     INSTANT("Instant"),
@@ -490,32 +488,6 @@ object GalleryDlPreferences {
 
     fun setShareMode(context: Context, mode: ShareMode) {
         prefs(context).edit().putString(KEY_SHARE_MODE, mode.name).apply()
-        syncQuickDownloadAliasEnabled(context, mode)
-    }
-
-    /** The Sharesheet's "Instant" entry (the ".QuickDownloadActivity" alias — see
-     * AndroidManifest.xml's own comment on it) is a *second*, separate intent-filter match in the
-     * manifest — Android resolves and shows Sharesheet entries from installed components' static
-     * manifest declarations, with no way for it to consult this app's own runtime preference
-     * first. Reported live: the OS popup kept offering "Configure"/"Instant" as two choices no
-     * matter what Sharing mode was actually set to in-app, since nothing was ever telling Android
-     * to stop matching that second component. The real, standard mechanism for this is disabling
-     * the component itself via PackageManager.
-     *
-     * Enabled only for ALWAYS_ASK — that's the one mode where an OS-level choice between the two
-     * is actually meaningful. CONFIGURE and INSTANT each pick one fixed behavior for the default
-     * entry, so a second entry offering the other one is exactly the extra tap-to-choose popup
-     * those modes exist to avoid — first tried keeping it enabled for CONFIGURE too (reasoning
-     * "Instant" still offered a real shortcut there), but that's not what "Configure" means to the
-     * user: no ambiguity, not almost none. */
-    private fun syncQuickDownloadAliasEnabled(context: Context, mode: ShareMode) {
-        val alias = android.content.ComponentName(context, "com.comfort.app.QuickDownloadActivity")
-        val state = if (mode == ShareMode.ALWAYS_ASK) {
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        } else {
-            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-        }
-        context.packageManager.setComponentEnabledSetting(alias, state, android.content.pm.PackageManager.DONT_KILL_APP)
     }
 
     fun isLibraryGridView(context: Context): Boolean {

@@ -100,12 +100,6 @@ class MainActivity : ComponentActivity() {
     }
 
     AppImageLoader.install(applicationContext)
-    // Re-applies the stored Sharing mode's side effect (enabling/disabling the Sharesheet's
-    // "Instant" alias component — see GalleryDlPreferences.setShareMode's own doc comment) on
-    // every launch, not just when the user actively changes the setting — component-enabled
-    // state can silently reset to the manifest default across a reinstall/update, and there's no
-    // other hook that would ever re-sync it otherwise.
-    GalleryDlPreferences.setShareMode(applicationContext, GalleryDlPreferences.getShareMode(applicationContext))
     // Unpack + precompile the Python engines ahead of the first preview/download (no-op once done
     // for this build) — see PythonRuntime.warmUpInBackground.
     com.comfort.app.util.PythonRuntime.warmUpInBackground(applicationContext)
