@@ -3492,8 +3492,8 @@ private fun QuickAppUpdateSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf<AppUpdater.UpdateStatus?>(null) }
-    var downloading by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    val downloadProgress by com.comfort.app.util.AppUpdater.downloadProgress.collectAsState()
+    val downloadError by com.comfort.app.util.AppUpdater.downloadError.collectAsState()
 
     LaunchedEffect(Unit) {
         val result = AppUpdater.check(context)
@@ -3509,29 +3509,12 @@ private fun QuickAppUpdateSection() {
     SettingsSection(title = "App update available", icon = Icons.Outlined.Download) {
         AppUpdateRow(
             status = current,
-            downloading = downloading,
-            onUpdate = {
-                val url = current.downloadUrl ?: return@AppUpdateRow
-                downloading = true
-                errorText = null
-                scope.launch {
-                    val result = AppUpdater.downloadApk(context, url)
-                    downloading = false
-                    result.onSuccess { apk ->
-                        if (AppUpdater.canInstall(context)) {
-                            AppUpdater.installApk(context, apk)
-                        } else {
-                            errorText = "Allow installing from this app in the settings screen that just opened, then tap Update again."
-                            AppUpdater.requestInstallPermission(context)
-                        }
-                    }
-                    result.onFailure { e -> errorText = "Couldn't download update: ${e.message ?: "unknown error"}" }
-                }
-            },
+            downloadProgress = downloadProgress,
+            onUpdate = { AppUpdater.startDownload(context, current) },
         )
-        if (errorText != null) {
+        if (downloadError != null) {
             Spacer(Modifier.height(10.dp))
-            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(downloadError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
     }
 }
@@ -3546,8 +3529,8 @@ private fun AppUpdateSection() {
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf<AppUpdater.UpdateStatus?>(null) }
     var checking by remember { mutableStateOf(false) }
-    var downloading by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    val downloadProgress by com.comfort.app.util.AppUpdater.downloadProgress.collectAsState()
+    val downloadError by com.comfort.app.util.AppUpdater.downloadError.collectAsState()
 
     fun runCheck() {
         checking = true
@@ -3575,30 +3558,13 @@ private fun AppUpdateSection() {
         } else {
             AppUpdateRow(
                 status = current,
-                downloading = downloading,
-                onUpdate = {
-                    val url = current.downloadUrl ?: return@AppUpdateRow
-                    downloading = true
-                    errorText = null
-                    scope.launch {
-                        val result = AppUpdater.downloadApk(context, url)
-                        downloading = false
-                        result.onSuccess { apk ->
-                            if (AppUpdater.canInstall(context)) {
-                                AppUpdater.installApk(context, apk)
-                            } else {
-                                errorText = "Allow installing from this app in the settings screen that just opened, then tap Update again."
-                                AppUpdater.requestInstallPermission(context)
-                            }
-                        }
-                        result.onFailure { e -> errorText = "Couldn't download update: ${e.message ?: "unknown error"}" }
-                    }
-                },
+                downloadProgress = downloadProgress,
+                onUpdate = { AppUpdater.startDownload(context, current) },
             )
         }
-        if (errorText != null) {
+        if (downloadError != null) {
             Spacer(Modifier.height(10.dp))
-            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(downloadError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(14.dp))
         OutlinedButton(onClick = { runCheck() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
@@ -3614,7 +3580,7 @@ private fun AppUpdateSection() {
 }
 
 @Composable
-private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloading: Boolean, onUpdate: () -> Unit) {
+private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Float?, onUpdate: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
             Text("Comfort", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -3625,7 +3591,12 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloading: Boolean, 
             )
         }
         when {
-            downloading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            downloadProgress != null -> CircularProgressIndicator(
+                progress = { downloadProgress },
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
             status.updateAvailable -> Button(
                 onClick = onUpdate,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
