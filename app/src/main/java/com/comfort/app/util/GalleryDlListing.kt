@@ -85,8 +85,14 @@ data class ListingResult(val items: List<GalleryItem>, val errorMessage: String?
  * so the two never quietly drift into deciding it differently. A single video mixed with photos
  * still goes to the picker: there's exactly one video either way, but excluding the photos needs
  * the picker's own per-item selection, which DownloadPreviewSheet's single-video card has no UI
- * for. */
-fun ListingResult.shouldUsePreviewSheet(): Boolean {
+ * for.
+ *
+ * A song source ([VideoSiteRouter.isSongSource]: Spotify, known music hosts) always gets the preview
+ * sheet too, which has its own song layout and track checklist — its listing holds audio, not video,
+ * so the video count alone sent it to the picker grid, where a track showed up as a lone picture
+ * tile (reported live). Unless the listing failed: the picker is what explains that. */
+fun ListingResult.shouldUsePreviewSheet(url: String): Boolean {
+    if (VideoSiteRouter.isSongSource(url) && errorMessage == null) return true
     val videoItemCount = items.count { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }
     return items.isNotEmpty() && ((items.size == 1 && videoItemCount == 1) || videoItemCount >= 2)
 }

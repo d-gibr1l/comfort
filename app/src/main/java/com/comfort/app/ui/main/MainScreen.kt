@@ -180,7 +180,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     LaunchedEffect(routingUrl) {
         val url = routingUrl ?: return@LaunchedEffect
         val result = com.comfort.app.util.GalleryDlListing.listItems(context, url)
-        if (result.shouldUsePreviewSheet()) previewUrl = url else pickerState = url to result
+        if (result.shouldUsePreviewSheet(url)) previewUrl = url else pickerState = url to result
         routingUrl = null
     }
 
