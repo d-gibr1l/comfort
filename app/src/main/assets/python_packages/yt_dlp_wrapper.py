@@ -1354,8 +1354,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # next. A default only: merged in first so an explicit youtube:player_client=... already
         # present in extractor_args (the free-text Advanced setting) still wins outright, same
         # "app default, explicit override wins" shape custom_headers already uses above.
+        # "default" first: yt-dlp's own current client set. The plain android/web/ios list alone
+        # now leaves only the 360p combined format on YouTube (android/ios skip when cookies are
+        # set, web gets SABR-only streams) — reproduced live, it's why Instant saved 360p.
         youtube_args = parsed_extractor_args.setdefault("youtube", {})
-        youtube_args.setdefault("player_client", ["android", "web", "ios"])
+        youtube_args.setdefault("player_client", ["default", "android", "web", "ios"])
     if parsed_extractor_args:
         ydl_opts["extractor_args"] = parsed_extractor_args
     if save_thumbnail:
@@ -1374,8 +1377,30 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     _apply_extra_args(ydl_opts, extra_args, callback)
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    # YouTube refuses the stream links it hands a signed-in session with 403 on this connection
+    # (reproduced on the phone: the same download with and without the cookie file, every other
+    # option equal — only the cookie run failed, on its first request). The Instant path rarely
+    # hit it only because Settings' client rotation leaves just the 360p combined format, which
+    # isn't refused. So when a YouTube download with cookies gets that 403, it's retried once
+    # without them, extracting fresh (a saved preview was made with the cookies too).
+    is_youtube = bool(re.search(r"(^|[/.])(youtube\.com|youtu\.be|youtube-nocookie\.com)(/|$|:)", url.split("?", 1)[0]))
+    refused = []
+    logger = ydl_opts.get("logger")
+    _log_error = logger.error if logger is not None else None
+    if is_youtube and ydl_opts.get("cookiefile") and logger is not None:
+        def _error(msg):
+            if "HTTP Error 403" in str(msg):
+                refused.append(msg)
+                # Downgraded to a warning: the retry below decides whether this download failed,
+                # and DownloadWorker would otherwise keep this as the card's error message.
+                if callback:
+                    callback(f"[warning] {msg}")
+                return
+            _log_error(msg)
+        logger.error = _error
+
+    def _attempt(opts, reuse_info):
+        with yt_dlp.YoutubeDL(opts) as ydl:
             if clip_ranges and ffmpeg_path:
                 # Added directly rather than through ydl_opts["postprocessors"] (a list of plain
                 # {"key": ...} dicts yt-dlp itself resolves to stock Ffmpeg*PP classes) since
@@ -1396,14 +1421,24 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # its full result to info_json_path). Reusing it skips the whole "extracting" phase
             # instead of starting over from the page (reported live). Format selection, playlist
             # items, trimming etc. still run fresh against it with *this* download's options.
-            # yt-dlp's download_with_info_file() itself falls back to a normal extraction from the
-            # page if the saved stream links no longer work, so an old file can't break a download;
-            # the age check just avoids trying links that have most likely expired.
-            if info_json_path and os.path.isfile(info_json_path) and \
+            # yt-dlp's own "saved links failed, extract again" fallback in download_with_info_file()
+            # never runs here: "ignoreerrors" reports a failed download instead of raising it. The
+            # age check just avoids trying links that have most likely expired.
+            if reuse_info and info_json_path and os.path.isfile(info_json_path) and \
                     time.time() - os.path.getmtime(info_json_path) < _INFO_JSON_MAX_AGE_SECONDS:
                 ydl.download_with_info_file(info_json_path)
             else:
                 ydl.download([url])
+
+    try:
+        _attempt(ydl_opts, reuse_info=True)
+        if refused:
+            if callback:
+                callback("[warning] YouTube refused the stream with your cookies (HTTP 403); retrying without them")
+            logger.error = _log_error
+            opts = dict(ydl_opts)
+            opts.pop("cookiefile", None)
+            _attempt(opts, reuse_info=False)
         return "Done"
     except _Cancelled:
         return "Cancelled"
@@ -1411,6 +1446,52 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         if callback:
             callback(f"[error] {e}")
         return f"Error: {e}"
+
+# Settings' / the preview sheet's quality chips (GalleryDlPreferences.VideoQuality names) and the
+# resolution cap download() sorts by for each; "audio" is the audio-only selector.
+_QUALITY_CAPS = (("BEST", None), ("P2160", 2160), ("P1440", 1440), ("P1080", 1080), ("P720", 720), ("P480", 480),
+                 ("AUDIO_ONLY", "audio"))
+
+
+def _sizes_by_quality(info):
+    """What each quality chip would actually download, in bytes, keyed "P720|mkv" etc. — so the
+    preview sheet can show the size of the chip that's selected instead of always the best format's
+    (reported live: 720 selected, 718 MB shown — the 4K size). Runs download()'s own format choice
+    (same selector, same res:<cap> sort, same MP4 codec bias) against the extraction already in
+    hand; yt-dlp only sorts and picks here, it doesn't fetch anything. A choice whose size any part
+    doesn't report is left out rather than shown too small."""
+    if not info or not info.get("formats") or info.get("entries") is not None:
+        return None
+    base = yt_dlp.YoutubeDL.sanitize_info(info)
+    # The extraction's own pick (the best format) would otherwise survive a single-format pick:
+    # yt-dlp only overwrites requested_formats when the new choice is a merge (found testing —
+    # audio-only came out as the 4K pair's size).
+    base = json.dumps({k: v for k, v in base.items() if k not in ("requested_formats", "requested_downloads")})
+    sizes = {}
+    for ext in ("mkv", "mp4"):
+        for name, cap in _QUALITY_CAPS:
+            if cap == "audio":
+                if ext == "mp4":
+                    continue
+                fmt, sort = "bestaudio[ext=m4a]/bestaudio/best", []
+            else:
+                fmt = "bestvideo+bestaudio/best"
+                sort = ([f"res:{cap}"] if cap else []) + (["vcodec:h264", "acodec:aac"] if ext == "mp4" else [])
+            try:
+                with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "simulate": True, "skip_download": True,
+                                       "format": fmt, "format_sort": sort}) as y:
+                    picked = y.process_ie_result(json.loads(base), download=False)
+            except Exception:
+                continue
+            parts = (picked or {}).get("requested_formats") or [picked or {}]
+            part_sizes = [f.get("filesize") or f.get("filesize_approx") for f in parts]
+            if part_sizes and all(part_sizes):
+                sizes[f"{name}|{ext}"] = int(sum(part_sizes))
+    for name, _ in _QUALITY_CAPS:
+        if name == "AUDIO_ONLY" and f"{name}|mkv" in sizes:
+            sizes[f"{name}|mp4"] = sizes[f"{name}|mkv"]
+    return sizes or None
+
 
 def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, impersonate=False, info_cache_path=None):
     """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
@@ -1565,7 +1646,12 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
     if entries is not None:
         print(f"[status] Found {len(entries)} tracks…", flush=True)
         return json.dumps({"entries": [_pick(e) for e in entries]})
-    return json.dumps(_pick(info) or {"error": "no info extracted"})
+    picked = _pick(info)
+    if picked:
+        sizes = _sizes_by_quality(info)
+        if sizes:
+            picked["sizes_by_quality"] = sizes
+    return json.dumps(picked or {"error": "no info extracted"})
 
 
 # CLI entry point for PythonRuntime.kt (subprocess model, replacing Chaquopy's direct callAttr()).
