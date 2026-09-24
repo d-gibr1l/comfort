@@ -17,6 +17,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -891,6 +893,7 @@ fun HomeScreen(
  * another place to manage the download from. */
 @Composable
 private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClick: () -> Unit) {
+    val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
     val progress = when {
         item.totalItems > 1 -> (item.downloadedItems.toFloat() / item.totalItems).coerceIn(0f, 1f)
         item.expectedBytes > 0 -> ((item.totalBytes + item.liveBytes).toFloat() / item.expectedBytes).coerceIn(0f, 1f)
@@ -939,13 +942,23 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                 )
                 Spacer(Modifier.height(6.dp))
                 if (progress != null) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                    // Same wavy bar as the Queue card (QueueItemCard: tween-smoothed level, explicit
+                    // waveSpeed so it keeps moving while the level sits still, flat near 100%).
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = progress,
+                        animationSpec = tween(durationMillis = 450),
+                        label = "homeDownloadProgress",
+                    )
+                    LinearWavyProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier.fillMaxWidth().height(10.dp),
                         color = MaterialTheme.colorScheme.primary,
                         // surfaceContainerHighest, not the older surfaceVariant token — same
                         // finding as the Queue screen's own progress track.
                         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        amplitude = { p -> if (reducedMotion || p > 0.9f) 0f else 0.4f },
+                        wavelength = 32.dp,
+                        waveSpeed = 8.dp,
                     )
                 } else {
                     Text(
@@ -1045,9 +1058,9 @@ private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, 
 // was, with no other obvious discovery path on Home.
 private val HOME_TIPS = listOf(
     "Long-press a card in Queue to select multiple downloads at once." to Icons.Outlined.CheckBox,
-    "gallery-dl and yt-dlp engines auto-update in the background — check Settings > About." to Icons.Outlined.Refresh,
+    "yt-dlp, gallery-dl and Instaloader auto-update in the background — check Settings > Updates." to Icons.Outlined.Refresh,
     "Add cookies from Settings to unlock private or age-restricted content." to Icons.Outlined.Lock,
-    "Tap a queued download's \"Start now\" to skip the schedule window or its place in line." to Icons.Outlined.Bolt,
+    "Tap a queued download's \"Up next\" to move it to the front of the line, skipping any schedule wait." to Icons.Outlined.Bolt,
     "Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads." to Icons.Outlined.Settings,
 )
 
