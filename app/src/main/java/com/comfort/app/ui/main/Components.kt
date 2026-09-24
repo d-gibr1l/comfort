@@ -288,7 +288,11 @@ fun formatEta(seconds: Int): String {
 fun InfoPill(shape: Shape = MaterialTheme.shapes.small, content: @Composable () -> Unit) {
     Surface(
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        // A wash of onSurface over whatever card this sits on, not a fixed surfaceVariant: the
+        // wallpaper (dynamic) schemes can make surfaceVariant nearly identical to the cards'
+        // surfaceContainer, and the pills vanished (reported live on the Queue card). A tint of
+        // the text color always shows against its own background, light or dark.
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
