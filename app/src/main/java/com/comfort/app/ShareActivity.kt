@@ -393,7 +393,7 @@ private fun ShareRouter(url: String, onFinished: () -> Unit) {
     val result = listingResult
     // See ListingResult.shouldUsePreviewSheet's own doc comment — shared with MainScreen's own
     // paste-a-link flow so the two never quietly drift into deciding this differently.
-    val usePreviewSheet = result?.shouldUsePreviewSheet() == true
+    val usePreviewSheet = result?.shouldUsePreviewSheet(url) == true
 
     when {
         result == null -> LoadingSheet(
