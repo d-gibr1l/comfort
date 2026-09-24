@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.foundation.gestures.animateScrollBy
+
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
@@ -627,9 +629,18 @@ fun DownloadsHistoryScreen(
             FloatingActionButton(
                 onClick = {
                     scrollTopScope.launch {
-                        if (gridView) gridState.animateScrollToItem(0) else listState.animateScrollToItem(0)
+                        // From far down, animateScrollToItem() alone teleported most of the way and
+                        // then snapped (recorded: two jumps, barely any motion). Jump silently to a
+                        // few rows from the top first, then glide only that last stretch.
+                        if (gridView) {
+                            if (gridState.firstVisibleItemIndex > SCROLL_TOP_GLIDE_ITEMS) gridState.scrollToItem(SCROLL_TOP_GLIDE_ITEMS)
+                            gridState.animateScrollToItem(0)
+                        } else {
+                            listState.glideToTop()
+                        }
                     }
                 },
+                shape = androidx.compose.material3.MaterialShapes.Arch.toShape(),
             ) {
                 Icon(Icons.Outlined.ArrowUpward, contentDescription = "Scroll to top")
             }
@@ -1814,3 +1825,26 @@ private fun MetaRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text:
 
 /** Library list-view card shape — same 20dp corners as the Download Queue's cards. */
 private val LIBRARY_CARD_SHAPE = RoundedCornerShape(20.dp)
+
+/** How many rows from the top the Library's scroll-to-top button glides over (it jumps to here
+ * first when further down). */
+private const val SCROLL_TOP_GLIDE_ITEMS = 6
+
+/** The list view's scroll-to-top: jump to [SCROLL_TOP_GLIDE_ITEMS] rows from the top, then one
+ * even 450ms glide the rest of the way. animateScrollToItem(0) did the last stretch with the top
+ * item off screen, and recorded frame by frame it sat still for ~7 frames and then covered it all
+ * in ~4. The distance is estimated from the visible rows' real heights (near-uniform here) and
+ * padded, since the list can't scroll past its top — the excess is absorbed in the slow end of the
+ * ease — and a final scrollToItem(0) settles any shortfall. */
+private suspend fun androidx.compose.foundation.lazy.LazyListState.glideToTop() {
+    if (firstVisibleItemIndex > SCROLL_TOP_GLIDE_ITEMS) scrollToItem(SCROLL_TOP_GLIDE_ITEMS)
+    val rowHeights = layoutInfo.visibleItemsInfo.filter { it.index > 0 }.map { it.size }
+    if (rowHeights.isNotEmpty() && firstVisibleItemIndex > 0) {
+        val distance = (firstVisibleItemIndex * rowHeights.average() + firstVisibleItemScrollOffset) * 1.15
+        animateScrollBy(
+            -distance.toFloat(),
+            androidx.compose.animation.core.tween(450, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        )
+    }
+    scrollToItem(0)
+}
