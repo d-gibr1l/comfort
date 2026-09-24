@@ -50,11 +50,15 @@
         <!-- Lets other apps (Twitter, Instagram, a browser, ...) share a link straight into the
              download flow via their own Share sheet. Handled by a separate, transparent-themed
              activity (rather than MainActivity) so it renders as a bottom sheet floating over
-             whatever app the user was in, instead of visibly switching to this app. -->
+             whatever app the user was in, instead of visibly switching to this app. Its only
+             Sharesheet entry: a second "Instant" entry (an activity-alias) used to sit beside it,
+             but Samsung's Sharesheet then showed its own Configure/Instant popup under the icon;
+             Always ask now asks in the app's own sheet instead (ShareActivity's
+             AskShareModeHandler). -->
         <activity
             android:name=".ShareActivity"
             android:exported="true"
-            android:label="@string/share_configure_label"
+            android:label="@string/app_name"
             android:theme="@style/Theme.GalleryDL.Transparent"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
@@ -113,31 +117,6 @@
                 <data android:scheme="https" android:host="open.spotify.com" />
             </intent-filter>
         </activity>
-
-        <!-- "Instant" — a second entry for this exact same Activity, not the Sharing
-             Shortcuts/ShortcutManager API (tried that first; per Android's own docs it only
-             surfaces shortcuts published dynamically at runtime, and even a correctly-published
-             one never showed up live on a real device — most likely the Sharesheet's own target
-             cache never picked it up). This is the real mechanism Seal (github.com/JunkFood02/
-             Seal) uses for its own "Quick download" share entry: a second manifest component
-             with the identical intent-filter but a distinct label — Android's Sharesheet groups
-             multiple same-package matches under one icon and offers a tap-to-expand choice
-             between their labels. An activity-alias (not a duplicate Activity class) so this
-             stays wired to ShareActivity's own real implementation; ShareActivity tells the two
-             apart via getIntent().component, which the platform documents as reporting the
-             *alias* actually invoked, not always ShareActivity itself. -->
-        <activity-alias
-            android:name=".QuickDownloadActivity"
-            android:targetActivity=".ShareActivity"
-            android:exported="true"
-            android:label="@string/share_instant_label"
-            android:excludeFromRecents="true">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity-alias>
 
         <receiver
             android:name=".worker.DownloadActionReceiver"

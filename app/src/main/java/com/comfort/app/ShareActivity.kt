@@ -94,29 +94,6 @@ class ShareActivity : ComponentActivity() {
     // time onCreate ran.
     private var sharedUrls by mutableStateOf<List<String>>(emptyList())
 
-    // True when this share arrived through the manifest's ".QuickDownloadActivity"
-    // activity-alias (see AndroidManifest.xml's own comment on it) rather than the normal
-    // ShareActivity entry — the alias is a second Sharesheet entry, labeled "Instant", that
-    // resolves to this exact same Activity. Tracked separately from the "Instant download"
-    // setting below: picking that entry is itself an explicit one-tap request to skip the
-    // picker, whether or not the user has that setting turned on globally.
-    private fun isQuickDownloadAlias(intent: Intent): Boolean =
-        intent.component?.className == "com.comfort.app.QuickDownloadActivity"
-
-    private var isQuickDownload by mutableStateOf(false)
-
-    // True when this share came through the Sharesheet's "Configure" entry (a SEND to this
-    // Activity itself, not the "Instant" alias). In Always ask mode that alias is enabled (see
-    // GalleryDlPreferences.syncQuickDownloadAliasEnabled), so the OS has already made the user
-    // pick between "Configure" and "Instant" — asking "Download this how?" again on top of that
-    // was a second, redundant question (reported live: tapping "Configure" in the OS popup still
-    // opened the in-app Instant/Configure sheet). Direct link taps (ACTION_VIEW) never went
-    // through that OS choice, so they still get the in-app one.
-    private fun isConfigureEntry(intent: Intent): Boolean =
-        intent.action == Intent.ACTION_SEND && !isQuickDownloadAlias(intent)
-
-    private var isConfigureShare by mutableStateOf(false)
-
     /** while(find()), not a single if — used to stop at the first match, so sharing a block of
      * text with two separate links (e.g. a text message with two TikTok URLs) silently discarded
      * the second one. Every match is collected the same way, in the order they appear in the
@@ -155,8 +132,6 @@ class ShareActivity : ComponentActivity() {
         com.comfort.app.util.AppImageLoader.install(applicationContext)
 
         sharedUrls = parseUrls(intent)
-        isQuickDownload = isQuickDownloadAlias(intent)
-        isConfigureShare = isConfigureEntry(intent)
         if (sharedUrls.isEmpty()) {
             finish()
             return
@@ -200,11 +175,11 @@ class ShareActivity : ComponentActivity() {
                             // Sharing mode setting, which only ever gated whether *one* link's
                             // sheet appears) and just enqueues every link found.
                             urls.size > 1 -> MultiLinkHandler(urls = urls, onFinished = { finish() })
-                            isQuickDownload || GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
+                            GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
                                 url = urls[0],
                                 onFinished = { finish() },
                             )
-                            !isConfigureShare && GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
+                            GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
                                 onFinished = { finish() },
                             )
@@ -235,8 +210,6 @@ class ShareActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val urls = parseUrls(intent)
-        isQuickDownload = isQuickDownloadAlias(intent)
-        isConfigureShare = isConfigureEntry(intent)
         if (urls.isEmpty()) {
             // Only close if nothing else is in flight — a URL-less intent (e.g. sharing a photo
             // with no link right after a real share) used to call finish() unconditionally here,
@@ -297,10 +270,10 @@ private fun InstantShareHandler(url: String, onFinished: () -> Unit) {
     }
 }
 
-/** The "Always ask" Sharing mode: a tiny sheet offering the same two choices as the Sharesheet's
- * own two entries ("Configure"/"Instant"), just for this one share — picking either one hands
- * straight off to that same handler, so the two paths stay identical to sharing directly into the
- * matching Sharesheet entry, not a third, subtly-different behavior. */
+/** The "Always ask" Sharing mode: a tiny sheet offering "Configure"/"Instant" for this one share —
+ * picking either one hands straight off to that mode's own handler, so each path is identical to
+ * having that mode set, not a third, subtly-different behavior. Comfort has a single Sharesheet
+ * entry; a second "Instant" one made Samsung's Sharesheet ask the same question in its own popup. */
 @Composable
 private fun AskShareModeHandler(url: String, onFinished: () -> Unit) {
     var choice by remember { mutableStateOf<ShareMode?>(null) }
@@ -354,11 +327,24 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                     // without a sources jar — not worth guessing blind at an unstable API's
                     // contract a second time (see groupedChipShape's own doc comment for the
                     // first attempt).
+                    // Configure left, Instant right — same order as Home's Configure/Download pair.
                     Row(modifier = Modifier.fillMaxWidth()) {
+                        AssistChip(
+                            onClick = { onChoose(ShareMode.CONFIGURE) },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = groupedChipShape(0, 2, height = 52.dp),
+                            border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = MaterialTheme.colorScheme.outline),
+                            colors = AssistChipDefaults.assistChipColors(
+                                labelColor = MaterialTheme.colorScheme.onSurface,
+                                leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            leadingIcon = { Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Configure") } },
+                        )
                         AssistChip(
                             onClick = { onChoose(ShareMode.INSTANT) },
                             modifier = Modifier.weight(1f).height(52.dp),
-                            shape = groupedChipShape(0, 2, height = 52.dp),
+                            shape = groupedChipShape(1, 2, height = 52.dp),
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -367,18 +353,6 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                             border = null,
                             leadingIcon = { Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(18.dp)) },
                             label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Instant") } },
-                        )
-                        AssistChip(
-                            onClick = { onChoose(ShareMode.CONFIGURE) },
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = groupedChipShape(1, 2, height = 52.dp),
-                            border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = MaterialTheme.colorScheme.outline),
-                            colors = AssistChipDefaults.assistChipColors(
-                                labelColor = MaterialTheme.colorScheme.onSurface,
-                                leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
-                            ),
-                            leadingIcon = { Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Configure") } },
                         )
                     }
                     Spacer(Modifier.height(8.dp))
