@@ -1093,7 +1093,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # yt-dlp's own --buffer-size, in bytes — this app's own setting is entered in KB for a
         # more human-scaled number.
         ydl_opts["buffersize"] = int(buffer_size_kb) * 1024
-    if aria2_path:
+    if aria2_path and not impersonate:
+        # If impersonation is enabled, we MUST NOT use aria2c: aria2c is linked against standard
+        # GnuTLS/OpenSSL and cannot mimic Chrome's TLS fingerprint. Using it for the final download
+        # would reveal the bot and trigger a 403 block (crashing FFmpeg later), undoing the
+        # impersonation work done during extraction. 
+        # We also explicitly map it only to "default" so yt-dlp still uses its native m3u8 downloader
+        # for HLS streams (aria2c downloads m3u8 manifests as text files).
+        ydl_opts["external_downloader"] = {"default": aria2_path}
         # Real multi-connection segmented downloading of a single file (yt-dlp's own downloader
         # fetches one file with one connection) — matches --downloader in the real CLI. aria2c
         # isn't statically linked (see Aria2Runtime.kt's own doc comment for the full dependency
@@ -1101,7 +1108,6 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # its actual shared-library deps; os.environ here is inherited by the subprocess yt-dlp's
         # own Aria2cFD spawns aria2c as, same as any other child process inheriting its parent's
         # environment unless explicitly overridden.
-        ydl_opts["external_downloader"] = aria2_path
         if aria2_lib_dir:
             existing = os.environ.get("LD_LIBRARY_PATH")
             os.environ["LD_LIBRARY_PATH"] = f"{aria2_lib_dir}:{existing}" if existing else aria2_lib_dir
