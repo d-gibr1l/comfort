@@ -653,18 +653,10 @@ def _apply_cover_art_override(filepath, image_url):
             image_data = resp.read()
         if not image_data:
             return
-        import os
-        ext = os.path.splitext(filepath)[1].lower()
-        if ext in (".m4a", ".mp4"):
-            from mutagen.mp4 import MP4, MP4Cover
-            audio = MP4(filepath)
-            audio.tags["covr"] = [MP4Cover(data=image_data, imageformat=MP4Cover.FORMAT_JPEG)]
-            audio.save()
-        elif ext == ".mp3":
-            from mutagen.id3 import ID3, APIC
-            audio = ID3(filepath)
-            audio.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=image_data))
-            audio.save()
+        from mutagen.mp4 import MP4, MP4Cover
+        audio = MP4(filepath)
+        audio.tags["covr"] = [MP4Cover(data=image_data, imageformat=MP4Cover.FORMAT_JPEG)]
+        audio.save()
     except Exception:
         pass
 
@@ -1066,7 +1058,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # because the photo item (processed first) raised before yt-dlp ever reached the videos.
         # "only_download" still lets a genuine extraction-level failure (bad URL, private/deleted
         # post, etc.) raise normally — it only tolerates individual items failing mid-playlist.
-        "ignoreerrors": "only_download",
+        "ignoreerrors": False if no_playlist else "only_download",
     }
     if verbose:
         # Every internal debug line yt-dlp itself would print with --verbose on the real CLI, not
