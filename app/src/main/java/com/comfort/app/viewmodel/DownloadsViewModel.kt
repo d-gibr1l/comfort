@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class DownloadsViewModel(application: Application) : AndroidViewModel(application) {
@@ -57,6 +58,8 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds) { queue, deleting ->
         if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val globalPauseMutex = kotlinx.coroutines.sync.Mutex()
 
     private val _isGloballyPaused = MutableStateFlow(GalleryDlPreferences.isGloballyPaused(application))
     val isGloballyPaused: StateFlow<Boolean> = _isGloballyPaused.asStateFlow()
@@ -143,50 +146,65 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Pauses every currently running/queued download and holds any added afterwards until resumed. */
     fun pauseAll() {
         viewModelScope.launch {
-            val context = getApplication<Application>()
-            // Set *before* the loop below, not after — pauseDownload() calls repairOrphanedQueue()
-            // internally, which only fast-exits once GalleryDlPreferences.isGloballyPaused(context)
-            // is already true. Setting the flag after the loop meant every single pauseDownload()
-            // call in a large selection ran repairOrphanedQueue()'s full DB+WorkManager inspection
-            // instead of skipping it — real thrashing reproduced against a 50-item queue.
-            _isGloballyPaused.value = true
-            GalleryDlPreferences.setGloballyPaused(context, true)
-            val active = dao.getActiveInQueueOrderOnce()
-                .filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED }
-            // Freeze the current order so Resume All brings everything back exactly like this: the
-            // download(s) running right now first, then the "Up next" ones, then everything else.
-            // Only that front block needs renumbering (into -n..-1, ahead of every plain queued
-            // download's 0); the rest is already ordered by dateAdded and is left untouched. The
-            // running one(s) thereby also carry the "Up next" mark (negative queueOrder), so they
-            // continue straight away on resume — they were already in progress.
-            val front = active.filter { it.status == DownloadStatus.RUNNING } +
-                active.filter { it.status != DownloadStatus.RUNNING && it.queueOrder < 0 }
-            front.forEachIndexed { index, entity -> dao.setQueueOrder(entity.id, index - front.size) }
-            // notify = false — a per-item "Paused" notification for every download in a large
-            // queue would turn one "Pause All" tap into a stack of individual notifications.
-            active.forEach { entity -> DownloadDispatcher.pauseDownload(context, entity.id, notify = false) }
+            // One at a time with resumeAll(): the FAB flips the instant the flag changes, so a quick
+            // Pause→Resume used to run both loops interleaved — Resume re-enqueued the rows Pause
+            // had already handled while Pause went on to pause the rest, leaving a mix of running
+            // and paused rows with the button saying "Pause".
+            globalPauseMutex.withLock { pauseAllLocked() }
         }
+    }
+
+    private suspend fun pauseAllLocked() {
+        val context = getApplication<Application>()
+        // Set *before* the loop below, not after — pauseDownload() calls repairOrphanedQueue()
+        // internally, which only fast-exits once GalleryDlPreferences.isGloballyPaused(context)
+        // is already true. Setting the flag after the loop meant every single pauseDownload()
+        // call in a large selection ran repairOrphanedQueue()'s full DB+WorkManager inspection
+        // instead of skipping it — real thrashing reproduced against a 50-item queue.
+        _isGloballyPaused.value = true
+        GalleryDlPreferences.setGloballyPaused(context, true)
+        val active = dao.getActiveInQueueOrderOnce()
+            .filter { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED }
+        // Freeze the current order so Resume All brings everything back exactly like this: the
+        // download(s) running right now first, then the "Up next" ones, then everything else.
+        // Only that front block needs renumbering (into -n..-1, ahead of every plain queued
+        // download's 0); the rest is already ordered by dateAdded and is left untouched. This
+        // only fixes the *order* — whether a row bypasses the schedule window is its separate
+        // forceStart flag, which Pause All leaves alone, so a download that was running before the
+        // pause still waits for the window on resume if it's closed by then.
+        val front = active.filter { it.status == DownloadStatus.RUNNING } +
+            active.filter { it.status != DownloadStatus.RUNNING && it.queueOrder < 0 }
+        front.forEachIndexed { index, entity -> dao.setQueueOrder(entity.id, index - front.size) }
+        // notify = false — a per-item "Paused" notification for every download in a large
+        // queue would turn one "Pause All" tap into a stack of individual notifications.
+        active.forEach { entity -> DownloadDispatcher.pauseDownload(context, entity.id, notify = false) }
     }
 
     /** Resumes everything held by pauseAll(), including downloads added while paused. */
     fun resumeAll() {
         viewModelScope.launch {
-            val context = getApplication<Application>()
-            _isGloballyPaused.value = false
-            GalleryDlPreferences.setGloballyPaused(context, false)
-            dao.getActiveInQueueOrderOnce()
-                .filter { it.status == DownloadStatus.PAUSED || (it.status == DownloadStatus.QUEUED && it.workRequestId == null) }
-                .forEach { entity ->
-                    // One at a time, in queue order (see pauseAll's frozen order) — these used to be
-                    // launched concurrently, which appended them to WorkManager's per-slot chains in
-                    // whatever order the coroutines happened to finish, so downloads came back in a
-                    // shuffled order (reported live). A few ms per item is the whole cost.
-                    // enqueueWork() itself sets the correct QUEUED/SCHEDULED status once it knows
-                    // the actual delay — no need to guess QUEUED here first. A negative queueOrder
-                    // (running before the pause, or "Up next") resumes immediately, same as
-                    // DownloadDispatcher.repairIfJobDead treats it.
-                    DownloadDispatcher.enqueueWork(context, entity.id, entity.url, forceImmediate = entity.queueOrder < 0)
-                }
+            globalPauseMutex.withLock {
+                val context = getApplication<Application>()
+                _isGloballyPaused.value = false
+                GalleryDlPreferences.setGloballyPaused(context, false)
+                dao.getActiveInQueueOrderOnce()
+                    .filter { it.status == DownloadStatus.PAUSED || (it.status == DownloadStatus.QUEUED && it.workRequestId == null) }
+                    .forEach { entity ->
+                        // One at a time, in queue order (see pauseAll's frozen order) — these used to be
+                        // launched concurrently, which appended them to WorkManager's per-slot chains in
+                        // whatever order the coroutines happened to finish, so downloads came back in a
+                        // shuffled order (reported live). A few ms per item is the whole cost.
+                        // enqueueWork() itself sets the correct QUEUED/SCHEDULED status once it knows
+                        // the actual delay — no need to guess QUEUED here first. Only an explicit
+                        // "Up next" (forceStart) skips the schedule window, same as
+                        // DownloadDispatcher.repairIfJobDead treats it.
+                        DownloadDispatcher.enqueueWork(
+                            context, entity.id, entity.url,
+                            forceImmediate = entity.forceStart,
+                            expectedStatus = setOf(DownloadStatus.PAUSED, DownloadStatus.QUEUED),
+                        )
+                    }
+            }
         }
     }
 
@@ -233,7 +251,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                     // Errored retries go to the back of the queue, keeping the order they're listed
                     // in relative to each other (1ms apart) — see retryDownload.
                     if (status == DownloadStatus.ERRORED) dao.moveToQueueEnd(entity.id, now + index)
-                    DownloadDispatcher.enqueueWork(context, entity.id, entity.url)
+                    DownloadDispatcher.enqueueWork(context, entity.id, entity.url, expectedStatus = setOf(status))
                 }
         }
     }

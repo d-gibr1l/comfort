@@ -56,12 +56,22 @@ interface DownloadDao {
      * retry kept its original, usually older dateAdded and was *listed* near the top while
      * WorkManager actually ran it last, behind everything already queued. Also drops any old
      * "Up next" mark (negative queueOrder). */
-    @Query("UPDATE downloads SET queueOrder = 0, dateAdded = :now WHERE id = :id")
+    @Query("UPDATE downloads SET queueOrder = 0, forceStart = 0, dateAdded = :now WHERE id = :id")
     suspend fun moveToQueueEnd(id: String, now: Long)
 
     /** Bumps a still-waiting download to the front of the queue — see [DownloadDispatcher.startNow]. */
     @Query("UPDATE downloads SET queueOrder = :order WHERE id = :id")
     suspend fun setQueueOrder(id: String, order: Int)
+
+    /** [DownloadDispatcher.startNow]'s override: front of the line *and* past the schedule window. */
+    @Query("UPDATE downloads SET queueOrder = :order, forceStart = 1 WHERE id = :id")
+    suspend fun setForceStart(id: String, order: Int)
+
+    /** Status write that only lands if the row is still in one of [allowed] — Pause/Cancel work from
+     * a snapshot, and a download that finished or failed in the meantime must not be overwritten.
+     * Returns the number of rows changed (0 = skipped). */
+    @Query("UPDATE downloads SET status = :status WHERE id = :id AND status IN (:allowed)")
+    suspend fun updateStatusIfIn(id: String, status: DownloadStatus, allowed: List<DownloadStatus>): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(download: DownloadEntity)

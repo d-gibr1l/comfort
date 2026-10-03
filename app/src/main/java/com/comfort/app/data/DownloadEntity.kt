@@ -166,6 +166,12 @@ data class DownloadEntity(
      * info sheet. [errorMessage] stays the one-line summary. Null for failures from before this
      * existed, or where no engine ran. */
     val errorDetails: String? = null,
+    /** The user explicitly jumped this past the schedule window / Download Delay ("Up next" →
+     * DownloadDispatcher.startNow). Kept apart from [queueOrder]: Pause All also gives running
+     * downloads a negative queueOrder purely to freeze their order, and that must not make them
+     * ignore the schedule window on Resume. */
+    @ColumnInfo(defaultValue = "0")
+    val forceStart: Boolean = false,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for
