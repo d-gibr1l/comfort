@@ -91,12 +91,18 @@ private object DownloadConcurrencyGate {
     // happened to re-check first, so several downloads moved up with "Up next" (see
     // DownloadDispatcher.startNow) raced each other at random instead of going in the order the
     // queue promises. Now only the front of this line may take a free slot.
-    private data class Place(val queueOrder: Int, val dateAdded: Long)
+    // A plain class (identity equality), not a data class: every acquire() gets its own Place, and
+    // cleanup removes only *that* instance. A download re-enqueued while its previous worker is
+    // still winding down at the gate (Up next, schedule change, ...) has two acquire() calls for
+    // the same id briefly overlapping; removing by id alone let the old one's cleanup delete the
+    // new one's entry, after which the new worker could never be "first in line" again.
+    private class Place(val queueOrder: Int, val dateAdded: Long)
     private val waiting = java.util.concurrent.ConcurrentHashMap<String, Place>()
     private val lineOrder = compareBy<Map.Entry<String, Place>>({ it.value.queueOrder }, { it.value.dateAdded }, { it.key })
 
     suspend fun acquire(context: Context, downloadId: String, queueOrder: Int, dateAdded: Long) {
-        waiting[downloadId] = Place(queueOrder, dateAdded)
+        val place = Place(queueOrder, dateAdded)
+        waiting[downloadId] = place
         try {
             while (true) {
                 val limit = GalleryDlPreferences.getEffectiveConcurrentDownloads(context).coerceAtLeast(1)
@@ -109,7 +115,7 @@ private object DownloadConcurrencyGate {
                     val current = active.get()
                     if (current >= limit) break
                     if (active.compareAndSet(current, current + 1)) {
-                        waiting.remove(downloadId)
+                        waiting.remove(downloadId, place)
                         // The next in line may also fit (concurrency limit above 1).
                         slotFreed.tryEmit(Unit)
                         return
@@ -120,7 +126,7 @@ private object DownloadConcurrencyGate {
             }
         } finally {
             // Cancelled while waiting (paused/cancelled): leave the line so it can't block others.
-            waiting.remove(downloadId)
+            waiting.remove(downloadId, place)
         }
     }
 
@@ -218,8 +224,11 @@ class DownloadWorker(
             // Only once this download has a slot: every queued download's worker now waits at the
             // gate (one job per download, see DownloadDispatcher.enqueueWork), and posting before
             // it gave each waiting one its own "downloading" notification.
-            DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, entity?.downloadedItems ?: 0, initialPercent)
+            // Inside the try (not before it): acquire() has already taken a slot, so anything that
+            // throws between there and the finally's release() — this notification call included —
+            // would otherwise leak it permanently and starve every other queued download.
             try {
+            DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, entity?.downloadedItems ?: 0, initialPercent)
             return withContext(Dispatchers.IO) {
                 try {
                 // Re-checked fresh here, not the `entity` snapshot fetched before this worker ever
@@ -427,14 +436,14 @@ class DownloadWorker(
                 // cancellation of this same job takes a moment to actually propagate back in.
                 val lastScheduleCheckMs = AtomicLong(0L)
                 val scheduleClosedPauseRequested = AtomicBoolean(false)
-                // A negative queueOrder is startNow()'s own marker for "the user explicitly jumped
+                // forceStart is startNow()'s own marker for "the user explicitly jumped
                 // this past the schedule window" (see DownloadDispatcher.startNow/repairIfJobDead).
                 // Without this, the periodic check below would pause a Start-Now'd download within
                 // its first minute anyway the instant the window happens to already be closed —
                 // silently undoing the very override the user just tapped. Snapshotted once from the
                 // entity fetched at the top of doWork(), not re-read live, so this exemption covers
                 // this entire run exactly like the initial forceImmediate skip already did.
-                val startedViaStartNow = (entity?.queueOrder ?: 0) < 0
+                val startedViaStartNow = entity?.forceStart == true
 
                 // suspend, not a plain lambda — PythonRuntime's onLine has no JNI-reentrancy
                 // constraint (unlike Chaquopy's old synchronous callback), so every DB write below

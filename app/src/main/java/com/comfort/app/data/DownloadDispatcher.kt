@@ -110,6 +110,9 @@ object DownloadDispatcher {
 
     private const val QUEUE_REPAIR_DEBOUNCE_MS = 600L
 
+    private val PAUSABLE_STATUSES = listOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
+    private val CANCELLABLE_STATUSES = PAUSABLE_STATUSES + DownloadStatus.PAUSED
+
     /** DownloadWorker's own staging area for [id] (`cacheDir/gallery-dl-staging/<id>/`) — where a
      * download's files sit while in progress before each one gets copied out to the real gallery/
      * custom folder (see MediaStoreHelper.saveMediaToGallery(), called per-item as it completes).
@@ -240,13 +243,22 @@ object DownloadDispatcher {
         url: String,
         forceImmediate: Boolean = false,
         userInitiated: Boolean = false,
+        // For callers working through a snapshot taken earlier (reschedule/restart/repair/resume/
+        // retry-all loops): re-checked here, under the lock, against the row's *current* status, so
+        // a download that finished, failed, was cancelled/paused or deleted since the snapshot
+        // isn't resurrected to QUEUED and re-run. null = no check (a single explicit user action).
+        expectedStatus: Set<DownloadStatus>? = null,
     ) = withDownloadLock(id) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
+        val current = dao.getById(id)
+        if (expectedStatus != null && (current == null || current.status !in expectedStatus)) {
+            return@withDownloadLock
+        }
         // Cancel whatever job is already associated with this id first, atomically with the new
         // submission below — closes the race where a second caller for the same id would
         // otherwise interleave its own cancel+submit and end up running two WorkRequests for the
         // same download concurrently (see the lock's own doc comment above).
-        cancelWorkManagerJob(context, dao.getById(id)?.workRequestId)
+        cancelWorkManagerJob(context, current?.workRequestId)
 
         // Every dispatch path funnels through here — retryDownload/retryAll/startNow/
         // resumeDownload used to call straight through to WorkManager regardless of this,
@@ -278,7 +290,8 @@ object DownloadDispatcher {
         // "Start now" bypass as the schedule delay for the same reason: jumping the queue means
         // skipping every reason this item would otherwise wait, not just one of them.
         val downloadDelayMillis = if (forceImmediate) 0L else GalleryDlPreferences.getEffectiveDownloadDelaySeconds(context) * 1000L
-        val delayMillis = (if (forceImmediate) 0L else scheduleDelayMillis(context)) + downloadDelayMillis
+        val windowDelayMillis = if (forceImmediate) 0L else scheduleDelayMillis(context)
+        val delayMillis = windowDelayMillis + downloadDelayMillis
 
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(workDataOf("downloadId" to id, "url" to url))
@@ -305,7 +318,9 @@ object DownloadDispatcher {
         // SCHEDULED vs QUEUED distinguishes "waiting on the schedule window" from "waiting on a
         // concurrency slot" in the UI — recomputed on every (re-)enqueue so a schedule change
         // flips this correctly for anything rescheduleQueuedDownloads() re-submits.
-        dao.updateStatus(id, if (delayMillis > 0) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED)
+        // Only the schedule window makes it SCHEDULED — the generic Download Delay is a short wait
+        // that still counts as plain "In Queue", not "Waiting for the scheduled time window".
+        dao.updateStatus(id, if (windowDelayMillis > 0) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED)
 
         // One job per download, not a slot in a chain. Downloads used to be appended round-robin
         // to one WorkManager chain per concurrency slot ("gallery_dl_queue_N"), which ran each
@@ -363,7 +378,9 @@ object DownloadDispatcher {
             val dao = AppDatabase.getDatabase(context).downloadDao()
             val entity = dao.getById(id) ?: return@withDownloadLock
             cancelWorkManagerJob(context, entity.workRequestId)
-            dao.updateStatus(id, DownloadStatus.PAUSED)
+            // Conditional: Pause All works from a snapshot, and a download that finished or failed
+            // before its turn must stay FINISHED/ERRORED rather than being flipped to PAUSED.
+            if (dao.updateStatusIfIn(id, DownloadStatus.PAUSED, PAUSABLE_STATUSES) == 0) return@withDownloadLock
             dao.resetSpeed(id)
             if (notify) {
                 // A static "Paused" notification with its own Resume action, not cancel() —
@@ -394,7 +411,9 @@ object DownloadDispatcher {
             val dao = AppDatabase.getDatabase(context).downloadDao()
             val entity = dao.getById(id) ?: return@withDownloadLock
             cancelWorkManagerJob(context, entity.workRequestId)
-            dao.updateStatus(id, DownloadStatus.CANCELLED)
+            // Same reasoning as pauseDownload: don't overwrite a download that already finished or
+            // failed (and don't wipe its staging dir either).
+            if (dao.updateStatusIfIn(id, DownloadStatus.CANCELLED, CANCELLABLE_STATUSES) == 0) return@withDownloadLock
             dao.resetSpeed(id)
             DownloadNotifications.cancel(context, id)
             // cancelWorkManagerJob() just requests the stop — it doesn't wait for the worker's own
@@ -474,13 +493,17 @@ object DownloadDispatcher {
             // ENQUEUED/RUNNING/BLOCKED means it's healthy and must not be touched.
             val info = uuid?.let { runCatching { workManager.getWorkInfoById(it).get() }.getOrNull() }
             if (info == null || info.state.isFinished) {
-                // A negative queueOrder is startNow()'s own marker for "the user explicitly jumped
+                // forceStart is startNow()'s own marker for "the user explicitly jumped
                 // this past the schedule window" (see its doc comment) — re-submitting through the
                 // normal delayed path here would silently drop that override the moment a forced
                 // download's process dies mid-transfer and gets picked back up by this repair on
                 // the next cold start, sending it back to waiting on a window that's since closed
                 // instead of resuming immediately like the user asked.
-                enqueueWork(context, entity.id, entity.url, forceImmediate = entity.queueOrder < 0)
+                enqueueWork(
+                    context, entity.id, entity.url,
+                    forceImmediate = entity.forceStart,
+                    expectedStatus = setOf(entity.status),
+                )
             }
         }
     }
@@ -518,7 +541,13 @@ object DownloadDispatcher {
         // enqueueWork() cancels whatever job is already associated with each id itself, atomically
         // with resubmitting it — no need to duplicate that cancellation here.
         dao.getQueuedOnce().forEach { entity ->
-            enqueueWork(context, entity.id, entity.url)
+            // forceStart: a download the user jumped with "Up next" must keep that override (same
+            // as repairIfJobDead) instead of going back to waiting on a closed schedule window.
+            enqueueWork(
+                context, entity.id, entity.url,
+                forceImmediate = entity.forceStart,
+                expectedStatus = setOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED),
+            )
         }
     }
 
@@ -533,7 +562,11 @@ object DownloadDispatcher {
     suspend fun restartRunningDownloads(context: Context) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         dao.getRunningOnce().forEach { entity ->
-            enqueueWork(context, entity.id, entity.url)
+            enqueueWork(
+                context, entity.id, entity.url,
+                forceImmediate = entity.forceStart,
+                expectedStatus = setOf(DownloadStatus.RUNNING),
+            )
         }
     }
 
@@ -589,7 +622,7 @@ object DownloadDispatcher {
     suspend fun startNow(context: Context, id: String) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
-        dao.setQueueOrder(id, -(System.currentTimeMillis() / 1000L).toInt())
+        dao.setForceStart(id, -(System.currentTimeMillis() / 1000L).toInt())
         enqueueWork(context, id, entity.url, forceImmediate = true, userInitiated = true)
         repairOrphanedQueue(context)
     }
