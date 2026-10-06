@@ -76,26 +76,6 @@ private val tabs = listOf(
     NavTab("Settings", Icons.Outlined.Settings),
 )
 
-/** Live, in-session mirror of GalleryDlPreferences.isEngineUpdateAvailable() — the persisted flag
- * stays the source of truth across process restarts, but reading it back only on a tab switch
- * (the previous approach) meant updating an engine from Settings' own quick-update section or the
- * About page, *without* ever leaving the Settings tab, left the nav-bar dot showing stale
- * (reproduced live: updated an engine, dot stayed lit until switching tabs and back). Every writer
- * — MainScreen's own rate-limited auto-check, and every Settings screen that finishes an
- * update — sets this directly, so the badge (which just reads it, no LaunchedEffect polling needed)
- * updates the instant any of them do, same-session, regardless of which screen did it. */
-object EngineUpdateSignal {
-    var hasUpdate by mutableStateOf(false)
-}
-
-/** Same shape as [EngineUpdateSignal], for AppUpdater's own GitHub Releases check on the app
- * itself instead of PyPI on yt-dlp/gallery-dl — kept as a separate signal (not folded into the one
- * above) since Updates > App update and Updates > Engines are separate sections a user acts on
- * independently; the nav-bar dot itself still just ORs the two together (see FloatingNavBar's call
- * site) since it means "something in Settings needs attention," not specifically which. */
-object AppUpdateSignal {
-    var hasUpdate by mutableStateOf(false)
-}
 
 // FloatingNavBar's own footprint: 16dp padding + 68dp pill + 16dp padding. Screens that now
 // overlay it (instead of Scaffold reserving space for it) use this so their own scrollable
@@ -184,35 +164,10 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         routingUrl = null
     }
 
-    LaunchedEffect(Unit) {
-        // Seeded from the persisted flag immediately (so the badge shows right away without
-        // waiting on a fresh network round trip), then only actually re-checks PyPI if
-        // ENGINE_UPDATE_CHECK_INTERVAL_MS has elapsed since the last check, so relaunching the app
-        // repeatedly doesn't spam it.
-        EngineUpdateSignal.hasUpdate = GalleryDlPreferences.isEngineUpdateAvailable(context)
-        // Provisioning first: right after an app update it re-unpacks the runtime, which puts the
-        // bundled engines back and resets the last-check time — so this launch checks (and
-        // auto-updates) them now, instead of trusting a check made against the old ones.
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.comfort.app.util.PythonRuntime.ensureProvisioned(context) }
-        val lastCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
-        if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
-        // Installs what it finds when auto-update is on (Settings > Updates > Engines, on by default).
-        EngineUpdateSignal.hasUpdate = EngineUpdater.checkAndAutoUpdate(context).any { it.updateAvailable }
-    }
-
-    // Same rate-limited-auto-check shape as the engine one just above, for AppUpdater's own GitHub
-    // Releases check instead — a separate LaunchedEffect (not folded into that one) since it's a
-    // fully independent check against a different service on its own interval
-    // (APP_UPDATE_CHECK_INTERVAL_MS), not a step of the engine-update flow.
-    LaunchedEffect(Unit) {
-        AppUpdateSignal.hasUpdate = GalleryDlPreferences.isAppUpdateAvailable(context)
-        val lastCheck = GalleryDlPreferences.getAppUpdateLastCheckMs(context)
-        if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.APP_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
-        val status = AppUpdater.check(context)
-        AppUpdateSignal.hasUpdate = status.updateAvailable
-        GalleryDlPreferences.setAppUpdateAvailable(context, status.updateAvailable)
-        GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
-    }
+    // Engine and app update checks, once per launch and rate-limited — see UpdatesViewModel.
+    val updates = updatesViewModel()
+    val anyUpdateAvailable by updates.anyUpdateAvailable.collectAsState()
+    LaunchedEffect(Unit) { updates.runLaunchChecks() }
 
     // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
     // measured region — pill height plus FloatingNavBar's own 24dp/16dp padding — and paints
@@ -313,7 +268,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         FloatingNavBar(
             selectedTab = selectedTab,
             activeDownloadsCount = activeDownloadsCount,
-            hasEngineUpdate = EngineUpdateSignal.hasUpdate || AppUpdateSignal.hasUpdate,
+            hasEngineUpdate = anyUpdateAvailable,
             onSelect = { index ->
                 when {
                     // Tapping the already-selected Library tab again jumps to the Queue, matching

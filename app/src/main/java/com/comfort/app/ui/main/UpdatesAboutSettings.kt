@@ -144,19 +144,12 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
  * both can be visible at once if both happen to have something new. */
 @Composable
 internal fun QuickAppUpdateSection() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf<AppUpdater.UpdateStatus?>(null) }
-    val downloadProgress by com.comfort.app.util.AppUpdater.downloadProgress.collectAsState()
-    val downloadError by com.comfort.app.util.AppUpdater.downloadError.collectAsState()
+    val updates = updatesViewModel()
+    val status by updates.appStatus.collectAsState()
+    val downloadProgress by updates.appDownloadProgress.collectAsState()
+    val downloadError by updates.appDownloadError.collectAsState()
 
-    LaunchedEffect(Unit) {
-        val result = AppUpdater.check(context)
-        status = result
-        GalleryDlPreferences.setAppUpdateAvailable(context, result.updateAvailable)
-        GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
-        AppUpdateSignal.hasUpdate = result.updateAvailable
-    }
+    LaunchedEffect(Unit) { updates.ensureAppChecked() }
 
     val current = status
     if (current == null || !current.updateAvailable) return
@@ -165,7 +158,7 @@ internal fun QuickAppUpdateSection() {
         AppUpdateRow(
             status = current,
             downloadProgress = downloadProgress,
-            onUpdate = { AppUpdater.startDownload(context, current) },
+            onUpdate = { updates.startAppDownload(current) },
         )
         if (downloadError != null) {
             Spacer(Modifier.height(10.dp))
@@ -180,26 +173,13 @@ internal fun QuickAppUpdateSection() {
  * of the cached flag/interval MainScreen's periodic one respects, same as EnginesSection. */
 @Composable
 private fun AppUpdateSection() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var status by remember { mutableStateOf<AppUpdater.UpdateStatus?>(null) }
-    var checking by remember { mutableStateOf(false) }
-    val downloadProgress by com.comfort.app.util.AppUpdater.downloadProgress.collectAsState()
-    val downloadError by com.comfort.app.util.AppUpdater.downloadError.collectAsState()
+    val updates = updatesViewModel()
+    val status by updates.appStatus.collectAsState()
+    val checking by updates.checkingApp.collectAsState()
+    val downloadProgress by updates.appDownloadProgress.collectAsState()
+    val downloadError by updates.appDownloadError.collectAsState()
 
-    fun runCheck() {
-        checking = true
-        scope.launch {
-            val result = AppUpdater.check(context)
-            status = result
-            checking = false
-            GalleryDlPreferences.setAppUpdateAvailable(context, result.updateAvailable)
-            GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
-            AppUpdateSignal.hasUpdate = result.updateAvailable
-        }
-    }
-
-    LaunchedEffect(Unit) { runCheck() }
+    LaunchedEffect(Unit) { updates.checkApp() }
 
     SettingsSection(title = "App Update", icon = Icons.Outlined.Download) {
         val current = status
@@ -213,7 +193,7 @@ private fun AppUpdateSection() {
             AppUpdateRow(
                 status = current,
                 downloadProgress = downloadProgress,
-                onUpdate = { AppUpdater.startDownload(context, current) },
+                onUpdate = { updates.startAppDownload(current) },
             )
         }
         if (downloadError != null) {
@@ -221,7 +201,7 @@ private fun AppUpdateSection() {
             Text(downloadError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(14.dp))
-        OutlinedButton(onClick = { runCheck() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { updates.checkApp() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
@@ -277,22 +257,13 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
  * not a permanent fixture). */
 @Composable
 internal fun QuickEngineUpdateSection() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var statuses by remember { mutableStateOf<List<EngineUpdater.VersionStatus>?>(null) }
-    // A set, not one engine: updates run concurrently, and a single slot made tapping a second
-    // engine's Update look like it stopped the first (its spinner reverted to an Update button),
-    // then the first to finish cleared the other's spinner too.
-    var updatingEngines by remember { mutableStateOf(emptySet<String>()) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    val updates = updatesViewModel()
+    val statuses by updates.engineStatuses.collectAsState()
+    val updatingEngines by updates.updatingEngines.collectAsState()
+    val errorText by updates.engineError.collectAsState()
 
-    LaunchedEffect(Unit) {
-        // Same as MainScreen's launch check: installs what it finds when auto-update is on, so
-        // opening Settings doesn't need a manual tap either.
-        val result = EngineUpdater.checkAndAutoUpdate(context)
-        statuses = result
-        EngineUpdateSignal.hasUpdate = result.any { it.updateAvailable }
-    }
+    // Installs what it finds when auto-update is on, so opening Settings needs no manual tap.
+    LaunchedEffect(Unit) { updates.ensureEnginesChecked() }
 
     val outdated = statuses?.filter { it.updateAvailable } ?: return
     if (outdated.isEmpty()) return
@@ -302,26 +273,7 @@ internal fun QuickEngineUpdateSection() {
             EngineUpdateRow(
                 status = status,
                 updating = status.engine.packageDirName in updatingEngines,
-                onUpdate = {
-                    if (status.artifactUrl == null) return@EngineUpdateRow
-                    updatingEngines = updatingEngines + status.engine.packageDirName
-                                scope.launch {
-                        val result = EngineUpdater.update(context, status)
-                        updatingEngines = updatingEngines - status.engine.packageDirName
-                        result.onSuccess { newVersion ->
-                            val updated = statuses.orEmpty().map {
-                                if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
-                            }
-                            statuses = updated
-                            val available = updated.any { it.updateAvailable }
-                            GalleryDlPreferences.setEngineUpdateAvailable(context, available)
-                            EngineUpdateSignal.hasUpdate = available
-                        }
-                        result.onFailure { e ->
-                            errorText = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
-                        }
-                    }
-                },
+                onUpdate = { updates.updateEngine(status) },
             )
             if (index != outdated.lastIndex) Spacer(Modifier.height(12.dp))
         }
@@ -339,37 +291,19 @@ internal fun QuickEngineUpdateSection() {
 @Composable
 private fun EnginesSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
-    var statuses by remember { mutableStateOf<List<EngineUpdater.VersionStatus>?>(null) }
-    var checking by remember { mutableStateOf(false) }
-    // A set, not one engine: updates run concurrently, and a single slot made tapping a second
-    // engine's Update look like it stopped the first (its spinner reverted to an Update button),
-    // then the first to finish cleared the other's spinner too.
-    var updatingEngines by remember { mutableStateOf(emptySet<String>()) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    val updates = updatesViewModel()
+    val statuses by updates.engineStatuses.collectAsState()
+    val checking by updates.checkingEngines.collectAsState()
+    val updatingEngines by updates.updatingEngines.collectAsState()
+    val errorText by updates.engineError.collectAsState()
     var autoUpdate by remember { mutableStateOf(GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) }
     var ytDlpChannel by remember { mutableStateOf(GalleryDlPreferences.getYtDlpUpdateChannel(context)) }
     var galleryDlChannel by remember { mutableStateOf(GalleryDlPreferences.getGalleryDlUpdateChannel(context)) }
     var instaloaderChannel by remember { mutableStateOf(GalleryDlPreferences.getInstaloaderUpdateChannel(context)) }
 
-    fun runCheck() {
-        checking = true
-        scope.launch {
-            // Installs too when auto-update is on — this page used to only report, showing
-            // "Update" buttons for engines auto-update was supposed to take care of. Also
-            // refreshes the persisted flag and the live nav-bar badge signal.
-            val result = EngineUpdater.checkAndAutoUpdate(context)
-            statuses = result
-            checking = false
-            EngineUpdateSignal.hasUpdate = result.any { it.updateAvailable }
-        }
-    }
-
-    // Re-checks whenever a channel picker below flips — EngineUpdater.checkAll() reads the
-    // channel preference itself, so switching from Stable to Nightly/Master needs a fresh check
-    // against that new source before the row/button below reflect it, same as opening this screen
-    // for the first time does.
-    LaunchedEffect(ytDlpChannel, galleryDlChannel, instaloaderChannel) { runCheck() }
+    // A fresh check when the page opens, and again whenever a channel flips — the check reads the
+    // channel preference itself, so Stable -> Nightly/Master needs one against that new source.
+    LaunchedEffect(ytDlpChannel, galleryDlChannel, instaloaderChannel) { updates.checkEngines() }
 
     SettingsSection(title = "Engines", icon = Icons.Outlined.Refresh) {
         IconToggleRow(
@@ -419,29 +353,7 @@ private fun EnginesSection() {
                         }
                     },
                     updating = status.engine.packageDirName in updatingEngines,
-                    onUpdate = {
-                        if (status.artifactUrl == null) return@EngineCard
-                        updatingEngines = updatingEngines + status.engine.packageDirName
-                                        scope.launch {
-                            val result = EngineUpdater.update(context, status)
-                            updatingEngines = updatingEngines - status.engine.packageDirName
-                            result.onSuccess { newVersion ->
-                                // The live list, not the currentStatuses snapshot from when Update was
-                                // tapped — with two updates in flight, writing back that stale copy let
-                                // whichever finished second erase the first one's new version.
-                                val updated = statuses.orEmpty().map {
-                                    if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
-                                }
-                                statuses = updated
-                                val available = updated.any { it.updateAvailable }
-                                GalleryDlPreferences.setEngineUpdateAvailable(context, available)
-                                EngineUpdateSignal.hasUpdate = available
-                            }
-                            result.onFailure { e ->
-                                errorText = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
-                            }
-                        }
-                    },
+                    onUpdate = { updates.updateEngine(status) },
                 )
                 if (index != currentStatuses.lastIndex) Spacer(Modifier.height(12.dp))
             }
@@ -451,7 +363,7 @@ private fun EnginesSection() {
             Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         Spacer(Modifier.height(14.dp))
-        OutlinedButton(onClick = { runCheck() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { updates.checkEngines() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
             if (checking) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             } else {
@@ -655,4 +567,17 @@ private fun CreditChip(entry: CreditEntry, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/** The activity's [com.comfort.app.viewmodel.UpdatesViewModel] — one per activity, not per screen,
+ * so Home, the Settings root and the Updates page all read and update the same state. */
+@Composable
+internal fun updatesViewModel(): com.comfort.app.viewmodel.UpdatesViewModel {
+    var context = androidx.compose.ui.platform.LocalContext.current
+    while (context !is androidx.activity.ComponentActivity && context is android.content.ContextWrapper) {
+        context = context.baseContext
+    }
+    val owner = context as? androidx.lifecycle.ViewModelStoreOwner
+        ?: error("updatesViewModel() needs to run inside an activity")
+    return androidx.lifecycle.viewmodel.compose.viewModel(viewModelStoreOwner = owner)
 }
