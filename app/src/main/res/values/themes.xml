@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.GalleryDL" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Dark status/nav bar icons on the light theme. MainActivity sets them per the app's own
+         light/dark choice, but removing the splash re-applies this theme's, so they have to be
+         right here too (white icons on the near-white page were hard to see). -->
+    <style name="Theme.GalleryDL" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+    </style>
 
     <!-- MainActivity's cold-start theme (see AndroidManifest.xml) — shown for the brief instant
          between process start and the first Compose frame being ready. Not android:-namespaced:
