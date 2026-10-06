@@ -81,7 +81,7 @@ private val tabs = listOf(
  * (the previous approach) meant updating an engine from Settings' own quick-update section or the
  * About page, *without* ever leaving the Settings tab, left the nav-bar dot showing stale
  * (reproduced live: updated an engine, dot stayed lit until switching tabs and back). Every writer
- * — MainScreen's own rate-limited auto-check, and every place in MoreScreen.kt that finishes an
+ * — MainScreen's own rate-limited auto-check, and every Settings screen that finishes an
  * update — sets this directly, so the badge (which just reads it, no LaunchedEffect polling needed)
  * updates the instant any of them do, same-session, regardless of which screen did it. */
 object EngineUpdateSignal {
