@@ -22,7 +22,14 @@ import org.json.JSONObject
  * separate field precisely so nothing downstream is tempted to reuse [num] for identity again. */
 /** [sizeBytes]: the file's size when the listing reported one — gallery-dl and Instaloader listings
  * get it from the media server (the wrappers' "filesize"); null when it didn't answer. */
-data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?, val listIndex: Int, val sizeBytes: Long? = null)
+data class GalleryItem(
+    val num: Int, val url: String, val filename: String?, val title: String?, val listIndex: Int, val sizeBytes: Long? = null,
+    /** A video item's size per quality chip ("P720|mkv" — see PreviewInfo.sizesByQuality), from the
+     * yt-dlp lookup that also fetches its thumbnail (enrichVideoThumbnails); empty otherwise. */
+    val sizesByQuality: Map<String, Long> = emptyMap(),
+    /** Who posted it — the preview card's line under the title. */
+    val uploader: String? = null,
+)
 
 /** What the download preview sheet shows about a link before committing to downloading it. Every
  * field is independently optional — extractors vary a lot in what they populate, and a missing
@@ -102,6 +109,8 @@ fun ListingResult.shouldUsePreviewSheet(url: String): Boolean {
 object GalleryDlListing {
     // gallery-dl's own Message.Url constant — stable across extractors, see gallery_dl/job.py.
     private const val MESSAGE_URL = 3
+    // Message.Queue: "go list/download this other URL instead" — what a share link's extractor yields.
+    private const val MESSAGE_QUEUE = 6
     // gallery-dl's own Message.Error-shaped entry: [-1, {"error": "...", "message": "..."}] — seen
     // live from an --dump-json run against a login-gated post ({"error": "AbortExtraction",
     // "message": "HTTP redirect to login page (...)"}), not otherwise documented as a stable
@@ -327,7 +336,7 @@ object GalleryDlListing {
         }
     }
 
-    private suspend fun listViaGalleryDl(context: Context, url: String): ListingResult {
+    private suspend fun listViaGalleryDl(context: Context, url: String, followRedirect: Boolean = true): ListingResult {
         val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.GALLERY_DL)
 
         val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
@@ -373,11 +382,27 @@ object GalleryDlListing {
                 jsonText = rawText
             }
     
-            return parseGalleryDlItems(jsonText, url)
+            val parsed = parseGalleryDlItems(jsonText, url)
+            // A share link (Reddit's /s/<code>, ...) lists nothing itself: gallery-dl answers with
+            // a redirect to the real post (a Message.Queue entry) and only follows it when actually
+            // downloading. Listed as-is, the preview fell back to yt-dlp — no images, no author, no
+            // sizes. Followed once here, so the listing is the real post's.
+            if (followRedirect && parsed.items.isEmpty() && parsed.errorMessage == null) {
+                redirectTarget(jsonText)?.let { target -> return listViaGalleryDl(context, target, followRedirect = false) }
+            }
+            return parsed
         } finally {
             tempCookieFile?.delete()
         }
     }
+
+    /** The URL of gallery-dl's redirect (Message.Queue) entry, when that's what a listing is. */
+    private fun redirectTarget(jsonText: String): String? = runCatching {
+        val root = JSONArray(jsonText.trim())
+        (0 until root.length()).mapNotNull { root.optJSONArray(it) }
+            .firstOrNull { it.optInt(0) == MESSAGE_QUEUE }
+            ?.optString(1)?.takeIf { it.startsWith("http") }
+    }.getOrNull()
 
     private fun parseGalleryDlItems(jsonText: String, url: String): ListingResult {
         val trimmed = jsonText.trim()
@@ -419,7 +444,7 @@ object GalleryDlListing {
                     .firstNotNullOfOrNull { key -> keywords?.optString(key)?.trim()?.takeIf { it.isNotBlank() } }
                     ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
                 val sizeBytes = keywords?.optLong("filesize", 0L)?.takeIf { it > 0L }
-                items.add(GalleryItem(num, fileUrl, filename, title, listIndex = items.size, sizeBytes = sizeBytes))
+                items.add(GalleryItem(num, fileUrl, filename, title, listIndex = items.size, sizeBytes = sizeBytes, uploader = keywords?.let(::uploaderOf)))
             }
             // Real items found despite an error entry also being present (a partial failure) still
             // count as a usable listing — only surface the error when there's nothing else to show.
@@ -529,7 +554,12 @@ object GalleryDlListing {
         // the gallery-dl path below, and with SharePickerScreen's own video/quality-picker gating)
         // recognizes this as a video — the real download never uses this filename, only the
         // picker's video detection does.
-        return GalleryItem(num, thumbnail, "$num.mp4", title, listIndex = listIndex)
+        return GalleryItem(
+            num, thumbnail, "$num.mp4", title, listIndex = listIndex,
+            sizeBytes = entry.optLong("filesize", 0L).takeIf { it > 0L } ?: entry.optLong("filesize_approx", 0L).takeIf { it > 0L },
+            sizesByQuality = sizesByQualityOf(entry),
+            uploader = entry.optString("uploader").takeIf { it.isNotBlank() && it != "null" },
+        )
     }
 
     /** For a gallery-dl-sourced carousel that contains a video item: fetches yt-dlp's own listing
@@ -554,10 +584,39 @@ object GalleryDlListing {
             val isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename) == true
             if (!isVideo) return@map item
             val thumbnail = ytThumbnails.getOrNull(videoIndex)
+            // The same entry also carries the video's size — a gallery-dl video item is a "ytdl:"
+            // hand-off the media-server size check can't ask about, so Reddit videos showed none.
+            val entry = ytEntries.getOrNull(videoIndex)
             videoIndex++
-            if (thumbnail != null) item.copy(url = thumbnail) else item
+            val size = entry?.let { e -> e.optLong("filesize", 0L).takeIf { it > 0L } ?: e.optLong("filesize_approx", 0L).takeIf { it > 0L } }
+            item.copy(
+                url = thumbnail ?: item.url,
+                sizeBytes = item.sizeBytes ?: size,
+                sizesByQuality = entry?.let(::sizesByQualityOf).orEmpty(),
+                uploader = item.uploader ?: entry?.optString("uploader")?.takeIf { it.isNotBlank() && it != "null" },
+            )
         }
     }
+
+    /** The poster's name from a gallery-dl item's keywords. Extractors name it differently —
+     * Reddit "author", Instagram "username", others "uploader"/"user"/"owner" — and some (Twitter/X)
+     * make it an object, whose display name is used. The preview card showed none at all. */
+    private fun uploaderOf(keywords: JSONObject): String? {
+        for (key in listOf("author", "username", "uploader", "owner", "user", "artist")) {
+            val name = when (val value = keywords.opt(key)) {
+                is String -> value
+                is JSONObject -> listOf("name", "nick", "username").firstNotNullOfOrNull { value.optString(it).takeIf { n -> n.isNotBlank() } }
+                else -> null
+            }?.trim()
+            if (!name.isNullOrBlank() && name != "null" && name != "[deleted]") return name
+        }
+        return null
+    }
+
+    private fun sizesByQualityOf(entry: JSONObject): Map<String, Long> =
+        entry.optJSONObject("sizes_by_quality")?.let { sizes ->
+            sizes.keys().asSequence().mapNotNull { key -> sizes.optLong(key, 0L).takeIf { it > 0L }?.let { key to it } }.toMap()
+        } ?: emptyMap()
 
     /** Title/uploader/thumbnail for the download preview sheet's card, from the same yt-dlp
      * listing pass the share picker already runs — so showing the sheet costs no extra extraction
@@ -662,13 +721,16 @@ object GalleryDlListing {
         if (items.isEmpty()) return null
         if (items.size == 1) {
             val only = items[0]
-            return PreviewInfo(title = only.title, uploader = null, thumbnail = only.url, filesizeBytes = only.sizeBytes, durationMs = null, streamUrls = listOf(only.url))
+            return PreviewInfo(
+                title = only.title, uploader = only.uploader, thumbnail = only.url, filesizeBytes = only.sizeBytes,
+                sizesByQuality = only.sizesByQuality, durationMs = null, streamUrls = listOf(only.url),
+            )
         }
         val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url, isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename), sizeBytes = item.sizeBytes) }
         val first = items.first()
         return PreviewInfo(
             title = first.title,
-            uploader = null,
+            uploader = first.uploader,
             thumbnail = first.url,
             // The whole post, only when every item's size is known (a partial sum would read as the total).
             filesizeBytes = items.takeIf { all -> all.all { it.sizeBytes != null } }?.sumOf { it.sizeBytes!! },
