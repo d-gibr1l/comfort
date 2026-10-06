@@ -42,12 +42,11 @@ import java.util.zip.ZipInputStream
  * directory for it (a real `pip install` would build the wheel itself; there's no build backend
  * available on-device to do that, so this is a source-copy install instead).
  *
- * Caveat worth knowing: PythonRuntime.ensureProvisioned() re-unpacks everything from the bundled
- * assets from scratch whenever PROVISION_VERSION changes (i.e. the *next real app update* that
- * touches assets/python_packages/) — an engine updated in-app via this object reverts back to
- * whatever's bundled in that new APK at that point (STABLE, since that's what's bundled). It also
- * reverts back to the STABLE channel's wheel shape — a BLEEDING_EDGE install re-checks/re-installs
- * the same one tap away, same as any other update. */
+ * Caveat worth knowing: PythonRuntime.ensureProvisioned() re-unpacks the runtime from the bundled
+ * assets whenever PROVISION_VERSION changes — now only when the runtime or a bundled engine wheel
+ * changes, not for wrapper-script edits (those are refreshed on their own). An engine updated
+ * in-app reverts to the bundled one at that point; the re-unpack resets the last-check time, so
+ * [checkAndAutoUpdate] reinstalls the update on the next launch when auto-update is on. */
 object EngineUpdater {
     data class EngineInfo(
         val displayName: String,
@@ -231,6 +230,33 @@ object EngineUpdater {
             }
             VersionStatus(engine, channel, installed, latest?.version, latest?.artifactUrl, latest?.artifactKind, latest?.sha256)
         }
+    }
+
+    /** Checks every engine and, with Settings > Updates > Auto-update on, installs what the check
+     * found — the one place that does this, for the launch check, the Settings screen and the
+     * Updates page alike (the Updates page used to only report, so it showed "Update" buttons even
+     * with auto-update on). Records the result (the update-available flag and the check time) and
+     * returns the statuses as they are after any installs; a failed install leaves that engine
+     * outdated, still shown as such.
+     *
+     * Waits for the runtime to be provisioned first: a first launch after an app update used to
+     * read the engines' versions moments *before* the runtime was re-unpacked, record "up to date",
+     * then have those updated engines replaced by the bundled ones with no re-check for hours. */
+    suspend fun checkAndAutoUpdate(context: Context): List<VersionStatus> = withContext(Dispatchers.IO) {
+        PythonRuntime.ensureProvisioned(context)
+        var statuses = checkAll(context)
+        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
+            statuses = statuses.map { status ->
+                if (status.updateAvailable && status.artifactUrl != null) {
+                    update(context, status).getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
+                } else {
+                    status
+                }
+            }
+        }
+        GalleryDlPreferences.setEngineUpdateAvailable(context, statuses.any { it.updateAvailable })
+        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+        statuses
     }
 
     private fun sha256Of(file: File): String = file.inputStream().use { stream ->

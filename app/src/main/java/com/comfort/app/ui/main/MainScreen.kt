@@ -190,28 +190,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // ENGINE_UPDATE_CHECK_INTERVAL_MS has elapsed since the last check, so relaunching the app
         // repeatedly doesn't spam it.
         EngineUpdateSignal.hasUpdate = GalleryDlPreferences.isEngineUpdateAvailable(context)
+        // Provisioning first: right after an app update it re-unpacks the runtime, which puts the
+        // bundled engines back and resets the last-check time — so this launch checks (and
+        // auto-updates) them now, instead of trusting a check made against the old ones.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.comfort.app.util.PythonRuntime.ensureProvisioned(context) }
         val lastCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
         if (System.currentTimeMillis() - lastCheck < GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) return@LaunchedEffect
-        var statuses = EngineUpdater.checkAll(context)
-        // On by default (Settings > Updates > Engines): install whatever this check found instead
-        // of only flagging it for the user to apply by hand later. Best-effort per engine — a
-        // failed download/verify (network hiccup, PyPI momentarily unreachable) just leaves that
-        // one engine's own outdated status in place, still surfaced normally via the dot/quick
-        // Settings section/About page, rather than silently swallowing the failure.
-        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
-            statuses = statuses.map { status ->
-                if (status.updateAvailable && status.artifactUrl != null) {
-                    val result = EngineUpdater.update(context, status)
-                    result.getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
-                } else {
-                    status
-                }
-            }
-        }
-        val available = statuses.any { it.updateAvailable }
-        EngineUpdateSignal.hasUpdate = available
-        GalleryDlPreferences.setEngineUpdateAvailable(context, available)
-        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+        // Installs what it finds when auto-update is on (Settings > Updates > Engines, on by default).
+        EngineUpdateSignal.hasUpdate = EngineUpdater.checkAndAutoUpdate(context).any { it.updateAvailable }
     }
 
     // Same rate-limited-auto-check shape as the engine one just above, for AppUpdater's own GitHub

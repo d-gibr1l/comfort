@@ -3639,25 +3639,11 @@ private fun QuickEngineUpdateSection() {
     var errorText by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        var result = EngineUpdater.checkAll(context)
-        // Same auto-update behavior as MainScreen's own periodic check (Settings > Updates > Engines
-        // > Auto-update, on by default) — opening Settings shouldn't need a manual tap either when
-        // it's enabled.
-        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
-            result = result.map { status ->
-                if (status.updateAvailable && status.artifactUrl != null) {
-                    val update = EngineUpdater.update(context, status)
-                    update.getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
-                } else {
-                    status
-                }
-            }
-        }
+        // Same as MainScreen's launch check: installs what it finds when auto-update is on, so
+        // opening Settings doesn't need a manual tap either.
+        val result = EngineUpdater.checkAndAutoUpdate(context)
         statuses = result
-        val available = result.any { it.updateAvailable }
-        GalleryDlPreferences.setEngineUpdateAvailable(context, available)
-        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
-        EngineUpdateSignal.hasUpdate = available
+        EngineUpdateSignal.hasUpdate = result.any { it.updateAvailable }
     }
 
     val outdated = statuses?.filter { it.updateAvailable } ?: return
@@ -3721,17 +3707,13 @@ private fun EnginesSection() {
     fun runCheck() {
         checking = true
         scope.launch {
-            val result = EngineUpdater.checkAll(context)
+            // Installs too when auto-update is on — this page used to only report, showing
+            // "Update" buttons for engines auto-update was supposed to take care of. Also
+            // refreshes the persisted flag and the live nav-bar badge signal.
+            val result = EngineUpdater.checkAndAutoUpdate(context)
             statuses = result
             checking = false
-            // Refreshes both the persisted flag (survives process restart) and the live in-session
-            // signal MainScreen's nav-bar badge reads directly — opening this screen and checking
-            // here is itself a fresh signal, no reason to wait for the next auto-check interval, or
-            // a tab switch, to clear/set it.
-            val available = result.any { it.updateAvailable }
-            GalleryDlPreferences.setEngineUpdateAvailable(context, available)
-            GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
-            EngineUpdateSignal.hasUpdate = available
+            EngineUpdateSignal.hasUpdate = result.any { it.updateAvailable }
         }
     }
 
