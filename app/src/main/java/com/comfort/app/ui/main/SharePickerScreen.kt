@@ -1,5 +1,6 @@
 package com.comfort.app.ui.main
 
+import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -26,7 +27,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlin.math.ceil
-import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
@@ -34,12 +34,12 @@ import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.GalleryItem
 import com.comfort.app.util.ListingResult
 import com.comfort.app.util.rememberIsNetworkAvailable
+import com.comfort.app.viewmodel.ListingState
+import com.comfort.app.viewmodel.SharePickerViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
-import kotlinx.coroutines.launch
 
-private enum class ListingState { LOADING, LOADED, UNAVAILABLE, ERROR }
 
 /** Shown when a link is shared in from another app (and instant mode is off): lets the user
  * preview the gallery's items and pick which ones to actually download, instead of always
@@ -61,38 +61,29 @@ fun SharePickerScreen(
     preloadedResult: ListingResult? = null,
 ) {
     val context = LocalContext.current
-    var state by remember { mutableStateOf(ListingState.LOADING) }
-    var items by remember { mutableStateOf<List<GalleryItem>>(emptyList()) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    // The listing, the selection and the duplicate check live in SharePickerViewModel, scoped to
+    // this sheet so every share starts fresh. The quality override and the login dialog stay here.
+    val sheetViewModelOwner = rememberSheetViewModelStoreOwner()
+    val picker: SharePickerViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        viewModelStoreOwner = sheetViewModelOwner,
+        key = url,
+    ) { SharePickerViewModel(context.applicationContext as android.app.Application, url, preloadedResult) }
+    val state by picker.state.collectAsState()
+    val items by picker.items.collectAsState()
+    val errorMessage by picker.errorMessage.collectAsState()
+    val selectedNums by picker.selectedNums.collectAsState()
+    val itemFilter by picker.itemFilter.collectAsState()
+    val isDuplicate by picker.isDuplicate.collectAsState()
     var showLoginDialog by remember { mutableStateOf(false) }
-    var selectedNums by remember { mutableStateOf<Set<Int>>(emptySet()) }
     // Seeded from the global Settings default once the listing loads, then only ever changed by
     // the quality chips below — a per-download override, not a change to the global default.
     var selectedQuality by remember { mutableStateOf<VideoQuality?>(null) }
-    val scope = rememberCoroutineScope()
     val isNetworkAvailable = rememberIsNetworkAvailable()
 
     // Whether any item this listing found is a video — gates both the play-icon overlay on that
     // item's thumbnail and the quality picker strip, since there's nothing to pick a quality for
     // in an all-image gallery.
     val hasVideoItems = remember(items) { items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true } }
-
-    // Mirrors the Download button's own onClick computation below exactly (null means "the whole
-    // gallery," matching what a plain shared link with no selection at all would enqueue as) —
-    // computed here too so the duplicate check and the button label agree on exactly what
-    // download this selection actually represents.
-    val itemFilter = if (selectedNums.isEmpty() || selectedNums.size == items.size) null
-        else "num in {${selectedNums.sorted().joinToString(",")}}"
-
-    // Re-checked on every selection change, not just once — DownloadDao.findActiveOrFinishedByUrl
-    // now matches on (url, itemFilter) together (see its own doc comment), so switching which
-    // items are selected can genuinely flip this: a previously-downloaded 3-item subset of a
-    // 10-item gallery is a real duplicate only while that same subset (or "whole gallery," if
-    // itemFilter is null on both sides) is what's currently selected.
-    var isDuplicate by remember { mutableStateOf(false) }
-    LaunchedEffect(url, itemFilter) {
-        isDuplicate = DownloadDispatcher.isDuplicate(context, url, itemFilter)
-    }
 
     LaunchedEffect(hasVideoItems) {
         if (hasVideoItems && selectedQuality == null) {
@@ -138,31 +129,6 @@ fun SharePickerScreen(
         val maxHeight = configuration.screenHeightDp.dp * 0.92f
         val minHeight = 280.dp
         onHeightChange(target.coerceIn(minHeight, maxHeight))
-    }
-
-    LaunchedEffect(url) {
-        state = ListingState.LOADING
-        errorMessage = null
-        val result = preloadedResult ?: GalleryDlListing.listItems(context, url)
-        when {
-            result.items.isNotEmpty() -> {
-                items = result.items
-                selectedNums = result.items.map { it.num }.toSet()
-                state = ListingState.LOADED
-            }
-            // A genuine failure (needs login, network error, ...) — surfaced to the user instead
-            // of silently falling through to a download that's just going to fail the same way a
-            // moment later with no explanation (reproduced live: a login-gated post went straight
-            // to the queue and errored there with no indication why).
-            result.errorMessage != null -> {
-                errorMessage = result.errorMessage
-                state = ListingState.ERROR
-            }
-            // A source that genuinely can't be listed this way (single-file links, unsupported
-            // extractors) falls back to a normal whole-gallery download — there's no error here,
-            // just nothing this picker knows how to preview ahead of time.
-            else -> state = ListingState.UNAVAILABLE
-        }
     }
 
     LaunchedEffect(state) {
@@ -214,9 +180,7 @@ fun SharePickerScreen(
                 },
                 actions = {
                     if (state == ListingState.LOADED) {
-                        TextButton(onClick = {
-                            selectedNums = if (selectedNums.size == items.size) emptySet() else items.map { it.num }.toSet()
-                        }) {
+                        TextButton(onClick = { picker.toggleAll() }) {
                             Text(if (selectedNums.size == items.size) "Deselect all" else "Select all")
                         }
                     }
@@ -374,22 +338,7 @@ fun SharePickerScreen(
                                 showLoginDialog = false
                                 // Cookies just changed — the same URL is worth re-listing rather
                                 // than leaving the user stuck on the same error they just fixed.
-                                state = ListingState.LOADING
-                                scope.launch {
-                                    val retry = GalleryDlListing.listItems(context, url)
-                                    when {
-                                        retry.items.isNotEmpty() -> {
-                                            items = retry.items
-                                            selectedNums = retry.items.map { it.num }.toSet()
-                                            state = ListingState.LOADED
-                                        }
-                                        retry.errorMessage != null -> {
-                                            errorMessage = retry.errorMessage
-                                            state = ListingState.ERROR
-                                        }
-                                        else -> state = ListingState.UNAVAILABLE
-                                    }
-                                }
+                                picker.retry()
                             },
                         )
                     }
@@ -468,7 +417,7 @@ fun SharePickerScreen(
                         items(items, key = { it.listIndex }) { item ->
                             val selected = item.num in selectedNums
                             val isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename) == true
-                            val toggle = { selectedNums = if (selected) selectedNums - item.num else selectedNums + item.num }
+                            val toggle = { picker.toggleItem(item.num) }
 
                             // The shorter 16:9-plus-caption treatment is reserved for the single,
                             // full-row video case — a lone video post filling the entire row at a

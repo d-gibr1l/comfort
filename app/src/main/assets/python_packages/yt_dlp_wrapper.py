@@ -950,7 +950,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 caption = info.get("title") or info.get("description")
                 if poster or caption:
                     reported_title[0] = True
-                    title = f"{poster} - {caption}" if poster and caption else (poster or caption)
+                    # Music uploads are often already titled "Artist - Song" by that same artist —
+                    # prefixing again gave "Rick Astley - Rick Astley - Never Gonna Give You Up".
+                    if poster and caption and not caption.lower().startswith(poster.lower()):
+                        title = f"{poster} - {caption}"
+                    else:
+                        title = caption or poster
                     callback(event("title", title=title[:200]))
                 # Same idea, same timing — the extractor already picked a thumbnail URL by now.
                 # Sent from this same one-shot block (guarded by reported_title, not its own flag)

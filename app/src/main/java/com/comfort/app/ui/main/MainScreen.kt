@@ -1,5 +1,8 @@
 package com.comfort.app.ui.main
 
+import com.comfort.app.viewmodel.startedMessage
+import com.comfort.app.viewmodel.LinkRouterViewModel
+import com.comfort.app.viewmodel.LinkRoute
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -118,18 +121,10 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     LaunchedEffect(openQueueSignal) {
         if (openQueueSignal > 0) showQueueScreen = true
     }
-    // Non-null while the download preview sheet is up for that URL — the Home screen's Download
-    // button opens the sheet instead of enqueueing straight away, so per-download quality/format/
-    // trim/commands/filename can be set before anything starts.
-    var previewUrl by remember { mutableStateOf<String?>(null) }
-    // Non-null while a just-pasted/downloaded URL is being listed to decide which of the two
-    // sheets above it actually deserves — see routingUrl's own LaunchedEffect further down.
-    var routingUrl by remember { mutableStateOf<String?>(null) }
-    // Non-null once that listing decides this link is a real multi-item gallery rather than a
-    // single/multi-video case: url paired with the already-fetched result, fed straight into
-    // SharePickerScreen as its own preloadedResult so it isn't listed a second time — same
-    // optimization ShareActivity's own share-sheet flow already does for a shared link.
-    var pickerState by remember { mutableStateOf<Pair<String, com.comfort.app.util.ListingResult>?>(null) }
+    // Which sheet a link opened from Home is showing (listing it / preview / item picker), and the
+    // download it starts — LinkRouterViewModel, shared with the share sheet's own flow.
+    val router: LinkRouterViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val route by router.route.collectAsState()
     // Hoisted here (not owned inside MoreScreen) specifically so it survives switching away from
     // and back to the Settings tab — see MoreScreen's own doc comment for why a local remember
     // there wasn't enough.
@@ -151,18 +146,6 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // elapsed since the last one, so relaunching the app repeatedly doesn't spam it. The Engines
     // section in Settings > About always does its own fresh check regardless of this cache.
     val context = androidx.compose.ui.platform.LocalContext.current
-
-    // Runs the same listing pass ShareActivity's own share-sheet flow already does, so a link
-    // pasted directly on Home gets the same "look at what's there first" treatment a shared link
-    // does instead of always assuming it's a single video — reproduced live: pasting a plain
-    // multi-image gallery link went straight to DownloadPreviewSheet's video-styled card with
-    // nothing to actually pick between, no way to exclude any of the images.
-    LaunchedEffect(routingUrl) {
-        val url = routingUrl ?: return@LaunchedEffect
-        val result = com.comfort.app.util.GalleryDlListing.listItems(context, url)
-        if (result.shouldUsePreviewSheet(url)) previewUrl = url else pickerState = url to result
-        routingUrl = null
-    }
 
     // Engine and app update checks, once per launch and rate-limited — see UpdatesViewModel.
     val updates = updatesViewModel()
@@ -220,7 +203,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             )
         ) {
             HomeScreen(
-                onConfigure = { url -> routingUrl = url },
+                onConfigure = { url -> router.open(url) },
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = openQueue,
@@ -326,30 +309,13 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             }
         }
 
-        previewUrl?.let { pendingUrl ->
+        (route as? LinkRoute.Preview)?.let { preview ->
             DownloadPreviewSheet(
-                url = pendingUrl,
-                onDismiss = { previewUrl = null },
+                url = preview.url,
+                onDismiss = { router.close() },
                 onDownload = { options ->
-                    // forceDuplicate = true: DownloadPreviewSheet's own Download button already
-                    // checked DownloadDispatcher.isDuplicate and would already be reading
-                    // "Redownload" here if this url was one — see that button's own doc comment.
-                    viewModel.enqueueDownload(
-                        url = pendingUrl,
-                        title = "Downloading from ${VideoSiteRouter.siteName(pendingUrl)}",
-                        itemFilter = options.itemFilter,
-                        totalItems = options.totalItems,
-                        videoQuality = options.quality,
-                        clipRange = options.clipRange,
-                        extraCommands = options.extraCommands,
-                        outputFormat = options.outputFormat,
-                        filenameTemplate = options.filenameTemplate,
-                        saveThumbnail = options.saveThumbnail,
-                        overrideTitle = options.overrideTitle,
-                        overrideArtist = options.overrideArtist,
-                        forceDuplicate = true,
-                    )
-                    previewUrl = null
+                    router.download(preview.url, options)
+                    router.close()
                 },
             )
         }
@@ -357,8 +323,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // Brief — the listing pass above usually resolves in well under a second — but real
         // enough on a slow/rate-limited site that a bare frozen Download button would otherwise
         // look broken with no feedback at all.
-        if (routingUrl != null) {
-            ModalBottomSheet(onDismissRequest = { routingUrl = null }) {
+        if (route is LinkRoute.Listing) {
+            ModalBottomSheet(onDismissRequest = { router.close() }) {
                 Column(
                     modifier = Modifier.fillMaxWidth().height(220.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -375,33 +341,26 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             }
         }
 
-        // routingUrl's own listing decided this is a real multi-item gallery rather than a
+        // The router's listing decided this is a real multi-item gallery rather than a
         // single/multi-video case — same SharePickerScreen the share-sheet flow already uses,
         // fed the same already-fetched result so it isn't listed a second time.
-        pickerState?.let { (pickerUrl, preloadedResult) ->
+        (route as? LinkRoute.Picker)?.let { picker ->
             var sheetHeight by remember { mutableStateOf(400.dp) }
             val animatedHeight by androidx.compose.animation.core.animateDpAsState(targetValue = sheetHeight, label = "sharePickerSheetHeight")
             ModalBottomSheet(
-                onDismissRequest = { pickerState = null },
+                onDismissRequest = { router.close() },
                 dragHandle = null,
             ) {
                 Box(modifier = Modifier.fillMaxWidth().height(animatedHeight)) {
                     SharePickerScreen(
-                        url = pickerUrl,
-                        onDismiss = { pickerState = null },
+                        url = picker.url,
+                        onDismiss = { router.close() },
                         onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate ->
-                            viewModel.enqueueDownload(
-                                url = downloadUrl,
-                                title = "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}",
-                                itemFilter = itemFilter,
-                                totalItems = totalItems,
-                                videoQuality = videoQuality,
-                                forceDuplicate = forceDuplicate,
-                            )
-                            pickerState = null
+                            router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate)
+                            router.close()
                         },
                         onHeightChange = { sheetHeight = it },
-                        preloadedResult = preloadedResult,
+                        preloadedResult = picker.listing,
                     )
                 }
             }
@@ -505,20 +464,13 @@ fun HomeScreen(
 ) {
     var url by remember { mutableStateOf("") }
     val homeContext = androidx.compose.ui.platform.LocalContext.current
-    val homeScope = androidx.compose.runtime.rememberCoroutineScope()
+    val router: LinkRouterViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     // Download: starts right away with the default settings — the same thing sharing a link into
     // the "Instant" Sharesheet entry does (ShareActivity's InstantShareHandler), duplicate handling
     // and message included. Configure is the other button.
     fun downloadNow(link: String) {
-        homeScope.launch {
-            val result = com.comfort.app.data.DownloadDispatcher.enqueueDownload(
-                homeContext, link, "Downloading from ${com.comfort.app.data.VideoSiteRouter.siteName(link)}",
-            )
-            android.widget.Toast.makeText(
-                homeContext,
-                if (result is com.comfort.app.data.EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started",
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
+        router.download(link) { result ->
+            android.widget.Toast.makeText(homeContext, startedMessage(result), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current

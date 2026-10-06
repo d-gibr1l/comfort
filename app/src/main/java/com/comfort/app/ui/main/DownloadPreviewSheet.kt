@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.comfort.app.ui.main
 
+import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -2444,20 +2445,6 @@ private fun ViewTemplatesScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-/** A ViewModelStoreOwner that lives exactly as long as the calling composable: its ViewModels are
- * cleared when it leaves the composition. Gives the preview sheet a ViewModel per opening, instead
- * of one kept by the activity across sheets. */
-@Composable
-private fun rememberSheetViewModelStoreOwner(): androidx.lifecycle.ViewModelStoreOwner {
-    val store = remember { androidx.lifecycle.ViewModelStore() }
-    DisposableEffect(store) { onDispose { store.clear() } }
-    return remember(store) {
-        object : androidx.lifecycle.ViewModelStoreOwner {
-            override val viewModelStore = store
         }
     }
 }

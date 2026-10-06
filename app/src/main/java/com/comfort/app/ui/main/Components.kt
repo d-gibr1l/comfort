@@ -404,3 +404,28 @@ fun badgeCountText(count: Int): String = if (count > 99) "99+" else count.toStri
 @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun thumbnailShape(): Shape = androidx.compose.material3.MaterialShapes.Cookie4Sided.toShape()
+
+/** Delete with an Undo window, shared by the Queue and the Library. hideForDeletion() only hides
+ * the ids (reversible); the real, irreversible confirmDelete() runs once the Snackbar's Undo window
+ * passes untouched — a delete straight from a tap, with no confirmation or undo, was flagged HIGH
+ * in review. */
+@Composable
+fun rememberUndoableDelete(
+    viewModel: com.comfort.app.viewmodel.DownloadsViewModel,
+    snackbarHostState: SnackbarHostState,
+): (Set<String>) -> Unit {
+    val scope = rememberCoroutineScope()
+    return { ids ->
+        if (ids.isNotEmpty()) {
+            viewModel.hideForDeletion(ids)
+            scope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = if (ids.size == 1) "Download removed" else "${ids.size} downloads removed",
+                    actionLabel = "Undo",
+                    duration = SnackbarDuration.Short,
+                )
+                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.cancelDeletion(ids) else viewModel.confirmDelete(ids)
+            }
+        }
+    }
+}
