@@ -219,7 +219,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
 @Composable
 private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     // Compose's own Switch (unlike the platform's View-based SwitchCompat) never calls
-    // performHapticFeedback internally — see IconToggleRow's own comment in MoreScreen.kt, where
+    // performHapticFeedback internally — see IconToggleRow's own comment in SettingsComponents.kt, where
     // this same gap was found and fixed identically.
     val haptics = LocalHapticFeedback.current
     Row(
@@ -239,7 +239,7 @@ private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, on
                 haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                 onCheckedChange(it)
             },
-            // Same fix as MoreScreen.kt's IconToggleRow: the default unchecked thumb color is
+            // Same fix as SettingsComponents.kt's IconToggleRow: the default unchecked thumb color is
             // nearly invisible against the unchecked track in this theme, so an off toggle read
             // as a dead gray blob rather than a working control resting in its off position.
             colors = SwitchDefaults.colors(

@@ -415,7 +415,7 @@ fun SharePickerScreen(
                                     // this row and the label) so the scrollable viewport spans the
                                     // full screen width instead of stopping short at that margin on
                                     // either side — same bug/fix as the Downloads settings page's
-                                    // own Video quality row (MoreScreen.kt) and Home's
+                                    // own Video quality row (ProcessingSettings.kt) and Home's
                                     // Recently-downloaded strip (MainScreen.kt): a trailing
                                     // Modifier.padding() looks identical at rest but caps the row's
                                     // own scrollable width, a bleed measured via a custom layout{}

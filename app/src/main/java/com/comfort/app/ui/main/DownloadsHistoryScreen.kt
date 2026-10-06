@@ -107,7 +107,7 @@ fun DownloadsHistoryScreen(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     // Library's own topic icon in its header — same role Icons.Outlined.SettingsApplications
-    // plays in the Settings root header (see MoreScreen.kt's SettingsRootScreen).
+    // plays in the Settings root header (see SettingsScreen.kt's SettingsRootScreen).
     val libraryTopicIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_gallery_thumbnail)
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
     val deletedItems by viewModel.deletedFlow.collectAsStateWithLifecycle()
@@ -135,7 +135,7 @@ fun DownloadsHistoryScreen(
     val duplicateAttempts by viewModel.duplicateAttemptsFlow.collectAsStateWithLifecycle()
     var searchQuery by remember { mutableStateOf("") }
     // Toggles the header's title row into the search field, same crossfade-in-place behavior as
-    // the Settings root header's own search icon (see MoreScreen.kt's SettingsRootScreen) — this
+    // the Settings root header's own search icon (see SettingsScreen.kt's SettingsRootScreen) — this
     // replaces the old always-visible PillSearchBar that used to sit permanently below the title.
     var searchExpanded by remember { mutableStateOf(false) }
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
@@ -847,7 +847,7 @@ private fun LibraryHeader(
                         Text(
                             "Library",
                             // Same style declaration as the Settings root header's own "Settings"
-                            // title (see MoreScreen.kt's SettingsRootScreen) — displayMedium (30sp)
+                            // title (see SettingsScreen.kt's SettingsRootScreen) — displayMedium (30sp)
                             // plus the Google Sans HeaderFontFamily.
                             style = MaterialTheme.typography.displayMedium,
                             fontFamily = HeaderFontFamily,
