@@ -102,6 +102,17 @@ class EnginePlanTest {
     }
 
     @Test
+    fun timedOutListingTriesYtDlpFirstAndKeepsGalleryDlForImagePosts() = runTest {
+        val video = FakeExecutor(mapOf(YT_DLP to 1))
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = false, listingTimedOut = true).execute(video)
+        assertEquals(listOf("YT_DLP"), video.ran)
+
+        val images = FakeExecutor(mapOf(GALLERY_DL to 3))
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = false, listingTimedOut = true).execute(images)
+        assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), images.ran)
+    }
+
+    @Test
     fun probeThatFailedToRunIsNoReasonToSkipGalleryDl() = runTest {
         val executor = FakeExecutor(probeResult = EngineProbe.Result(galleryDlHasExtractor = null, ytDlpHasExtractor = true))
         assertEquals(listOf("GALLERY_DL(excludeVideo=true)", "YT_DLP"), ranFor(GALLERY_DL, executor = executor))

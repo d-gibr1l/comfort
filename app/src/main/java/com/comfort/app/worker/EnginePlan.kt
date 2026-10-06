@@ -36,6 +36,10 @@ internal sealed interface EnginePlan {
     }
 
     /** gallery-dl for everything it can parse, with yt-dlp after it:
+     * - The listing timed out ([listingTimedOut]) — on Reddit, gallery-dl's shared client ID
+     *   waiting out a rate limit, for minutes: yt-dlp first, and gallery-dl only if yt-dlp saved
+     *   nothing (an image post), so a video doesn't sit behind that same wait a second time. A
+     *   mixed post's images are lost in that case; the alternative was every video waiting.
      * - The listing found only videos ([onlyVideos]): yt-dlp alone. gallery-dl runs with video
      *   excluded, so its pass could only save nothing before yt-dlp ran anyway — on a Reddit video
      *   post that was a probe plus a Reddit API round trip spent on nothing, every time.
@@ -48,8 +52,13 @@ internal sealed interface EnginePlan {
      *   video supplement when the post has or may have a video ([supplementVideo]).
      * The probe isn't consulted for that second yt-dlp run: its regex check against a raw share
      * link (Reddit's /s/<code>) said "no extractor" for links yt-dlp's generic extractor handles. */
-    data class GalleryDlFirst(val supplementVideo: Boolean, val onlyVideos: Boolean = false) : EnginePlan {
+    data class GalleryDlFirst(val supplementVideo: Boolean, val onlyVideos: Boolean = false, val listingTimedOut: Boolean = false) : EnginePlan {
         override suspend fun execute(executor: EngineExecutor) {
+            if (listingTimedOut) {
+                executor.run(DownloadEngine.YT_DLP)
+                if (!executor.isStopped && executor.savedCount == 0) executor.run(DownloadEngine.GALLERY_DL, excludeVideo = true)
+                return
+            }
             if (onlyVideos) {
                 executor.run(DownloadEngine.YT_DLP)
                 return
@@ -70,16 +79,22 @@ internal sealed interface EnginePlan {
          * without Instaloader (VideoSiteRouter.classify); [supplementVideo] whether a gallery-dl
          * download should also give its video to yt-dlp (a listed video, or a host whose listings
          * miss them — VideoSiteRouter.alwaysSupplementsVideo); [onlyVideos] whether its listing
-         * found nothing but videos. */
-        fun planFor(engine: DownloadEngine, classicEngine: DownloadEngine, supplementVideo: Boolean, onlyVideos: Boolean = false): EnginePlan =
+         * found nothing but videos; [listingTimedOut] whether it gave up waiting for one. */
+        fun planFor(
+            engine: DownloadEngine,
+            classicEngine: DownloadEngine,
+            supplementVideo: Boolean,
+            onlyVideos: Boolean = false,
+            listingTimedOut: Boolean = false,
+        ): EnginePlan =
             if (engine == DownloadEngine.INSTALOADER) {
-                FallbackIfNothingSaved(Single(DownloadEngine.INSTALOADER), classic(classicEngine, supplementVideo, onlyVideos))
+                FallbackIfNothingSaved(Single(DownloadEngine.INSTALOADER), classic(classicEngine, supplementVideo, onlyVideos, listingTimedOut))
             } else {
-                classic(engine, supplementVideo, onlyVideos)
+                classic(engine, supplementVideo, onlyVideos, listingTimedOut)
             }
 
-        private fun classic(engine: DownloadEngine, supplementVideo: Boolean, onlyVideos: Boolean): EnginePlan = when (engine) {
-            DownloadEngine.GALLERY_DL -> GalleryDlFirst(supplementVideo, onlyVideos)
+        private fun classic(engine: DownloadEngine, supplementVideo: Boolean, onlyVideos: Boolean, listingTimedOut: Boolean): EnginePlan = when (engine) {
+            DownloadEngine.GALLERY_DL -> GalleryDlFirst(supplementVideo, onlyVideos, listingTimedOut)
             DownloadEngine.YT_DLP, DownloadEngine.SPOTIFY, DownloadEngine.INSTALOADER -> Single(engine)
         }
     }
