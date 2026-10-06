@@ -36,6 +36,9 @@ internal sealed interface EnginePlan {
     }
 
     /** gallery-dl for everything it can parse, with yt-dlp after it:
+     * - The listing found only videos ([onlyVideos]): yt-dlp alone. gallery-dl runs with video
+     *   excluded, so its pass could only save nothing before yt-dlp ran anyway — on a Reddit video
+     *   post that was a probe plus a Reddit API round trip spent on nothing, every time.
      * - The probe says only yt-dlp knows this link: yt-dlp alone, no doomed gallery-dl attempt.
      *   Only a confirmed "no" from gallery-dl plus a confirmed "yes" from yt-dlp counts; a probe
      *   that failed to run (null) is no evidence, so gallery-dl still gets its turn.
@@ -45,8 +48,12 @@ internal sealed interface EnginePlan {
      *   video supplement when the post has or may have a video ([supplementVideo]).
      * The probe isn't consulted for that second yt-dlp run: its regex check against a raw share
      * link (Reddit's /s/<code>) said "no extractor" for links yt-dlp's generic extractor handles. */
-    data class GalleryDlFirst(val supplementVideo: Boolean) : EnginePlan {
+    data class GalleryDlFirst(val supplementVideo: Boolean, val onlyVideos: Boolean = false) : EnginePlan {
         override suspend fun execute(executor: EngineExecutor) {
+            if (onlyVideos) {
+                executor.run(DownloadEngine.YT_DLP)
+                return
+            }
             val probe = executor.probe()
             if (probe.galleryDlHasExtractor == false && probe.ytDlpHasExtractor == true) {
                 executor.run(DownloadEngine.YT_DLP)
@@ -62,16 +69,17 @@ internal sealed interface EnginePlan {
         /** The plan for a download routed to [engine]. [classicEngine] is where the link would go
          * without Instaloader (VideoSiteRouter.classify); [supplementVideo] whether a gallery-dl
          * download should also give its video to yt-dlp (a listed video, or a host whose listings
-         * miss them — VideoSiteRouter.alwaysSupplementsVideo). */
-        fun planFor(engine: DownloadEngine, classicEngine: DownloadEngine, supplementVideo: Boolean): EnginePlan =
+         * miss them — VideoSiteRouter.alwaysSupplementsVideo); [onlyVideos] whether its listing
+         * found nothing but videos. */
+        fun planFor(engine: DownloadEngine, classicEngine: DownloadEngine, supplementVideo: Boolean, onlyVideos: Boolean = false): EnginePlan =
             if (engine == DownloadEngine.INSTALOADER) {
-                FallbackIfNothingSaved(Single(DownloadEngine.INSTALOADER), classic(classicEngine, supplementVideo))
+                FallbackIfNothingSaved(Single(DownloadEngine.INSTALOADER), classic(classicEngine, supplementVideo, onlyVideos))
             } else {
-                classic(engine, supplementVideo)
+                classic(engine, supplementVideo, onlyVideos)
             }
 
-        private fun classic(engine: DownloadEngine, supplementVideo: Boolean): EnginePlan = when (engine) {
-            DownloadEngine.GALLERY_DL -> GalleryDlFirst(supplementVideo)
+        private fun classic(engine: DownloadEngine, supplementVideo: Boolean, onlyVideos: Boolean): EnginePlan = when (engine) {
+            DownloadEngine.GALLERY_DL -> GalleryDlFirst(supplementVideo, onlyVideos)
             DownloadEngine.YT_DLP, DownloadEngine.SPOTIFY, DownloadEngine.INSTALOADER -> Single(engine)
         }
     }

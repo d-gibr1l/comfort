@@ -87,6 +87,21 @@ class EnginePlanTest {
     }
 
     @Test
+    fun listingOfOnlyVideosSkipsTheGalleryDlPassAndTheProbe() = runTest {
+        // A probe saying gallery-dl knows the link would otherwise send it through gallery-dl first.
+        val executor = FakeExecutor(mapOf(YT_DLP to 1))
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = true, onlyVideos = true).execute(executor)
+        assertEquals(listOf("YT_DLP"), executor.ran)
+    }
+
+    @Test
+    fun onlyVideosDoesNotChangeTheInstaloaderRoute() = runTest {
+        val executor = FakeExecutor(mapOf(INSTALOADER to 1))
+        EnginePlan.planFor(INSTALOADER, GALLERY_DL, supplementVideo = true, onlyVideos = true).execute(executor)
+        assertEquals(listOf("INSTALOADER"), executor.ran)
+    }
+
+    @Test
     fun probeThatFailedToRunIsNoReasonToSkipGalleryDl() = runTest {
         val executor = FakeExecutor(probeResult = EngineProbe.Result(galleryDlHasExtractor = null, ytDlpHasExtractor = true))
         assertEquals(listOf("GALLERY_DL(excludeVideo=true)", "YT_DLP"), ranFor(GALLERY_DL, executor = executor))

@@ -114,7 +114,7 @@ object GalleryDlPreferences {
     const val KEY_VERBOSE_LOGGING = "verbose_logging"
     const val KEY_DOWNLOAD_DELAY_SECONDS = "download_delay_seconds"
     const val KEY_INCOGNITO_DEFAULT = "incognito_default"
-    const val DEFAULT_CONCURRENT_FRAGMENTS = 1
+    const val DEFAULT_CONCURRENT_FRAGMENTS = 4
     const val MAX_CONCURRENT_FRAGMENTS = 16
     const val KEY_EMBED_CHAPTERS = "embed_chapters"
     const val KEY_SAVE_SUBTITLE_FILES = "save_subtitle_files"
@@ -886,8 +886,10 @@ object GalleryDlPreferences {
     /** How many fragments (pieces of a single format — HLS/DASH segments, not separate
      * video+audio tracks) download in parallel. Separate from [getConcurrentDownloads], which
      * controls how many *whole downloads* run at once — this is yt-dlp's own
-     * --concurrent-fragments, one format's own internal parallelism. 1 (sequential) matches
-     * yt-dlp's built-in default. */
+     * --concurrent-fragments, one format's own internal parallelism. Defaults to 4, not yt-dlp's
+     * own 1: fetching a split stream's pieces one at a time pays a full request round trip per
+     * piece, which dominated Reddit/HLS downloads on a slow connection. Only an install that never
+     * set this gets the new default; a stored value is kept. */
     fun getConcurrentFragments(context: Context): Int {
         return prefs(context).getInt(KEY_CONCURRENT_FRAGMENTS, DEFAULT_CONCURRENT_FRAGMENTS)
             .coerceIn(1, MAX_CONCURRENT_FRAGMENTS)
@@ -897,10 +899,8 @@ object GalleryDlPreferences {
         prefs(context).edit().putInt(KEY_CONCURRENT_FRAGMENTS, count.coerceIn(1, MAX_CONCURRENT_FRAGMENTS)).apply()
     }
 
-    /** Whether [getConcurrentFragments] actually applies — defaults true, harmless either way for
-     * an install that never touched this (default value 1 is already a no-op downstream — see
-     * DownloadWorker's own "only forward when > 1" check). Off forces that same no-op regardless
-     * of the stored slider value. */
+    /** Whether [getConcurrentFragments] actually applies — defaults true. Off means one piece at a
+     * time (yt-dlp's own default) regardless of the stored slider value. */
     fun isConcurrentFragmentsEnabled(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_CONCURRENT_FRAGMENTS_ENABLED, true)
     }

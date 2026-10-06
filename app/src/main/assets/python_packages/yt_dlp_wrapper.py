@@ -1234,6 +1234,13 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # available when a source has no AAC variant.
         format_sort_terms.append("vcodec:h264")
         format_sort_terms.append("acodec:aac")
+    # Between otherwise-equal formats (same resolution/codec), a single-file download over one
+    # split into pieces (HLS/DASH segments). yt-dlp's own order compares size and bitrate before
+    # protocol, so on Reddit — which offers every video both ways — it picked the HLS copy for 2 of
+    # 3 videos tested (2026-10-06), even where the single-file DASH copy had the higher bitrate.
+    # After the codec terms, so an MP4 download still prefers h264/aac over a single-file VP9/Opus
+    # it couldn't mux; no effect on a site that only offers one kind of stream.
+    format_sort_terms.append("proto")
     if format_sort_extra:
         # Raw --format-sort syntax (e.g. "codec:vp9,fps") from Settings > Advanced — appended
         # last so it can still reorder/override the quality-cap and MP4-compatibility terms above
