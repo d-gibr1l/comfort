@@ -793,6 +793,7 @@ private fun LibraryHeader(
                         onQueryChange = onSearchQueryChange,
                         placeholder = "Search downloads",
                         modifier = Modifier.weight(1f),
+                        autoFocus = true,
                     )
                     Spacer(Modifier.width(8.dp))
                     IconButton(
@@ -1778,7 +1779,7 @@ private fun RenameDialog(
                 onValueChange = { text = it },
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
             )
         },
         confirmButton = {

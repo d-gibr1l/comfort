@@ -566,7 +566,7 @@ fun HomeScreen(
                         // resting pill with "Paste a link" sitting centered inside it, rather than
                         // a caption perched above the field's own border.
                         placeholder = { Text("Paste a link") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                         shape = MaterialTheme.shapes.extraLarge,
                         leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
                         trailingIcon = {

@@ -253,7 +253,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                         subtitleLanguages = it
                         GalleryDlPreferences.setSubtitleLanguages(context, it)
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     label = { Text("Subtitle languages") },
                     placeholder = { Text("en") },
                     singleLine = true,
@@ -300,7 +300,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                     formatIdOverride = it
                     GalleryDlPreferences.setFormatIdOverride(context, it)
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                 label = { Text("Format selector") },
                 placeholder = { Text("bv+ba/b") },
                 singleLine = true,

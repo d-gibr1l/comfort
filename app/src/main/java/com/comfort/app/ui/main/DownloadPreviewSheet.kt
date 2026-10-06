@@ -1401,7 +1401,7 @@ private fun SongPreviewCard(
                                 ),
                                 singleLine = true,
                                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.weight(1f).clearFocusOnKeyboardDismiss(),
                             )
                             Icon(
                                 Icons.Outlined.Edit,
@@ -1424,7 +1424,7 @@ private fun SongPreviewCard(
                             textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                             singleLine = true,
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                         )
                     }
                     if (album != null) {
@@ -1843,7 +1843,7 @@ private fun ExtraCommandsScreen(
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp).clearFocusOnKeyboardDismiss(),
             placeholder = { Text("Add Command") },
             leadingIcon = { Icon(Icons.Outlined.Terminal, contentDescription = null) },
             trailingIcon = {
@@ -2191,7 +2191,8 @@ private fun TrimVideoScreen(
                         if (!it.isFocused) {
                             startInput = formatTimestamp(active?.startMs ?: 0L)
                         }
-                    },
+                    }
+                    .clearFocusOnKeyboardDismiss(),
                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Next),
             )
             OutlinedTextField(
@@ -2213,7 +2214,8 @@ private fun TrimVideoScreen(
                         if (!it.isFocused) {
                             endInput = formatTimestamp(active?.endMs ?: 0L)
                         }
-                    },
+                    }
+                    .clearFocusOnKeyboardDismiss(),
                 keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
             )
         }
@@ -2321,7 +2323,7 @@ private fun FilenameTemplatesScreen(
         OutlinedTextField(
             value = input,
             onValueChange = { input = it; message = null },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
             label = { Text("Add FileName template") },
             leadingIcon = { Icon(Icons.Outlined.Tag, contentDescription = null) },
             singleLine = true,

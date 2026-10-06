@@ -689,7 +689,7 @@ internal fun SizeSheetField(
                 OutlinedTextField(
                     value = numberText,
                     onValueChange = { numberText = it.filter { c -> c.isDigit() || c == '.' } },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     placeholder = { Text("Unlimited") },
                     singleLine = true,
                     shape = MaterialTheme.shapes.medium,

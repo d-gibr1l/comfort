@@ -97,7 +97,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             OutlinedTextField(
                 value = extractorArgs,
                 onValueChange = { extractorArgs = it; extractorArgsSaved = false },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
+                modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. youtube:player_client=android") },
                 shape = MaterialTheme.shapes.medium,
             )
@@ -136,7 +136,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             OutlinedTextField(
                 value = formatSort,
                 onValueChange = { formatSort = it; formatSortSaved = false },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. codec:vp9,fps") },
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
@@ -174,7 +174,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             OutlinedTextField(
                 value = customHeaders,
                 onValueChange = { customHeaders = it; customHeadersSaved = false },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
+                modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. Referer: https://example.com") },
                 shape = MaterialTheme.shapes.medium,
             )
@@ -350,7 +350,7 @@ private fun ExtraArgsSection(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).clearFocusOnKeyboardDismiss(),
         placeholder = { Text(placeholder) },
         shape = MaterialTheme.shapes.medium,
     )
