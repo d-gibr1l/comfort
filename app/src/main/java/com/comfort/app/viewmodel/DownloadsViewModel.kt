@@ -8,6 +8,8 @@ import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
+import com.comfort.app.util.MediaShape
+import com.comfort.app.util.MediaShapes
 import com.comfort.app.util.MediaStoreHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -48,6 +50,21 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     val historyFlow: StateFlow<List<DownloadEntity>> = combine(rawHistoryFlow, _deletingIds) { history, deleting ->
         if (deleting.isEmpty()) history else history.filterNot { it.id in deleting }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Each Library item's shape and length (MediaShapes), by download id — what the grid sizes
+     * its tiles and duration badges from. Read from MediaStore off the main thread; an audio
+     * download's cover art gives the shape and its real file (mediaUri) the length. */
+    val mediaShapes: StateFlow<Map<String, MediaShape>> = combine(rawHistoryFlow, rawDeletedFlow) { history, deleted -> history + deleted }
+        .map { items ->
+            withContext(Dispatchers.IO) {
+                items.mapNotNull { item ->
+                    val shape = item.thumbnailPath?.let { MediaShapes.of(getApplication(), it) } ?: return@mapNotNull null
+                    val duration = item.mediaUri?.let { MediaShapes.of(getApplication(), it)?.durationMs } ?: shape.durationMs
+                    item.id to shape.copy(durationMs = duration)
+                }.toMap()
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val deletedFlow: StateFlow<List<DownloadEntity>> = combine(rawDeletedFlow, _deletingIds) { deleted, deleting ->
         if (deleting.isEmpty()) deleted else deleted.filterNot { it.id in deleting }
