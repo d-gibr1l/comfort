@@ -87,7 +87,7 @@ class SharePickerViewModel(
         _state.value = ListingState.LOADING
         _errorMessage.value = null
         listing = viewModelScope.launch {
-            val result = preloaded ?: GalleryDlListing.listItems(context, url)
+            val result = preloaded ?: GalleryDlListing.listItemsForSheet(context, url)
             when {
                 result.items.isNotEmpty() -> {
                     _items.value = result.items

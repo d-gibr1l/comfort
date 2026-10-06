@@ -1020,6 +1020,9 @@ fun QueueItemCard(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
+                    // A live note (an engine waiting out a site's rate limit) replaces the speed,
+                    // which would otherwise sit at 0 KB/s with no explanation — see DownloadNotes.
+                    val note = com.comfort.app.data.DownloadNotes.notes.collectAsState().value[item.id]
                     val speedStr = when {
                         !isNetworkAvailable -> "0.00 KB/s"
                         item.speedMbs == 0f -> "0.00 KB/s"
@@ -1027,7 +1030,7 @@ fun QueueItemCard(
                         else -> String.format(Locale.getDefault(), "%.2f MB/s", item.speedMbs)
                     }
                     Text(
-                        text = "Speed: " + speedStr,
+                        text = note ?: ("Speed: " + speedStr),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

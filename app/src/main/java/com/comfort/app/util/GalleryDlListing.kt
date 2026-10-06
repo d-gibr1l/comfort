@@ -241,6 +241,19 @@ object GalleryDlListing {
      * links, unsupported extractors) — callers should fall back to a normal whole-gallery download
      * silently in that case. A non-null errorMessage means listing actually failed (needs login,
      * network error, ...) and should be shown, not silently swallowed into the same fallback. */
+    /** [listItems] for a sheet the user is waiting on: gives up after [SHEET_LISTING_CAP_MS] with an
+     * error the picker shows next to "Try downloading anyway". gallery-dl sleeps silently through a
+     * site's rate limit (Reddit's shared client ID: 6 minutes seen live), which used to leave
+     * "Looking at what's there…" up the whole time. Cancelling kills the Python job. */
+    suspend fun listItemsForSheet(context: Context, url: String): ListingResult =
+        kotlinx.coroutines.withTimeoutOrNull(SHEET_LISTING_CAP_MS) { listItems(context, url) }
+            ?: ListingResult(
+                emptyList(),
+                errorMessage = "${VideoSiteRouter.siteName(url)} is taking too long to answer — it may be rate-limiting requests right now. You can still download the link.",
+            )
+
+    private const val SHEET_LISTING_CAP_MS = 20_000L
+
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
         listingCache[url]?.let { cached ->
             if (System.currentTimeMillis() - cached.atMs < LISTING_CACHE_MS) return@withContext cached.result

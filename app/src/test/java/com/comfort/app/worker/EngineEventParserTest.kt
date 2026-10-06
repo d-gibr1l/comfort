@@ -104,4 +104,15 @@ class EngineEventParserTest {
         assertEquals(EngineEvent.Ignored, parse("just some text"))
         assertEquals(EngineEvent.Ignored, parse(""))
     }
+
+    @Test
+    fun galleryDlRateLimitWaitBecomesItsOwnEvent() {
+        assertEquals(
+            EngineEvent.RateLimited("Reddit", "21:19"),
+            parse("[reddit][info] Waiting for 6 minutes until 21:19:59 (rate limit)"),
+        )
+        // Other waits, and other info lines, stay ignored.
+        assertEquals(EngineEvent.Ignored, parse("[reddit][info] Waiting for 6 seconds"))
+        assertEquals(EngineEvent.Ignored, parse("[reddit][info] Requesting public access token"))
+    }
 }
