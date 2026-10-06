@@ -411,6 +411,15 @@ class DownloadWorker(
                 // user already renamed this" so a real poster/caption title only ever replaces the
                 // former, never clobbers a deliberate rename.
                 val hasPlaceholderTitle = entity?.title?.startsWith("Downloading") != false
+                // Set once an engine has named the download itself (EngineEvent.Title). Its title is
+                // the real one; the filename-derived one would replace it with restricted-filename
+                // underscores ("jawed - Me_at_the_zoo"). First one wins: Spotify's own beats the
+                // matched YouTube video's that its yt-dlp run sends after.
+                val engineNamedTitle = AtomicBoolean(false)
+                // The video sub-file's format tags ("240p|MP4"). A merge reports the audio's last, so
+                // the card kept "106 kbps OPUS" for a finished video; restored once the file lands.
+                val videoFormatTags = java.util.concurrent.atomic.AtomicReference<String?>(null)
+                val downloadingAudio = AtomicBoolean(false)
 
                 // A multi-item gallery-dl download pins its thumbnail to whichever item finishes
                 // first (setThumbnailIfAbsent below) so it doesn't keep flickering to the latest
@@ -492,9 +501,15 @@ class DownloadWorker(
                         }
                         // Sent once per sub-file (a merge's separate audio track, or an audio-only
                         // download's sole file) — see DownloadEntity.downloadingAudioTrack.
-                        is EngineEvent.Phase -> dao.setDownloadingAudioTrack(downloadId, event.isAudio)
+                        is EngineEvent.Phase -> {
+                            downloadingAudio.set(event.isAudio)
+                            dao.setDownloadingAudioTrack(downloadId, event.isAudio)
+                        }
                         // Same per-sub-file timing — see DownloadEntity.formatTags.
-                        is EngineEvent.Format -> dao.setFormatTags(downloadId, event.tags)
+                        is EngineEvent.Format -> {
+                            if (!downloadingAudio.get()) videoFormatTags.set(event.tags)
+                            dao.setFormatTags(downloadId, event.tags)
+                        }
                         is EngineEvent.Progress -> {
                             lastDataAt.set(System.currentTimeMillis())
                             lastProgressLineAt.set(System.currentTimeMillis())
@@ -516,7 +531,9 @@ class DownloadWorker(
                         // Also sent before the first byte lands, so the card stops showing the
                         // "Downloading from X" placeholder. gallery-dl has no such early hook — its
                         // downloads rely on derivePosterCaptionTitle once a file lands instead.
-                        is EngineEvent.Title -> if (hasPlaceholderTitle) dao.updateTitle(downloadId, event.title)
+                        is EngineEvent.Title -> if (hasPlaceholderTitle && engineNamedTitle.compareAndSet(false, true)) {
+                            dao.updateTitle(downloadId, event.title)
+                        }
                         // yt-dlp's info_dict metadata or Spotify's scraped metadata — see
                         // DownloadEntity.artist/album/track.
                         is EngineEvent.Artist -> dao.setArtistIfAbsent(downloadId, event.artist)
@@ -613,9 +630,14 @@ class DownloadWorker(
                                             if (artworkUri != null) dao.setMediaUriIfAbsent(downloadId, savedUri.toString())
                                         }
                                         dao.addBytes(downloadId, fileSize)
-                                        if (hasPlaceholderTitle) {
+                                        if (hasPlaceholderTitle && !engineNamedTitle.get()) {
                                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                                         }
+                                        // The merged file is the video: show its tags again, and stop
+                                        // saying "downloading audio". (Audio-only downloads have no
+                                        // video tags and keep their own.)
+                                        videoFormatTags.get()?.let { dao.setFormatTags(downloadId, it) }
+                                        if (downloadingAudio.getAndSet(false)) dao.setDownloadingAudioTrack(downloadId, false)
                                         // The song preview sheet's editable title/artist — applied
                                         // last, unconditionally, so the user's edit always wins in the
                                         // Library, matching what the wrappers embedded in the file's tags.
