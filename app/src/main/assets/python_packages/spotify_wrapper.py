@@ -371,6 +371,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # whatever the matched YouTube video's own info_dict reports) never overwrite this
             # once it lands in the DB (see DownloadDao's own doc comment on why *IfAbsent exists).
             if callback:
+                # The card's title too, for a single track: otherwise it only ever got one from the
+                # saved filename (underscores and all). Sent before yt-dlp's own, which names the
+                # matched YouTube video ("... (Official Video)") — the first title an engine sends wins.
+                if len(track_ids) == 1 and tag_title:
+                    callback(event("title", title=(f"{tag_artist} - {tag_title}" if tag_artist else tag_title)[:200]))
                 callback(event("artist", artist=tag_artist[:200]))
                 if album_name:
                     callback(event("album", album=album_name[:200]))
