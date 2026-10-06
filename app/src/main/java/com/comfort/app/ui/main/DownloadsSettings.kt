@@ -1,5 +1,6 @@
 package com.comfort.app.ui.main
 
+import com.comfort.app.viewmodel.DownloadsSettingsViewModel
 import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
@@ -20,13 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import dev.darkokoa.datetimewheelpicker.WheelTimePicker
 import dev.darkokoa.datetimewheelpicker.core.format.TimeFormat
 import dev.darkokoa.datetimewheelpicker.core.format.timeFormatter
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
@@ -37,7 +35,8 @@ import androidx.compose.material.icons.outlined.*
 @Composable
 internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
+    // Settings that also re-plan existing downloads (reschedule, restart, alarm, cleanup).
+    val downloadsSettings: DownloadsSettingsViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     var concurrentDownloads by remember { mutableStateOf(GalleryDlPreferences.getConcurrentDownloads(context)) }
     var concurrentDownloadsEnabled by remember { mutableStateOf(GalleryDlPreferences.isConcurrentDownloadsEnabled(context)) }
@@ -116,8 +115,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = concurrentDownloadsEnabled,
                 onCheckedChange = {
                     concurrentDownloadsEnabled = it
-                    GalleryDlPreferences.setConcurrentDownloadsEnabled(context, it)
-                    scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                    downloadsSettings.setConcurrentDownloadsEnabled(it)
                 },
             )
             ToggleReveal(concurrentDownloadsEnabled) {
@@ -131,15 +129,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     label = { "$it at once" },
                     onValueChange = {
                         concurrentDownloads = it
-                        sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_CONCURRENT_DOWNLOADS, it).apply()
-                        // Without this, everything already queued stays chained in whatever
-                        // round-robin lane(s) it was originally assigned to (e.g. all in
-                        // gallery_dl_queue_0 from when the setting was 1) and keeps running
-                        // exactly that concurrently regardless of the new setting — it only
-                        // ever applied to downloads added *after* this tap. Redistributes the
-                        // existing backlog across the new lane count immediately instead of
-                        // leaving the user's current queue stuck on the old concurrency.
-                        scope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
+                        downloadsSettings.setConcurrentDownloads(it)
                     },
                 )
             }
@@ -172,8 +162,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = speedLimitEnabled,
                 onCheckedChange = {
                     speedLimitEnabled = it
-                    GalleryDlPreferences.setSpeedLimitEnabled(context, it)
-                    scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                    downloadsSettings.setSpeedLimitEnabled(it)
                 },
             )
             ToggleReveal(speedLimitEnabled) {
@@ -184,12 +173,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     units = SPEED_UNITS,
                     onValueChange = {
                         speedLimit = it
-                        GalleryDlPreferences.setSpeedLimit(context, it)
-                        // A speed limit is only ever read fresh when a new subprocess is spawned —
-                        // no IPC channel reaches an already-running one, so changing it here used
-                        // to do nothing for whatever's downloading right now, only the next thing
-                        // queued.
-                        scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                        downloadsSettings.setSpeedLimit(it)
                     },
                 )
             }
@@ -259,8 +243,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = proxyEnabled,
                 onCheckedChange = {
                     proxyEnabled = it
-                    GalleryDlPreferences.setProxyEnabled(context, it)
-                    scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                    downloadsSettings.setProxyEnabled(it)
                 },
             )
             ToggleReveal(proxyEnabled) {
@@ -269,7 +252,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     value = proxyUrl,
                     onValueChange = {
                         proxyUrl = it
-                        GalleryDlPreferences.setProxyUrl(context, it)
+                        downloadsSettings.setProxyUrl(it)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Proxy") },
@@ -277,18 +260,6 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     singleLine = true,
                     shape = MaterialTheme.shapes.medium,
                 )
-                // Same reasoning as the speed-limit toggle above — a proxy is only ever read
-                // fresh when a new subprocess is spawned, so changing it here otherwise does
-                // nothing for whatever's downloading right now. Debounced so typing a new URL
-                // doesn't restart every currently running download on every keystroke.
-                var proxyUrlSettled by remember { mutableStateOf(proxyUrl) }
-                LaunchedEffect(proxyUrl) {
-                    delay(800)
-                    if (proxyUrl != proxyUrlSettled) {
-                        proxyUrlSettled = proxyUrl
-                        DownloadDispatcher.restartRunningDownloads(context)
-                    }
-                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -506,11 +477,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = scheduleEnabled,
                 onCheckedChange = {
                     scheduleEnabled = it
-                    sharedPreferences.edit().putBoolean(GalleryDlPreferences.KEY_SCHEDULE_ENABLED, it).apply()
-                    // Otherwise a download already queued under the old setting just sits
-                    // there until its stale delay elapses — see rescheduleQueuedDownloads().
-                    scope.launch { com.comfort.app.data.DownloadDispatcher.rescheduleQueuedDownloads(context) }
-                    com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
+                    downloadsSettings.setScheduleEnabled(it)
                 },
             )
 
@@ -526,9 +493,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         minutesSinceMidnight = scheduleStartMin,
                         onPicked = { minutes ->
                             scheduleStartMin = minutes
-                            sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_SCHEDULE_START_MIN, minutes).apply()
-                            scope.launch { com.comfort.app.data.DownloadDispatcher.rescheduleQueuedDownloads(context) }
-                            com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
+                            downloadsSettings.setScheduleStart(minutes)
                         },
                     )
                     TimePickerButton(
@@ -537,9 +502,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         minutesSinceMidnight = scheduleEndMin,
                         onPicked = { minutes ->
                             scheduleEndMin = minutes
-                            sharedPreferences.edit().putInt(GalleryDlPreferences.KEY_SCHEDULE_END_MIN, minutes).apply()
-                            scope.launch { com.comfort.app.data.DownloadDispatcher.rescheduleQueuedDownloads(context) }
-                            com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
+                            downloadsSettings.setScheduleEnd(minutes)
                         },
                     )
                 }
@@ -555,8 +518,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     checked = alarmSchedulingEnabled,
                     onCheckedChange = {
                         alarmSchedulingEnabled = it
-                        GalleryDlPreferences.setAlarmSchedulingEnabled(context, it)
-                        com.comfort.app.data.DownloadDispatcher.scheduleWindowAlarm(context)
+                        downloadsSettings.setAlarmSchedulingEnabled(it)
                     },
                 )
             }
@@ -570,8 +532,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = maxFilesizeEnabled,
                 onCheckedChange = {
                     maxFilesizeEnabled = it
-                    GalleryDlPreferences.setMaxFilesizeEnabled(context, it)
-                    scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                    downloadsSettings.setMaxFilesizeEnabled(it)
                 },
             )
 
@@ -583,8 +544,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     units = FILESIZE_UNITS,
                     onValueChange = {
                         maxFilesize = it
-                        GalleryDlPreferences.setMaxFilesize(context, it)
-                        scope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+                        downloadsSettings.setMaxFilesize(it)
                     },
                 )
             }
@@ -681,8 +641,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = deleteLeftoverOnFailure,
                 onCheckedChange = {
                     deleteLeftoverOnFailure = it
-                    GalleryDlPreferences.setDeleteLeftoverOnFailure(context, it)
-                    DownloadDispatcher.rescheduleStagingCleanup(context)
+                    downloadsSettings.setDeleteLeftoverOnFailure(it)
                 },
             )
             if (deleteLeftoverOnFailure) {
@@ -712,8 +671,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                             selected = selected,
                             onClick = {
                                 cleanupLeftoverInterval = value
-                                GalleryDlPreferences.setCleanupLeftoverInterval(context, value)
-                                DownloadDispatcher.rescheduleStagingCleanup(context)
+                                downloadsSettings.setCleanupLeftoverInterval(value)
                             },
                             modifier = Modifier.weight(1f).height(40.dp),
                             interactionSource = interactionSource,
