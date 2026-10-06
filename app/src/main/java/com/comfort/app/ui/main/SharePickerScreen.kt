@@ -73,6 +73,8 @@ fun SharePickerScreen(
     val errorMessage by picker.errorMessage.collectAsState()
     val selectedNums by picker.selectedNums.collectAsState()
     val itemFilter by picker.itemFilter.collectAsState()
+    val selectedCount by picker.selectedCount.collectAsState()
+    val allSelected by picker.allSelected.collectAsState()
     val isDuplicate by picker.isDuplicate.collectAsState()
     var showLoginDialog by remember { mutableStateOf(false) }
     // Seeded from the global Settings default once the listing loads, then only ever changed by
@@ -166,7 +168,7 @@ fun SharePickerScreen(
                 title = {
                     Text(
                         when (state) {
-                            ListingState.LOADED -> "${selectedNums.size} of ${items.size} selected"
+                            ListingState.LOADED -> "$selectedCount of ${items.size} selected"
                             ListingState.ERROR -> "Preview unavailable"
                             else -> "Loading…"
                         },
@@ -181,7 +183,7 @@ fun SharePickerScreen(
                 actions = {
                     if (state == ListingState.LOADED) {
                         TextButton(onClick = { picker.toggleAll() }) {
-                            Text(if (selectedNums.size == items.size) "Deselect all" else "Select all")
+                            Text(if (allSelected) "Deselect all" else "Select all")
                         }
                     }
                 },
@@ -207,7 +209,7 @@ fun SharePickerScreen(
                                 // this button already said "Redownload" when isDuplicate was true,
                                 // so tapping it is the confirmation — same reasoning
                                 // DownloadPreviewSheet's own Download button already uses.
-                                onDownload(url, itemFilter, selectedNums.size, if (hasVideoItems) selectedQuality else null, isDuplicate)
+                                onDownload(url, itemFilter, selectedCount, if (hasVideoItems) selectedQuality else null, isDuplicate)
                             },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = MaterialTheme.shapes.medium,
@@ -221,7 +223,7 @@ fun SharePickerScreen(
                                 .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
                                 ?.sumOf { it.sizeBytes!! }
                             val sizeSuffix = selectedSize?.let { " · ${formatFilesize(it)}" } ?: ""
-                            Text((if (isDuplicate) "Redownload ${selectedNums.size}" else "Download ${selectedNums.size}") + sizeSuffix)
+                            Text((if (isDuplicate) "Redownload $selectedCount" else "Download $selectedCount") + sizeSuffix)
                         }
                     }
                 }
