@@ -50,6 +50,12 @@ class MainActivity : ComponentActivity() {
   // trigger recomposition, the standard way to thread an Activity-level Intent into Compose state.
   private val openQueueSignal = mutableIntStateOf(0)
 
+  // Re-applies the status/nav bar icon colors for the current light/dark theme. Removing the
+  // Android 12+ splash resets them to the base theme's own (core-splashscreen re-applies the
+  // theme's system bar appearance), which left white icons on the light theme's near-white page —
+  // reported as "hard to see". Set from the composition below, called again once the splash is gone.
+  private var applySystemBarStyle: (() -> Unit)? = null
+
   private fun consumeOpenQueueExtra(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
       openQueueSignal.intValue++
@@ -94,7 +100,10 @@ class MainActivity : ComponentActivity() {
           .alpha(0f)
           .setStartDelay(remaining)
           .setDuration(200L)
-          .withEndAction { provider.remove() }
+          .withEndAction {
+            provider.remove()
+            applySystemBarStyle?.invoke()
+          }
           .start()
       }
     }
@@ -125,7 +134,9 @@ class MainActivity : ComponentActivity() {
           } else {
               SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
           }
-          enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+          val apply = { enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style) }
+          apply()
+          applySystemBarStyle = apply
           onDispose {}
       }
 
