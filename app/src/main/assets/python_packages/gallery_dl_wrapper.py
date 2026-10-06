@@ -1,4 +1,5 @@
 import io
+import json
 import shlex
 import sys
 import time
@@ -253,6 +254,32 @@ class _ReconfigurableStringIO(io.StringIO):
     def reconfigure(self, *args, **kwargs):
         pass
 
+# Items whose size is asked for — enough for a carousel or a page of a gallery without a long wait
+# on a huge one (the Kotlin listing itself stops at a similar count).
+_SIZED_ITEMS = 60
+
+
+def _with_sizes(dump_json, referer=None):
+    """--dump-json output with each file's size added as "filesize" (bytes), asked from the media
+    server since gallery-dl doesn't list sizes — so the picker/preview can say how big a download
+    will be. Anything that goes wrong returns the output unchanged: sizes are a nicety."""
+    try:
+        entries = json.loads(dump_json)
+        files = [e for e in entries if isinstance(e, list) and len(e) >= 3 and e[0] == 3
+                 and isinstance(e[1], str) and isinstance(e[2], dict) and not e[2].get("filesize")][:_SIZED_ITEMS]
+        if not files:
+            return dump_json
+        sizes = net_resilience.content_lengths([e[1] for e in files], headers={"Referer": referer} if referer else None)
+        if not sizes:
+            return dump_json
+        for e in files:
+            if e[1] in sizes:
+                e[2]["filesize"] = sizes[e[1]]
+        return json.dumps(entries, ensure_ascii=False, default=str)
+    except Exception:  # noqa: BLE001
+        return dump_json
+
+
 def list_items(url, cookies_path=None, extra_args=None):
     """Enumerates items in a gallery without downloading anything, for the share-sheet item
     picker. Returns gallery-dl's raw --dump-json output as text (a JSON array of
@@ -301,7 +328,7 @@ def list_items(url, cookies_path=None, extra_args=None):
             if file_index is not None:
                 gallery_dl.job.DataJob.__init__.__defaults__ = original_defaults
 
-    out = out_buffer.getvalue()
+    out = _with_sizes(out_buffer.getvalue(), referer=url)
     warnings = err_buffer.getvalue().strip()
     if out.strip():
         # gallery-dl can silently drop an individual item mid-listing (logging a warning, not

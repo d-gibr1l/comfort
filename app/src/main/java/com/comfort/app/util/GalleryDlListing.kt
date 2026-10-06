@@ -20,7 +20,9 @@ import org.json.JSONObject
  * posts' items both happened to be numbered 0. [listIndex] is this item's actual position in the
  * combined list — always unique regardless of what gallery-dl's own numbering does — kept as a
  * separate field precisely so nothing downstream is tempted to reuse [num] for identity again. */
-data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?, val listIndex: Int)
+/** [sizeBytes]: the file's size when the listing reported one — gallery-dl and Instaloader listings
+ * get it from the media server (the wrappers' "filesize"); null when it didn't answer. */
+data class GalleryItem(val num: Int, val url: String, val filename: String?, val title: String?, val listIndex: Int, val sizeBytes: Long? = null)
 
 /** What the download preview sheet shows about a link before committing to downloading it. Every
  * field is independently optional — extractors vary a lot in what they populate, and a missing
@@ -69,7 +71,7 @@ data class PreviewInfo(
  * scale to a long playlist. [isVideo] marks a picture vs a video in a mixed listing (an
  * Instagram carousel, say) for the row's badge; null when the listing doesn't say (a song, or a
  * flat playlist entry with no extension), which shows no badge rather than a guess. */
-data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null, val isVideo: Boolean? = null)
+data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null, val isVideo: Boolean? = null, val sizeBytes: Long? = null)
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
@@ -416,7 +418,8 @@ object GalleryDlListing {
                 val title = listOf("title", "content", "description")
                     .firstNotNullOfOrNull { key -> keywords?.optString(key)?.trim()?.takeIf { it.isNotBlank() } }
                     ?.let { if (it.length > 120) it.take(120).trimEnd() + "…" else it }
-                items.add(GalleryItem(num, fileUrl, filename, title, listIndex = items.size))
+                val sizeBytes = keywords?.optLong("filesize", 0L)?.takeIf { it > 0L }
+                items.add(GalleryItem(num, fileUrl, filename, title, listIndex = items.size, sizeBytes = sizeBytes))
             }
             // Real items found despite an error entry also being present (a partial failure) still
             // count as a usable listing — only surface the error when there's nothing else to show.
@@ -659,15 +662,16 @@ object GalleryDlListing {
         if (items.isEmpty()) return null
         if (items.size == 1) {
             val only = items[0]
-            return PreviewInfo(title = only.title, uploader = null, thumbnail = only.url, filesizeBytes = null, durationMs = null, streamUrls = listOf(only.url))
+            return PreviewInfo(title = only.title, uploader = null, thumbnail = only.url, filesizeBytes = only.sizeBytes, durationMs = null, streamUrls = listOf(only.url))
         }
-        val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url, isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename)) }
+        val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url, isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename), sizeBytes = item.sizeBytes) }
         val first = items.first()
         return PreviewInfo(
             title = first.title,
             uploader = null,
             thumbnail = first.url,
-            filesizeBytes = null,
+            // The whole post, only when every item's size is known (a partial sum would read as the total).
+            filesizeBytes = items.takeIf { all -> all.all { it.sizeBytes != null } }?.sumOf { it.sizeBytes!! },
             durationMs = null,
             streamUrls = emptyList(),
             tracks = tracks,

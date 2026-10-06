@@ -940,7 +940,7 @@ private val VideoQuality.chipLabel: String
     }
 
 /** Bytes as the compact size the preview card shows ("10mb"). */
-private fun formatFilesize(bytes: Long): String = when {
+internal fun formatFilesize(bytes: Long): String = when {
     bytes >= 1024L * 1024L * 1024L -> "%.1fgb".format(bytes / (1024.0 * 1024.0 * 1024.0))
     bytes >= 1024L * 1024L -> "${bytes / (1024L * 1024L)}mb"
     bytes >= 1024L -> "${bytes / 1024L}kb"
@@ -1267,7 +1267,14 @@ private fun MainPreviewScreen(
         // unchecking every song can never be mistaken for (or silently become) "download
         // everything".
         val downloadEnabled = song.mode != PreviewMode.SONG_LIST || song.selectedNums.isNotEmpty()
-        val countSuffix = if (song.mode == PreviewMode.SONG_LIST) " ${song.selectedNums.size}" else ""
+        // The selection's size too, when every selected item's is known — a sum over only some of
+        // them would read as the whole download's.
+        val selectedSize = song.tracks.filter { it.num in song.selectedNums }
+            .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
+            ?.sumOf { it.sizeBytes!! }
+        val countSuffix = if (song.mode == PreviewMode.SONG_LIST) {
+            " ${song.selectedNums.size}" + (selectedSize?.let { " · ${formatFilesize(it)}" } ?: "")
+        } else ""
         Button(
             onClick = onDownload,
             enabled = downloadEnabled,
@@ -1696,10 +1703,11 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
                 )
             }
         }
-        if (track.durationMs != null) {
+        val trailing = listOfNotNull(track.durationMs?.let(::formatDurationShort), track.sizeBytes?.let(::formatFilesize))
+        if (trailing.isNotEmpty()) {
             Spacer(Modifier.width(8.dp))
             Text(
-                formatDurationShort(track.durationMs),
+                trailing.joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -251,7 +251,13 @@ fun SharePickerScreen(
                         ) {
                             Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(if (isDuplicate) "Redownload ${selectedNums.size}" else "Download ${selectedNums.size}")
+                            // The selection's size when every selected item reported one (gallery-dl /
+                            // Instaloader listings ask the media server) — never a partial sum.
+                            val selectedSize = items.filter { it.num in selectedNums }
+                                .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
+                                ?.sumOf { it.sizeBytes!! }
+                            val sizeSuffix = selectedSize?.let { " · ${formatFilesize(it)}" } ?: ""
+                            Text((if (isDuplicate) "Redownload ${selectedNums.size}" else "Download ${selectedNums.size}") + sizeSuffix)
                         }
                     }
                 }
