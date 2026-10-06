@@ -10,12 +10,14 @@ import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.ui.main.DownloadOptions
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.ListingResult
+import com.comfort.app.util.PreviewInfo
 import com.comfort.app.util.shouldUsePreviewSheet
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Which sheet a link gets: [Listing] while the listing pass decides, then [Preview] (a single
  * video, a song, a playlist — see ListingResult.shouldUsePreviewSheet) or [Picker] (a real
@@ -23,7 +25,9 @@ import kotlinx.coroutines.launch
 sealed interface LinkRoute {
     val url: String
     data class Listing(override val url: String) : LinkRoute
-    data class Preview(override val url: String) : LinkRoute
+    /** [preloaded]: the preview, when the router already had to fetch it (yt-dlp, after the
+     * gallery-dl listing timed out) — the sheet shows it instead of fetching again. */
+    data class Preview(override val url: String, val preloaded: PreviewInfo? = null) : LinkRoute
     data class Picker(override val url: String, val listing: ListingResult) : LinkRoute
 }
 
@@ -54,6 +58,15 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         listing = viewModelScope.launch {
             launch { _isDuplicate.value = DownloadDispatcher.isDuplicate(context, url) }
             val result = GalleryDlListing.listItemsForSheet(context, url)
+            if (result.timedOut) {
+                // gallery-dl is stuck (a rate limit, typically), but yt-dlp reaches the site its own
+                // way — a video link still gets its normal preview. Only if yt-dlp can't show
+                // anything either (an image post, or the site really is down) does the picker's
+                // "taking too long" screen come up.
+                val preview = withTimeoutOrNull(YT_DLP_PREVIEW_CAP_MS) { GalleryDlListing.fetchPreviewInfo(context, url, ytDlpOnly = true) }
+                _route.value = if (preview?.hasContent() == true) LinkRoute.Preview(url, preview) else LinkRoute.Picker(url, result)
+                return@launch
+            }
             _route.value = if (result.shouldUsePreviewSheet(url)) LinkRoute.Preview(url) else LinkRoute.Picker(url, result)
         }
     }
@@ -110,6 +123,12 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
 
     private fun enqueue(onDone: (EnqueueResult) -> Unit, block: suspend () -> EnqueueResult): Job =
         viewModelScope.launch { onDone(block()) }
+
+    private fun PreviewInfo.hasContent() = title != null || thumbnail != null || streamUrls.isNotEmpty()
+
+    private companion object {
+        const val YT_DLP_PREVIEW_CAP_MS = 30_000L
+    }
 
     private fun titleFor(url: String) = "Downloading from ${VideoSiteRouter.siteName(url)}"
 }

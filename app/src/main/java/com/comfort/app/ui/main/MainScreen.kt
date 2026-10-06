@@ -312,6 +312,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         (route as? LinkRoute.Preview)?.let { preview ->
             DownloadPreviewSheet(
                 url = preview.url,
+                preloadedPreview = preview.preloaded,
                 onDismiss = { router.close() },
                 onDownload = { options ->
                     router.download(preview.url, options)

@@ -22,7 +22,12 @@ import kotlinx.coroutines.launch
  * current selection was already downloaded. Created per sheet (DownloadPreviewSheet scopes it to
  * its own composition), so every opening starts fresh, as before. The sheet's own UI state — its
  * slide-in state, which sub-screen is showing — stays in the composable. */
-class PreviewSheetViewModel(application: Application, val url: String) : AndroidViewModel(application) {
+class PreviewSheetViewModel(
+    application: Application,
+    val url: String,
+    /** Already fetched by whoever opened the sheet (LinkRouterViewModel's yt-dlp fallback). */
+    preloaded: PreviewInfo? = null,
+) : AndroidViewModel(application) {
     private val context get() = getApplication<Application>()
 
     private val _preview = MutableStateFlow<PreviewInfo?>(null)
@@ -64,7 +69,7 @@ class PreviewSheetViewModel(application: Application, val url: String) : Android
 
     init {
         viewModelScope.launch {
-            val result = GalleryDlListing.fetchPreviewInfo(context, url) { _status.value = it }
+            val result = preloaded ?: GalleryDlListing.fetchPreviewInfo(context, url, onStatus = { _status.value = it })
             _preview.value = result
             result?.tracks?.takeIf { it.isNotEmpty() }?.let { tracks -> _selectedNums.value = tracks.map { it.num }.toSet() }
             if (_editedTitle.value == null) result?.title?.let { _editedTitle.value = cleanTrackTitle(it) }

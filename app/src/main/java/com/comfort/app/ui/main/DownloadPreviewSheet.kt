@@ -236,6 +236,8 @@ fun DownloadPreviewSheet(
     url: String,
     onDismiss: () -> Unit,
     onDownload: (DownloadOptions) -> Unit,
+    // Shown as-is instead of fetched — see LinkRoute.Preview.preloaded.
+    preloadedPreview: com.comfort.app.util.PreviewInfo? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -343,7 +345,7 @@ fun DownloadPreviewSheet(
     val sheet: com.comfort.app.viewmodel.PreviewSheetViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
         viewModelStoreOwner = sheetViewModelOwner,
         key = url,
-    ) { com.comfort.app.viewmodel.PreviewSheetViewModel(context.applicationContext as android.app.Application, url) }
+    ) { com.comfort.app.viewmodel.PreviewSheetViewModel(context.applicationContext as android.app.Application, url, preloadedPreview) }
     val preview by sheet.preview.collectAsState()
     val previewLoading by sheet.loading.collectAsState()
     val previewStatus by sheet.status.collectAsState()
