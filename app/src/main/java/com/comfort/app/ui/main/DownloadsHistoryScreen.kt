@@ -30,6 +30,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -454,12 +457,25 @@ fun DownloadsHistoryScreen(
                 )
             }
         } else if (gridView) {
+            // Gallery-style: edge to edge, hairline gaps, and rows where every tile is as wide as
+            // its media's shape needs (justifiedCells) rather than identical squares. A file whose
+            // shape isn't known (yet) counts as square.
+            val shapes by viewModel.mediaShapes.collectAsStateWithLifecycle()
+            val gridWidth = LocalConfiguration.current.screenWidthDp.toFloat()
+            val cells = remember(visibleItems, shapes, gridWidth) {
+                justifiedCells(
+                    aspects = visibleItems.map { shapes[it.id]?.aspect ?: 1f },
+                    width = gridWidth,
+                    targetHeight = gridWidth * 0.5f,
+                    gap = GRID_GAP_DP,
+                )
+            }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Fixed(JUSTIFIED_COLUMNS),
                 state = gridState,
-                contentPadding = PaddingValues(top = topPaddingWhileSelecting, start = 8.dp, end = 8.dp, bottom = navBarClearance()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(top = topPaddingWhileSelecting, bottom = navBarClearance()),
+                horizontalArrangement = Arrangement.spacedBy(GRID_GAP_DP.dp),
+                verticalArrangement = Arrangement.spacedBy(GRID_GAP_DP.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 // Full-width span so the header isn't squeezed into a single grid cell's own 1/3
@@ -472,24 +488,12 @@ fun DownloadsHistoryScreen(
                 // list. Modifier.padding can't do this (it throws on a negative value); measuring
                 // wider than the slot and placing the result shifted left is the same trick as
                 // making an image bleed past a padded container's own edges.
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(
-                        modifier = Modifier.layout { measurable, constraints ->
-                            val bleedPx = 8.dp.roundToPx()
-                            val widerConstraints = Constraints(
-                                minWidth = (constraints.minWidth + bleedPx * 2).coerceAtLeast(0),
-                                maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth + bleedPx * 2 else constraints.maxWidth,
-                                minHeight = constraints.minHeight,
-                                maxHeight = constraints.maxHeight,
-                            )
-                            val placeable = measurable.measure(widerConstraints)
-                            layout(placeable.width - bleedPx * 2, placeable.height) {
-                                placeable.placeRelative(-bleedPx, 0)
-                            }
-                        },
-                    ) { fullHeaderContent() }
-                }
-                gridItems(visibleItems, key = { it.id }) { item ->
+                item(span = { GridItemSpan(maxLineSpan) }) { fullHeaderContent() }
+                gridItemsIndexed(
+                    visibleItems,
+                    key = { _, item -> item.id },
+                    span = { index, _ -> GridItemSpan(cells.getOrNull(index)?.span ?: JUSTIFIED_COLUMNS / 3) },
+                ) { index, item ->
                     // Same slide-up + fade-in entrance / crossfade-out + reflow-on-removal pattern
                     // as the Download Queue's own cards (see QueueScreen.kt's own comment on this)
                     // — visibleState never flips back to false from here, so the removal half is
@@ -510,6 +514,8 @@ fun DownloadsHistoryScreen(
                     ) {
                         HistoryGridItem(
                             item = item,
+                            height = (cells.getOrNull(index)?.height ?: (gridWidth / 3)).dp,
+                            durationMs = shapes[item.id]?.durationMs,
                             selected = item.id in selectedIds,
                             selectionMode = selectionMode,
                             onTap = {
@@ -1389,6 +1395,8 @@ private fun LibraryToolbarChip(
 @Composable
 private fun HistoryGridItem(
     item: DownloadEntity,
+    height: androidx.compose.ui.unit.Dp,
+    durationMs: Long?,
     selected: Boolean,
     selectionMode: Boolean,
     onTap: () -> Unit,
@@ -1401,11 +1409,11 @@ private fun HistoryGridItem(
 
     Box(
         modifier = Modifier
-            .aspectRatio(1f)
-            // shapes.medium (12dp token) — same value as before, now tied to the theme's own
-            // shape scale instead of a magic number that would silently drift out of sync with
-            // it if the app's shape theme is ever customized.
-            .clip(MaterialTheme.shapes.medium)
+            // Width comes from the tile's span in its row (justifiedCells), height from the row.
+            // Square corners and edge to edge, like a gallery app's grid.
+            .fillMaxWidth()
+            .height(height)
+            .clip(RectangleShape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .combinedClickable(
                 onClick = {
@@ -1459,20 +1467,31 @@ private fun HistoryGridItem(
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
         }
 
-        if (item.downloadedItems > 1) {
-            Box(
+        // Gallery-style corner badge: "▶ 0:13" on a video or song, the item count on a
+        // multi-item download — white on a dark translucent pill, readable on any thumbnail.
+        val badgeIcon = when {
+            durationMs != null -> Icons.Filled.PlayArrow
+            item.downloadedItems > 1 -> Icons.Outlined.Layers
+            else -> null
+        }
+        if (badgeIcon != null) {
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(5.dp)
+                    .padding(6.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f))
-                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(10.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text("${item.downloadedItems}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelSmall)
-                }
+                Icon(badgeIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    if (durationMs != null) formatGridDuration(durationMs) else "${item.downloadedItems}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
 
@@ -1494,7 +1513,9 @@ private fun HistoryGridItem(
         // alert, so you don't have to open each item (or squint at its icon-vs-photo state) to
         // tell success from failure. DELETED/CANCELLED already read clearly enough from their own
         // placeholder icon above (trash can, greyed out) not to need one.
-        StatusBadge(status = item.status, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp))
+        if (item.status == DownloadStatus.ERRORED) {
+            StatusBadge(status = item.status, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp))
+        }
 
         if (selected) {
             Box(
@@ -1511,6 +1532,18 @@ private fun HistoryGridItem(
         }
     }
 }
+
+/** "0:13", "1:21", "1:02:05" — a grid tile's duration badge. */
+private fun formatGridDuration(ms: Long): String {
+    val total = (ms + 500) / 1000
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val s = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
+/** Gap between grid tiles, horizontally and vertically (dp). */
+private const val GRID_GAP_DP = 2f
 
 /** Small circular success/failure badge shared by both the grid and list history rows —
  * FINISHED gets a check in the theme's primary color, ERRORED an alert in its error color (on a
