@@ -630,6 +630,8 @@ class DownloadWorker(
                                             if (artworkUri != null) dao.setMediaUriIfAbsent(downloadId, savedUri.toString())
                                         }
                                         dao.addBytes(downloadId, fileSize)
+                                        // Its bytes are in totalBytes now; the card adds liveBytes on top.
+                                        dao.updateLiveBytes(downloadId, 0, speedMbs)
                                         if (hasPlaceholderTitle && !engineNamedTitle.get()) {
                                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                                         }
@@ -726,6 +728,14 @@ class DownloadWorker(
                                 // which reads as a dip; never negative.
                                 val instant = ((total - previousTotal).coerceAtLeast(0L) / (1024f * 1024f)) / seconds
                                 smoothed = if (smoothed == 0f) instant else smoothed * 0.6f + instant * 0.4f
+                                // Progress too, not just speed: these engines only announce a file once
+                                // it's complete (Instaloader streams it into a ".temp" file here), so the
+                                // bar sat at 0 and jumped to done — reported on an 11 MB Instagram reel.
+                                // What's in staging is this file's bytes so far.
+                                if (staged != currentFileBytesRef.get()) {
+                                    currentFileBytesRef.set(staged)
+                                    dao.updateLiveBytes(downloadId, staged, smoothed)
+                                }
                                 if (now - lastDataAt.get() > STALL_AFTER_MS) {
                                     smoothed = 0f
                                     measuredSpeedMbs.set(0f)
