@@ -470,8 +470,11 @@ fun DownloadsHistoryScreen(
                 justifiedCells(
                     aspects = visibleItems.map { shapes[it.id]?.aspect ?: 1f },
                     width = gridWidth,
-                    targetHeight = gridWidth * 0.5f,
+                    targetHeight = gridWidth * 0.62f,
                     gap = GRID_GAP_DP,
+                    // Portraits cropped only down to 0.6 wide-to-tall: a row of three is taller (bigger
+                    // tiles) and shows more of each video.
+                    minAspect = 0.6f,
                 )
             }
             LazyVerticalGrid(
