@@ -36,6 +36,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -103,7 +104,30 @@ val NAV_BAR_RESERVED_HEIGHT = 100.dp
  * gesture, and however tall a given OEM skin makes either) instead of assuming a fixed guess
  * happens to already cover it. See [NAV_BAR_RESERVED_HEIGHT]'s own doc comment for the full story. */
 @Composable
-fun navBarClearance(): Dp = NAV_BAR_RESERVED_HEIGHT + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+fun navBarClearance(): Dp {
+    val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // No floating pill on wide windows (a side rail replaces it), so only a small margin is needed.
+    return if (LocalUseNavRail.current) 16.dp + inset else NAV_BAR_RESERVED_HEIGHT + inset
+}
+
+/** True when the window is wide enough (tablet, or a phone in landscape) that navigation is a side
+ * rail instead of the floating bottom pill. Set once in [MainScreen]. */
+val LocalUseNavRail = androidx.compose.runtime.compositionLocalOf { false }
+
+/** Window width (dp) from which navigation becomes a side rail — Material's "medium" breakpoint. */
+private const val NAV_RAIL_MIN_WIDTH_DP = 600
+
+/** Widest a text/form-style screen (Home, Settings, Queue) gets before it's centered instead of
+ * stretching edge to edge across a tablet. */
+val CONTENT_MAX_WIDTH = 720.dp
+
+/** Centers [content] at most [CONTENT_MAX_WIDTH] wide; a no-op on phone-width windows. */
+@Composable
+fun ConstrainedWidth(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Box(modifier = Modifier.widthIn(max = CONTENT_MAX_WIDTH).fillMaxHeight()) { content() }
+    }
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -159,39 +183,84 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // list content would otherwise be visible there. Overlaying it on a plain Box instead lets
     // content scroll underneath the pill's transparent padding for real, which is what "floating"
     // is supposed to look like.
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        // Home is always composed here, underneath, as the one and only Home: it's what a
-        // non-Home tab's back reveals, and it's simply the visible page on tab 0. There used to be
-        // a second Home inside the animated box below for tab 0 — so every back to Home threw this
-        // copy away and built a brand-new one mid-transition, which showed as a flicker at the end
-        // of the back animation (reported live). Now back just removes the page on top.
-        // Back from a non-Home tab returns to Home first, matching standard bottom-nav behavior,
-        // instead of immediately falling through to the empty nav backstack and quitting the app.
-        // Disabled while QueueScreen is up — its own predictive-back handler below takes over.
-        val tabBack = rememberBackRevealState(enabled = !showQueueScreen && selectedTab != 0) {
-            selectedTab = 0
+    // Hoisted out of the content Box below so the side rail (wide windows) and the floating pill
+    // (narrow ones) can share the same tab-switching logic.
+    // Home is always composed under everything, as the one and only Home: it's what a
+    // non-Home tab's back reveals, and it's simply the visible page on tab 0. There used to be
+    // a second Home inside the animated box below for tab 0 — so every back to Home threw this
+    // copy away and built a brand-new one mid-transition, which showed as a flicker at the end
+    // of the back animation (reported live). Now back just removes the page on top.
+    // Back from a non-Home tab returns to Home first, matching standard bottom-nav behavior,
+    // instead of immediately falling through to the empty nav backstack and quitting the app.
+    // Disabled while QueueScreen is up — its own predictive-back handler takes over.
+    val tabBack = rememberBackRevealState(enabled = !showQueueScreen && selectedTab != 0) {
+        selectedTab = 0
+    }
+    val queueBack = rememberBackRevealState(enabled = showQueueScreen) {
+        showQueueScreen = false
+    }
+    // Opening the Queue plays the push, the mirror of its back (see animateEnter).
+    val openQueue = { if (!showQueueScreen) queueBack.animateEnter { showQueueScreen = true } }
+    // The tab being left during a switch between two tabs (Library <-> Settings): kept on
+    // screen as the page behind, so it slides out like any page does. Without it the old tab
+    // vanished at once and the screen was empty for ~80ms before the new one came in (Home,
+    // the usual page behind, is hidden while another tab is up). Cleared when the switch ends.
+    var outgoingTab by remember { mutableStateOf<Int?>(null) }
+    // Settings stays composed once built, hidden when not shown, instead of being thrown away
+    // on every tab switch. Measured on-device: every open cost one ~87ms frame (~47ms
+    // composing the page, ~38ms layout+draw) — rebuilt from scratch each time, which also
+    // re-ran its "Updates available" engine check. It's nearly static, so keeping it costs
+    // little. Built ~2s after launch while idle, so even the first open only has to draw it.
+    // (Library isn't kept: it recomposes on every download progress tick, and costs ~35-50ms.)
+    var keepSettings by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(2_000)
+        keepSettings = true
+    }
+    val onTabSelect: (Int) -> Unit = { index ->
+        when {
+            // Tapping the already-selected Library tab again jumps to the Queue, matching
+            // the "tap again for more" pattern used elsewhere in the app.
+            index == 1 && selectedTab == 1 -> openQueue()
+            // Tapping the already-selected Settings tab again backs all the way out to the
+            // main Settings list, instead of leaving whatever subpage was open in place —
+            // selectedTab is already 2 here, so a bare `selectedTab = index` wouldn't have
+            // changed anything.
+            index == 2 && selectedTab == 2 -> {
+                settingsRoute = SettingsRoute.ROOT
+                settingsHighlightKey = null
+            }
+            index == selectedTab -> Unit
+            // Home is the page every other tab sits on: going there is a back.
+            index == 0 -> tabBack.animateBack()
+            // Another tab opens with the push, the page it covers sliding away behind it:
+            // Home, or when switching between two tabs, the tab being left (outgoingTab).
+            selectedTab == 0 -> tabBack.animateEnter { selectedTab = index }
+            else -> {
+                val leaving = selectedTab
+                tabBack.animateEnter(onFinished = { outgoingTab = null }) {
+                    outgoingTab = leaving
+                    selectedTab = index
+                }
+            }
         }
-        val queueBack = rememberBackRevealState(enabled = showQueueScreen) {
-            showQueueScreen = false
-        }
-        // Opening the Queue plays the push, the mirror of its back (see animateEnter).
-        val openQueue = { if (!showQueueScreen) queueBack.animateEnter { showQueueScreen = true } }
-        // The tab being left during a switch between two tabs (Library <-> Settings): kept on
-        // screen as the page behind, so it slides out like any page does. Without it the old tab
-        // vanished at once and the screen was empty for ~80ms before the new one came in (Home,
-        // the usual page behind, is hidden while another tab is up). Cleared when the switch ends.
-        var outgoingTab by remember { mutableStateOf<Int?>(null) }
-        // Settings stays composed once built, hidden when not shown, instead of being thrown away
-        // on every tab switch. Measured on-device: every open cost one ~87ms frame (~47ms
-        // composing the page, ~38ms layout+draw) — rebuilt from scratch each time, which also
-        // re-ran its "Updates available" engine check. It's nearly static, so keeping it costs
-        // little. Built ~2s after launch while idle, so even the first open only has to draw it.
-        // (Library isn't kept: it recomposes on every download progress tick, and costs ~35-50ms.)
-        var keepSettings by remember { mutableStateOf(false) }
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(2_000)
-            keepSettings = true
-        }
+    }
+
+    val useNavRail = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= NAV_RAIL_MIN_WIDTH_DP
+    CompositionLocalProvider(LocalUseNavRail provides useNavRail) {
+    Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    if (useNavRail) {
+        SideNavRail(
+            selectedTab = selectedTab,
+            activeDownloadsCount = activeDownloadsCount,
+            hasEngineUpdate = anyUpdateAvailable,
+            onSelect = onTabSelect,
+        )
+    }
+    // clipToBounds: pages parked behind the front one are shifted left (predictiveBackBehind) and
+    // are invisible but still hit-testable — unclipped, on a wide window they landed on top of the
+    // rail and swallowed its taps (Home's text field opened the keyboard instead of switching tab).
+    Box(modifier = Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
         // Everything under the Queue (Home + the current tab) — it's what closing the Queue
         // reveals, so it trails/fades in as one layer (see predictiveBackBehind).
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
@@ -202,12 +271,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 else Modifier.predictiveBackBehind(tabBack, active = selectedTab != 0)
             )
         ) {
+            ConstrainedWidth {
             HomeScreen(
                 onConfigure = { url -> router.open(url) },
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = openQueue,
             )
+            }
         }
 
         // Only the non-Home tabs, on top of the Home above (see its comment) — plus, during a
@@ -217,7 +288,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         val keptTabs = (shownTabs + listOfNotNull(2.takeIf { keepSettings })).distinct()
         for (tab in keptTabs) key(tab) {
             Box(
-                modifier = Modifier.fillMaxSize().then(
+                // Opaque so a centered, width-capped page (Home/Settings on a wide window) doesn't
+                // show whatever's underneath in the gutters either side of it.
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).then(
                     when (tab) {
                         selectedTab -> Modifier.predictiveBackReveal(tabBack)
                         outgoingTab -> Modifier.predictiveBackBehind(tabBack, active = true)
@@ -237,49 +310,24 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         isQueueOpen = showQueueScreen,
                         snackbarHostState = librarySnackbarHostState,
                     )
-                    2 -> MoreScreen(
+                    2 -> ConstrainedWidth {
+                    MoreScreen(
                         route = settingsRoute,
                         highlightKey = settingsHighlightKey,
                         onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
                         isVisible = selectedTab == 2,
                     )
+                    }
                 }
             }
         }
         }
 
-        FloatingNavBar(
+        if (!useNavRail) FloatingNavBar(
             selectedTab = selectedTab,
             activeDownloadsCount = activeDownloadsCount,
             hasEngineUpdate = anyUpdateAvailable,
-            onSelect = { index ->
-                when {
-                    // Tapping the already-selected Library tab again jumps to the Queue, matching
-                    // the "tap again for more" pattern used elsewhere in the app.
-                    index == 1 && selectedTab == 1 -> openQueue()
-                    // Tapping the already-selected Settings tab again backs all the way out to the
-                    // main Settings list, instead of leaving whatever subpage was open in place —
-                    // selectedTab is already 2 here, so a bare `selectedTab = index` wouldn't have
-                    // changed anything.
-                    index == 2 && selectedTab == 2 -> {
-                        settingsRoute = SettingsRoute.ROOT
-                        settingsHighlightKey = null
-                    }
-                    index == selectedTab -> Unit
-                    // Home is the page every other tab sits on: going there is a back.
-                    index == 0 -> tabBack.animateBack()
-                    // Another tab opens with the push, the page it covers sliding away behind it:
-                    // Home, or when switching between two tabs, the tab being left (outgoingTab).
-                    selectedTab == 0 -> tabBack.animateEnter { selectedTab = index }
-                    else -> {
-                        val leaving = selectedTab
-                        tabBack.animateEnter(onFinished = { outgoingTab = null }) {
-                            outgoingTab = leaving
-                            selectedTab = index
-                        }
-                    }
-                }
-            },
+            onSelect = onTabSelect,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
 
@@ -300,12 +348,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // underneath is actually visible while mid-swipe — an early-return here (the previous
         // approach) would mean there's nothing behind QueueScreen to peek at during the gesture.
         if (showQueueScreen) {
-            Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(queueBack)) {
+            Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(queueBack).background(MaterialTheme.colorScheme.background)) {
+                ConstrainedWidth {
                 QueueScreen(
                     viewModel = viewModel,
                     // Same peel-away as the back gesture, not an instant jump back.
                     onBack = { queueBack.animateBack() },
                 )
+                }
             }
         }
 
@@ -366,6 +416,41 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 }
             }
         }
+    }
+    }
+    }
+}
+
+/** Side navigation for wide windows (tablets, phones in landscape) — same three destinations,
+ * badges and tap behavior as [FloatingNavBar], which only suits a narrow portrait window. */
+@Composable
+private fun SideNavRail(
+    selectedTab: Int,
+    activeDownloadsCount: Int,
+    hasEngineUpdate: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+        Spacer(Modifier.weight(1f))
+        tabs.forEachIndexed { index, tab ->
+            NavigationRailItem(
+                selected = selectedTab == index,
+                onClick = { onSelect(index) },
+                icon = {
+                    when {
+                        index == 1 && activeDownloadsCount > 0 -> BadgedBox(badge = {
+                            Badge(containerColor = MaterialTheme.colorScheme.error) { Text(badgeCountText(activeDownloadsCount)) }
+                        }) { Icon(tab.icon, contentDescription = tab.label) }
+                        index == 2 && hasEngineUpdate -> BadgedBox(badge = {
+                            Badge(containerColor = MaterialTheme.colorScheme.error)
+                        }) { Icon(tab.icon, contentDescription = tab.label) }
+                        else -> Icon(tab.icon, contentDescription = tab.label)
+                    }
+                },
+                label = { Text(tab.label) },
+            )
+        }
+        Spacer(Modifier.weight(1f))
     }
 }
 
