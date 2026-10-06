@@ -5,6 +5,8 @@ import com.comfort.app.data.AppDatabase
 import com.comfort.app.data.EngineUpdateChannel
 import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedInputStream
@@ -242,7 +244,16 @@ object EngineUpdater {
      * Waits for the runtime to be provisioned first: a first launch after an app update used to
      * read the engines' versions moments *before* the runtime was re-unpacked, record "up to date",
      * then have those updated engines replaced by the bundled ones with no re-check for hours. */
-    suspend fun checkAndAutoUpdate(context: Context): List<VersionStatus> = withContext(Dispatchers.IO) {
+    // One check-and-install at a time: the launch check and the (always-composed) Settings section
+    // both run at app start, and used to install the same engines side by side. The second one now
+    // waits, then finds them up to date.
+    private val autoUpdateMutex = Mutex()
+    // One install at a time, so an auto-update and a tapped Update can't swap the same engine twice.
+    private val installMutex = Mutex()
+
+    suspend fun checkAndAutoUpdate(context: Context): List<VersionStatus> = autoUpdateMutex.withLock { checkAndAutoUpdateLocked(context) }
+
+    private suspend fun checkAndAutoUpdateLocked(context: Context): List<VersionStatus> = withContext(Dispatchers.IO) {
         PythonRuntime.ensureProvisioned(context)
         var statuses = checkAll(context)
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
@@ -274,7 +285,7 @@ object EngineUpdater {
      * wheels from, just against a freshly downloaded one here instead of an asset. A source tarball
      * or repo zip (BLEEDING_EDGE channels) carries no dist-info of its own, so one's synthesized
      * here afterward purely so [installedVersion] keeps working the same way regardless of channel. */
-    suspend fun update(context: Context, status: VersionStatus): Result<String> =
+    suspend fun update(context: Context, status: VersionStatus): Result<String> = installMutex.withLock {
         withContext(Dispatchers.IO) {
             runCatching {
                 val artifactUrl = status.artifactUrl ?: error("Nothing to install")
@@ -313,31 +324,53 @@ object EngineUpdater {
                     }
                 }
 
-                // Shares PythonRuntime's own provisioning Mutex — without it, this delete+install
-                // could race a concurrent first-ever ensureProvisioned() (e.g. a download that
-                // started at the same moment on a fresh install) the same way two provisions could
-                // race each other, clobbering whichever writer loses.
-                PythonRuntime.withProvisionLock {
-                    val sitePackages = PythonRuntime.sitePackagesDir(context)
-                    // The old install first — the new artifact's own contents fully replace the
-                    // package and dist-info directories, but a file the *previous* version shipped
-                    // that the new one no longer does (a removed submodule, say) would otherwise
-                    // linger forever.
-                    sitePackages.listFiles { f ->
-                        f.name == engine.packageDirName || (f.name.startsWith("${engine.packageDirName}-") && f.name.endsWith(".dist-info"))
-                    }?.forEach { it.deleteRecursively() }
-
-                    when (artifactKind) {
-                        ArtifactKind.WHEEL -> tempFile.inputStream().use { PythonRuntime.unzipStreamTo(it, sitePackages) }
-                        ArtifactKind.TAR_GZ_SOURCE -> installFromTarGz(tempFile, sitePackages, engine.packageDirName)
-                        ArtifactKind.GIT_ZIP_SOURCE -> installFromGitZip(tempFile, sitePackages, engine.packageDirName)
-                    }
-
-                    if (artifactKind != ArtifactKind.WHEEL) {
-                        File(sitePackages, "${engine.packageDirName}-$version.dist-info").mkdirs()
-                    }
+                // Unpacked next to site-packages first, then swapped in. Unpacking straight into
+                // site-packages after deleting the old version left the engine half-installed for as
+                // long as that took (~1 min for gallery-dl's master zip, seen on device), and broken
+                // for good if it failed part-way (corrupt download, full storage). Now the old
+                // version stays in place until the new one is complete and checked, and the swap
+                // itself is a few same-filesystem renames.
+                val sitePackages = PythonRuntime.sitePackagesDir(context)
+                // Left behind only if the app was killed mid-install; no other install runs now.
+                sitePackages.parentFile?.listFiles { f -> f.name.startsWith(".update-") }?.forEach { it.deleteRecursively() }
+                val staging = File(sitePackages.parentFile, ".update-${engine.packageDirName}-${System.nanoTime()}").apply {
+                    deleteRecursively()
+                    mkdirs()
                 }
-                tempFile.delete()
+                try {
+                    when (artifactKind) {
+                        ArtifactKind.WHEEL -> tempFile.inputStream().use { PythonRuntime.unzipStreamTo(it, staging) }
+                        ArtifactKind.TAR_GZ_SOURCE -> installFromTarGz(tempFile, staging, engine.packageDirName)
+                        ArtifactKind.GIT_ZIP_SOURCE -> installFromGitZip(tempFile, staging, engine.packageDirName)
+                    }
+                    if (artifactKind != ArtifactKind.WHEEL) {
+                        File(staging, "${engine.packageDirName}-$version.dist-info").mkdirs()
+                    }
+                    if (!File(staging, "${engine.packageDirName}/__init__.py").isFile) {
+                        error("The download didn't contain ${engine.displayName} — nothing was changed")
+                    }
+
+                    // Shares PythonRuntime's provisioning Mutex, so the swap can't race a concurrent
+                    // ensureProvisioned() (a first-ever provision, or a job starting right now).
+                    PythonRuntime.withProvisionLock {
+                        // The old install goes entirely: a file the previous version shipped that the
+                        // new one doesn't (a removed submodule) would otherwise linger forever.
+                        sitePackages.listFiles { f ->
+                            f.name == engine.packageDirName || (f.name.startsWith("${engine.packageDirName}-") && f.name.endsWith(".dist-info"))
+                        }?.forEach { it.deleteRecursively() }
+                        staging.listFiles()?.forEach { entry ->
+                            val target = File(sitePackages, entry.name)
+                            // A wheel's "<pkg>-<version>.data" can collide with the old version's.
+                            if (target.exists()) target.deleteRecursively()
+                            if (!entry.renameTo(target)) {
+                                entry.copyRecursively(target, overwrite = true)
+                            }
+                        }
+                    }
+                } finally {
+                    staging.deleteRecursively()
+                    tempFile.delete()
+                }
                 // The fork server still has the old version imported.
                 PythonRuntime.restartServer()
                 // The new version's modules have no .pyc yet — compile them now, in the background,
@@ -348,6 +381,7 @@ object EngineUpdater {
                 installedVersion(context, engine) ?: error("Update installed but its version couldn't be read back")
             }
         }
+    }
 
     /** A GitHub/Codeberg source zip wraps everything in one top-level directory named after the
      * repo (confirmed live for mikf/gallery-dl's Codeberg archive) — this pulls out just the
