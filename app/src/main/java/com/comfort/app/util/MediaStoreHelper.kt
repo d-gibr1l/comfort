@@ -10,6 +10,11 @@ import androidx.documentfile.provider.DocumentFile
 import com.comfort.app.data.GalleryDlPreferences
 import java.io.File
 import java.net.URLConnection
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 object MediaStoreHelper {
 
@@ -38,7 +43,12 @@ object MediaStoreHelper {
      * one is set, otherwise the public Pictures/gallery-dl gallery folder — and returns its
      * content Uri. */
     fun saveMediaToGallery(context: Context, sourceFile: File, forceAudioMime: Boolean = false): Uri? {
+        // Whatever the engine left as this file's mtime (a server's Last-Modified = upload time,
+        // for Redgifs) must not become the saved file's date: copies made by some gallery/profile
+        // setups (Secure Folder) keep the source's timestamp rather than stamping a new one.
+        sourceFile.setLastModified(System.currentTimeMillis())
         val ext = sourceFile.name.substringAfterLast('.', "").lowercase()
+        if (ext == "mp4" || ext == "m4v" || ext == "mov") rewriteMp4CreationTime(sourceFile, System.currentTimeMillis())
         var mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
             ?: URLConnection.guessContentTypeFromName(sourceFile.name)
             ?: when (ext) {
@@ -282,11 +292,76 @@ object MediaStoreHelper {
         // such a download (seen with YouTube and Redgifs videos; most files carry no date) landed
         // months back among older items instead of with today's. Stamped after that update, since
         // indexing would overwrite it otherwise.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) runCatching {
-            resolver.update(uri, ContentValues().apply {
-                put(MediaStore.MediaColumns.DATE_TAKEN, System.currentTimeMillis())
-            }, null, null)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val takenAt = System.currentTimeMillis()
+            stampDateTaken(resolver, uri, takenAt)
+            // Indexing after IS_PENDING=0 isn't always finished by the time that returns (seen on
+            // device: every download since the first fix had datetaken NULL, i.e. the stamp above
+            // was overwritten by a later scan, and the gallery then fell back to the file's own
+            // embedded creation date again). Re-check a few times and re-apply if it got reset.
+            val appContext = context.applicationContext
+            restampScope.launch {
+                for (waitMs in RESTAMP_DELAYS_MS) {
+                    delay(waitMs)
+                    val current = appContext.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATE_TAKEN), null, null, null)
+                        ?.use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null }
+                    if (current != takenAt) stampDateTaken(appContext.contentResolver, uri, takenAt)
+                }
+            }
         }
         return uri
+    }
+
+    private val restampScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val RESTAMP_DELAYS_MS = longArrayOf(1_500, 4_000, 10_000)
+
+    /** Rewrites an MP4/MOV's own creation/modification times (mvhd, tkhd, mdhd) to now, in place.
+     * Redgifs and similar videos carry the upload date there, and MediaStore copies it into DATE_TAKEN
+     * when indexing — which Secure Folder's MediaProvider then refuses to let us overwrite afterwards
+     * (update() returns 0 rows), so the gallery showed the upload date. Only touches non-zero fields;
+     * does nothing for anything that isn't a plain MP4 box structure. Staging file only (never the
+     * user's copy), so editing in place is safe. */
+    private fun rewriteMp4CreationTime(file: File, nowMs: Long) {
+        runCatching {
+            val secs = nowMs / 1000 + 2082844800L // Unix epoch -> MP4's 1904 epoch
+            java.io.RandomAccessFile(file, "rw").use { f ->
+                fun patch(start: Long, end: Long) {
+                    var pos = start
+                    while (pos + 8 <= end) {
+                        f.seek(pos)
+                        var size = f.readInt().toLong() and 0xFFFFFFFFL
+                        val type = ByteArray(4).also { f.readFully(it) }.toString(Charsets.ISO_8859_1)
+                        var header = 8L
+                        if (size == 1L) { size = f.readLong(); header = 16L }
+                        if (size == 0L) size = end - pos
+                        if (size < header || pos + size > end) return
+                        when (type) {
+                            "moov", "trak", "mdia" -> patch(pos + header, pos + size)
+                            "mvhd", "tkhd", "mdhd" -> {
+                                val body = pos + header
+                                f.seek(body)
+                                val version = f.readUnsignedByte()
+                                val fieldStart = body + 4
+                                if (version == 1) {
+                                    f.seek(fieldStart); f.writeLong(secs); f.writeLong(secs)
+                                } else {
+                                    f.seek(fieldStart); f.writeInt(secs.toInt()); f.writeInt(secs.toInt())
+                                }
+                            }
+                        }
+                        pos += size
+                    }
+                }
+                patch(0, f.length())
+            }
+        }
+    }
+
+    private fun stampDateTaken(resolver: android.content.ContentResolver, uri: Uri, takenAt: Long) {
+        runCatching {
+            resolver.update(uri, ContentValues().apply {
+                put(MediaStore.MediaColumns.DATE_TAKEN, takenAt)
+            }, null, null)
+        }
     }
 }

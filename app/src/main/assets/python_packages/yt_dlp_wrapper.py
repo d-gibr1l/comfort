@@ -1094,6 +1094,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         "noprogress": True,
         "quiet": True,
         "no_color": True,
+        # Don't stamp the file with the server's Last-Modified (yt-dlp's default): for Redgifs that
+        # is the upload time, which then leaves the saved file looking uploaded, not downloaded.
+        "updatetime": False,
         # Was hardcoded True unconditionally — now a real Settings > Folders choice (see
         # GalleryDlPreferences.isRestrictFilenames's own doc comment), defaulting to the same
         # always-on behavior this had before so an existing install's downloads look identical
