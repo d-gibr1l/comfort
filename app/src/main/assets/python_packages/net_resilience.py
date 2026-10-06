@@ -184,3 +184,75 @@ def install():
             patch()
         except Exception:  # noqa: BLE001
             pass  # a library changed shape: that one keeps its stock behaviour
+
+
+# --- Media sizes -------------------------------------------------------------------------------
+# For listings whose engine doesn't report sizes (gallery-dl's --dump-json, Instaloader): asks the
+# media server itself, so the preview can show how big a download will be before it starts.
+
+_SIZE_UA = ("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/128.0 Mobile Safari/537.36")
+
+
+_ssl_context = None
+
+
+def _size_context():
+    # Built once: loading the CA bundle took ~1s per request when made each time.
+    global _ssl_context
+    if _ssl_context is None:
+        import ssl
+        try:
+            import certifi
+            _ssl_context = ssl.create_default_context(cafile=certifi.where())
+        except Exception:  # noqa: BLE001
+            _ssl_context = ssl.create_default_context()
+    return _ssl_context
+
+
+def _size_of(url, timeout, headers):
+    import urllib.error
+    import urllib.request
+    context = _size_context()
+    base = {"User-Agent": _SIZE_UA, **(headers or {})}
+    # HEAD first; some servers refuse it or leave out Content-Length, so then a one-byte ranged GET,
+    # whose Content-Range ("bytes 0-0/12345") carries the full size.
+    attempts = (("HEAD", {}), ("GET", {"Range": "bytes=0-0"}))
+    for method, extra in attempts:
+        try:
+            req = urllib.request.Request(url, method=method, headers={**base, **extra})
+            with urllib.request.urlopen(req, timeout=timeout, context=context) as resp:
+                total = (resp.headers.get("Content-Range") or "").rpartition("/")[2]
+                if total.isdigit():
+                    return int(total)
+                length = resp.headers.get("Content-Length")
+                if method == "HEAD" and length and length.isdigit() and int(length) > 0:
+                    return int(length)
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 410):
+                return None  # gone: a second request won't find it either
+        except Exception:  # noqa: BLE001 — no size is fine, the listing still works without one
+            continue
+    return None
+
+
+def content_lengths(urls, timeout=4.0, deadline=6.0, workers=8, headers=None):
+    """{url: size in bytes} for whichever of [urls] answered within [deadline] seconds overall —
+    a slow or missing size never holds up the listing it decorates. Only http(s) links are asked."""
+    import concurrent.futures
+    wanted = list(dict.fromkeys(u for u in urls if isinstance(u, str) and u.startswith(("http://", "https://"))))
+    if not wanted:
+        return {}
+    sizes = {}
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=min(workers, len(wanted)))
+    futures = {pool.submit(_size_of, u, timeout, headers): u for u in wanted}
+    try:
+        for future in concurrent.futures.as_completed(futures, timeout=deadline):
+            size = future.result()
+            if size:
+                sizes[futures[future]] = size
+    except concurrent.futures.TimeoutError:
+        pass
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    return sizes

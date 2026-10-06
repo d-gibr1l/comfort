@@ -252,6 +252,12 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
     multi = post.typename == "GraphSidecar"
 
     emit(f"[total] {len(items)}")
+    # The whole download's size up front, like gallery-dl and yt-dlp report theirs — only when
+    # every file to fetch answered, so the queue card never shows a total that's too small.
+    pending = [media for num, _v, media, _p in items if (f"{shortcode}_{num}" if multi else shortcode) not in done]
+    sizes = net_resilience.content_lengths(pending)
+    if pending and all(m in sizes for m in pending):
+        emit(f"[size] {sum(sizes[m] for m in pending)}")
     title = _display_title(post)
     emit(f"[title] {title}")
     if post.url:
@@ -322,8 +328,11 @@ def list_items(url, cookies_path=None, proxy_url=None, socket_timeout_seconds=No
         message = _friendly_error(exc)
         return json.dumps([[-1, {"error": type(exc).__name__, "message": message}]])
     caption = post.caption or ""
+    # Asked from Instagram's media servers in parallel (a few seconds at most): Instaloader itself
+    # doesn't list sizes, and the preview shows how big the download will be.
+    sizes = net_resilience.content_lengths([media for _n, _v, media, _p in items])
     out = []
-    for num, is_video, _media_url, preview_url in items:
+    for num, is_video, media_url, preview_url in items:
         # The preview image doubles as the picker thumbnail for a video item too — the extension
         # alone is what marks it as a video (VideoSiteRouter.isVideoFilename).
         out.append([3, preview_url, {
@@ -332,6 +341,7 @@ def list_items(url, cookies_path=None, proxy_url=None, socket_timeout_seconds=No
             "extension": "mp4" if is_video else "jpg",
             "description": caption,
             "username": post.owner_username,
+            **({"filesize": sizes[media_url]} if media_url in sizes else {}),
         }])
     return json.dumps(out, ensure_ascii=False)
 
