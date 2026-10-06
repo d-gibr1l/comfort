@@ -8,8 +8,6 @@ import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.GalleryDlPreferences
-import com.comfort.app.data.OutputFormat
-import com.comfort.app.data.VideoQuality
 import com.comfort.app.util.MediaStoreHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -106,41 +104,6 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun dismissDuplicateAttempt(id: String) {
         viewModelScope.launch { dao.deleteDuplicateAttempt(id) }
-    }
-
-    fun enqueueDownload(
-        url: String,
-        title: String,
-        itemFilter: String? = null,
-        totalItems: Int = 0,
-        videoQuality: VideoQuality? = null,
-        clipRange: String? = null,
-        extraCommands: String? = null,
-        outputFormat: OutputFormat? = null,
-        filenameTemplate: String? = null,
-        saveThumbnail: Boolean? = null,
-        overrideTitle: String? = null,
-        overrideArtist: String? = null,
-        // Pass true from a caller whose own "Download" button already checked
-        // DownloadDispatcher.isDuplicate and relabeled itself "Redownload" (DownloadPreviewSheet
-        // does this internally) — the button already told the user, so tapping it is the
-        // confirmation; nothing here should silently no-op a tap that says "Redownload" on its face.
-        forceDuplicate: Boolean = false,
-    ) {
-        viewModelScope.launch {
-            DownloadDispatcher.enqueueDownload(
-                getApplication(), url, title, itemFilter, totalItems,
-                videoQuality = videoQuality,
-                clipRange = clipRange,
-                extraCommands = extraCommands,
-                outputFormat = outputFormat,
-                filenameTemplate = filenameTemplate,
-                saveThumbnail = saveThumbnail,
-                overrideTitle = overrideTitle,
-                overrideArtist = overrideArtist,
-                forceDuplicate = forceDuplicate,
-            )
-        }
     }
 
     /** Pauses every currently running/queued download and holds any added afterwards until resumed. */

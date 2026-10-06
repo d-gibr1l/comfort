@@ -1,5 +1,11 @@
 package com.comfort.app
 
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.comfort.app.viewmodel.startedMessage
+import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
+import com.comfort.app.viewmodel.LinkRouterViewModel
+import com.comfort.app.viewmodel.LinkRoute
 import android.content.Intent
 import android.os.Bundle
 import android.util.Patterns
@@ -43,7 +49,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,8 +59,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
-import com.comfort.app.data.DownloadDispatcher
-import com.comfort.app.data.EnqueueResult
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.ShareMode
 import com.comfort.app.data.VideoSiteRouter
@@ -64,7 +67,6 @@ import com.comfort.app.theme.ThemePreferences
 import com.comfort.app.ui.main.DownloadPreviewSheet
 import com.comfort.app.ui.main.SharePickerScreen
 import com.comfort.app.ui.main.groupedChipShape
-import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.ListingResult
 import com.comfort.app.util.shouldUsePreviewSheet
 import androidx.compose.material.icons.Icons
@@ -72,7 +74,6 @@ import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private const val SHEET_ANIM_MS = 280
 
@@ -168,22 +169,26 @@ class ShareActivity : ComponentActivity() {
                     // mid-way through for the *previous* share when this Activity was reused
                     // instead of recreated.
                     key(urls) {
+                        val routerOwner = rememberSheetViewModelStoreOwner()
+                        val router: LinkRouterViewModel = viewModel(viewModelStoreOwner = routerOwner)
                         when {
                             // Multiple links: the picker/preview sheets below are built around
                             // reviewing/filtering exactly one link's own gallery, and stacking one
                             // per link would be terrible UX — so this bypasses them (and the
                             // Sharing mode setting, which only ever gated whether *one* link's
                             // sheet appears) and just enqueues every link found.
-                            urls.size > 1 -> MultiLinkHandler(urls = urls, onFinished = { finish() })
+                            urls.size > 1 -> MultiLinkHandler(urls = urls, router = router, onFinished = { finish() })
                             GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
                                 url = urls[0],
+                                router = router,
                                 onFinished = { finish() },
                             )
                             GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
+                                router = router,
                                 onFinished = { finish() },
                             )
-                            else -> ShareRouter(url = urls[0], onFinished = { finish() })
+                            else -> ShareRouter(url = urls[0], router = router, onFinished = { finish() })
                         }
                     }
                 }
@@ -230,22 +235,19 @@ class ShareActivity : ComponentActivity() {
  * Library > Duplicates entry each one still gets recorded into (see DownloadDispatcher.
  * enqueueDownload) is there for exactly this case. */
 @Composable
-private fun MultiLinkHandler(urls: List<String>, onFinished: () -> Unit) {
+private fun MultiLinkHandler(urls: List<String>, router: LinkRouterViewModel, onFinished: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(urls) {
-        var duplicateCount = 0
-        urls.forEach { sharedUrl ->
-            val result = DownloadDispatcher.enqueueDownload(context, sharedUrl, "Downloading from ${VideoSiteRouter.siteName(sharedUrl)}")
-            if (result is EnqueueResult.Duplicate) duplicateCount++
+        router.downloadAll(urls) { duplicateCount ->
+            val startedCount = urls.size - duplicateCount
+            val message = when {
+                duplicateCount == 0 -> "${urls.size} downloads started"
+                startedCount == 0 -> "Already downloaded — see Library > Duplicates"
+                else -> "$startedCount downloads started, $duplicateCount already downloaded"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            onFinished()
         }
-        val startedCount = urls.size - duplicateCount
-        val message = when {
-            duplicateCount == 0 -> "${urls.size} downloads started"
-            startedCount == 0 -> "Already downloaded — see Library > Duplicates"
-            else -> "$startedCount downloads started, $duplicateCount already downloaded"
-        }
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        onFinished()
     }
 }
 
@@ -257,16 +259,13 @@ private fun MultiLinkHandler(urls: List<String>, onFinished: () -> Unit) {
  * > Duplicates is the audit trail), same as MultiLinkHandler already does for several links at
  * once. */
 @Composable
-private fun InstantShareHandler(url: String, onFinished: () -> Unit) {
+private fun InstantShareHandler(url: String, router: LinkRouterViewModel, onFinished: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(url) {
-        val result = DownloadDispatcher.enqueueDownload(context, url, "Downloading from ${VideoSiteRouter.siteName(url)}")
-        Toast.makeText(
-            context,
-            if (result is EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started",
-            Toast.LENGTH_SHORT,
-        ).show()
-        onFinished()
+        router.download(url) { result ->
+            Toast.makeText(context, startedMessage(result), Toast.LENGTH_SHORT).show()
+            onFinished()
+        }
     }
 }
 
@@ -275,11 +274,11 @@ private fun InstantShareHandler(url: String, onFinished: () -> Unit) {
  * having that mode set, not a third, subtly-different behavior. Comfort has a single Sharesheet
  * entry; a second "Instant" one made Samsung's Sharesheet ask the same question in its own popup. */
 @Composable
-private fun AskShareModeHandler(url: String, onFinished: () -> Unit) {
+private fun AskShareModeHandler(url: String, router: LinkRouterViewModel, onFinished: () -> Unit) {
     var choice by remember { mutableStateOf<ShareMode?>(null) }
     when (choice) {
-        ShareMode.INSTANT -> InstantShareHandler(url = url, onFinished = onFinished)
-        ShareMode.CONFIGURE -> ShareRouter(url = url, onFinished = onFinished)
+        ShareMode.INSTANT -> InstantShareHandler(url = url, router = router, onFinished = onFinished)
+        ShareMode.CONFIGURE -> ShareRouter(url = url, router = router, onFinished = onFinished)
         ShareMode.ALWAYS_ASK, null -> AskShareModeSheet(
             onDismiss = onFinished,
             onChoose = { choice = it },
@@ -374,79 +373,44 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
  * existing SharePickerScreen item-picker unchanged, fed this same already-fetched result so it
  * isn't listed a second time. */
 @Composable
-private fun ShareRouter(url: String, onFinished: () -> Unit) {
+private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var listingResult by remember { mutableStateOf<ListingResult?>(null) }
-    // Checked purely off the url — unlike the listing pass below, doesn't need to wait on it, so
-    // LoadingSheet's own "Download now" button can already read "Redownload" the moment this
-    // screen opens rather than only DownloadPreviewSheet (once listing resolves) being able to.
-    var isDuplicate by remember { mutableStateOf(false) }
+    LaunchedEffect(url) { router.open(url) }
+    val route by router.route.collectAsState()
+    // Checked purely off the url — doesn't wait on the listing, so LoadingSheet's own "Download
+    // now" button can already read "Redownload" the moment this screen opens.
+    val isDuplicate by router.isDuplicate.collectAsState()
 
-    LaunchedEffect(url) {
-        listingResult = GalleryDlListing.listItems(context, url)
-    }
-    LaunchedEffect(url) {
-        isDuplicate = DownloadDispatcher.isDuplicate(context, url)
-    }
-
-    val result = listingResult
-    // See ListingResult.shouldUsePreviewSheet's own doc comment — shared with MainScreen's own
-    // paste-a-link flow so the two never quietly drift into deciding this differently.
-    val usePreviewSheet = result?.shouldUsePreviewSheet(url) == true
-
-    when {
-        result == null -> LoadingSheet(
+    // Same forceDuplicate reasoning for both buttons below: each already said "Redownload" when
+    // this url is a duplicate, so tapping it is the confirmation.
+    when (val current = route) {
+        null, is LinkRoute.Listing -> LoadingSheet(
             onDismiss = onFinished,
             isDuplicate = isDuplicate,
-            // Detection (the listing pass above) can take a real few seconds on a slow/rate-
-            // limited site — this lets an impatient share skip straight to a plain whole-URL
-            // download instead of waiting it out, the same fire-and-forget shape Instant Share
-            // itself already uses. forceDuplicate unconditionally true: the button already told
-            // the user "Redownload" when isDuplicate is true, so tapping it is the confirmation —
-            // no separate Snackbar+action needed to ask again.
+            // Detection (the listing pass) can take a real few seconds on a slow/rate-limited
+            // site — this lets an impatient share skip straight to a plain whole-URL download
+            // instead of waiting it out, the same fire-and-forget shape Instant Share uses.
             onDownloadNow = {
-                scope.launch {
-                    DownloadDispatcher.enqueueDownload(context, url, "Downloading from ${VideoSiteRouter.siteName(url)}", forceDuplicate = true)
+                router.close()
+                router.download(url, forceDuplicate = true) {
                     Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
         )
-        usePreviewSheet -> DownloadPreviewSheet(
+        // The sheet's item checklist and edited title/artist go through too (found live,
+        // 2026-09-24: these were once dropped here, so one picked carousel item saved all 13).
+        is LinkRoute.Preview -> DownloadPreviewSheet(
             url = url,
             onDismiss = onFinished,
-            // Same forceDuplicate = true reasoning as LoadingSheet above — DownloadPreviewSheet's
-            // own Download button already says "Redownload" when this url is a duplicate (its own
-            // independent isDuplicate check), so this is never a surprise skip-past.
             onDownload = { options ->
-                scope.launch {
-                    DownloadDispatcher.enqueueDownload(
-                        context = context,
-                        url = url,
-                        title = "Downloading from ${VideoSiteRouter.siteName(url)}",
-                        // The sheet's item checklist (a carousel's one picked image, say) and its
-                        // edited title/artist: these were dropped here, unlike Home's own preview
-                        // sheet call, so a shared carousel always downloaded every item (found
-                        // live, 2026-09-24: one item picked, all 13 saved).
-                        itemFilter = options.itemFilter,
-                        totalItems = options.totalItems,
-                        videoQuality = options.quality,
-                        clipRange = options.clipRange,
-                        extraCommands = options.extraCommands,
-                        outputFormat = options.outputFormat,
-                        filenameTemplate = options.filenameTemplate,
-                        saveThumbnail = options.saveThumbnail,
-                        overrideTitle = options.overrideTitle,
-                        overrideArtist = options.overrideArtist,
-                        forceDuplicate = true,
-                    )
+                router.download(url, options) {
                     Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
         )
-        else -> SharePickerSheet(url = url, preloadedResult = result, onFinished = onFinished)
+        is LinkRoute.Picker -> SharePickerSheet(url = url, preloadedResult = current.listing, router = router, onFinished = onFinished)
     }
 }
 
@@ -541,10 +505,10 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
 private fun SharePickerSheet(
     url: String,
     preloadedResult: ListingResult? = null,
+    router: LinkRouterViewModel,
     onFinished: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var visible by remember { mutableStateOf(false) }
     // Set the moment a download is actually kicked off — the exit-animation effect below awaits
     // it before finishing the Activity, so the "Download started"/"Already downloaded" Toast still
@@ -617,11 +581,7 @@ private fun SharePickerSheet(
                         // relabels accordingly, so forceDuplicate here is just that same
                         // already-shown confirmation carried through, same reasoning as
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
-                        downloadJob = scope.launch {
-                            DownloadDispatcher.enqueueDownload(
-                                context, downloadUrl, "Downloading from ${VideoSiteRouter.siteName(downloadUrl)}",
-                                itemFilter, totalItems, videoQuality, forceDuplicate = forceDuplicate,
-                            )
+                        downloadJob = router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
                             Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
                         }
                         visible = false
