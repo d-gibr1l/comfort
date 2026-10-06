@@ -335,46 +335,23 @@ fun DownloadPreviewSheet(
         )
     }
 
-    // Everything the listing pass returns — one state var instead of one per field (title/
-    // uploader/thumbnail/filesize/streamUrls/durationMs used to each be their own, before this
-    // grew artist/album/tracks/collection* alongside them for the song preview). The listing
-    // pass is the same one the share picker already uses, so none of this costs anything new on
-    // the engine side.
-    var preview by remember { mutableStateOf<PreviewInfo?>(null) }
-    var previewLoading by remember { mutableStateOf(false) }
-    // Real-time status text from the listing pass itself (e.g. "Fetching info…", "Found 40
-    // tracks…") — shown in place of a static "Loading…" while previewLoading is true, so a long
-    // playlist's listing doesn't look stuck with no feedback. Null falls back to "Loading…".
-    var previewStatus by remember { mutableStateOf<String?>(null) }
-    // Checked once per url+itemFilter, independent of the listing fetch below — drives MAIN's own
-    // Download button reading "Redownload" instead, so a duplicate is known *before* the user
-    // commits to downloading rather than only surfacing afterward. Replaces the old post-hoc
-    // Snackbar+its own separate "Redownload" action; the button itself already saying
-    // "Redownload" here is the confirmation, so the caller's own onDownload now just forces
-    // straight through. Re-keyed on the track selection below (see its own doc comment) so
-    // unchecking a song doesn't leave a stale duplicate verdict from the full album.
-    var isDuplicate by remember { mutableStateOf(false) }
-
-    // Which songs are selected for a song-list (Spotify album/playlist) preview — 1-based
-    // GalleryDlListing.TrackPreview.num values, same numbering "num in {...}" item-filter strings
-    // already use app-wide (see DownloadOptions.itemFilter's own doc comment). Seeded to "every
-    // track" the moment the track list arrives, same pattern SharePickerScreen already uses for
-    // its own gallery-dl multi-item selection.
-    var selectedNums by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    LaunchedEffect(preview?.tracks) {
-        preview?.tracks?.takeIf { it.isNotEmpty() }?.let { selectedNums = it.map { t -> t.num }.toSet() }
-    }
-
-    // "num in {1,3,4}" — same gallery-dl-syntax expression SharePickerScreen already builds for
-    // its own selection, kept as one string format app-wide (see DownloadWorker's own per-engine
-    // translation of DownloadEntity.itemFilter). Null whenever there's no song list or nothing's
-    // been deselected — "everything" is the common case, not a special one.
+    // The link's data — the listing pass, the selection, the editable song title/artist and the
+    // duplicate check — lives in PreviewSheetViewModel, scoped to this sheet so every opening starts
+    // fresh. What's left here is the sheet's own UI state (sub-screen, overlay, slide state).
+    val sheetViewModelOwner = rememberSheetViewModelStoreOwner()
+    val sheet: com.comfort.app.viewmodel.PreviewSheetViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        viewModelStoreOwner = sheetViewModelOwner,
+        key = url,
+    ) { com.comfort.app.viewmodel.PreviewSheetViewModel(context.applicationContext as android.app.Application, url) }
+    val preview by sheet.preview.collectAsState()
+    val previewLoading by sheet.loading.collectAsState()
+    val previewStatus by sheet.status.collectAsState()
+    val isDuplicate by sheet.isDuplicate.collectAsState()
+    val selectedNums by sheet.selectedNums.collectAsState()
+    val itemFilter by sheet.itemFilter.collectAsState()
+    val editedTitle by sheet.editedTitle.collectAsState()
+    val editedArtist by sheet.editedArtist.collectAsState()
     val tracks = preview?.tracks.orEmpty()
-    val itemFilter = if (tracks.isEmpty() || selectedNums.size == tracks.size) {
-        null
-    } else {
-        "num in {${selectedNums.sorted().joinToString(",")}}"
-    }
 
     val isSongSource = remember(url) { VideoSiteRouter.isSongSource(url) }
     // Any multi-entry listing gets the checklist — not just song sources. fetchPreviewInfo already
@@ -390,34 +367,6 @@ fun DownloadPreviewSheet(
         tracks.isNotEmpty() -> PreviewMode.SONG_LIST
         isSongSource || quality == VideoQuality.AUDIO_ONLY -> PreviewMode.SONG_SINGLE
         else -> PreviewMode.VIDEO
-    }
-
-    // SONG_SINGLE's own editable title/artist fields (SongPreviewCard) — null until the listing
-    // pass resolves a real value to seed from. Seeded exactly once per url (the `== null` guard),
-    // so a user edit survives the preview's own later state updates (e.g. isDuplicate's separate
-    // effect re-running) instead of getting silently overwritten mid-edit.
-    var editedTitle by remember(url) { mutableStateOf<String?>(null) }
-    var editedArtist by remember(url) { mutableStateOf<String?>(null) }
-    LaunchedEffect(preview?.title) {
-        if (editedTitle == null) preview?.title?.let { editedTitle = cleanTrackTitle(it) }
-    }
-    LaunchedEffect(preview?.artist) {
-        if (editedArtist == null) preview?.artist?.let { editedArtist = cleanArtistName(it) }
-    }
-
-    LaunchedEffect(url) {
-        previewLoading = true
-        previewStatus = null
-        preview = GalleryDlListing.fetchPreviewInfo(context, url) { status -> previewStatus = status }
-        previewLoading = false
-    }
-    // Re-checked whenever the selection changes (not just the url) — SharePickerScreen already
-    // does the same thing for its own itemFilter, for the same reason: a 4-track subset and the
-    // full 16-track album are different downloads (DownloadDao.findActiveOrFinishedByUrl treats
-    // them that way), so "Redownload" should only show once the *current* selection, not some
-    // earlier one, is confirmed to already exist.
-    LaunchedEffect(url, itemFilter) {
-        isDuplicate = DownloadDispatcher.isDuplicate(context, url, itemFilter)
     }
 
     // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
@@ -499,16 +448,12 @@ fun DownloadPreviewSheet(
                 collectionArtist = preview?.collectionArtist,
                 collectionThumbnail = preview?.collectionThumbnail,
                 selectedNums = selectedNums,
-                onToggleNum = { num ->
-                    selectedNums = if (num in selectedNums) selectedNums - num else selectedNums + num
-                },
-                onToggleAll = {
-                    selectedNums = if (selectedNums.size == tracks.size) emptySet() else tracks.map { it.num }.toSet()
-                },
+                onToggleNum = { num -> sheet.toggleItem(num) },
+                onToggleAll = { sheet.toggleAll() },
                 editedTitle = editedTitle,
                 editedArtist = editedArtist,
-                onEditedTitleChange = { editedTitle = it },
-                onEditedArtistChange = { editedArtist = it },
+                onEditedTitleChange = { sheet.setEditedTitle(it) },
+                onEditedArtistChange = { sheet.setEditedArtist(it) },
             ),
             quality = quality,
             onQualityChange = {
@@ -2503,13 +2448,16 @@ private fun ViewTemplatesScreen(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
+/** A ViewModelStoreOwner that lives exactly as long as the calling composable: its ViewModels are
+ * cleared when it leaves the composition. Gives the preview sheet a ViewModel per opening, instead
+ * of one kept by the activity across sheets. */
+@Composable
+private fun rememberSheetViewModelStoreOwner(): androidx.lifecycle.ViewModelStoreOwner {
+    val store = remember { androidx.lifecycle.ViewModelStore() }
+    DisposableEffect(store) { onDispose { store.clear() } }
+    return remember(store) {
+        object : androidx.lifecycle.ViewModelStoreOwner {
+            override val viewModelStore = store
+        }
+    }
+}
