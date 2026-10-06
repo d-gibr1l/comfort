@@ -31,6 +31,7 @@ import time
 import instaloader
 from instaloader import Instaloader, Post, RateController
 import net_resilience
+from comfort_events import event
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 _SHORTCODE_RE = re.compile(
@@ -241,7 +242,7 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
         loader, post, from_cache = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds, info_cache_path)
         items = _media_items(post)
     except Exception as exc:  # noqa: BLE001
-        emit(f"[error] ERROR: {_friendly_error(exc)}")
+        emit(event("error", message=f"ERROR: {_friendly_error(exc)}"))
         return "error"
 
     wanted = _parse_item_filter(item_filter)
@@ -251,17 +252,17 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
     shortcode = post.shortcode
     multi = post.typename == "GraphSidecar"
 
-    emit(f"[total] {len(items)}")
+    emit(event("total", count=len(items)))
     # The whole download's size up front, like gallery-dl and yt-dlp report theirs — only when
     # every file to fetch answered, so the queue card never shows a total that's too small.
     pending = [media for num, _v, media, _p in items if (f"{shortcode}_{num}" if multi else shortcode) not in done]
     sizes = net_resilience.content_lengths(pending)
     if pending and all(m in sizes for m in pending):
-        emit(f"[size] {sum(sizes[m] for m in pending)}")
+        emit(event("size", bytes=sum(sizes[m] for m in pending)))
     title = _display_title(post)
-    emit(f"[title] {title}")
+    emit(event("title", title=title))
     if post.url:
-        emit(f"[thumbnail] {post.url}")
+        emit(event("thumbnail", url=post.url))
 
     os.makedirs(download_dir, exist_ok=True)
     # Same "poster - caption [unique-id].ext" shape as the other engines' default filename format,
@@ -274,7 +275,7 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
         if key in done:
             continue
         if not media_url:
-            emit(f"[error] ERROR: Instagram didn't provide a download link for item {num} of this post")
+            emit(event("error", message=f"ERROR: Instagram didn't provide a download link for item {num} of this post"))
             continue
         base = os.path.join(download_dir, f"{safe_title} [{key}]")
         try:
@@ -295,14 +296,14 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
                 media_url = fresh_urls.get(num, media_url)
                 loader.download_pic(base, media_url, post.date_utc)
         except Exception as exc:  # noqa: BLE001
-            emit(f"[error] ERROR: {_friendly_error(exc)}")
+            emit(event("error", message=f"ERROR: {_friendly_error(exc)}"))
             continue
         prefix = os.path.basename(base) + "."
         produced = [n for n in os.listdir(download_dir) if n.startswith(prefix)]
         if not produced:
             continue
         _append_archive(archive_path, key)
-        emit(os.path.abspath(os.path.join(download_dir, produced[0])))
+        emit(event("file", path=os.path.abspath(os.path.join(download_dir, produced[0]))))
         saved += 1
 
     if write_info_files and saved:
@@ -371,7 +372,7 @@ if __name__ == "__main__":
             socket_timeout_seconds=_s(_rest[7]), emit=_emit,
             info_cache_path=_s(_rest[8]),
         )
-        print(f"[__status__] {_status}", flush=True)
+        print(event("exit", status=_status), flush=True)
     elif _cmd == "list":
         print(list_items(url=_rest[0], cookies_path=_s(_rest[1]), proxy_url=_s(_rest[2]),
                          socket_timeout_seconds=_s(_rest[3]), info_cache_path=_s(_rest[4])), flush=True)

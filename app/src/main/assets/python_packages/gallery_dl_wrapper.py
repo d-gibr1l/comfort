@@ -8,6 +8,7 @@ import gallery_dl
 import gallery_dl.job
 import gallery_dl.output
 import net_resilience
+from comfort_events import event
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 # gallery-dl's own internal yt-dlp delegation (downloader/ytdl.py, used for "ytdl:"-prefixed
@@ -111,19 +112,19 @@ class _CallbackOutput:
     # problem) as the download's final error — masking that gallery-dl had actually already
     # succeeded.
     def success(self, path):
-        self._emit(path)
+        self._emit(event("file", path=path))
 
     def progress(self, bytes_total, bytes_downloaded, bytes_per_second):
         if bytes_total is not None and bytes_total != self._last_total:
             self._last_total = bytes_total
-            self._emit(f"[size] {bytes_total}")
+            self._emit(event("size", bytes=bytes_total))
         # Same 0.5s throttle yt_dlp_wrapper.py's own progress_hook already uses — gallery-dl's
         # downloader otherwise calls this several times a second, far more often than the UI
         # (or a DB write per line) needs.
         now = time.monotonic()
         if now - self._last_emit_time >= 0.5:
             self._last_emit_time = now
-            self._emit(f"[progress] downloaded={bytes_downloaded} speed={bytes_per_second or 0}")
+            self._emit(event("progress", downloaded=bytes_downloaded, speed=bytes_per_second or 0))
 
 def probe(url):
     # "1" if gallery-dl has a real extractor for url, "0" otherwise (incl. on any error).
@@ -384,7 +385,7 @@ if __name__ == "__main__":
             proxy_url=_s(_rest[12]) if len(_rest) > 12 else None,
             socket_timeout_seconds=_s(_rest[13]) if len(_rest) > 13 else None,
         )
-        print(f"[__status__] {_status}", file=_real_stdout, flush=True)
+        print(event("exit", status=_status), file=_real_stdout, flush=True)
     elif _cmd == "list_items":
         _result = list_items(url=_rest[0], cookies_path=_s(_rest[1]), extra_args=_s(_rest[2]))
         print(_result, file=_real_stdout, flush=True)

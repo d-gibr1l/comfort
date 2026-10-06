@@ -11,16 +11,12 @@ import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.DownloadedFileRecord
 import com.comfort.app.data.GalleryDlPreferences
-import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
-import com.comfort.app.util.Aria2Runtime
 import com.comfort.app.util.EngineProbe
-import com.comfort.app.util.FfmpegRuntime
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.MediaStoreHelper
 import com.comfort.app.util.PythonRuntime
-import com.comfort.app.util.QuickJsRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -161,8 +157,8 @@ class DownloadWorker(
         // The song preview sheet's own editable title/artist (SongPreviewCard) — see
         // DownloadEntity.overrideTitle/overrideArtist's own doc comment. Empty string (not null)
         // is this argv's own "not set" sentinel, same convention every other optional string arg
-        // passed to the Python wrappers already uses. Computed here (not down by runYtDlp's own
-        // other argv-building vals) since the final-file handling block, well above that point in
+        // passed to the Python wrappers already uses. Computed here (not in EngineCommands with
+        // the other wrapper arguments) since the final-file handling block, well above that point in
         // the file, also needs these to update the DB's own displayed title/artist.
         val overrideTitle = entity?.overrideTitle.orEmpty()
         val overrideArtist = entity?.overrideArtist.orEmpty()
@@ -479,163 +475,70 @@ class DownloadWorker(
                         }
                     }
 
-                    when {
-                        // yt-dlp-only signals (see yt_dlp_wrapper.py's progress_hook) — gallery-dl
-                        // never emits these, so gallery-dl-routed downloads just never hit this
-                        // branch and keep using the item-count progress path below untouched.
-                        line.startsWith("[size] ") -> {
-                            // toLongOrNull() alone silently dropped this for any HLS/fragmented
-                            // stream (Reddit's native videos, Twitter/X, ...): yt-dlp's own
-                            // total_bytes_estimate (used whenever there's no exact Content-Length
-                            // to report, only an estimate from fragment count/size) is a float,
-                            // e.g. "6897840.0" — reproduced live, that exact line never set a size
-                            // for a Twitter video, matching the user's own "size never shows for
-                            // Reddit/Twitter" report. toDoubleOrNull() first still accepts a plain
-                            // integer string too, so this covers both shapes.
-                            val bytes = line.removePrefix("[size] ").trim().toDoubleOrNull()?.toLong()
-                            if (bytes != null) {
-                                dao.setExpectedBytes(downloadId, bytes)
-                                expectedBytesRef.set(bytes)
-                            }
+                    // What the line reports — see EngineEventParser for every shape it understands.
+                    when (val event = EngineEventParser.parse(line)) {
+                        is EngineEvent.Size -> {
+                            dao.setExpectedBytes(downloadId, event.bytes)
+                            expectedBytesRef.set(event.bytes)
                         }
-                        // Sent once per sub-file (a video+audio merge's own separate audio track,
-                        // or the sole file of an audio_only download) — see
-                        // DownloadEntity.downloadingAudioTrack's own doc comment for why the queue
-                        // card needs to know this at all.
                         // instaloader_wrapper.py's item count (after the picker's filter), known
                         // before the first file lands — the upfront gallery-dl listing pass that
                         // normally provides this is skipped for Instaloader-routed downloads.
-                        line.startsWith("[total] ") -> {
-                            val total = line.removePrefix("[total] ").trim().toIntOrNull()
-                            if (total != null && total > 0 && totalItemsRef.get() <= 0) {
-                                dao.setTotalItems(downloadId, total)
-                                totalItemsRef.set(total)
+                        is EngineEvent.Total -> {
+                            if (totalItemsRef.get() <= 0) {
+                                dao.setTotalItems(downloadId, event.count)
+                                totalItemsRef.set(event.count)
                             }
                         }
-                        line.startsWith("[phase] ") -> {
-                            dao.setDownloadingAudioTrack(downloadId, line.removePrefix("[phase] ").trim() == "audio")
+                        // Sent once per sub-file (a merge's separate audio track, or an audio-only
+                        // download's sole file) — see DownloadEntity.downloadingAudioTrack.
+                        is EngineEvent.Phase -> dao.setDownloadingAudioTrack(downloadId, event.isAudio)
+                        // Same per-sub-file timing — see DownloadEntity.formatTags.
+                        is EngineEvent.Format -> dao.setFormatTags(downloadId, event.tags)
+                        is EngineEvent.Progress -> {
+                            lastDataAt.set(System.currentTimeMillis())
+                            lastProgressLineAt.set(System.currentTimeMillis())
+                            val speedMbs = event.speedBytesPerSecond / (1024f * 1024f)
+                            dao.updateLiveBytes(downloadId, event.downloadedBytes, speedMbs)
+                            currentFileBytesRef.set(event.downloadedBytes)
+                            // The wrappers already throttle these to about one a second. This is
+                            // what moves the notification's bar during a single large file (the
+                            // other updateProgress call only fires once per finished file).
+                            DownloadNotifications.updateProgress(
+                                applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
+                                speedMbs = speedMbs, currentBytes = bytesSoFar.get() + event.downloadedBytes, expectedBytes = expectedBytesRef.get(),
+                            )
                         }
-                        // Sent alongside [phase] above, same per-sub-file timing — see
-                        // DownloadEntity.formatTags' own doc comment.
-                        line.startsWith("[format] ") -> {
-                            dao.setFormatTags(downloadId, line.removePrefix("[format] ").trim())
-                        }
-                        line.startsWith("[progress] ") -> {
-                            val rest = line.removePrefix("[progress] ")
-                            val downloaded = Regex("downloaded=(\\d+)").find(rest)?.groupValues?.get(1)?.toLongOrNull()
-                            val speedBps = Regex("speed=([\\d.]+)").find(rest)?.groupValues?.get(1)?.toFloatOrNull()
-                            if (downloaded != null) {
-                                lastDataAt.set(System.currentTimeMillis())
-                                lastProgressLineAt.set(System.currentTimeMillis())
-                                val speedMbs = (speedBps ?: 0f) / (1024f * 1024f)
-                                dao.updateLiveBytes(downloadId, downloaded, speedMbs)
-                                currentFileBytesRef.set(downloaded)
-                                // yt_dlp_wrapper.py's own progress_hook already throttles these lines
-                                // to roughly once a second, so no extra throttling needed here — this
-                                // is what actually makes the notification's progress bar move at all
-                                // during a single large download instead of sitting indeterminate for
-                                // the whole transfer until the one file finishes (the only other call
-                                // to updateProgress, below, only fires once per completed *file*).
-                                DownloadNotifications.updateProgress(
-                                    applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
-                                    speedMbs = speedMbs, currentBytes = bytesSoFar.get() + downloaded, expectedBytes = expectedBytesRef.get(),
-                                )
+                        // Sent as soon as extraction finishes, so the card shows a real preview for
+                        // the whole transfer. IfAbsent: a resumed download keeps its thumbnail, and
+                        // the real local file still replaces it once it lands (singleItemDownload).
+                        is EngineEvent.Thumbnail -> dao.setThumbnailIfAbsent(downloadId, event.url)
+                        // Also sent before the first byte lands, so the card stops showing the
+                        // "Downloading from X" placeholder. gallery-dl has no such early hook — its
+                        // downloads rely on derivePosterCaptionTitle once a file lands instead.
+                        is EngineEvent.Title -> if (hasPlaceholderTitle) dao.updateTitle(downloadId, event.title)
+                        // yt-dlp's info_dict metadata or Spotify's scraped metadata — see
+                        // DownloadEntity.artist/album/track.
+                        is EngineEvent.Artist -> dao.setArtistIfAbsent(downloadId, event.artist)
+                        is EngineEvent.Album -> dao.setAlbumIfAbsent(downloadId, event.album)
+                        is EngineEvent.Track -> dao.setTrackIfAbsent(downloadId, event.track)
+                        // First error wins, unless it's unusable garbage: when gallery-dl and a
+                        // yt-dlp fallback both fail, gallery-dl's message is normally the real cause
+                        // and yt-dlp's a symptom — except gallery-dl's raw HTML/CSS-blob
+                        // AbortExtraction (reproduced on Reddit), where yt-dlp's message ("Account
+                        // authentication is required") is the useful one. sanitizeErrorMessage
+                        // changing the text is the signal that the kept error is that garbage.
+                        is EngineEvent.Error -> {
+                            lastErrorLine.getAndUpdate { current ->
+                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) event.message else current
                             }
+                            recordEngineError(event.message)
                         }
-                        line.startsWith("[thumbnail] ") -> {
-                            // Sent as soon as extraction finishes, same timing as [title] — lets
-                            // the queue card show a real preview image for the whole transfer
-                            // instead of a generic icon. setThumbnailIfAbsent (not the unconditional
-                            // setThumbnail) so it doesn't preempt an already-set thumbnail on a
-                            // resumed/retried download; the real local file still wins over this
-                            // remote preview once it lands, via the singleItemDownload check below.
-                            val thumbUrl = line.removePrefix("[thumbnail] ").trim()
-                            if (thumbUrl.isNotBlank()) dao.setThumbnailIfAbsent(downloadId, thumbUrl)
-                        }
-                        line.startsWith("[title] ") -> {
-                            // Sent as soon as extraction finishes — well before the first byte
-                            // lands — so the card shows what's actually downloading instead of
-                            // sitting on the "Downloading from X" placeholder for the whole
-                            // transfer. gallery-dl has no equivalent early hook, so its downloads
-                            // keep relying on derivePosterCaptionTitle once a file lands instead.
-                            if (hasPlaceholderTitle) {
-                                val title = line.removePrefix("[title] ").trim()
-                                if (title.isNotBlank()) dao.updateTitle(downloadId, title)
-                            }
-                        }
-                        // yt-dlp's own info_dict metadata (yt_dlp_wrapper.py's progress_hook) or
-                        // Spotify's own scraped metadata (spotify_wrapper.py) — see
-                        // DownloadEntity.artist/album/track's own doc comments.
-                        line.startsWith("[artist] ") -> {
-                            val artist = line.removePrefix("[artist] ").trim()
-                            if (artist.isNotBlank()) dao.setArtistIfAbsent(downloadId, artist)
-                        }
-                        line.startsWith("[album] ") -> {
-                            val album = line.removePrefix("[album] ").trim()
-                            if (album.isNotBlank()) dao.setAlbumIfAbsent(downloadId, album)
-                        }
-                        line.startsWith("[track] ") -> {
-                            val track = line.removePrefix("[track] ").trim()
-                            if (track.isNotBlank()) dao.setTrackIfAbsent(downloadId, track)
-                        }
-                        // yt-dlp's own "[error] ERROR: ..." lines, gallery-dl's own
-                        // "[extractor_name][error] ..." lines (different shape — its logger name
-                        // comes first, confirmed live: "[instagram][error] HTTP redirect to login
-                        // page" was silently missed here before, letting a *less* useful fallback
-                        // error from yt-dlp's own supplement pass overwrite it instead of ever being
-                        // shown), and gallery_dl_wrapper.py's print() fallback for a SystemExit/
-                        // Exception it couldn't otherwise report ("Error, exited with code N" /
-                        // "Exception: ...") — all reach here as plain stdout/stderr lines via the
-                        // same callback.
-                        line.startsWith("[error] ") || GALLERY_DL_ERROR_LINE.containsMatchIn(line) ||
-                            line.startsWith("Error,") || line.startsWith("Exception:") -> {
-                            // First error wins, not last, *unless* that first one turns out to be
-                            // unusable garbage. The general rule (when gallery-dl and a yt-dlp
-                            // fallback/supplement pass both fail, gallery-dl's message is normally
-                            // the actual root cause and yt-dlp's is just a downstream symptom of the
-                            // same block) doesn't hold for gallery-dl's own "AbortExtraction(raw
-                            // HTML/CSS blob)" failure mode (see GalleryDlListing.sanitizeErrorMessage's
-                            // doc comment) — reproduced live against Reddit: gallery-dl's own error
-                            // was that unusable blob, while yt-dlp's fallback attempt gave a real,
-                            // actionable one ("Account authentication is required") that a strict
-                            // first-wins policy was silently discarding in favor of the useless one.
-                            // sanitizeErrorMessage() changing the text is exactly the signal that the
-                            // captured error is that class of garbage, not a real diagnostic message
-                            // worth protecting from being overwritten.
-                            val candidate = line.substringAfter("[error] ").trim()
-                            // yt-dlp's own logger reprints *every* line of a multi-line Python
-                            // traceback with this same "[error] " prefix — not just the real
-                            // "ERROR: ..." announcement, but every "  File \"...\", line N, in ..."
-                            // and bare code-fragment continuation line too. A genuinely long-but-
-                            // real message (reproduced live: yt-dlp's own "Instagram sent an empty
-                            // media response... may need cookies" line) is long enough to trip
-                            // sanitizeErrorMessage's own length-based "looks like garbage"
-                            // heuristic above — which used to let the *traceback's own noise*, a
-                            // few lines later, win the overwrite race purely for arriving after it,
-                            // discarding the one actually informative line in favor of a bare
-                            // "ie_result = self._real_extract(url)" fragment. yt-dlp always starts
-                            // a real error announcement with "ERROR:"; a continuation line never
-                            // does — this is the correct signal to gate on here, not length.
-                            val isTracebackNoise = line.startsWith("[error] ") && !candidate.startsWith("ERROR:")
-                            if (!isTracebackNoise) {
-                                lastErrorLine.getAndUpdate { current ->
-                                    if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) candidate else current
-                                }
-                                recordEngineError(candidate)
-                            }
-                        }
-                        // gallery-dl's own "no results" outcome — not an [error] line at all (just
-                        // its logger's [info] level), so it silently fell through to the file-path
-                        // branch below and never got captured as a reason. Reproduced live: a tweet
-                        // gallery-dl's guest-token API simply can't see (no [error], just an empty
-                        // result) fell all the way through to savedCount==0's yt-dlp fallback, whose
-                        // own unrelated failure ("No video could be found in this tweet" for a post
-                        // that was actually a picture carousel) was the only thing left to show —
-                        // actively misleading about what really went wrong. Capturing gallery-dl's
-                        // real, empty-handed outcome here first means the "first wins" rule above
-                        // correctly keeps this over yt-dlp's less relevant fallback error, the same
-                        // way a genuine gallery-dl [error] line already would.
-                        GALLERY_DL_NO_RESULTS_LINE.containsMatchIn(line) -> {
+                        // gallery-dl's "no results" outcome is an info line, not an error. Captured
+                        // so it wins (first-wins) over a less relevant yt-dlp fallback error — a
+                        // tweet gallery-dl couldn't see used to show yt-dlp's "No video could be
+                        // found in this tweet" for a picture carousel.
+                        is EngineEvent.NoResults -> {
                             recordEngineError("No content found at this link (gallery-dl found no results)")
                             lastErrorLine.getAndUpdate { current ->
                                 if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) {
@@ -643,22 +546,11 @@ class DownloadWorker(
                                 } else current
                             }
                         }
-                        // yt-dlp's own non-fatal warnings — never file paths, nothing to act on,
-                        // just kept out of the file-path branch below.
-                        line.startsWith("[warning] ") -> Unit
-                        // Only ever emitted when a caller explicitly opts a run into
-                        // ydl_opts["verbose"] (see yt_dlp_wrapper.py's _Logger.debug()) — not
-                        // something a normal download run produces, kept out of the file-path
-                        // branch below the same as [warning].
-                        line.startsWith("[debug] ") -> Unit
-                        // The wrapper script's own final status line (see its __main__ block) —
-                        // never consumed (status is derived from lastErrorLine/savedCount instead,
-                        // same as when this was Chaquopy's callAttr() return value), just kept out
-                        // of the file-path branch below.
-                        line.startsWith("[__status__] ") -> Unit
-                        else -> {
+                        // Listing-only progress text, and the engines' warnings/debug/status lines.
+                        is EngineEvent.Status, EngineEvent.Ignored -> Unit
+                        is EngineEvent.File -> {
                             try {
-                                val candidate = File(line.trim())
+                                val candidate = File(event.path)
                                 if (candidate.isAbsolute && candidate.isFile &&
                                     candidate.canonicalPath.startsWith(stagingDir.canonicalPath)
                                 ) {
@@ -675,21 +567,13 @@ class DownloadWorker(
                                         return@actualCallback
                                     }
                                     val fileSize = candidate.length()
-                                    // Extension-derived, except for Spotify: its own ffmpeg
-                                    // compatibility fix (yt_dlp_wrapper.py's ACODECS remap,
-                                    // needed because this app's stripped ffmpeg build has no
-                                    // ogg/opus muxer) makes an opus/vorbis extraction land as
-                                    // a bare .webm file — a container AUDIO_EXTENSIONS can't
-                                    // list on its own without misclassifying real webm video
-                                    // downloads as audio. Every Spotify download is audio by
-                                    // definition (see VideoSiteRouter/runSpotify), so that
-                                    // engine check covers the gap without broadening the
-                                    // general-purpose extension set. Computed before
-                                    // saveMediaToGallery (not after, like the rest of this
-                                    // block) so it can override that "webm" extension's own
-                                    // default video/webm MIME guess — without this, a Spotify
-                                    // track saved as .webm lands in Movies/Comfort as a
-                                    // "video", not Music/Comfort as audio.
+                                    // Extension-derived, except for Spotify: this app's stripped
+                                    // ffmpeg has no ogg/opus muxer, so an opus/vorbis extraction
+                                    // lands as a bare .webm — a container AUDIO_EXTENSIONS can't
+                                    // list without misclassifying real webm video. Every Spotify
+                                    // download is audio, so that engine check covers it. Computed
+                                    // before saveMediaToGallery so it can override webm's default
+                                    // video MIME (else the track lands in Movies, not Music).
                                     val isAudioFile = candidate.extension.lowercase() in AUDIO_EXTENSIONS ||
                                         engine == DownloadEngine.SPOTIFY
                                     val savedUri = MediaStoreHelper.saveMediaToGallery(
@@ -700,31 +584,20 @@ class DownloadWorker(
                                         candidate.delete()
                                         val count = savedCount.incrementAndGet()
                                         val totalBytes = bytesSoFar.addAndGet(fileSize)
-                                        // This file's bytes now live in bytesSoFar (via addAndGet
-                                        // above) instead of being "in flight" — without resetting
-                                        // this, the next file's own progress would double-count
-                                        // everything the previous file already contributed.
+                                        // This file's bytes now live in bytesSoFar — without resetting
+                                        // this, the next file's progress would double-count them.
                                         currentFileBytesRef.set(0)
                                         val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
                                         val speedMbs = measuredSpeedMbs.get().takeIf { it > 0f }
                                             ?: ((totalBytes / (1024f * 1024f)) / elapsedSeconds)
                                         dao.updateLiveProgress(downloadId, count, speedMbs)
-                                        // savedUri (the audio file's own content Uri) has no frame
-                                        // Coil can decode as an image, unlike video — pull the
-                                        // embedded cover art out to its own file instead when
-                                        // there is one (see extractAudioArtworkUri's own doc
-                                        // comment). Only when that actually produces a separate
-                                        // image does thumbnailPath stop being "the same Uri as the
-                                        // real file" — so only then does mediaUri need to carry the
-                                        // real file's own Uri separately (see its own doc comment
-                                        // on DownloadEntity) for the Library screen's tap-to-open
-                                        // to still open/play the real file instead of the cover art.
-                                        // isAudioFile computed above, before saveMediaToGallery.
-                                        // Independent of the [artist]/[album]/[track] lines —
-                                        // this is extension-derived and always correct for a
-                                        // given file, so it's set unconditionally (not IfAbsent)
-                                        // every time a file for this download lands, regardless
-                                        // of whether any metadata line ever fired.
+                                        // An audio file's own Uri has no frame Coil can decode, so its
+                                        // embedded cover art is pulled out to its own file when there
+                                        // is one (extractAudioArtworkUri). Only then does thumbnailPath
+                                        // stop being the real file's Uri, so only then does mediaUri
+                                        // need to carry it separately (Library's tap-to-open).
+                                        // isAudio is extension-derived and always right for a given
+                                        // file, so it's set unconditionally, not IfAbsent.
                                         if (isAudioFile) dao.setIsAudio(downloadId, true)
                                         val artworkUri = if (isAudioFile) {
                                             MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId)
@@ -743,14 +616,9 @@ class DownloadWorker(
                                         if (hasPlaceholderTitle) {
                                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                                         }
-                                        // The song preview sheet's own editable title/artist
-                                        // (SongPreviewCard) — applied last, unconditionally, so a
-                                        // user's explicit edit always wins in the Library's own
-                                        // display regardless of whatever the source itself (or the
-                                        // filename-derived title just above) already set. Matches
-                                        // what actually got embedded into the file's own tags —
-                                        // see yt_dlp_wrapper.py's/spotify_wrapper.py's own
-                                        // override_title/override_artist handling.
+                                        // The song preview sheet's editable title/artist — applied
+                                        // last, unconditionally, so the user's edit always wins in the
+                                        // Library, matching what the wrappers embedded in the file's tags.
                                         if (!overrideTitle.isNullOrBlank()) dao.updateTitle(downloadId, overrideTitle)
                                         if (!overrideArtist.isNullOrBlank()) dao.setArtist(downloadId, overrideArtist)
                                         DownloadNotifications.updateProgress(
@@ -767,50 +635,13 @@ class DownloadWorker(
                 }
 
                 val cookiesArg = normalizedCookiesPath?.absolutePath ?: ""
-                // Each of these prefers what the download preview sheet recorded for this one
-                // download over the global Settings default — see DownloadEntity's own comment on
-                // why they're nullable rather than defaulted. A retry/resume therefore re-applies
-                // exactly what the user picked in the sheet, not a since-changed global.
-                val filenameFormat = entity?.filenameTemplate?.takeIf { it.isNotBlank() }
-                    ?: GalleryDlPreferences.getFilenameFormat(applicationContext)
-                // The sheet's extra commands are appended to (not a replacement for) the global
-                // Advanced > Extra arguments field, so a per-download tweak doesn't silently drop
-                // whatever the user configured globally for every download.
-                // Advanced > Extra arguments: each engine gets the "both" set plus its own (see
-                // GalleryDlPreferences.getExtraArgsFor) — the two take different flags.
-                fun extraArgsFor(engine: DownloadEngine) = listOfNotNull(
-                    GalleryDlPreferences.getExtraArgsFor(applicationContext, engine).takeIf { it.isNotBlank() },
-                    entity?.extraCommands?.takeIf { it.isNotBlank() },
-                ).joinToString(" ")
-                val extraArgs = extraArgsFor(DownloadEngine.GALLERY_DL)
-                val ytDlpExtraArgs = extraArgsFor(DownloadEngine.YT_DLP)
-                // Tracks already-fetched item IDs across retries, so pausing/retrying a download
-                // resumes where it left off instead of starting the whole gallery over. Separate
-                // files per engine — gallery-dl's archive is a sqlite db, yt-dlp's is a plain text
-                // list of extractor ids, and the two formats aren't compatible with each other.
-                val galleryArchivePath = File(applicationContext.filesDir, "archives/$downloadId.sqlite3")
-                    .apply { parentFile?.mkdirs() }
-                    .absolutePath
-                val ytDlpArchivePath = File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt")
-                    .apply { parentFile?.mkdirs() }
-                    .absolutePath
-                // Plain list of "<shortcode>_<n>" keys instaloader_wrapper.py already fetched.
-                val instaloaderArchivePath = File(applicationContext.filesDir, "archives/$downloadId.instaloader.txt")
-                    .apply { parentFile?.mkdirs() }
-                    .absolutePath
-                val limitRate = GalleryDlPreferences.getEffectiveSpeedLimit(applicationContext)
-                val networkRetries = GalleryDlPreferences.getEffectiveNetworkRetries(applicationContext)
-                val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(applicationContext).orEmpty()
-                val writeInfoFiles = GalleryDlPreferences.isWriteInfoFiles(applicationContext)
-                val proxyUrl = GalleryDlPreferences.getEffectiveProxyUrl(applicationContext)
-                val extractorArgs = GalleryDlPreferences.getExtractorArgs(applicationContext)
-                val socketTimeoutSeconds = GalleryDlPreferences.getEffectiveSocketTimeoutSeconds(applicationContext)
+                // Each engine's command line, from this download's own choices and the Settings.
+                val commands = EngineCommands(
+                    applicationContext, entity, url, downloadId, engine, stagingDir, cookiesArg, overrideTitle, overrideArtist,
+                )
 
-                // Each download is its own OS subprocess now (see PythonRuntime), not a reentrant
-                // call into one shared interpreter — the race PythonEngineLock existed to prevent
-                // (gallery-dl mutating process-global sys.argv/stdout across concurrent calls)
-                // doesn't apply here, so downloads now run genuinely concurrently up to the
-                // "Concurrent downloads" setting instead of being serialized behind one lock.
+                // Each download is its own OS subprocess (see PythonRuntime), so downloads run
+                // genuinely concurrently up to the "Concurrent downloads" setting.
                 // Wraps actualCallback so every line is filed under the engine that printed it (see
                 // engineErrors). Created as each runner starts, which also marks that engine as run.
                 fun callbackFor(engine: String): suspend (String) -> Unit {
@@ -821,292 +652,27 @@ class DownloadWorker(
                     }
                 }
 
-                suspend fun runGalleryDl(excludeVideo: Boolean): Int =
-                    PythonRuntime.run(
-                        applicationContext, "gallery_dl_wrapper.py",
-                        listOf(
-                            "download", url, stagingDir.absolutePath, cookiesArg,
-                            filenameFormat, extraArgs, galleryArchivePath, limitRate,
-                            entity?.itemFilter.orEmpty(), if (excludeVideo) "1" else "0",
-                            networkRetries, maxFilesize, if (writeInfoFiles) "1" else "0", proxyUrl,
-                            socketTimeoutSeconds,
-                        ),
-                        callbackFor("gallery-dl"),
-                    )
-
-                // Bundled as jniLibs/<abi>/libqjs.so and libffmpeg.so respectively — see
-                // QuickJsRuntime's and FfmpegRuntime's doc comments for why sites like YouTube
-                // need the former just to extract real download URLs, and the latter to merge
-                // the separate video/audio streams those URLs point to into one playable file.
-                val jsRuntimePath = QuickJsRuntime.getExecutablePath(applicationContext).orEmpty()
-                val ffmpegPath = FfmpegRuntime.getExecutablePath(applicationContext).orEmpty()
-                // Empty on arm64-v8a/x86_64 (that ABI's ffmpeg is fully static, nothing to
-                // resolve) — non-empty only on armeabi-v7a, where it points yt_dlp_wrapper.py at
-                // ffmpeg's own unpacked shared-library dependencies (LD_LIBRARY_PATH), the same
-                // mechanism aria2LibDir below already uses for aria2c.
-                val ffmpegLibDir = FfmpegRuntime.ensureProvisioned(applicationContext)?.absolutePath.orEmpty()
-
-                // A per-download override the share-sheet picker set (only offered when its
-                // listing found a video item) takes priority over the global Settings default —
-                // falls back to it when null, same as before this override existed.
-                val videoQuality = entity?.videoQuality?.let { stored -> runCatching { VideoQuality.valueOf(stored) }.getOrNull() }
-                    ?: GalleryDlPreferences.getVideoQuality(applicationContext)
-                val audioOnly = videoQuality == VideoQuality.AUDIO_ONLY
-                val clipRange = entity?.clipRange.orEmpty()
-                val downloadSubtitles = GalleryDlPreferences.isDownloadSubtitles(applicationContext)
-                val subtitleLangs = GalleryDlPreferences.getSubtitleLanguages(applicationContext)
-                val embedThumbnail = GalleryDlPreferences.isEmbedThumbnail(applicationContext)
-                // The sheet's "Save thumbnail" chip writes the thumbnail out as its own file
-                // (yt-dlp's writethumbnail) rather than embedding it in the media — a separate
-                // choice from the global "Embed thumbnail" setting above, which muxes it in.
-                val saveThumbnail = entity?.saveThumbnail == true
-                val embedMetadata = GalleryDlPreferences.isEmbedMetadata(applicationContext)
-                val noPlaylist = GalleryDlPreferences.isNoPlaylist(applicationContext)
-                val liveFromStart = GalleryDlPreferences.isLiveFromStart(applicationContext)
-                val outputFormat = entity?.outputFormat?.let { stored -> runCatching { OutputFormat.valueOf(stored) }.getOrNull() }
-                    ?: GalleryDlPreferences.getOutputFormat(applicationContext)
-                // The share-sheet picker's own gallery-dl-syntax --filter ("num in {1,3,4}", see
-                // SharePickerScreen) translated into the bare "1,3,4" digit-list syntax both
-                // yt-dlp's own native playlist_items AND spotify_wrapper.py's own playlist_items
-                // param (added for the song preview sheet's per-track checkboxes) expect — the
-                // item numbers themselves are already the right 1-indexed positions in every case
-                // (see GalleryDlListing.listViaYtDlp's entryToGalleryItem and
-                // GalleryDlListing.PreviewInfo.tracks' own doc comment for the Spotify case), only
-                // the surrounding syntax differs between engines' own filter mechanisms — so this
-                // one extraction is reused verbatim for both the yt-dlp and Spotify engines below.
-                // Previously dropped entirely for a yt-dlp-routed download: the picker let the
-                // user uncheck specific playlist videos, but yt-dlp itself never heard about that
-                // selection and downloaded based only on the global "Download Playlists" setting
-                // instead.
-                //
-                // Blank whenever engine == GALLERY_DL, though: runYtDlp() below is reused verbatim
-                // as that engine's own video-supplement pass (see the GALLERY_DL branch further
-                // down), and for a multi-item Instagram/TikTok post the checklist's "num"s now come
-                // from gallery-dl's own listing (GalleryDlListing.fetchGalleryDlPreviewInfo) so
-                // runGalleryDl's own --filter (below) understands them correctly — but yt-dlp lists
-                // that exact same post completely independently (its own extractor, its own
-                // numbering, usually far fewer entries since it only ever sees the video items), so
-                // the same digits handed to its playlist_items would filter against the wrong
-                // listing entirely. Left unfiltered here, the supplement pass just fetches every
-                // real video it finds regardless of the checklist selection — an occasional extra
-                // file, never a silently wrong one, which is the safer failure mode of the two.
-                // INSTALOADER too: its fallback is this same gallery-dl + yt-dlp-supplement path,
-                // and its checklist "num"s are gallery-dl's carousel numbering, not yt-dlp's.
-                val ytDlpPlaylistItems = if (engine == DownloadEngine.GALLERY_DL || engine == DownloadEngine.INSTALOADER) {
-                    ""
-                } else {
-                    ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
-                }
-                // Imported from YTDLnis's own settings screens — see GalleryDlPreferences' own
-                // doc comments on each of these for why they're yt-dlp-only.
-                val forceIpv4 = GalleryDlPreferences.isForceIpv4(applicationContext)
-                val concurrentFragments = GalleryDlPreferences.getEffectiveConcurrentFragments(applicationContext)
-                val noCheckCertificates = GalleryDlPreferences.isNoCheckCertificates(applicationContext)
-                val sleepIntervalSeconds = GalleryDlPreferences.getEffectiveSleepIntervalSeconds(applicationContext)
-                val customHeaders = GalleryDlPreferences.getCustomHeaders(applicationContext)
-                val formatSort = GalleryDlPreferences.getFormatSort(applicationContext)
-                val verboseLogging = GalleryDlPreferences.isVerboseLogging(applicationContext)
-                // Second YTDLnis settings-import batch — see GalleryDlPreferences' own doc
-                // comments on each of these.
-                val embedChapters = GalleryDlPreferences.isEmbedChapters(applicationContext)
-                val saveSubtitleFiles = GalleryDlPreferences.isSaveSubtitleFiles(applicationContext)
-                val restrictFilenames = GalleryDlPreferences.isRestrictFilenames(applicationContext)
-                val trimFilenames = GalleryDlPreferences.isTrimFilenames(applicationContext)
-                val fragmentRetries = GalleryDlPreferences.getEffectiveFragmentRetries(applicationContext)
-                val bufferSizeKb = GalleryDlPreferences.getEffectiveBufferSizeKb(applicationContext)
-                val formatIdOverride = GalleryDlPreferences.getFormatIdOverride(applicationContext)
-                val youtubeClientRotation = GalleryDlPreferences.isYoutubeClientRotationEnabled(applicationContext)
-                val impersonate = GalleryDlPreferences.isImpersonateEnabled(applicationContext)
-                val aria2Enabled = GalleryDlPreferences.isAria2Enabled(applicationContext)
-                val aria2Path = if (aria2Enabled) Aria2Runtime.getExecutablePath(applicationContext).orEmpty() else ""
-                val aria2LibDir = if (aria2Enabled) {
-                    Aria2Runtime.ensureProvisioned(applicationContext)?.absolutePath.orEmpty()
-                } else {
-                    ""
-                }
-                suspend fun runYtDlp(): Int =
-                    // gallery-dl's filename-format template syntax means nothing to yt-dlp, so
-                    // it isn't passed; extra arguments are yt-dlp's own set (ytDlpExtraArgs, real
-                    // yt-dlp flags). Cookies and the speed limit are shared.
-                    PythonRuntime.run(
-                        applicationContext, "yt_dlp_wrapper.py",
-                        listOf(
-                            "download", url, stagingDir.absolutePath, cookiesArg,
-                            "", ytDlpExtraArgs, ytDlpArchivePath, limitRate, formatIdOverride,
-                            jsRuntimePath, ffmpegPath,
-                            if (audioOnly) "1" else "0", if (downloadSubtitles) "1" else "0", subtitleLangs,
-                            if (embedThumbnail) "1" else "0", if (embedMetadata) "1" else "0", if (noPlaylist) "1" else "0",
-                            videoQuality.resolutionCap()?.toString().orEmpty(),
-                            outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
-                            if (writeInfoFiles) "1" else "0", clipRange, proxyUrl,
-                            if (liveFromStart) "1" else "0", extractorArgs,
-                            if (saveThumbnail) "1" else "0",
-                            if (forceIpv4) "1" else "0",
-                            if (concurrentFragments > 1) concurrentFragments.toString() else "",
-                            if (noCheckCertificates) "1" else "0",
-                            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
-                            customHeaders,
-                            formatSort,
-                            if (verboseLogging) "1" else "0",
-                            if (embedChapters) "1" else "0",
-                            if (saveSubtitleFiles) "1" else "0",
-                            if (restrictFilenames) "1" else "0",
-                            if (trimFilenames) "1" else "0",
-                            fragmentRetries,
-                            socketTimeoutSeconds,
-                            bufferSizeKb,
-                            if (youtubeClientRotation) "1" else "0",
-                            if (impersonate) "1" else "0",
-                            aria2Path,
-                            aria2LibDir,
-                            ffmpegLibDir,
-                            overrideTitle,
-                            overrideArtist,
-                            // The preview sheet's saved extraction of this same URL, if any —
-                            // reused instead of extracting again (see yt_dlp_wrapper.download).
-                            GalleryDlListing.ytDlpInfoCacheFile(applicationContext, url).absolutePath,
-                        ),
-                        callbackFor("yt-dlp"),
-                    )
-
-                // Always audio-only (Spotify links have no video concept at all — see
-                // VideoSiteRouter's own doc comment on why this is its own dedicated engine) —
-                // no quality/subtitle options apply, so this passes a much smaller argv than
-                // runYtDlp's own. spotify_wrapper.py delegates the actual per-track download to
-                // yt_dlp_wrapper.py's own download() internally, which is where ffmpeg/aria2c/
-                // js-runtime actually get used.
-                suspend fun runSpotify(): Int =
-                    PythonRuntime.run(
-                        applicationContext, "spotify_wrapper.py",
-                        listOf(
-                            // filenameFormat deliberately NOT passed through — it's gallery-dl's
-                            // own "{keyword}" template syntax (see runYtDlp's own identical "",
-                            // "" for the same reason), meaningless to yt_dlp_wrapper.py's own
-                            // outtmpl and reproduced live as a literal, unsubstituted "{uploader|
-                            // category} - {title|category} [{filename}].{extension}" filename that
-                            // failed ffmpeg outright ("Invalid argument") the first time this was
-                            // tried without this fix.
-                            "download", url, stagingDir.absolutePath, cookiesArg,
-                            "", ytDlpArchivePath, jsRuntimePath,
-                            ffmpegPath, ffmpegLibDir, aria2Path, aria2LibDir,
-                            if (restrictFilenames) "1" else "0",
-                            if (trimFilenames) "1" else "0",
-                            if (verboseLogging) "1" else "0",
-                            if (saveThumbnail) "1" else "0",
-                            ytDlpPlaylistItems,
-                            overrideTitle,
-                            overrideArtist,
-                        ),
-                        callbackFor("Spotify"),
-                    )
-
-                // Instagram posts/reels (see VideoSiteRouter.resolveEngine). Same staging dir,
-                // cookies copy and output protocol as the other wrappers, so the callback above
-                // handles its files exactly like gallery-dl's. The picker's itemFilter passes
-                // straight through — its "num"s are the same 1-based carousel positions.
-                suspend fun runInstaloader(): Int =
-                    PythonRuntime.run(
-                        applicationContext, "instaloader_wrapper.py",
-                        listOf(
-                            "download", url, stagingDir.absolutePath, cookiesArg,
-                            entity?.itemFilter.orEmpty(), instaloaderArchivePath,
-                            if (writeInfoFiles) "1" else "0", proxyUrl, socketTimeoutSeconds,
-                            // The preview's saved post, reused instead of fetching it again.
-                            GalleryDlListing.instaloaderInfoCacheFile(applicationContext, url).absolutePath,
-                        ),
-                        callbackFor("Instaloader"),
-                    )
-
-                // The routing every link got before Instaloader existed — also the fallback when
-                // Instaloader saves nothing for an Instagram post.
-                suspend fun runClassic(classicEngine: DownloadEngine) {
-                    when (classicEngine) {
-                        DownloadEngine.YT_DLP -> runYtDlp()
-                        DownloadEngine.SPOTIFY -> runSpotify()
-                        DownloadEngine.INSTALOADER -> runInstaloader()
-                        DownloadEngine.GALLERY_DL -> {
-                            // classify() only routed here because this host isn't in the hardcoded
-                            // videoOnlyHosts/spotifyHosts fast paths — not because gallery-dl is
-                            // actually known to support it. A live, no-network probe against the
-                            // real bundled packages (see EngineProbe's own doc comment) tells us
-                            // whether either engine has a genuine extractor for this URL, so an
-                            // engine-exclusive link never wastes an attempt on the wrong one.
-                            val probe = EngineProbe.probeBoth(applicationContext, url)
-
-                            // `== false`/`== true`, not `!probe.x`/plain truthiness — probe.kt's own
-                            // Result fields are Boolean? (null means the probe itself failed to run,
-                            // genuinely unknown), and only a *confirmed* negative on gallery-dl plus a
-                            // *confirmed* positive on yt-dlp justifies skipping gallery-dl entirely.
-                            // Anything involving an unknown (a probe crash) must fall through to the
-                            // normal gallery-dl attempt below instead — a probe subprocess crash is
-                            // not evidence gallery-dl can't handle this URL.
-                            if (probe.galleryDlHasExtractor == false && probe.ytDlpHasExtractor == true) {
-                                // gallery-dl has nothing for this URL at all, yt-dlp does — skip the
-                                // doomed gallery-dl attempt entirely.
-                                runYtDlp()
-                            } else {
-                                // Always excluded, not just when hasVideoItem's own listing pass
-                                // happened to succeed: gallery-dl has its own *unconfigured* internal
-                                // yt-dlp delegation for video posts on sites like Instagram (no
-                                // ffmpeg_location, no js_runtimes), which silently produces broken
-                                // split video/audio fragments instead of the one properly-merged file
-                                // our own yt_dlp_wrapper (below) produces. Relying on hasVideoItem
-                                // here would mean any listing failure — Instagram rate-limits this
-                                // extra lookup fairly readily — falls straight through to that broken
-                                // path with no exclusion at all.
-                                runGalleryDl(excludeVideo = true)
-                                if (!isStopped) {
-                                    // hasVideoItem reflects gallery-dl's own listing, which uses the
-                                    // same extractor code path as the real download pass — a real,
-                                    // reproduced case: Instagram's API silently omitted media info for
-                                    // exactly the video child of an otherwise-fine photo carousel, so
-                                    // gallery-dl's own listing genuinely never saw a video to report,
-                                    // and this would otherwise skip yt-dlp entirely with no trace of a
-                                    // video ever having existed. See
-                                    // VideoSiteRouter.alwaysSupplementsVideo's own doc comment for
-                                    // which hosts get this always-on attempt and why.
-                                    val alwaysTryVideo = VideoSiteRouter.alwaysSupplementsVideo(url)
-                                    // Neither branch below gates on the probe's own
-                                    // galleryDlHasExtractor/ytDlpHasExtractor result any more — a
-                                    // no-network regex probe against the raw, pre-redirect/share URL
-                                    // saying yt-dlp has "no extractor" is not trustworthy enough to
-                                    // skip a fallback/supplement pass that's already been earned by a
-                                    // stronger, real signal (gallery-dl having actually run and found
-                                    // something, or its own listing confirming/suspecting a video).
-                                    // Originally this WAS gated by a `skipYtDlpFallback` flag — removed
-                                    // from the savedCount==0 branch first, after it was reproduced live
-                                    // wrongly suppressing the fallback for a Reddit share link (.../s/
-                                    // <code>) whose only content was an external redgifs video:
-                                    // gallery-dl's own redirect-following extractor found it fine, but
-                                    // probe.ytDlpHasExtractor came back false for the *raw, unresolved*
-                                    // share link (yt-dlp's dedicated reddit extractor's own regex
-                                    // requires "/comments/<id>", which a bare "/s/<code>" redirect
-                                    // never has) — even though yt-dlp's generic extractor (deliberately
-                                    // excluded from probe()'s "real extractor" check, same "opt-in"
-                                    // reasoning as gallery-dl's — see EngineProbe's own doc comment)
-                                    // DOES follow that exact redirect and finds the same video fine on
-                                    // its own (confirmed live, --simulate). The hasVideoItem/
-                                    // alwaysTryVideo branch below was left gated by the same flag at
-                                    // first — same underlying probe, same class of false negative, so
-                                    // the same fix applies here too.
-                                    if (savedCount.get() == 0) {
-                                        // gallery-dl having already run at all by this point is itself
-                                        // the signal that this URL resolves to *something* real —
-                                        // worth yt-dlp's cheap attempt regardless of what the probe
-                                        // alone could ever know.
-                                        runYtDlp()
-                                    } else if (hasVideoItem || alwaysTryVideo) {
-                                        // gallery-dl already grabbed the pictures (video excluded
-                                        // from its own pass above); yt-dlp now handles this same
-                                        // post's video, since it has real format/quality selection
-                                        // gallery-dl doesn't.
-                                        runYtDlp()
-                                    }
-                                }
-                            }
-                        }
+                val savedSoFar = savedCount
+                val executor = object : EngineExecutor {
+                    override suspend fun run(engine: DownloadEngine, excludeVideo: Boolean) {
+                        val command = commands.forEngine(engine, excludeVideo)
+                        PythonRuntime.run(applicationContext, command.script, command.args, callbackFor(command.label))
                     }
+                    // A live, no-network check against the bundled engines (EngineProbe) — only a
+                    // gallery-dl-routed plan asks, to skip a gallery-dl attempt that can't work.
+                    override suspend fun probe() = EngineProbe.probeBoth(applicationContext, url)
+                    override val savedCount: Int get() = savedSoFar.get()
+                    override val isStopped: Boolean get() = this@DownloadWorker.isStopped
                 }
+                // Which engines run and when one falls back to another — see EnginePlan. A gallery-dl
+                // download also hands its video to yt-dlp when its listing found one, or on hosts
+                // whose listings miss them (VideoSiteRouter.alwaysSupplementsVideo — an Instagram
+                // carousel's video can be missing from the API response entirely).
+                val plan = EnginePlan.planFor(
+                    engine,
+                    classicEngine = VideoSiteRouter.classify(url),
+                    supplementVideo = hasVideoItem || VideoSiteRouter.alwaysSupplementsVideo(url),
+                )
 
                 // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl
                 // and Instaloader only announce a file once it's complete, so their speed used to
@@ -1162,21 +728,13 @@ class DownloadWorker(
                         }
                     }
                     try {
-                        if (engine == DownloadEngine.INSTALOADER) {
-                            runInstaloader()
-                            // Nothing saved (private post, rate limit, Instagram changed something, ...):
-                            // hand the same link to the classic path. Its own error only shows if that
-                            // fails too — lastErrorLine is first-wins, so Instaloader's reason is kept.
-                            if (!isStopped && savedCount.get() == 0) runClassic(VideoSiteRouter.classify(url))
-                        } else {
-                            runClassic(engine)
-                        }
+                        plan.execute(executor)
                     } finally {
                         stallWatchdog.cancel()
                     }
                 }
 
-                if (writeInfoFiles || saveThumbnail || saveSubtitleFiles) {
+                if (commands.writeInfoFiles || commands.saveThumbnail || commands.saveSubtitleFiles) {
                     // gallery-dl's --write-metadata, yt-dlp's --write-description/--write-info-json,
                     // and yt-dlp's own --write-thumbnail (this sheet's "Save thumbnail" chip, see
                     // saveThumbnail above) all write these silently to disk — neither engine ever
@@ -1221,7 +779,7 @@ class DownloadWorker(
                 // schedule case — it's true for a plain pause/cancel racing the same way too.
                 if (isStopped || dao.getById(downloadId)?.workRequestId != id.toString()) {
                     // Defensive fallback only now — a genuine Pause/Cancel mid-download normally
-                    // throws CancellationException straight out of runGalleryDl()/runYtDlp() these
+                    // throws CancellationException straight out of plan.execute() these
                     // days (PythonRuntime kills the subprocess the moment this coroutine's Job is
                     // cancelled, which is what isStopped flipping true actually means; see its own
                     // doc comment), caught by the outer catch block below instead of reaching here.
@@ -1335,28 +893,6 @@ private fun derivePosterCaptionTitle(filename: String): String? {
     val stripped = withoutExtension.replace(Regex("\\s*\\[[^\\[\\]]*]$"), "").trim()
     return stripped.ifBlank { null }
 }
-
-// gallery-dl/yt-dlp's own extractor-level log lines are shaped "[extractor_name][error]
-// <message>" (both bracketed, e.g. "[instagram][error] HTTP redirect to login page") — a
-// different shape from yt-dlp's top-level "[error] <message>", confirmed live via a real
-// Instagram failure whose actual root cause (a login redirect) was silently missed by the plain
-// "[error] " prefix check, letting a vaguer fallback error overwrite it instead.
-private val GALLERY_DL_ERROR_LINE = Regex("^\\[[\\w.]+\\]\\[error\\] ")
-
-// Same "[<extractor>][<level>] " shape as GALLERY_DL_ERROR_LINE above, but at gallery-dl's own
-// [info] level — its logger genuinely doesn't treat "found nothing" as an error, so this never
-// reaches GALLERY_DL_ERROR_LINE at all. See the actualCallback branch that uses this for the full
-// story (a real access failure reported this way, then masked by a less useful yt-dlp fallback
-// error).
-private val GALLERY_DL_NO_RESULTS_LINE = Regex("^\\[[\\w.]+\\]\\[info\\] No results for ")
-
-// Pulls the comma-separated item numbers out of SharePickerScreen's gallery-dl-syntax
-// --filter string ("num in {1,3,4}") — the same numbers double as yt-dlp's own native
-// playlist_items syntax once stripped of the surrounding "num in {...}" (see runYtDlp's own
-// ytDlpPlaylistItems). No match (itemFilter null, or a "download everything" case where the
-// picker never set one at all) just yields an empty string, same as any other unset arg here.
-private val ITEM_FILTER_NUMS_RE = Regex("""\{([\d,]+)\}""")
-
 
 /** No data for this long counts as stalled; see the stall watchdog in doWork(). */
 private const val STALL_AFTER_MS = 6_000L

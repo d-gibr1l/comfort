@@ -52,7 +52,7 @@ object PythonRuntime {
 
     // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
     // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
-    private const val PROVISION_VERSION = "106"
+    private const val PROVISION_VERSION = "108"
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -123,7 +123,7 @@ object PythonRuntime {
         // go through Android's system trust store transparently), so every aria2c-downloaded
         // HTTPS URL failed with "SSL/TLS handshake failure: not signed by known authorities"
         // until yt_dlp_wrapper.py started passing --ca-certificate=<this file> explicitly.
-        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py", SERVER_SCRIPT, "net_resilience.py", "cacert.pem")) {
+        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py", SERVER_SCRIPT, "net_resilience.py", "comfort_events.py", "cacert.pem")) {
             context.assets.open("python_packages/$name").use { input ->
                 File(root, name).outputStream().use { input.copyTo(it) }
             }

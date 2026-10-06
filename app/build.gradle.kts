@@ -170,6 +170,8 @@ dependencies {
   // Navigation
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
+  // EngineEventParser: the Python wrappers' structured output lines (also works in plain JVM unit tests, unlike android's org.json stub).
+  implementation(libs.kotlinx.serialization.json)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 
   // Schedule time-window picker (wheel-style Start/End pickers, replacing the native
