@@ -90,7 +90,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             OutlinedTextField(
                 value = filenameFormat,
                 onValueChange = { filenameFormat = it; filenameFormatSaved = false },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                 label = { Text("Filename format") },
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,

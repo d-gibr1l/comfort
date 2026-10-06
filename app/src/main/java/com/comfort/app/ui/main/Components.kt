@@ -39,6 +39,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.composed
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -426,6 +429,34 @@ fun rememberUndoableDelete(
                 )
                 if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.cancelDeletion(ids) else viewModel.confirmDelete(ids)
             }
+        }
+    }
+}
+
+/** Ends editing when the keyboard is dismissed (back gesture, the keyboard's own hide key) while
+ * this field has focus: focus is cleared, so the cursor and the focused outline go away instead of
+ * the field staying "active" with no keyboard. Per field rather than once per screen because a
+ * sheet or dialog is its own window, with its own insets and focus. Only acts after the keyboard
+ * was actually seen for this focus, so focusing a field doesn't immediately unfocus it. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+fun Modifier.clearFocusOnKeyboardDismiss(): Modifier = composed {
+    var isFocused by remember { mutableStateOf(false) }
+    var keyboardShownSinceFocus by remember { mutableStateOf(false) }
+    if (isFocused) {
+        val imeVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+        LaunchedEffect(imeVisible) {
+            if (imeVisible) {
+                keyboardShownSinceFocus = true
+            } else if (keyboardShownSinceFocus) {
+                focusManager.clearFocus()
+            }
+        }
+    }
+    onFocusEvent { state ->
+        if (isFocused != state.isFocused) {
+            isFocused = state.isFocused
+            if (isFocused) keyboardShownSinceFocus = false
         }
     }
 }

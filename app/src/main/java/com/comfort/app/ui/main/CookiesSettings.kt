@@ -154,7 +154,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             OutlinedTextField(
                 value = pastedCookies,
                 onValueChange = { pastedCookies = it; pasteError = null },
-                modifier = Modifier.fillMaxWidth().height(160.dp),
+                modifier = Modifier.fillMaxWidth().height(160.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("cookies.txt contents") },
                 maxLines = 10,
                 shape = MaterialTheme.shapes.medium,
@@ -411,7 +411,7 @@ private fun SiteCookiesSheet(
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${cookie.name}", modifier = Modifier.size(18.dp))
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     )
                 }
             }
@@ -565,7 +565,8 @@ fun CookieLoginDialog(
                                                 )
                                             }
                                             editingAddress = state.isFocused
-                                        },
+                                        }
+                                        .clearFocusOnKeyboardDismiss(),
                                 )
                             }
                             IconButton(onClick = { if (isLoading) webView?.stopLoading() else webView?.reload() }) {

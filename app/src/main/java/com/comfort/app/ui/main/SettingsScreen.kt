@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import compose.icons.feathericons.Instagram
@@ -320,6 +321,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                             query = searchQuery,
                             onQueryChange = { searchQuery = it },
                             modifier = Modifier.weight(1f),
+                            autoFocus = true,
                         )
                         Spacer(Modifier.width(8.dp))
                         IconButton(
@@ -379,7 +381,26 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
 // Library page (DownloadsHistoryScreen.kt), which imports this same composable rather than
 // keeping its own separate copy of the same look.
 @Composable
-fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: String = "Search", modifier: Modifier = Modifier) {
+fun PillSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String = "Search",
+    modifier: Modifier = Modifier,
+    // Focus the field and bring up the keyboard as soon as the bar appears — for a bar opened by
+    // tapping a search icon, which otherwise needed a second tap on the field itself.
+    autoFocus: Boolean = false,
+) {
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    if (autoFocus) {
+        LaunchedEffect(Unit) {
+            // A frame first: the bar may still be entering (AnimatedContent), and focusing a node
+            // that isn't attached yet throws.
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { focusRequester.requestFocus() }
+            keyboard?.show()
+        }
+    }
     Surface(
         modifier = modifier.fillMaxWidth().height(56.dp),
         // A percentage shape, not a fixed 28dp — 28dp only reads as a true pill (MD3's "full"
@@ -404,7 +425,7 @@ fun PillSearchBar(query: String, onQueryChange: (String) -> Unit, placeholder: S
                 BasicTextField(
                     value = query,
                     onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).clearFocusOnKeyboardDismiss(),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),

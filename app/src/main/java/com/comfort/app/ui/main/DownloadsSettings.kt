@@ -254,7 +254,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         proxyUrl = it
                         downloadsSettings.setProxyUrl(it)
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     label = { Text("Proxy") },
                     placeholder = { Text("None") },
                     singleLine = true,
@@ -401,7 +401,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         bufferSizeKb = kb
                         GalleryDlPreferences.setBufferSizeKb(context, kb)
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     label = { Text("KB") },
                     placeholder = { Text("1024") },
                     singleLine = true,
@@ -572,7 +572,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         downloadDelaySeconds = seconds
                         GalleryDlPreferences.setDownloadDelaySeconds(context, seconds)
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     label = { Text("Seconds") },
                     placeholder = { Text("0") },
                     singleLine = true,
