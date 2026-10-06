@@ -16,7 +16,11 @@ data class JustifiedCell(val span: Int, val height: Float)
  * the row is stretched to fill the width exactly. Aspects are clamped to [minAspect]..[maxAspect]
  * (the tile crops the rest), so a very tall or very wide file can't make a sliver or a giant. The
  * last row is stretched too unless that would make it much taller than the others, in which case
- * it keeps the target height and leaves the end of the row empty. */
+ * it keeps the target height and leaves the end of the row empty.
+ *
+ * [minTileWidth]: a row ends early rather than squeeze any of its tiles narrower than this — two
+ * portraits next to a wide landscape came out a fifth of the screen wide each. That row is then
+ * taller than the target; [maxHeight] caps it (its tiles crop top and bottom). */
 fun justifiedCells(
     aspects: List<Float>,
     width: Float,
@@ -25,6 +29,8 @@ fun justifiedCells(
     maxPerRow: Int = 4,
     minAspect: Float = 0.75f,
     maxAspect: Float = 2f,
+    minTileWidth: Float = 0f,
+    maxHeight: Float = Float.MAX_VALUE,
 ): List<JustifiedCell> {
     val clamped = aspects.map { it.coerceIn(minAspect, maxAspect) }
     val out = ArrayList<JustifiedCell>(aspects.size)
@@ -48,10 +54,20 @@ fun justifiedCells(
     }
 
     for (aspect in clamped) {
+        // Close the row early — two or more tiles always can (capped at maxHeight, they crop top and
+        // bottom); a lone tile only if it's within a quarter of maxHeight on its own (a landscape
+        // is, slightly cropped; a lone portrait would be a huge crop, so that one still shares).
+        if (row.size >= 2 || (row.size == 1 && fillHeight(row) <= maxHeight * 1.25f)) {
+            val withNext = row + aspect
+            if (withNext.min() * fillHeight(withNext) < minTileWidth) {
+                emit(row, minOf(fillHeight(row), maxHeight), fullWidth = true)
+                row = ArrayList()
+            }
+        }
         row += aspect
         val h = fillHeight(row)
         if (h <= targetHeight || row.size >= maxPerRow) {
-            emit(row, h, fullWidth = true)
+            emit(row, minOf(h, maxHeight), fullWidth = true)
             row = ArrayList()
         }
     }

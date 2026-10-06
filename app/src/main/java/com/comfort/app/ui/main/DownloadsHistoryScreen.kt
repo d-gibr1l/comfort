@@ -475,6 +475,12 @@ fun DownloadsHistoryScreen(
                     // Portraits cropped only down to 0.6 wide-to-tall: a row of three is taller (bigger
                     // tiles) and shows more of each video.
                     minAspect = 0.6f,
+                    // No tile under 30% of the width: a wide video used to squeeze the portraits
+                    // sharing its row to a fifth of the screen. Rows that end early for that are
+                    // capped at 0.6x the width (tiles crop top and bottom), like Samsung Gallery.
+                    maxAspect = 1.78f,
+                    minTileWidth = gridWidth * 0.3f,
+                    maxHeight = gridWidth * 0.6f,
                 )
             }
             LazyVerticalGrid(
