@@ -274,6 +274,9 @@ class DownloadWorker(
                 // already write it to the DB.
                 val totalItemsRef = AtomicInteger(entity?.totalItems ?: 0)
                 var hasVideoItem = false
+                // Every listed item is a video — see EnginePlan.GalleryDlFirst. Only trusted from a
+                // complete listing (under MAX_ITEMS), so a truncated one can't hide an image.
+                var onlyVideos = false
                 // Listing runs whenever itemFilter is null, NOT only when totalItems isn't known
                 // yet — those are two separate concerns that used to share one gate. totalItems
                 // already being known (a resumed/retried download whose first attempt already
@@ -291,6 +294,8 @@ class DownloadWorker(
                         totalItemsRef.set(listed.size)
                     }
                     hasVideoItem = listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
+                    onlyVideos = listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS &&
+                        listed.all { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
                 }
                 // Spotify album/playlist links need the same upfront item count a gallery-dl
                 // gallery gets (a track link's own listing is always exactly 1, so this is a
@@ -696,6 +701,7 @@ class DownloadWorker(
                     engine,
                     classicEngine = VideoSiteRouter.classify(url),
                     supplementVideo = hasVideoItem || VideoSiteRouter.alwaysSupplementsVideo(url),
+                    onlyVideos = onlyVideos,
                 )
 
                 // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl
