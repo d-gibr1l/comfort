@@ -53,7 +53,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         _isDuplicate.value = false
         listing = viewModelScope.launch {
             launch { _isDuplicate.value = DownloadDispatcher.isDuplicate(context, url) }
-            val result = GalleryDlListing.listItems(context, url)
+            val result = GalleryDlListing.listItemsForSheet(context, url)
             _route.value = if (result.shouldUsePreviewSheet(url)) LinkRoute.Preview(url) else LinkRoute.Picker(url, result)
         }
     }

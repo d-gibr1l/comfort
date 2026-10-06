@@ -875,7 +875,16 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                     } else {
                         Spacer(Modifier.width(1.dp))
                     }
-                    if (item.speedMbs > 0f) {
+                    val note = com.comfort.app.data.DownloadNotes.notes.collectAsState().value[item.id]
+                    if (note != null) {
+                        Text(
+                            note,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    } else if (item.speedMbs > 0f) {
                         Text(
                             "${String.format("%.2f", item.speedMbs)} MB/s",
                             style = MaterialTheme.typography.labelSmall,

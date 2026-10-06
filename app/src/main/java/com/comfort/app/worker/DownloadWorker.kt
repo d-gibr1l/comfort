@@ -7,6 +7,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.comfort.app.data.AppDatabase
 import com.comfort.app.data.DownloadDispatcher
+import com.comfort.app.data.DownloadNotes
 import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.DownloadStatus
 import com.comfort.app.data.DownloadedFileRecord
@@ -524,6 +525,7 @@ class DownloadWorker(
                             dao.setFormatTags(downloadId, event.tags)
                         }
                         is EngineEvent.Progress -> {
+                            DownloadNotes.clear(downloadId)
                             lastDataAt.set(System.currentTimeMillis())
                             lastProgressLineAt.set(System.currentTimeMillis())
                             val speedMbs = event.speedBytesPerSecond / (1024f * 1024f)
@@ -577,8 +579,10 @@ class DownloadWorker(
                             }
                         }
                         // Listing-only progress text, and the engines' warnings/debug/status lines.
+                        is EngineEvent.RateLimited -> DownloadNotes.set(downloadId, "Rate-limited by ${event.site} — waiting until ${event.until}")
                         is EngineEvent.Status, EngineEvent.Ignored -> Unit
                         is EngineEvent.File -> {
+                            DownloadNotes.clear(downloadId)
                             try {
                                 val candidate = File(event.path)
                                 if (candidate.isAbsolute && candidate.isFile &&
@@ -775,7 +779,11 @@ class DownloadWorker(
                         }
                     }
                     try {
-                        plan.execute(executor)
+                        try {
+                            plan.execute(executor)
+                        } finally {
+                            DownloadNotes.clear(downloadId)
+                        }
                     } finally {
                         stallWatchdog.cancel()
                     }

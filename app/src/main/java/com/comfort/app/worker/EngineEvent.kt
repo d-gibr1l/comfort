@@ -30,6 +30,9 @@ sealed interface EngineEvent {
     data class Error(val message: String) : EngineEvent
     /** gallery-dl's "No results for ..." — an empty-handed outcome it logs at info level, not as an error. */
     data object NoResults : EngineEvent
+    /** gallery-dl is sleeping until a site's rate limit resets ("Waiting for 6 minutes until
+     * 21:19:59 (rate limit)") — silent otherwise, so the queue card says so. [until] is HH:MM. */
+    data class RateLimited(val site: String, val until: String) : EngineEvent
     /** A progress note while listing ("Fetching info…") — the preview's loading text. */
     data class Status(val message: String) : EngineEvent
     /** A finished file the engine saved (an absolute path; DownloadWorker checks it's in staging). */
@@ -56,6 +59,8 @@ object EngineEventParser {
     private val EXTRACTOR_ERROR_LINE = Regex("^\\[[\\w.]+\\]\\[error\\] ")
     // Same shape at gallery-dl's [info] level — it doesn't treat "found nothing" as an error.
     private val NO_RESULTS_LINE = Regex("^\\[[\\w.]+\\]\\[info\\] No results for ")
+    // gallery-dl's extractor.wait(): "[reddit][info] Waiting for 6 minutes until 21:19:59 (rate limit)".
+    private val RATE_LIMIT_WAIT_LINE = Regex("^\\[([\\w.]+)\\]\\[info\\] Waiting for .+? until (\\d{1,2}:\\d{2})(?::\\d{2})? \\(rate limit\\)")
     private val PROGRESS_DOWNLOADED = Regex("downloaded=(\\d+)")
     private val PROGRESS_SPEED = Regex("speed=([\\d.]+)")
 
@@ -125,6 +130,9 @@ object EngineEventParser {
             // gallery_dl_wrapper.py's own fallback report of an exit it couldn't otherwise describe.
             text.startsWith("Error,") || text.startsWith("Exception:") -> EngineEvent.Error(text.trim())
             NO_RESULTS_LINE.containsMatchIn(text) -> EngineEvent.NoResults
+            RATE_LIMIT_WAIT_LINE.find(text) != null -> RATE_LIMIT_WAIT_LINE.find(text)!!.groupValues.let { g ->
+                EngineEvent.RateLimited(g[1].substringBefore('.').replaceFirstChar { it.uppercase() }, g[2])
+            }
             text.startsWith("[status] ") -> after("[status] ").takeIf { it.isNotEmpty() }?.let { EngineEvent.Status(it) }
             text.startsWith("[") -> null // [warning], [debug], [__status__], other logger lines
             text.trim().startsWith("/") -> EngineEvent.File(text.trim())
