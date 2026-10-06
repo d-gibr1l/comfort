@@ -6,7 +6,7 @@ import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcessor
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 import net_resilience
@@ -414,6 +414,46 @@ def _parse_extractor_args(raw):
         if args:
             result[ie_key] = args
     return result or None
+
+_SUBTITLE_EXTENSIONS = ("vtt", "srt", "ass", "ssa", "ttml", "srv1", "srv2", "srv3", "json3")
+
+
+def _subtitle_has_captions(path):
+    """Whether a fetched subtitle file holds anything to embed. YouTube can serve a caption track
+    that's only a header (seen: a 440-byte .vtt for "Me at the zoo"), which ffmpeg rejects with
+    "Invalid data found when processing input". Text formats need at least one timed cue ("-->");
+    other formats only need to be non-empty."""
+    try:
+        if not path or not os.path.isfile(path) or os.path.getsize(path) == 0:
+            return False
+        if path.rsplit(".", 1)[-1].lower() in ("vtt", "srt"):
+            with open(path, encoding="utf-8", errors="ignore") as f:
+                return "-->" in f.read()
+        return True
+    except OSError:
+        return False
+
+
+class _SafeEmbedSubtitlePP(FFmpegEmbedSubtitlePP):
+    """yt-dlp's subtitle embedding, except subtitles can never cost the download itself. The stock
+    step fails the whole download when ffmpeg can't read a subtitle file — reproduced live: the
+    video and audio downloaded and merged fine, then an empty caption track turned it into an
+    error. Tracks with nothing in them are left out before embedding, and if ffmpeg still fails,
+    the video is kept without subtitles (a warning, not an error)."""
+
+    def run(self, info):
+        subtitles = info.get("requested_subtitles") or {}
+        usable = {lang: sub for lang, sub in subtitles.items() if _subtitle_has_captions(sub.get("filepath"))}
+        skipped = [lang for lang in subtitles if lang not in usable]
+        if skipped:
+            self.report_warning(f"Skipping subtitles with no captions in them: {', '.join(skipped)}")
+        info = {**info, "requested_subtitles": usable}
+        try:
+            return super().run(info)
+        except PostProcessingError as e:
+            self.report_warning(f"Couldn't embed subtitles, keeping the video without them: {e}")
+            return [], info
+
 
 class _LocalTrimPP(FFmpegPostProcessor):
     """Trims the just-produced file to `ranges` (a list of (start, end) second tuples — see
@@ -847,6 +887,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         status = d.get("status")
         if status == "downloading" and callback:
             info = d.get("info_dict") or {}
+            # Fetching a subtitle track goes through this hook too. It has no video codec, so it
+            # read as an "audio phase" with a tiny size on the queue card; it isn't a media file.
+            if str(d.get("filename") or "").rsplit(".", 1)[-1].lower() in _SUBTITLE_EXTENSIONS:
+                return
             # A "bestvideo+bestaudio" merge fetches two entirely separate sub-files in this same
             # download() call — reported_size latching after the *first* one (the video) meant the
             # audio track's own, much smaller total never got reported at all: the card kept
@@ -1160,6 +1204,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # Built once, combining every reason to prefer one format over another, rather than each
     # concern setting "format_sort" independently and silently clobbering whichever ran last.
     format_sort_terms = []
+    embed_subtitles = False
     if resolution_cap and not audio_only:
         # "res" sorts by min(height, width) rather than raw height — the conventional quality
         # number regardless of portrait/landscape orientation — so this correctly biases
@@ -1322,8 +1367,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # (save_subtitle_files) are independent choices; either, both, or neither can be on.
             ydl_opts["writesubtitles"] = True
             ydl_opts["subtitleslangs"] = [lang.strip() for lang in (subtitle_langs or "en").split(",") if lang.strip()]
-            if download_subtitles:
-                postprocessors.append({"key": "FFmpegEmbedSubtitle"})
+            # Embedded by _SafeEmbedSubtitlePP (added in _attempt below, after these), not
+            # yt-dlp's stock "FFmpegEmbedSubtitle", which fails the whole download on a bad track.
+            embed_subtitles = download_subtitles
         if postprocessors:
             ydl_opts["postprocessors"] = postprocessors
     if js_runtime_path:
@@ -1408,6 +1454,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     def _attempt(opts, reuse_info):
         with yt_dlp.YoutubeDL(opts) as ydl:
+            if embed_subtitles:
+                # Same place the stock step had: after metadata/thumbnail, before trimming and
+                # _FinalFilePP. already_have_subtitle keeps the subtitle file on disk when "Save
+                # subtitle files" is on too — the stock step deleted it after embedding.
+                ydl.add_post_processor(_SafeEmbedSubtitlePP(ydl, already_have_subtitle=save_subtitle_files), when="post_process")
             if clip_ranges and ffmpeg_path:
                 # Added directly rather than through ydl_opts["postprocessors"] (a list of plain
                 # {"key": ...} dicts yt-dlp itself resolves to stock Ffmpeg*PP classes) since
