@@ -28,6 +28,7 @@ album/playlist link's tracks all correctly get the real containing album name fo
 """
 
 import json
+from comfort_events import event, file_path
 import os
 import re
 import ssl
@@ -159,7 +160,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         # only network round-trip for an entire album/playlist regardless of track count (the
         # whole trackList comes back in this one response), so this is mostly reassurance against
         # a slow/rate-limited connection rather than covering genuine per-track work.
-        print("[status] Fetching info…", flush=True)
+        print(event("status", message="Fetching info…"), flush=True)
         entity = _fetch_entity(entity_type, entity_id)
         collection_title = entity.get("name")
         # A playlist's own "subtitle" is its curator ("Spotify", a username, ...), not a musical
@@ -320,7 +321,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         match = _SPOTIFY_URL_RE.search(url)
         if not match:
             if callback:
-                callback(f"[error] Not a recognized Spotify link: {url}")
+                callback(event("error", message=f"Not a recognized Spotify link: {url}"))
             return "Error: not a recognized Spotify link"
         entity_type, entity_id = match.group(1), match.group(2)
 
@@ -342,7 +343,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
         if not track_ids:
             if callback:
-                callback("[error] No tracks found at this Spotify link")
+                callback(event("error", message="No tracks found at this Spotify link"))
             return "Error: no tracks found"
 
         any_success = False
@@ -350,7 +351,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             title, artist, _duration, thumbnail_url = _get_track_metadata(track_id)
             if not title or not artist:
                 if callback:
-                    callback("[error] Couldn't resolve metadata for a track — skipping")
+                    callback(event("error", message="Couldn't resolve metadata for a track — skipping"))
                 continue
 
             # tag_title/tag_artist are what actually get embedded/shown — override_title/
@@ -370,9 +371,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # whatever the matched YouTube video's own info_dict reports) never overwrite this
             # once it lands in the DB (see DownloadDao's own doc comment on why *IfAbsent exists).
             if callback:
-                callback(f"[artist] {tag_artist[:200]}")
+                callback(event("artist", artist=tag_artist[:200]))
                 if album_name:
-                    callback(f"[album] {album_name[:200]}")
+                    callback(event("album", album=album_name[:200]))
 
             matched_url = _resolve_youtube_match(artist, title, js_runtime_path)
             if not matched_url:
@@ -395,9 +396,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # no real artist/album at all. Tagging the file on disk before it ever gets handed
             # to Kotlin is the only ordering that can actually work.
             def _capture_and_forward(line, _cb=callback, _out=captured_path):
-                if line and not line.startswith("[") and os.path.isabs(line) and os.path.exists(line):
-                    _out[0] = line
-                    _retag_with_spotify_metadata(line, tag_title, tag_artist, album_name, thumbnail_url)
+                path = file_path(line)
+                if path and os.path.isabs(path) and os.path.exists(path):
+                    _out[0] = path
+                    _retag_with_spotify_metadata(path, tag_title, tag_artist, album_name, thumbnail_url)
                 if _cb:
                     _cb(line)
 
@@ -418,7 +420,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         return "Done" if any_success else "Error: no tracks downloaded"
     except Exception as e:
         if callback:
-            callback(f"[error] {e}")
+            callback(event("error", message=str(e)))
         return f"Error: {e}"
 
 
@@ -460,4 +462,4 @@ if __name__ == "__main__":
         override_title=_s(a[15]) if len(a) > 15 else None,
         override_artist=_s(a[16]) if len(a) > 16 else None,
     )
-    print(f"[__status__] {status}", flush=True)
+    print(event("exit", status=status), flush=True)

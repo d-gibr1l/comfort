@@ -507,7 +507,7 @@ object GalleryDlListing {
             val lastLine = runCatching {
                 PythonRuntime.run(context, "spotify_wrapper.py", listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg)) { line ->
                     lines.add(line)
-                    if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
+                    (com.comfort.app.worker.EngineEventParser.parse(line) as? com.comfort.app.worker.EngineEvent.Status)?.let { onStatus?.invoke(it.message) }
                 }
                 lines.lastOrNull { it.isNotBlank() }
             }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return null
@@ -717,7 +717,7 @@ object GalleryDlListing {
                     listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg, ytDlpInfoCacheFile(context, url).absolutePath),
                 ) { line ->
                     lines.add(line)
-                    if (line.startsWith("[status] ")) onStatus?.invoke(line.removePrefix("[status] "))
+                    (com.comfort.app.worker.EngineEventParser.parse(line) as? com.comfort.app.worker.EngineEvent.Status)?.let { onStatus?.invoke(it.message) }
                 }
                 lines.lastOrNull { it.isNotBlank() }
             }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return null

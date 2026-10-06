@@ -10,6 +10,7 @@ from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 import net_resilience
+from comfort_events import event
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 # curl_cffi is the only impersonate backend this bundled yt-dlp ships with (see
@@ -574,7 +575,7 @@ class _FinalFilePP(PostProcessor):
                     cover_url = _itunes_cover_art_url(title, artist)
                     if cover_url:
                         _apply_cover_art_override(filepath, cover_url)
-            self._callback(os.path.abspath(filepath))
+            self._callback(event("file", path=os.path.abspath(filepath)))
         return [], info
 
 
@@ -674,15 +675,15 @@ class _Logger:
         # itself is gated behind that flag before it calls logger.debug() at all (see YoutubeDL's
         # own write_debug()), so this doesn't add any output/overhead to a normal (non-verbose) run.
         if self.callback:
-            self.callback(f"[debug] {msg}")
+            self.callback(event("debug", message=msg))
 
     def warning(self, msg):
         if self.callback:
-            self.callback(f"[warning] {msg}")
+            self.callback(event("warning", message=msg))
 
     def error(self, msg):
         if self.callback:
-            self.callback(f"[error] {msg}")
+            self.callback(event("error", message=msg))
 
 def probe(url):
     # "1" if yt-dlp has a real (non-generic) extractor for url, "0" otherwise (incl. on any
@@ -742,7 +743,7 @@ def _apply_extra_args(ydl_opts, extra_args, emit=None):
             parsed = yt_dlp.parse_options(tokens).ydl_opts
     except BaseException as e:  # noqa: BLE001 - optparse raises OptParseError/SystemExit
         message = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
-        line = f"[warning] Ignoring extra arguments: {message}"
+        line = event("warning", message=f"Ignoring extra arguments: {message}")
         (emit or print)(line)
         return
     for key, value in parsed.items():
@@ -869,7 +870,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # stuck/wrong progress bar rather than what it actually is. vcodec == "none" is the
                 # same signal yt-dlp itself uses to mean "this format carries no video at all".
                 is_audio_track = (info.get("vcodec") or "none") == "none"
-                callback(f"[phase] {'audio' if is_audio_track else 'video'}")
+                callback(event("phase", phase="audio" if is_audio_track else "video"))
                 # A quick "exactly what did it pick" readout beside the site badge — resolution/
                 # fps/container for a video track, bitrate+codec for an audio one. Every field
                 # here is best-effort (an HLS/DASH manifest doesn't always expose all of them);
@@ -893,7 +894,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                     if ext := info.get("ext"):
                         tags.append(ext.upper())
                 if tags:
-                    callback(f"[format] {'|'.join(tags)}")
+                    callback(event("format", tags="|".join(tags)))
             if not reported_title[0]:
                 # Extraction has already happened by the time any "downloading" event fires, so
                 # the real poster/caption are available immediately — sent once, this early,
@@ -906,7 +907,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 if poster or caption:
                     reported_title[0] = True
                     title = f"{poster} - {caption}" if poster and caption else (poster or caption)
-                    callback(f"[title] {title[:200]}")
+                    callback(event("title", title=title[:200]))
                 # Same idea, same timing — the extractor already picked a thumbnail URL by now.
                 # Sent from this same one-shot block (guarded by reported_title, not its own flag)
                 # since a title-less video is rare enough not to bother re-checking every tick.
@@ -914,7 +915,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                     thumbnail = info.get("thumbnail")
                     if thumbnail:
                         reported_thumbnail[0] = True
-                        callback(f"[thumbnail] {thumbnail}")
+                        callback(event("thumbnail", url=thumbnail))
                 # Real track metadata, distinct from the uploader/caption-based [title] line
                 # above — "artist" is only ever populated by extractors that genuinely carry
                 # music metadata (YouTube Music releases); a plain YouTube video's info_dict
@@ -927,11 +928,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 album = info.get("album")
                 track = info.get("track")
                 if artist:
-                    callback(f"[artist] {artist[:200]}")
+                    callback(event("artist", artist=artist[:200]))
                 if album:
-                    callback(f"[album] {album[:200]}")
+                    callback(event("album", album=album[:200]))
                 if track:
-                    callback(f"[track] {track[:200]}")
+                    callback(event("track", track=track[:200]))
             # When audio_only falls back to a muxed video+audio format (chosen_format's own
             # "bestaudio.../best" fallback — this site had no separate audio-only stream at all),
             # `total` here is the video-inclusive download's size, not what FFmpegExtractAudioPP
@@ -959,7 +960,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 total = d.get("total_bytes") or d.get("total_bytes_estimate")
                 if total and not skip_size and total != last_reported_total[0]:
                     last_reported_total[0] = total
-                    callback(f"[size] {total}")
+                    callback(event("size", bytes=total))
                 downloaded = d.get("downloaded_bytes") or 0
                 # Not d.get("speed") — yt-dlp computes that as a cumulative average over the whole
                 # transfer so far (total bytes ÷ total elapsed time since this file started), not a
@@ -979,7 +980,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                     speed = d.get("speed") or 0
                 last_progress_emit[0] = now
                 last_emitted_bytes[0] = downloaded
-                callback(f"[progress] downloaded={downloaded} speed={speed}")
+                callback(event("progress", downloaded=downloaded, speed=speed))
             return
         if status != "finished" or not callback:
             return
@@ -1003,7 +1004,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # at all when ffmpeg_path is falsy, meaning no Merger can exist to consume it either;
             # kept as a defensive no-op rather than reporting a fragment DownloadWorker can't use.
             return
-        callback(os.path.abspath(filename))
+        callback(event("file", path=os.path.abspath(filename)))
 
     # "bestvideo+bestaudio" (yt-dlp's own default) needs ffmpeg to mux the separately-fetched
     # streams together — without the bundled ffmpeg binary (see FfmpegRuntime.kt) that would abort
@@ -1400,7 +1401,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # Downgraded to a warning: the retry below decides whether this download failed,
                 # and DownloadWorker would otherwise keep this as the card's error message.
                 if callback:
-                    callback(f"[warning] {msg}")
+                    callback(event("warning", message=str(msg)))
                 return
             _log_error(msg)
         logger.error = _error
@@ -1440,7 +1441,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         _attempt(ydl_opts, reuse_info=True)
         if refused:
             if callback:
-                callback("[warning] YouTube refused the stream with your cookies (HTTP 403); retrying without them")
+                callback(event("warning", message="YouTube refused the stream with your cookies (HTTP 403); retrying without them"))
             logger.error = _log_error
             opts = dict(ydl_opts)
             opts.pop("cookiefile", None)
@@ -1450,7 +1451,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         return "Cancelled"
     except Exception as e:
         if callback:
-            callback(f"[error] {e}")
+            callback(event("error", message=str(e)))
         return f"Error: {e}"
 
 # Settings' / the preview sheet's quality chips (GalleryDlPreferences.VideoQuality names) and the
@@ -1627,7 +1628,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
     # (GalleryDlListing.kt's runYtDlpListInfo) reads PythonRuntime.run()'s per-line callback as
     # it's printed, well before this call returns, and surfaces it in place of a static "Loading…"
     # so a long-playlist listing doesn't look stuck with no feedback.
-    print("[status] Fetching info…", flush=True)
+    print(event("status", message="Fetching info…"), flush=True)
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -1650,7 +1651,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         return json.dumps({"error": "no info extracted"})
     entries = info.get("entries")
     if entries is not None:
-        print(f"[status] Found {len(entries)} tracks…", flush=True)
+        print(event("status", message=f"Found {len(entries)} tracks…"), flush=True)
         return json.dumps({"entries": [_pick(e) for e in entries]})
     picked = _pick(info)
     if picked:
@@ -1739,4 +1740,4 @@ if __name__ == "__main__":
         override_artist=(_s(a[47]) if len(a) > 47 else None),
         info_json_path=(_s(a[48]) if len(a) > 48 else None),
     )
-    print(f"[__status__] {status}", flush=True)
+    print(event("exit", status=status), flush=True)
