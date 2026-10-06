@@ -277,6 +277,12 @@ class DownloadWorker(
                 // Every listed item is a video — see EnginePlan.GalleryDlFirst. Only trusted from a
                 // complete listing (under MAX_ITEMS), so a truncated one can't hide an image.
                 var onlyVideos = false
+                // The listing is only a helper (item count, video check), so it gets LISTING_CAP_MS
+                // before the download goes ahead without it. On Reddit gallery-dl's shared client ID
+                // can be rate-limited, and gallery-dl then sleeps silently until the limit resets —
+                // 6 minutes seen live (2026-10-06), with the queue card showing nothing. Cancelling
+                // kills the Python job (PythonRuntime.run).
+                var listingTimedOut = false
                 // Listing runs whenever itemFilter is null, NOT only when totalItems isn't known
                 // yet — those are two separate concerns that used to share one gate. totalItems
                 // already being known (a resumed/retried download whose first attempt already
@@ -288,7 +294,9 @@ class DownloadWorker(
                 // permanently dropped the yt-dlp video-supplement pass for a mixed post's video on
                 // every subsequent resume, with no error and no trace it had ever been there.
                 if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null) {
-                    val listed = GalleryDlListing.listItems(applicationContext, url).items
+                    val listing = withTimeoutOrNull(LISTING_CAP_MS) { GalleryDlListing.listItems(applicationContext, url) }
+                    listingTimedOut = listing == null
+                    val listed = listing?.items.orEmpty()
                     if ((entity?.totalItems ?: 0) <= 0 && listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
                         dao.setTotalItems(downloadId, listed.size)
                         totalItemsRef.set(listed.size)
@@ -702,6 +710,7 @@ class DownloadWorker(
                     classicEngine = VideoSiteRouter.classify(url),
                     supplementVideo = hasVideoItem || VideoSiteRouter.alwaysSupplementsVideo(url),
                     onlyVideos = onlyVideos,
+                    listingTimedOut = listingTimedOut,
                 )
 
                 // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl
@@ -934,3 +943,7 @@ private fun derivePosterCaptionTitle(filename: String): String? {
 
 /** No data for this long counts as stalled; see the stall watchdog in doWork(). */
 private const val STALL_AFTER_MS = 6_000L
+
+/** How long the pre-download listing may take before the download goes ahead without it. 30 s, not
+ * less: a real listing on a slow connection (600 ms round trips seen) takes several seconds. */
+private const val LISTING_CAP_MS = 30_000L
