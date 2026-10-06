@@ -325,6 +325,10 @@ fun DownloadsHistoryScreen(
     // user deleted from their gallery outside the app.
     LaunchedEffect(Unit) { viewModel.scanForDeletedMedia() }
 
+    // Each item's shape (grid tile widths) and length (the list's duration badge) — see
+    // DownloadsViewModel.mediaShapes.
+    val shapes by viewModel.mediaShapes.collectAsStateWithLifecycle()
+
     val visibleItems = (if (showDeletedOnly) deletedItems else historyItems)
         .let { if (favoritesOnly) it.filter { item -> item.isFavorite } else it }
         .let { if (audioOnly) it.filter { item -> item.isAudio } else it }
@@ -460,7 +464,6 @@ fun DownloadsHistoryScreen(
             // Gallery-style: edge to edge, hairline gaps, and rows where every tile is as wide as
             // its media's shape needs (justifiedCells) rather than identical squares. A file whose
             // shape isn't known (yet) counts as square.
-            val shapes by viewModel.mediaShapes.collectAsStateWithLifecycle()
             val gridWidth = LocalConfiguration.current.screenWidthDp.toFloat()
             val cells = remember(visibleItems, shapes, gridWidth) {
                 justifiedCells(
@@ -515,7 +518,7 @@ fun DownloadsHistoryScreen(
                         HistoryGridItem(
                             item = item,
                             height = (cells.getOrNull(index)?.height ?: (gridWidth / 3)).dp,
-                            durationMs = shapes[item.id]?.durationMs,
+                            shape = shapes[item.id],
                             selected = item.id in selectedIds,
                             selectionMode = selectionMode,
                             onTap = {
@@ -547,6 +550,7 @@ fun DownloadsHistoryScreen(
                                 }
                             },
                             onLongPress = { selectedIds = selectedIds + item.id },
+                            durationMs = shapes[item.id]?.durationMs,
                             onDelete = { requestDelete(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
@@ -1396,7 +1400,7 @@ private fun LibraryToolbarChip(
 private fun HistoryGridItem(
     item: DownloadEntity,
     height: androidx.compose.ui.unit.Dp,
-    durationMs: Long?,
+    shape: com.comfort.app.util.MediaShape?,
     selected: Boolean,
     selectionMode: Boolean,
     onTap: () -> Unit,
@@ -1467,32 +1471,31 @@ private fun HistoryGridItem(
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
         }
 
-        // Gallery-style corner badge: "▶ 0:13" on a video or song, the item count on a
-        // multi-item download — white on a dark translucent pill, readable on any thumbnail.
-        val badgeIcon = when {
-            durationMs != null -> Icons.Filled.PlayArrow
-            item.downloadedItems > 1 -> Icons.Outlined.Layers
+        // Bottom-left: what kind of file it is (a play icon on a video, a note on audio — icon only,
+        // durations are in the list view) and, on a multi-item download, how many items. White on
+        // a dark translucent pill, readable on any thumbnail.
+        val isVideo = !item.isAudio && shape?.durationMs != null
+        val typeIcon = when {
+            item.isAudio -> Icons.Outlined.MusicNote
+            isVideo -> Icons.Filled.PlayArrow
             else -> null
         }
-        if (badgeIcon != null) {
+        if (typeIcon != null || item.downloadedItems > 1) {
             Row(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(6.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .padding(start = 4.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Icon(badgeIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(3.dp))
-                Text(
-                    if (durationMs != null) formatGridDuration(durationMs) else "${item.downloadedItems}",
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                if (typeIcon != null) MediaBadge(icon = typeIcon, text = null)
+                if (item.downloadedItems > 1) MediaBadge(icon = Icons.Outlined.Layers, text = "${item.downloadedItems}")
             }
+        }
+
+        // Top-left: a video's quality, from its real short side (a portrait 720x1280 video is
+        // "720p", not the "1280p" its format tag says) — only from 1080p up, so it stays a
+        // highlight rather than a label on every tile.
+        val quality = shape?.shortSide?.takeIf { isVideo }?.let { qualityLabel(it) }
+        if (quality != null) {
+            MediaBadge(icon = null, text = quality, modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
         if (item.isFavorite) {
@@ -1533,7 +1536,49 @@ private fun HistoryGridItem(
     }
 }
 
-/** "0:13", "1:21", "1:02:05" — a grid tile's duration badge. */
+/** Icon + short text on a dark translucent pill, white so it reads on any thumbnail — the list
+ * thumbnail's duration and the grid tile's item count. [compact] for the 76 dp list thumbnail. */
+@Composable
+private fun MediaBadge(
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    text: String?,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    val side = when {
+        text == null -> 3.dp
+        compact -> 4.dp
+        else -> 6.dp
+    }
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(if (compact) 5.dp else 6.dp))
+            .background(Color.Black.copy(alpha = 0.5f))
+            .padding(start = if (icon != null) side / 2 + 1.dp else side, end = side, top = if (text == null) 3.dp else 1.dp, bottom = if (text == null) 3.dp else 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(if (compact) 11.dp else 14.dp))
+        if (icon != null && text != null) Spacer(Modifier.width(2.dp))
+        if (text != null) {
+            Text(
+                text,
+                color = Color.White,
+                style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** A video's quality badge from its short side in pixels, or null below 1080p. */
+private fun qualityLabel(shortSide: Int): String? = when {
+    shortSide >= 2000 -> "4K"
+    shortSide >= 1400 -> "1440p"
+    shortSide >= 1000 -> "1080p"
+    else -> null
+}
+
+/** "0:13", "1:21", "1:02:05" — a thumbnail's duration badge. */
 private fun formatGridDuration(ms: Long): String {
     val total = (ms + 500) / 1000
     val h = total / 3600
@@ -1575,6 +1620,7 @@ private fun HistoryRow(
     selectionMode: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
+    durationMs: Long?,
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRename: (String) -> Unit,
@@ -1683,6 +1729,17 @@ private fun HistoryRow(
                         Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
                     }
                 }
+            }
+
+            // A video's or song's length ("▶ 0:13"), bottom-centre and outside the clip: the
+            // thumbnail's wavy shape cuts into its corners, which clipped a corner badge.
+            if (durationMs != null) {
+                MediaBadge(
+                    icon = Icons.Filled.PlayArrow,
+                    text = formatGridDuration(durationMs),
+                    compact = true,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
+                )
             }
 
             if (selected) {

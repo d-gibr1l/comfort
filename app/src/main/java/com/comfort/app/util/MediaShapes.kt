@@ -3,9 +3,10 @@ package com.comfort.app.util
 import android.content.Context
 import android.net.Uri
 
-/** A saved file's shape and length, for the Library's justified grid: [aspect] is width/height as
- * displayed (rotation applied), [durationMs] only for video/audio. */
-data class MediaShape(val aspect: Float, val durationMs: Long?)
+/** A saved file's shape and length, for the Library: [aspect] is width/height as displayed
+ * (rotation applied), [shortSide] the smaller dimension in pixels (a video's "720p"/"1080p",
+ * whatever its orientation), [durationMs] only for video/audio. */
+data class MediaShape(val aspect: Float, val durationMs: Long?, val shortSide: Int? = null)
 
 /** Reads [MediaShape]s from MediaStore — every finished download's thumbnailPath is its saved
  * file's MediaStore URI, and MediaStore already knows each file's size and duration, so nothing
@@ -39,6 +40,7 @@ object MediaShapes {
                     MediaShape(
                         aspect = if (w > 0 && h > 0) w.toFloat() / h else 1f,
                         durationMs = long("duration")?.takeIf { it > 0 },
+                        shortSide = minOf(w, h).takeIf { it > 0 }?.toInt(),
                     )
                 }
             }.getOrNull()
