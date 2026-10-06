@@ -49,6 +49,18 @@ class JustifiedGridTest {
     }
 
     @Test
+    fun noTileIsSqueezedBelowTheMinimumWidth() {
+        // Two portraits then a landscape: the landscape starts a new row instead of squeezing them.
+        val aspects = listOf(0.6f, 0.6f, 1.5f, 0.6f, 0.6f, 0.6f, 1.5f, 1f)
+        val cells = justifiedCells(aspects, width, 250f, gap, minAspect = 0.6f, maxAspect = 1.78f, minTileWidth = width * 0.3f, maxHeight = width * 0.6f)
+        val colWidth = width / JUSTIFIED_COLUMNS
+        rows(cells).dropLast(1).forEach { row ->
+            row.forEach { assertTrue("tile ${it.span * colWidth}dp", it.span * colWidth >= width * 0.3f - 2f * gap) }
+            assertTrue(row.first().height <= width * 0.6f + 0.01f)
+        }
+    }
+
+    @Test
     fun extremeShapesAreClamped() {
         val cells = justifiedCells(listOf(10f, 0.1f), width, target, gap)
         cells.forEach { assertTrue(it.span >= 1) }
