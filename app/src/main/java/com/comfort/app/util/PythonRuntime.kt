@@ -2,6 +2,7 @@ package com.comfort.app.util
 
 import android.content.Context
 import android.system.Os
+import com.comfort.app.data.GalleryDlPreferences
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStream
@@ -50,9 +51,17 @@ object PythonRuntime {
     private const val RUNTIME_DIR_NAME = "python_runtime"
     private const val PROVISION_MARKER = "provisioned.txt"
 
-    // Bump whenever assets/python_packages/ changes (a new gallery-dl/yt-dlp version, a wrapper
-    // script edit) so a rebuild re-provisions instead of silently keeping a stale extracted tree.
+    // Bump when the runtime itself changes: libpython.zip.so or a bundled engine wheel (gallery-dl,
+    // yt-dlp, Instaloader). That re-unpacks everything, which also replaces any engine the user
+    // updated in-app with the bundled one. The wrapper scripts don't need a bump: they're refreshed
+    // on every app install/update (see SCRIPTS_MARKER), leaving the engines alone.
     private const val PROVISION_VERSION = "110"
+    // Which app install the wrapper scripts were copied from (versionCode + install time).
+    private const val SCRIPTS_MARKER = "scripts.txt"
+    private val SCRIPTS = listOf(
+        "gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py",
+        "py_server.py", "net_resilience.py", "comfort_events.py", "cacert.pem",
+    )
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
 
@@ -88,6 +97,7 @@ object PythonRuntime {
         val root = runtimeRoot(context)
         val marker = File(root, PROVISION_MARKER)
         if (marker.exists() && runCatching { marker.readText() }.getOrNull() == PROVISION_VERSION) {
+            copyScriptsIfStale(context, root)
             return@withLock true
         }
 
@@ -117,24 +127,47 @@ object PythonRuntime {
         // deleted) again — Reddit's block is a separate, still-unresolved issue unrelated to this,
         // and TikTok genuinely needs curl_cffi's impersonation to get past its bot detection.
 
-        // cacert.pem (Mozilla's CA bundle via curl.se's own maintained mirror) rides along here
-        // too — aria2c's GnuTLS-linked TLS stack has no CA trust store of its own in this bundled
-        // environment (unlike a request made through Python's own ssl module or OkHttp, which both
-        // go through Android's system trust store transparently), so every aria2c-downloaded
-        // HTTPS URL failed with "SSL/TLS handshake failure: not signed by known authorities"
-        // until yt_dlp_wrapper.py started passing --ca-certificate=<this file> explicitly.
-        for (name in listOf("gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py", SERVER_SCRIPT, "net_resilience.py", "comfort_events.py", "cacert.pem")) {
-            context.assets.open("python_packages/$name").use { input ->
-                File(root, name).outputStream().use { input.copyTo(it) }
-            }
-        }
+        copyScriptsIfStale(context, root, force = true)
 
         marker.writeText(PROVISION_VERSION)
+        // The engines are the bundled ones again, whatever was installed in-app before: check for
+        // updates on the next launch instead of whenever the last check's interval runs out.
+        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, 0L)
         android.util.Log.i("PythonRuntime", "provisioned $PROVISION_VERSION in ${System.currentTimeMillis() - provisionStarted}ms")
         true
     }
 
     private const val PRECOMPILE_MARKER = "precompiled.txt"
+
+    /** Copies the wrapper scripts (and the CA bundle) out of the APK when this install's haven't been
+     * yet — after every app install or update, without touching the runtime or the engines. They
+     * used to be copied only with a full re-provision, so every script change needed a
+     * PROVISION_VERSION bump, which threw away any engine the user had updated in-app.
+     *
+     * cacert.pem (Mozilla's CA bundle) rides along: aria2c's GnuTLS stack has no trust store of its
+     * own here, so every aria2c HTTPS download failed with "not signed by known authorities" until
+     * yt_dlp_wrapper.py started passing --ca-certificate=<this file>. */
+    // Checked once per process: an app install or update always starts a new one.
+    @Volatile private var scriptsCurrent = false
+
+    private fun copyScriptsIfStale(context: Context, root: File, force: Boolean = false) {
+        if (scriptsCurrent && !force) return
+        val installId = runCatching {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            "${androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info)}:${info.lastUpdateTime}"
+        }.getOrDefault("unknown")
+        val marker = File(root, SCRIPTS_MARKER)
+        if (force || runCatching { marker.readText() }.getOrNull() != installId) {
+            for (name in SCRIPTS) {
+                context.assets.open("python_packages/$name").use { input ->
+                    File(root, name).outputStream().use { input.copyTo(it) }
+                }
+            }
+            marker.writeText(installId)
+            android.util.Log.i("PythonRuntime", "wrapper scripts copied for $installId")
+        }
+        scriptsCurrent = true
+    }
     private val warmUpStarted = java.util.concurrent.atomic.AtomicBoolean(false)
     // Outlives any one Activity (a rotation shouldn't cancel a half-done compile).
     private val backgroundScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
