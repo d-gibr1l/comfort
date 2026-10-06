@@ -145,6 +145,9 @@ fun DownloadsHistoryScreen(
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var gridView by remember { mutableStateOf(GalleryDlPreferences.isLibraryGridView(context)) }
+    // Tile size (pinch to change) and the item being peeked at (hold a tile).
+    var gridSize by remember { mutableStateOf(GalleryDlPreferences.getLibraryGridSize(context)) }
+    var peekItem by remember { mutableStateOf<DownloadEntity?>(null) }
     val selectionMode = selectedIds.isNotEmpty()
 
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
@@ -466,11 +469,12 @@ fun DownloadsHistoryScreen(
             // its media's shape needs (justifiedCells) rather than identical squares. A file whose
             // shape isn't known (yet) counts as square.
             val gridWidth = LocalConfiguration.current.screenWidthDp.toFloat()
-            val cells = remember(visibleItems, shapes, gridWidth) {
+            val (targetFraction, minTileFraction, maxHeightFraction) = LIBRARY_GRID_SIZES[gridSize.coerceIn(0, LIBRARY_GRID_SIZES.lastIndex)]
+            val cells = remember(visibleItems, shapes, gridWidth, gridSize) {
                 justifiedCells(
                     aspects = visibleItems.map { shapes[it.id]?.aspect ?: 1f },
                     width = gridWidth,
-                    targetHeight = gridWidth * 0.62f,
+                    targetHeight = gridWidth * targetFraction,
                     gap = GRID_GAP_DP,
                     // Portraits cropped only down to 0.6 wide-to-tall: a row of three is taller (bigger
                     // tiles) and shows more of each video.
@@ -479,8 +483,8 @@ fun DownloadsHistoryScreen(
                     // sharing its row to a fifth of the screen. Rows that end early for that are
                     // capped at 0.6x the width (tiles crop top and bottom), like Samsung Gallery.
                     maxAspect = 1.78f,
-                    minTileWidth = gridWidth * 0.3f,
-                    maxHeight = gridWidth * 0.6f,
+                    minTileWidth = gridWidth * minTileFraction,
+                    maxHeight = gridWidth * maxHeightFraction,
                 )
             }
             LazyVerticalGrid(
@@ -489,7 +493,14 @@ fun DownloadsHistoryScreen(
                 contentPadding = PaddingValues(top = topPaddingWhileSelecting, bottom = navBarClearance()),
                 horizontalArrangement = Arrangement.spacedBy(GRID_GAP_DP.dp),
                 verticalArrangement = Arrangement.spacedBy(GRID_GAP_DP.dp),
-                modifier = Modifier.fillMaxSize(),
+                // Pinch out for bigger tiles, in for smaller — one step per pinch, remembered.
+                modifier = Modifier.fillMaxSize().pinchSteps(onStep = { step ->
+                    val next = (gridSize + step).coerceIn(0, LIBRARY_GRID_SIZES.lastIndex)
+                    if (next != gridSize) {
+                        gridSize = next
+                        GalleryDlPreferences.setLibraryGridSize(context, next)
+                    }
+                }),
             ) {
                 // Full-width span so the header isn't squeezed into a single grid cell's own 1/3
                 // column — same instance, same fullHeaderContent(), as the list branch below. The
@@ -529,6 +540,7 @@ fun DownloadsHistoryScreen(
                             item = item,
                             height = (cells.getOrNull(index)?.height ?: (gridWidth / 3)).dp,
                             shape = shapes[item.id],
+                            onPeek = { peeking -> peekItem = if (peeking) item else null },
                             selected = item.id in selectedIds,
                             selectionMode = selectionMode,
                             onTap = {
@@ -733,6 +745,65 @@ fun DownloadsHistoryScreen(
                 headerScrollOffsetPx = ::currentHeaderScrollOffsetPx,
                 modifier = Modifier.align(Alignment.TopStart).compactHeaderReveal(compactBarReveal),
             )
+        }
+
+        LibraryPeek(item = peekItem, shape = peekItem?.let { shapes[it.id] })
+    }
+}
+
+/** The hold-to-peek preview: the whole thumbnail (not the tile's crop), large and centred on a dim
+ * scrim, with its title and details. Drawn over the screen while a tile is held; touch stays with
+ * the tile underneath, so releasing it closes this. */
+@Composable
+private fun LibraryPeek(item: DownloadEntity?, shape: com.comfort.app.util.MediaShape?) {
+    // Kept through the exit animation after item goes null.
+    var shown by remember { mutableStateOf(item) }
+    if (item != null) shown = item
+    AnimatedVisibility(
+        visible = item != null,
+        enter = fadeIn(tween(150)) + androidx.compose.animation.scaleIn(tween(180), initialScale = 0.9f),
+        exit = fadeOut(tween(120)) + androidx.compose.animation.scaleOut(tween(120), targetScale = 0.95f),
+    ) {
+        val peek = shown ?: return@AnimatedVisibility
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(0.88f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                val aspect = (shape?.aspect ?: 1f).coerceIn(0.5f, 2f)
+                AsyncImage(
+                    model = peek.thumbnailPath,
+                    contentDescription = peek.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth(if (aspect < 1f) aspect.coerceAtLeast(0.62f) else 1f)
+                        .aspectRatio(aspect)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                )
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    peek.title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                val details = listOfNotNull(
+                    shape?.shortSide?.takeIf { !peek.isAudio && shape.durationMs != null }?.let { qualityLabel(it) },
+                    shape?.durationMs?.let { formatGridDuration(it) },
+                    peek.totalBytes.takeIf { it > 0 }?.let { formatFileSize(it) },
+                ).joinToString("  ·  ")
+                if (details.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(details, color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }
@@ -1411,6 +1482,7 @@ private fun HistoryGridItem(
     item: DownloadEntity,
     height: androidx.compose.ui.unit.Dp,
     shape: com.comfort.app.util.MediaShape?,
+    onPeek: (Boolean) -> Unit,
     selected: Boolean,
     selectionMode: Boolean,
     onTap: () -> Unit,
@@ -1420,6 +1492,9 @@ private fun HistoryGridItem(
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
     // can only fail, and don't offer open/share actions that would just error out.
     val hasThumbnail = !item.thumbnailPath.isNullOrBlank() && item.status != DownloadStatus.DELETED
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val currentOnPeek by androidx.compose.runtime.rememberUpdatedState(onPeek)
+    val currentOnLongPress by androidx.compose.runtime.rememberUpdatedState(onLongPress)
 
     Box(
         modifier = Modifier
@@ -1456,7 +1531,16 @@ private fun HistoryGridItem(
                         runCatching { context.startActivity(intent) }
                     }
                 },
-                onLongClick = onLongPress,
+            )
+            // Hold to peek; moving the finger while peeking selects, as a long press used to.
+            .holdToPeek(
+                key = item.id,
+                onPeekStart = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    currentOnPeek(true)
+                },
+                onPeekEnd = { currentOnPeek(false) },
+                onSelect = { currentOnLongPress() },
             ),
     ) {
         if (hasThumbnail) {

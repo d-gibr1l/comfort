@@ -85,6 +85,7 @@ object GalleryDlPreferences {
     const val KEY_INSTANT_SHARE = "instant_share"
     const val KEY_SHARE_MODE = "share_mode"
     const val KEY_LIBRARY_GRID_VIEW = "library_grid_view"
+    const val KEY_LIBRARY_GRID_SIZE = "library_grid_size"
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
@@ -492,6 +493,13 @@ object GalleryDlPreferences {
 
     fun isLibraryGridView(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_LIBRARY_GRID_VIEW, false)
+    }
+
+    /** The Library grid's tile size, set by pinching: 0 small, 1 default, 2 large. */
+    fun getLibraryGridSize(context: Context): Int = prefs(context).getInt(KEY_LIBRARY_GRID_SIZE, 1)
+
+    fun setLibraryGridSize(context: Context, size: Int) {
+        prefs(context).edit().putInt(KEY_LIBRARY_GRID_SIZE, size).apply()
     }
 
     fun setLibraryGridView(context: Context, gridView: Boolean) {
