@@ -44,10 +44,23 @@ class SharePickerViewModel(
     private val _selectedNums = MutableStateFlow<Set<Int>>(emptySet())
     val selectedNums: StateFlow<Set<Int>> = _selectedNums.asStateFlow()
 
+    // Selection is by GalleryItem.num because that's all the download's item filter can express —
+    // so items sharing a num (a Wikimedia file page's archived revisions, item 1 of several posts in
+    // one listing) are one unit: they're ticked, counted and downloaded together. Everything below
+    // compares against the distinct nums, not the item count; comparing nums to items used to show
+    // "1 of 4 selected" with all four ticked, and a "Select all" that could never finish.
+
+    /** Items that will download with the current selection. */
+    val selectedCount: StateFlow<Int> = combine(_items, _selectedNums) { items, selected -> items.count { it.num in selected } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    val allSelected: StateFlow<Boolean> = combine(_items, _selectedNums) { items, selected -> isAll(items, selected) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     /** "num in {1,3,4}", or null for "the whole gallery" — nothing or everything selected, which
      * is what a plain shared link with no selection would enqueue as. */
     val itemFilter: StateFlow<String?> = combine(_items, _selectedNums) { items, selected ->
-        if (selected.isEmpty() || selected.size == items.size) null else "num in {${selected.sorted().joinToString(",")}}"
+        if (selected.isEmpty() || isAll(items, selected)) null else "num in {${selected.sorted().joinToString(",")}}"
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Whether this link with the current selection is already queued, running or finished.
@@ -101,6 +114,8 @@ class SharePickerViewModel(
 
     fun toggleAll() {
         val items = _items.value
-        _selectedNums.value = if (_selectedNums.value.size == items.size) emptySet() else items.map { it.num }.toSet()
+        _selectedNums.value = if (isAll(items, _selectedNums.value)) emptySet() else items.map { it.num }.toSet()
     }
+
+    private fun isAll(items: List<GalleryItem>, selected: Set<Int>) = items.isNotEmpty() && items.all { it.num in selected }
 }
