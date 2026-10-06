@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -1491,33 +1492,25 @@ private fun HistoryGridItem(
         }
 
         // Top-left: a video's quality, from its real short side (a portrait 720x1280 video is
-        // "720p", not the "1280p" its format tag says) — only from 1080p up, so it stays a
-        // highlight rather than a label on every tile.
+        // "720p", not the "1280p" its format tag says).
         val quality = shape?.shortSide?.takeIf { isVideo }?.let { qualityLabel(it) }
         if (quality != null) {
             MediaBadge(icon = null, text = quality, modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
+        // Top-right: favourite, in the same dark pill as the other badges.
         if (item.isFavorite) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(5.dp)
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
-            }
+            MediaBadge(icon = Icons.Filled.Star, text = null, tint = Color(0xFFFFD54F), modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
         }
 
-        // A quick, scannable outcome badge in a grid full of thumbnails — a checkmark or an
-        // alert, so you don't have to open each item (or squint at its icon-vs-photo state) to
-        // tell success from failure. DELETED/CANCELLED already read clearly enough from their own
-        // placeholder icon above (trash can, greyed out) not to need one.
-        if (item.status == DownloadStatus.ERRORED) {
-            StatusBadge(status = item.status, modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp))
+        // Bottom-right: the download's size, and the failure badge when it failed.
+        Row(
+            modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (item.totalBytes > 0) MediaBadge(icon = null, text = formatFileSize(item.totalBytes))
+            if (item.status == DownloadStatus.ERRORED) StatusBadge(status = item.status)
         }
 
         if (selected) {
@@ -1544,6 +1537,7 @@ private fun MediaBadge(
     text: String?,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    tint: Color = Color.White,
 ) {
     val side = when {
         text == null -> 3.dp
@@ -1557,7 +1551,7 @@ private fun MediaBadge(
             .padding(start = if (icon != null) side / 2 + 1.dp else side, end = side, top = if (text == null) 3.dp else 1.dp, bottom = if (text == null) 3.dp else 1.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(if (compact) 11.dp else 14.dp))
+        if (icon != null) Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(if (compact) 11.dp else 14.dp))
         if (icon != null && text != null) Spacer(Modifier.width(2.dp))
         if (text != null) {
             Text(
@@ -1570,13 +1564,18 @@ private fun MediaBadge(
     }
 }
 
-/** A video's quality badge from its short side in pixels, or null below 1080p. */
-private fun qualityLabel(shortSide: Int): String? = when {
-    shortSide >= 2000 -> "4K"
-    shortSide >= 1400 -> "1440p"
-    shortSide >= 1000 -> "1080p"
-    else -> null
+/** A video's quality badge from its short side in pixels, snapped to the usual steps (a 718 px
+ * encode reads "720p"); anything off the ladder shows its own number. */
+private fun qualityLabel(shortSide: Int): String {
+    val step = QUALITY_STEPS.lastOrNull { it <= shortSide * 1.05f }
+    return when {
+        step == null -> "${shortSide}p"
+        step >= 2160 -> "4K"
+        else -> "${step}p"
+    }
 }
+
+private val QUALITY_STEPS = listOf(144, 240, 360, 480, 540, 720, 1080, 1440, 2160)
 
 /** "0:13", "1:21", "1:02:05" — a thumbnail's duration badge. */
 private fun formatGridDuration(ms: Long): String {
