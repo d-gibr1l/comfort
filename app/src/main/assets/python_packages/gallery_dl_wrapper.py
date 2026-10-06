@@ -190,6 +190,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # each individual file's download — setting only one leaves the other at gallery-dl's
         # own default (4) regardless of what the user configured.
         args.extend(["-o", f"extractor.retries={retries}", "-o", f"downloader.retries={retries}"])
+    # gallery-dl sets each file's mtime to the server's Last-Modified by default (the upload time
+    # for e.g. Redgifs), so the saved file would look uploaded rather than downloaded.
+    args.extend(["-o", "downloader.mtime=false"])
     if max_filesize:
         args.extend(["-o", f"downloader.filesize-max={max_filesize}"])
     if socket_timeout_seconds:
