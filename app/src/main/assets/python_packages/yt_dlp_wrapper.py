@@ -1489,7 +1489,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 ydl.download([url])
 
     try:
-        _attempt(ydl_opts, reuse_info=True)
+        try:
+            _attempt(ydl_opts, reuse_info=True)
+        except _Cancelled:
+            raise
+        except Exception:
+            # Usually reported, not raised ("ignoreerrors"), but a redirect can raise it instead —
+            # a Spotify match on music.youtube.com redirects to a mix playlist and the 403 came out
+            # as an exception, skipping the retry below. Only a refused stream is retried.
+            if not refused:
+                raise
         if refused:
             if callback:
                 callback(event("warning", message="YouTube refused the stream with your cookies (HTTP 403); retrying without them"))
