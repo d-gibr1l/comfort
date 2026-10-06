@@ -303,7 +303,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              archive_path=None, js_runtime_path=None, ffmpeg_path=None, ffmpeg_lib_dir=None,
              aria2_path=None, aria2_lib_dir=None, restrict_filenames=True, trim_filenames=True,
              verbose=False, save_thumbnail=False, playlist_items=None,
-             override_title=None, override_artist=None):
+             override_title=None, override_artist=None, impersonate=False,
+             youtube_client_rotation=False, extractor_args=None, proxy_url=None,
+             socket_timeout_seconds=None, retries=None):
     """One call per Spotify link (track, or every track in an album/playlist in turn). Each
     track's own final-file callback line comes straight from the inner yt_dlp_wrapper.download()
     call unchanged, so DownloadWorker.kt's existing bare-filepath/[progress]/[size] handling needs
@@ -417,6 +419,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 trim_filenames=trim_filenames, verbose=verbose,
                 aria2_path=aria2_path, aria2_lib_dir=aria2_lib_dir,
                 save_thumbnail=save_thumbnail,
+                # The same network/YouTube settings a plain YouTube download gets — without them a
+                # matched track was fetched with no impersonation, no client rotation and no proxy,
+                # and failed where the same video downloaded fine from a YouTube link.
+                impersonate=impersonate, youtube_client_rotation=youtube_client_rotation,
+                extractor_args=extractor_args, proxy_url=proxy_url,
+                socket_timeout_seconds=socket_timeout_seconds, retries=retries,
             )
             if status != "Done":
                 continue
@@ -444,7 +452,7 @@ if __name__ == "__main__":
         print(line, flush=True)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
-        print("Usage: spotify_wrapper.py download <17 positional args> | list <4 positional args>", file=_sys.stderr)
+        print("Usage: spotify_wrapper.py download <23 positional args> | list <4 positional args>", file=_sys.stderr)
         _sys.exit(2)
 
     if _sys.argv[1] == "list":
@@ -466,5 +474,11 @@ if __name__ == "__main__":
         playlist_items=_s(a[14]) if len(a) > 14 else None,
         override_title=_s(a[15]) if len(a) > 15 else None,
         override_artist=_s(a[16]) if len(a) > 16 else None,
+        impersonate=_b(a[17]) if len(a) > 17 else False,
+        youtube_client_rotation=_b(a[18]) if len(a) > 18 else False,
+        extractor_args=_s(a[19]) if len(a) > 19 else None,
+        proxy_url=_s(a[20]) if len(a) > 20 else None,
+        socket_timeout_seconds=_s(a[21]) if len(a) > 21 else None,
+        retries=_s(a[22]) if len(a) > 22 else None,
     )
     print(event("exit", status=status), flush=True)

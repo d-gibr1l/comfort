@@ -200,6 +200,14 @@ internal class EngineCommands(
             ytDlpPlaylistItems,
             overrideTitle,
             overrideArtist,
+            // The matched YouTube video is downloaded like any YouTube link: same impersonation,
+            // client rotation, extractor args, proxy, timeout and retries.
+            flag(impersonate),
+            flag(youtubeClientRotation),
+            extractorArgs,
+            proxyUrl,
+            socketTimeoutSeconds,
+            networkRetries,
         ),
     )
 
