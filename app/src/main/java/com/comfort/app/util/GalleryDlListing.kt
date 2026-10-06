@@ -84,7 +84,9 @@ data class TrackPreview(val num: Int, val title: String?, val artist: String?, v
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
  * different situations for the picker: the former falls back to a normal whole-gallery download
  * silently, the latter should tell the user why before doing anything. */
-data class ListingResult(val items: List<GalleryItem>, val errorMessage: String? = null)
+/** [timedOut]: gallery-dl didn't answer in time (listItemsForSheet) — not a real failure of the
+ * link, so a sheet can still try yt-dlp. */
+data class ListingResult(val items: List<GalleryItem>, val errorMessage: String? = null, val timedOut: Boolean = false)
 
 /** Whether a listing should land on DownloadPreviewSheet (quality/trim/format/commands controls)
  * rather than SharePickerScreen's picker grid — a single detected video, or two-or-more videos
@@ -250,6 +252,7 @@ object GalleryDlListing {
             ?: ListingResult(
                 emptyList(),
                 errorMessage = "${VideoSiteRouter.siteName(url)} is taking too long to answer — it may be rate-limiting requests right now. You can still download the link.",
+                timedOut = true,
             )
 
     private const val SHEET_LISTING_CAP_MS = 20_000L
@@ -638,7 +641,14 @@ object GalleryDlListing {
      * download itself still goes ahead, since a preview failing is not a reason to block it. */
     private fun String?.blankToNull(): String? = this?.takeIf { it.isNotBlank() && it != "null" }
 
-    suspend fun fetchPreviewInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): PreviewInfo? = withContext(Dispatchers.IO) {
+    /** [ytDlpOnly] skips gallery-dl even where it normally answers — for when it's stuck waiting
+     * out a rate limit (LinkRouterViewModel), since yt-dlp reaches the site its own way. */
+    suspend fun fetchPreviewInfo(
+        context: Context,
+        url: String,
+        onStatus: ((String) -> Unit)? = null,
+        ytDlpOnly: Boolean = false,
+    ): PreviewInfo? = withContext(Dispatchers.IO) {
         // GALLERY_DL is the real download engine for a multi-item Instagram/TikTok *post* (not a
         // reel — see VideoSiteRouter.classify), so its checklist has to come from gallery-dl's own
         // listing/numbering too, not yt-dlp's. yt-dlp's own listing for these hosts only ever
@@ -649,8 +659,8 @@ object GalleryDlListing {
         // is what surfaced this). See fetchGalleryDlPreviewInfo's own doc comment for the rest.
         // Instaloader-routed Instagram posts too: their checklist numbering is the same 1-based
         // carousel order gallery-dl uses, and listItems() already handles their fallback.
-        if (VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL ||
-            VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER
+        if (!ytDlpOnly && (VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL ||
+            VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER)
         ) {
             return@withContext fetchGalleryDlPreviewInfo(context, url)
         }

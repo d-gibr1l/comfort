@@ -402,6 +402,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
         // 2026-09-24: these were once dropped here, so one picked carousel item saved all 13).
         is LinkRoute.Preview -> DownloadPreviewSheet(
             url = url,
+            preloadedPreview = current.preloaded,
             onDismiss = onFinished,
             onDownload = { options ->
                 router.download(url, options) {
