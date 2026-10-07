@@ -187,10 +187,13 @@ object GalleryDlPreferences {
     // stripping that trailing bracket, so the two need to keep matching.
     private const val LEGACY_DEFAULT_FILENAME_FORMAT_2 = "{uploader|category} - {title|id} - {filename}.{extension}"
     private const val LEGACY_DEFAULT_FILENAME_FORMAT_3 = "{uploader|category} - {title|category} [{filename}].{extension}"
-    // X posts have neither uploader nor title — their poster is author[name] and their text
-    // content — so they were all named "twitter - twitter [id]". ":? - //" adds " - <text>" only
-    // when there is text; the text is capped at 150 characters and "!W" folds its line breaks.
-    const val DEFAULT_FILENAME_FORMAT = "{uploader|author[name]|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
+    private const val LEGACY_DEFAULT_FILENAME_FORMAT_4 = "{uploader|author[name]|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
+    // poster_name is the wrapper's pick of the site's poster field (gallery_dl_wrapper.py) — sites
+    // name it differently, and only "uploader" used to count, so X files were "twitter - twitter"
+    // and Reddit's "reddit - <title>". X posts' text is "content", not "title". ":? - //" adds
+    // " - <text>" only when there is text; it's capped at 150 characters and "!W" folds its
+    // line breaks.
+    const val DEFAULT_FILENAME_FORMAT = "{poster_name|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
     private const val DEFAULT_FILENAME_TEMPLATES = """%(title)s.%(ext)s
 %(uploader)s - %(title)s [%(id)s].%(ext)s
 %(playlist_index)s - %(title)s.%(ext)s
@@ -205,7 +208,7 @@ object GalleryDlPreferences {
     fun getFilenameFormat(context: Context): String {
         val stored = prefs(context).getString(KEY_FILENAME_FORMAT, null)?.takeIf { it.isNotBlank() }
         if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT || stored == LEGACY_DEFAULT_FILENAME_FORMAT_2 ||
-            stored == LEGACY_DEFAULT_FILENAME_FORMAT_3) return DEFAULT_FILENAME_FORMAT
+            stored == LEGACY_DEFAULT_FILENAME_FORMAT_3 || stored == LEGACY_DEFAULT_FILENAME_FORMAT_4) return DEFAULT_FILENAME_FORMAT
         return stored
     }
 

@@ -11,6 +11,41 @@ import net_resilience
 from comfort_events import event
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
+
+# Sites name a file's poster differently — uploader, author (Reddit's "name", X's {"name": ...}),
+# user, owner, username, artist — so the default filename can't list them all without picking up
+# a record or a link somewhere. "poster_name" is the first of them that's a real name.
+_POSTER_KEYS = ("uploader", "author", "user", "owner", "username", "artist", "creator", "channel")
+_POSTER_SUBKEYS = ("name", "username", "handle", "screen_name", "nick")
+
+
+def _poster_name(kwdict):
+    for key in _POSTER_KEYS:
+        value = kwdict.get(key)
+        if isinstance(value, dict):
+            value = next((value[k] for k in _POSTER_SUBKEYS if isinstance(value.get(k), str) and value[k].strip()), None)
+        elif isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+        if isinstance(value, str):
+            value = value.strip()
+            if value and value != "[deleted]" and "://" not in value:
+                return value
+    return None
+
+
+_original_update_kwdict = gallery_dl.job.Job.update_kwdict
+
+
+def _update_kwdict(self, kwdict):
+    _original_update_kwdict(self, kwdict)
+    if "poster_name" not in kwdict:
+        name = _poster_name(kwdict)
+        if name:
+            kwdict["poster_name"] = name
+
+
+gallery_dl.job.Job.update_kwdict = _update_kwdict
+
 # gallery-dl's own internal yt-dlp delegation (downloader/ytdl.py, used for "ytdl:"-prefixed
 # URLs on sites like Instagram) names each pre-merge DASH stream "...fdash-<id>v.<ext>" (video)
 # or "...fdash-<id>a.<ext>" (audio) — and unlike our own yt_dlp_wrapper.py, that internal instance
