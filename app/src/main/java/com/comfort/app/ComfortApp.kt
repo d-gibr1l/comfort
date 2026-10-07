@@ -1,6 +1,7 @@
 package com.comfort.app
 
 import android.app.Application
+import com.comfort.app.data.AppDatabase
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.MediaStoreHelper
@@ -11,15 +12,24 @@ import kotlinx.coroutines.launch
 
 /** Process start-up: loads the user's Sites lists into VideoSiteRouter before anything routes a
  * link — the worker can start the process on its own, without any screen — and, once, sorts
- * downloads saved under the old folders into Download/Comfort's. */
+ * downloads saved under the old folders into Download/Comfort's and renames old-style names. */
 class ComfortApp : Application() {
     override fun onCreate() {
         super.onCreate()
         VideoSiteRouter.loadSiteRules(this)
-        if (!GalleryDlPreferences.isSavedFilesOrganized(this)) {
+        val organize = !GalleryDlPreferences.isSavedFilesOrganized(this)
+        val rename = !GalleryDlPreferences.isOldNamesTidied(this)
+        if (organize || rename) {
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                MediaStoreHelper.organizeSavedFiles(this@ComfortApp)
-                GalleryDlPreferences.setSavedFilesOrganized(this@ComfortApp)
+                if (organize) {
+                    MediaStoreHelper.organizeSavedFiles(this@ComfortApp)
+                    GalleryDlPreferences.setSavedFilesOrganized(this@ComfortApp)
+                }
+                if (rename) {
+                    val dao = AppDatabase.getDatabase(this@ComfortApp).downloadDao()
+                    MediaStoreHelper.tidyOldNames(this@ComfortApp) { dao.urlForSavedFile(it) }
+                    GalleryDlPreferences.setOldNamesTidied(this@ComfortApp)
+                }
             }
         }
     }

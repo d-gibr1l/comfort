@@ -280,18 +280,28 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    /** Checks every finished download's thumbnail Uri against the actual MediaStore and moves any
-     * that no longer resolve — i.e. the user deleted the image from their gallery outside the app
-     * — into the Deleted section, instead of leaving a permanently broken thumbnail in Library. */
+    /** Checks every finished download's file against the actual MediaStore and moves any that no
+     * longer resolve — i.e. the user deleted it from their gallery outside the app — into the
+     * Deleted section, instead of leaving a permanently broken thumbnail in Library. The file is
+     * mediaUri when there is one: a song's thumbnailPath is a copy of its cover art, which
+     * outlives the song (and can be cleared while the song is still there). A Deleted download
+     * whose file is back (restored from the gallery's trash) returns to the Library. */
     fun scanForDeletedMedia() {
         viewModelScope.launch {
             val context = getApplication<Application>()
             val candidates = dao.getHistoryWithThumbnailOnce()
+            val deleted = dao.getDeletedOnce()
             withContext(Dispatchers.IO) {
                 candidates.forEach { entity ->
-                    val uri = entity.thumbnailPath ?: return@forEach
+                    val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
                     if (!MediaStoreHelper.exists(context, uri)) {
                         dao.updateStatus(entity.id, DownloadStatus.DELETED)
+                    }
+                }
+                deleted.forEach { entity ->
+                    val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
+                    if (uri.startsWith("content://media/") && MediaStoreHelper.exists(context, uri, failOpen = false)) {
+                        dao.updateStatus(entity.id, DownloadStatus.FINISHED)
                     }
                 }
             }
