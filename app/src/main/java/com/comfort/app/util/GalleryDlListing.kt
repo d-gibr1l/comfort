@@ -198,13 +198,17 @@ object GalleryDlListing {
     /** Deletes cache files nothing will read again: previews' saved extractions (ytdlp-info,
      * instaloader-info) over an hour old — the download only reuses one for 20 minutes — and
      * downloaded app updates that are already installed (app_update.apk is an older build's name
-     * for them). Called once per launch. */
+     * for them), and the sign-in browser's HTTP cache. Called once per launch. */
     suspend fun sweepStaleCache(context: Context) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val cutoff = System.currentTimeMillis() - 60 * 60 * 1000L
         for (dir in listOf("ytdlp-info", "instaloader-info")) {
             java.io.File(context.cacheDir, dir).listFiles { f -> f.isFile && f.lastModified() < cutoff }?.forEach { it.delete() }
         }
         java.io.File(context.cacheDir, "app_update.apk").delete()
+        // The sign-in browser's saved pages and images. Logins aren't in here — WebView keeps
+        // cookies in the app's data folder (app_webview) — so they survive this. At process
+        // start no WebView is open yet to be using it.
+        java.io.File(context.cacheDir, "WebView/Default/HTTP Cache").deleteRecursively()
         val installed = AppUpdater.installedVersion(context)
         context.cacheDir.listFiles { f -> f.isFile && f.name.startsWith("Comfort-") && f.name.endsWith(".apk") }?.forEach { apk ->
             val version = apk.name.removePrefix("Comfort-").removeSuffix(".apk")
