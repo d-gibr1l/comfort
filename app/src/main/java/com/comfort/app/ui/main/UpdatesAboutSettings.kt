@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.verticalScroll
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Instagram
 import androidx.compose.foundation.Image
@@ -136,97 +137,76 @@ private fun EngineChoiceSection() {
     }
 }
 
-/** Which engine each site's links go to (VideoSiteRouter's Sites lists): the built-in video sites
- * on yt-dlp plus anything added, and sites moved to gallery-dl. A site can be added by domain or
- * by pasting any link from it; tapping a site's ✕ takes it off its list. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** Which engine each site's links go to (VideoSiteRouter's Sites lists). On the page it's one
+ * row with the counts; tapping it opens a sheet with both lists — the built-in video sites on
+ * yt-dlp plus anything added, and sites moved to gallery-dl — and an add form at the top, which
+ * takes a domain or any link from the site. A site's ✕ takes it off its list. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun SitesSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var ytDlpSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.ytDlpSites()) }
     var galleryDlSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.galleryDlSites()) }
-    var adding by remember { mutableStateOf(false) }
+    var open by remember { mutableStateOf(false) }
     fun refresh() {
         ytDlpSites = com.comfort.app.data.VideoSiteRouter.ytDlpSites()
         galleryDlSites = com.comfort.app.data.VideoSiteRouter.galleryDlSites()
     }
 
-    SettingsSection(title = "Sites", icon = Icons.Outlined.Public) {
-        Text(
-            "Which engine a site's links go to. Sites not listed try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        listOf(
-            Triple("yt-dlp", ytDlpSites, "Only yt-dlp"),
-            Triple("gallery-dl", galleryDlSites, "gallery-dl first"),
-        ).forEach { (name, sites, meaning) ->
-            Spacer(Modifier.height(14.dp))
-            Text("$name · $meaning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(6.dp))
-            if (sites.isEmpty()) {
-                Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                androidx.compose.foundation.layout.FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    sites.forEach { site ->
-                        androidx.compose.material3.InputChip(
-                            selected = false,
-                            onClick = {
-                                com.comfort.app.data.VideoSiteRouter.removeSite(context, site)
-                                refresh()
-                            },
-                            label = { Text(site) },
-                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "Remove $site", modifier = Modifier.size(16.dp)) },
-                        )
-                    }
-                }
+    SettingsSection(title = "Sites", icon = Icons.Outlined.Public, onClick = { open = true }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Which engine each site uses", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "${ytDlpSites.size} on yt-dlp · ${galleryDlSites.size} on gallery-dl",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { adding = true }) {
-                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Add site")
-            }
-            TextButton(onClick = {
-                com.comfort.app.data.VideoSiteRouter.resetSites(context)
-                refresh()
-            }) { Text("Restore defaults") }
+            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
-    if (adding) {
+    if (!open) return
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = { open = false },
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
         var input by remember { mutableStateOf("") }
         var toYtDlp by remember { mutableStateOf(true) }
         val site = com.comfort.app.data.VideoSiteRouter.siteFromInput(input)
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { adding = false },
-            title = { Text("Add a site") },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = { input = it },
-                        label = { Text("Site or any link from it") },
-                        placeholder = { Text("tiktok.com") },
-                        singleLine = true,
-                        supportingText = { Text(if (input.isBlank()) " " else site ?: "Not a site") },
-                        isError = input.isNotBlank() && site == null,
-                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        androidx.compose.material3.FilterChip(selected = toYtDlp, onClick = { toYtDlp = true }, label = { Text("yt-dlp") })
-                        androidx.compose.material3.FilterChip(selected = !toYtDlp, onClick = { toYtDlp = false }, label = { Text("gallery-dl") })
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
+                .imePadding()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+        ) {
+            Text("Sites", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Which engine a site's links go to. Sites not listed try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            // Add a site
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it },
+                label = { Text("Add a site, or paste a link from it") },
+                placeholder = { Text("tiktok.com") },
+                singleLine = true,
+                supportingText = { Text(if (input.isBlank()) " " else site ?: "Not a site") },
+                isError = input.isNotBlank() && site == null,
+                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.FilterChip(selected = toYtDlp, onClick = { toYtDlp = true }, label = { Text("yt-dlp") })
+                androidx.compose.material3.FilterChip(selected = !toYtDlp, onClick = { toYtDlp = false }, label = { Text("gallery-dl") })
+                Spacer(Modifier.weight(1f))
+                Button(
                     enabled = site != null,
                     onClick = {
                         site?.let {
@@ -236,12 +216,47 @@ private fun SitesSection() {
                             )
                         }
                         refresh()
-                        adding = false
+                        input = ""
                     },
                 ) { Text("Add") }
-            },
-            dismissButton = { TextButton(onClick = { adding = false }) { Text("Cancel") } },
-        )
+            }
+
+            // The two lists
+            listOf(
+                Triple("yt-dlp", ytDlpSites, "Only yt-dlp"),
+                Triple("gallery-dl", galleryDlSites, "gallery-dl first"),
+            ).forEach { (name, sites, meaning) ->
+                Spacer(Modifier.height(18.dp))
+                Text("$name · $meaning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                if (sites.isEmpty()) {
+                    Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    androidx.compose.foundation.layout.FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        sites.forEach { s ->
+                            androidx.compose.material3.InputChip(
+                                selected = false,
+                                onClick = {
+                                    com.comfort.app.data.VideoSiteRouter.removeSite(context, s)
+                                    refresh()
+                                },
+                                label = { Text(s) },
+                                trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "Remove $s", modifier = Modifier.size(16.dp)) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            TextButton(onClick = {
+                com.comfort.app.data.VideoSiteRouter.resetSites(context)
+                refresh()
+            }) { Text("Restore defaults") }
+        }
     }
 }
 
