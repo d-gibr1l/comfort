@@ -98,6 +98,12 @@ object VideoSiteRouter {
         saveSiteRules(context, addedYtDlp - host, addedGalleryDl - host, removed)
     }
 
+    /** Whether [host] is one of the built-in yt-dlp sites (not one the user added). */
+    fun isBuiltInYtDlpSite(host: String) = host in videoOnlyHosts
+
+    /** Whether the lists differ from the built-in defaults at all. */
+    fun hasSiteChanges() = addedYtDlp.isNotEmpty() || addedGalleryDl.isNotEmpty() || removedYtDlp.isNotEmpty()
+
     fun resetSites(context: Context) = saveSiteRules(context, emptySet(), emptySet(), emptySet())
 
     private fun saveSiteRules(context: Context, yt: Set<String>, gdl: Set<String>, removed: Set<String>) {

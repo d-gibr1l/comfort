@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.foundation.verticalScroll
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Instagram
@@ -171,91 +173,243 @@ private fun SitesSection() {
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = { open = false },
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         var input by remember { mutableStateOf("") }
         var toYtDlp by remember { mutableStateOf(true) }
+        var justAdded by remember { mutableStateOf<String?>(null) }
+        var changed by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.hasSiteChanges()) }
         val site = com.comfort.app.data.VideoSiteRouter.siteFromInput(input)
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+        fun afterEdit() {
+            refresh()
+            changed = com.comfort.app.data.VideoSiteRouter.hasSiteChanges()
+        }
+
         Column(
             modifier = Modifier
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 28.dp)
                 .imePadding()
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
         ) {
-            Text("Sites", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Which engine a site's links go to. Sites not listed try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            // Add a site
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                label = { Text("Add a site, or paste a link from it") },
-                placeholder = { Text("tiktok.com") },
-                singleLine = true,
-                supportingText = { Text(if (input.isBlank()) " " else site ?: "Not a site") },
-                isError = input.isNotBlank() && site == null,
-                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-            )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                androidx.compose.material3.FilterChip(selected = toYtDlp, onClick = { toYtDlp = true }, label = { Text("yt-dlp") })
-                androidx.compose.material3.FilterChip(selected = !toYtDlp, onClick = { toYtDlp = false }, label = { Text("gallery-dl") })
-                Spacer(Modifier.weight(1f))
-                Button(
-                    enabled = site != null,
-                    onClick = {
-                        site?.let {
-                            com.comfort.app.data.VideoSiteRouter.addSite(
-                                context, it,
-                                if (toYtDlp) com.comfort.app.data.DownloadEngine.YT_DLP else com.comfort.app.data.DownloadEngine.GALLERY_DL,
-                            )
-                        }
-                        refresh()
-                        input = ""
-                    },
-                ) { Text("Add") }
+            // Header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Public, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    Text("Sites", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Choose which engine a site's links go to",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
-            // The two lists
-            listOf(
-                Triple("yt-dlp", ytDlpSites, "Only yt-dlp"),
-                Triple("gallery-dl", galleryDlSites, "gallery-dl first"),
-            ).forEach { (name, sites, meaning) ->
-                Spacer(Modifier.height(18.dp))
-                Text("$name · $meaning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(6.dp))
-                if (sites.isEmpty()) {
-                    Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        sites.forEach { s ->
-                            androidx.compose.material3.InputChip(
-                                selected = false,
-                                onClick = {
-                                    com.comfort.app.data.VideoSiteRouter.removeSite(context, s)
-                                    refresh()
-                                },
-                                label = { Text(s) },
-                                trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "Remove $s", modifier = Modifier.size(16.dp)) },
-                            )
+            // Add a site
+            Spacer(Modifier.height(20.dp))
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text("Add a site", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = input,
+                        onValueChange = { input = it; justAdded = null },
+                        placeholder = { Text("tiktok.com, or paste a link") },
+                        leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
+                        trailingIcon = {
+                            if (input.isNotEmpty()) {
+                                IconButton(onClick = { input = "" }) { Icon(Icons.Outlined.Close, contentDescription = "Clear") }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(50),
+                        isError = input.isNotBlank() && site == null,
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                    )
+                    // What will be added (the link turned into its site), or why it can't be.
+                    Text(
+                        when {
+                            justAdded != null -> "Added $justAdded"
+                            input.isBlank() -> "A domain or any link from the site"
+                            site == null -> "That isn't a site"
+                            else -> "Adds $site"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when {
+                            input.isNotBlank() && site == null -> MaterialTheme.colorScheme.error
+                            justAdded != null -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+                            listOf(true to "yt-dlp", false to "gallery-dl").forEachIndexed { index, (yt, label) ->
+                                SegmentedButton(
+                                    selected = toYtDlp == yt,
+                                    onClick = { toYtDlp = yt },
+                                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, 2),
+                                ) { Text(label) }
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Button(
+                            enabled = site != null,
+                            onClick = {
+                                site?.let {
+                                    com.comfort.app.data.VideoSiteRouter.addSite(
+                                        context, it,
+                                        if (toYtDlp) com.comfort.app.data.DownloadEngine.YT_DLP else com.comfort.app.data.DownloadEngine.GALLERY_DL,
+                                    )
+                                    justAdded = it
+                                }
+                                input = ""
+                                focusManager.clearFocus()
+                                afterEdit()
+                            },
+                        ) {
+                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Add")
                         }
                     }
                 }
             }
 
+            // The two lists
+            SiteListCard(
+                icon = Icons.Outlined.Terminal,
+                engine = "yt-dlp",
+                meaning = "Only yt-dlp downloads these",
+                sites = ytDlpSites,
+                emptyText = "No sites: every link tries gallery-dl first.",
+                highlight = { it == justAdded || !com.comfort.app.data.VideoSiteRouter.isBuiltInYtDlpSite(it) },
+                onRemove = {
+                    com.comfort.app.data.VideoSiteRouter.removeSite(context, it)
+                    afterEdit()
+                },
+            )
+            SiteListCard(
+                icon = Icons.Outlined.Image,
+                engine = "gallery-dl",
+                meaning = "gallery-dl first, videos still to yt-dlp",
+                sites = galleryDlSites,
+                emptyText = "Nothing here yet. Add a site here to take it off yt-dlp.",
+                highlight = { true },
+                onRemove = {
+                    com.comfort.app.data.VideoSiteRouter.removeSite(context, it)
+                    afterEdit()
+                },
+            )
+
             Spacer(Modifier.height(16.dp))
-            TextButton(onClick = {
-                com.comfort.app.data.VideoSiteRouter.resetSites(context)
-                refresh()
-            }) { Text("Restore defaults") }
+            Text(
+                "Sites not listed try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+            if (changed) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = {
+                    com.comfort.app.data.VideoSiteRouter.resetSites(context)
+                    justAdded = null
+                    afterEdit()
+                }) {
+                    Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Restore defaults")
+                }
+            }
+        }
+    }
+}
+
+/** One engine's list in the Sites sheet: a header (icon, engine, what it means, count) over the
+ * sites as chips, each with a letter avatar and a remove button. [highlight] tints the sites the
+ * user added. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SiteListCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    engine: String,
+    meaning: String,
+    sites: List<String>,
+    emptyText: String,
+    highlight: (String) -> Boolean,
+    onRemove: (String) -> Unit,
+) {
+    Spacer(Modifier.height(12.dp))
+    androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(engine, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(meaning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Text(
+                        "${sites.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (sites.isEmpty()) {
+                Text(emptyText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    sites.forEach { s ->
+                        val tinted = highlight(s)
+                        androidx.compose.material3.InputChip(
+                            selected = tinted,
+                            onClick = { onRemove(s) },
+                            label = { Text(s) },
+                            avatar = {
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = Modifier.size(24.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(if (tinted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        s.first().uppercase(),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (tinted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "Remove $s", modifier = Modifier.size(16.dp)) },
+                            shape = RoundedCornerShape(50),
+                            border = null,
+                            colors = androidx.compose.material3.InputChipDefaults.inputChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        )
+                    }
+                }
+            }
         }
     }
 }
