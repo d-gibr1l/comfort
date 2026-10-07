@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comfort — download anything on Android</title>
+<meta name="description" content="Comfort is a free, open-source Android downloader for videos, galleries and music. Paste or share a link from any app and save it in the quality you want.">
+<meta name="theme-color" content="#2f6bff">
+<meta property="og:title" content="Comfort — download anything on Android">
+<meta property="og:description" content="Free, open-source downloader for videos, galleries and music. Built on yt-dlp, gallery-dl and Instaloader.">
+<meta property="og:image" content="https://d-gibr1l.github.io/comfort/screenshots/home.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Unbounded:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f3f7;
+    --surface: #ffffff;
+    --surface-2: #e9eaf2;
+    --tint: #e3e9ff;
+    --text: #15161a;
+    --muted: #5d6070;
+    --line: #dcdde6;
+    --primary: #2f6bff;
+    --primary-ink: #ffffff;
+    --primary-soft: #dbe5ff;
+    --shadow: 0 20px 50px -20px rgba(30, 40, 90, .35);
+    --radius: 28px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0e12;
+      --surface: #17181e;
+      --surface-2: #1f2129;
+      --tint: #1b2440;
+      --text: #f1f2f6;
+      --muted: #a2a6b6;
+      --line: #2a2c36;
+      --primary: #6f97ff;
+      --primary-ink: #0b1230;
+      --primary-soft: #23315c;
+      --shadow: 0 20px 50px -20px rgba(0, 0, 0, .8);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0e12; --surface: #17181e; --surface-2: #1f2129; --tint: #1b2440; --text: #f1f2f6;
+    --muted: #a2a6b6; --line: #2a2c36; --primary: #6f97ff; --primary-ink: #0b1230;
+    --primary-soft: #23315c; --shadow: 0 20px 50px -20px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 "Plus Jakarta Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: inherit; }
+  img { display: block; max-width: 100%; }
+  .wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+  h1, h2, h3 { margin: 0; line-height: 1.1; }
+  h2 { font: 900 clamp(28px, 4.4vw, 44px)/1.08 "Unbounded", sans-serif; letter-spacing: -.02em; }
+  .eyebrow { color: var(--primary); font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; }
+  .lead { color: var(--muted); font-size: clamp(16px, 2vw, 19px); max-width: 620px; }
+  section { padding: clamp(64px, 9vw, 112px) 0; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+    font-weight: 700; border-radius: 999px; padding: 15px 26px; transition: transform .15s, box-shadow .15s, background .15s;
+    border: 0; cursor: pointer; font-size: 16px; font-family: inherit;
+  }
+  .btn svg { width: 20px; height: 20px; flex: none; }
+  .btn-primary { background: var(--primary); color: var(--primary-ink); box-shadow: 0 10px 24px -10px var(--primary); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 30px -12px var(--primary); }
+  .btn-tonal { background: var(--surface-2); color: var(--text); }
+  .btn-tonal:hover { background: var(--primary-soft); }
+
+  /* Nav */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    border-bottom: 1px solid transparent; transition: border-color .2s;
+  }
+  header.scrolled { border-bottom-color: var(--line); }
+  .nav { display: flex; align-items: center; gap: 24px; height: 68px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 900 18px "Unbounded", sans-serif; letter-spacing: .02em; }
+  .brand img { width: 36px; height: 36px; border-radius: 10px; background: #fff; }
+  .nav-links { display: flex; gap: 22px; margin-left: auto; }
+  .nav-links a { text-decoration: none; color: var(--muted); font-weight: 600; font-size: 15px; }
+  .nav-links a:hover { color: var(--text); }
+  .nav .btn { padding: 10px 18px; font-size: 15px; }
+  .theme-toggle { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 8px; border-radius: 50%; display: grid; place-items: center; }
+  .theme-toggle:hover { background: var(--surface-2); color: var(--text); }
+  .theme-toggle svg { width: 20px; height: 20px; }
+  @media (max-width: 760px) { .nav-links { display: none; } .theme-toggle { margin-left: auto; } }
+  @media (max-width: 420px) { .nav .btn span { display: none; } .nav .btn { padding: 10px 12px; } }
+
+  /* Hero */
+  .hero { padding: clamp(40px, 7vw, 88px) 0 clamp(56px, 8vw, 96px); position: relative; }
+  .hero::before {
+    content: ""; position: absolute; inset: -120px 0 auto; height: 620px; z-index: -1;
+    background: radial-gradient(60% 60% at 75% 30%, var(--primary-soft), transparent 70%),
+                radial-gradient(40% 50% at 10% 10%, var(--tint), transparent 70%);
+  }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; }
+  .wordmark { width: min(420px, 88%); aspect-ratio: 4704 / 734; color: var(--text); margin-bottom: 30px; }
+  .wordmark svg { width: 100%; height: auto; display: block; }
+  .hero h1 { font: 900 clamp(34px, 5.6vw, 62px)/1.04 "Unbounded", sans-serif; letter-spacing: -.03em; margin-bottom: 20px; }
+  .hero h1 em { font-style: normal; color: var(--primary); }
+  .hero .lead { margin: 0 0 30px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .chip { font-size: 13px; font-weight: 600; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+  .chip b { color: var(--text); }
+
+  .phones { position: relative; height: clamp(440px, 52vw, 600px); }
+  .phone {
+    position: absolute; width: clamp(190px, 21vw, 260px); aspect-ratio: 540 / 1123;
+    border-radius: 34px; padding: 8px; background: #101114;
+    box-shadow: var(--shadow), inset 0 0 0 1.5px #2b2d33;
+  }
+  .phone img { width: 100%; height: 100%; object-fit: cover; border-radius: 27px; }
+  .phones .p1 { left: 4%; top: 6%; transform: rotate(-6deg); z-index: 1; }
+  .phones .p2 { right: 4%; top: 0; transform: rotate(5deg); z-index: 2; }
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .phones { height: 430px; margin-top: 8px; }
+    .phones .p1 { left: calc(50% - 205px); }
+    .phones .p2 { right: calc(50% - 205px); }
+  }
+  @media (max-width: 440px) {
+    .phones { height: 380px; }
+    .phone { width: 170px; }
+    .phones .p1 { left: 0; } .phones .p2 { right: 0; }
+  }
+
+  /* Engines strip */
+  .engines { padding: 0 0 clamp(40px, 6vw, 64px); }
+  .engines-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 28px; color: var(--muted); font-weight: 600; }
+  .engines-row strong { color: var(--text); font-weight: 800; }
+  .engines-row .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--line); }
+
+  /* See it work */
+  .demo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 44px; }
+  .demo { background: var(--surface); border-radius: var(--radius); padding: 28px; display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center; border: 1px solid var(--line); }
+  .demo .phone { position: static; width: 170px; transform: none; }
+  .demo h3 { font-size: 20px; margin-bottom: 8px; }
+  .demo p { margin: 0; color: var(--muted); }
+  .step { display: inline-block; font-size: 12px; font-weight: 800; color: var(--primary); background: var(--primary-soft); border-radius: 999px; padding: 4px 10px; margin-bottom: 12px; }
+  @media (max-width: 860px) { .demo-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { .demo { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+
+  /* Features */
+  .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 44px; }
+  .feature { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 26px; transition: transform .2s, box-shadow .2s; }
+  .feature:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .feature .icon { width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); margin-bottom: 18px; }
+  .feature .icon svg { width: 24px; height: 24px; }
+  .feature h3 { font-size: 18px; margin-bottom: 8px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 15px; }
+  .feature.wide { grid-column: span 2; background: linear-gradient(135deg, var(--primary), #5b4dff); color: #fff; border: 0; }
+  .feature.wide p { color: rgba(255,255,255,.85); }
+  .feature.wide .icon { background: rgba(255,255,255,.18); color: #fff; }
+  .feature.wide.tonal { background: var(--tint); color: var(--text); border: 1px solid var(--line); }
+  .feature.wide.tonal p { color: var(--muted); }
+  .feature.wide.tonal .icon { background: var(--primary-soft); color: var(--primary); }
+  @media (max-width: 960px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 600px) { .features { grid-template-columns: 1fr; } .feature.wide { grid-column: auto; } }
+
+  /* Screenshots */
+  .shots-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+  .shots-nav { display: flex; gap: 8px; }
+  .round { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; display: grid; place-items: center; }
+  .round:hover { background: var(--primary-soft); }
+  .round svg { width: 20px; height: 20px; }
+  .shots {
+    display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 40px 16px 24px;
+    margin-inline: calc((100vw - min(1120px, 100vw - 32px)) / -2); padding-inline: calc((100vw - min(1120px, 100vw - 32px)) / 2);
+    scrollbar-width: none;
+  }
+  .shots::-webkit-scrollbar { display: none; }
+  .shot { flex: none; scroll-snap-align: center; text-align: center; margin: 0; }
+  .shot .phone { position: static; width: 220px; transform: none; box-shadow: 0 16px 34px -18px rgba(20,30,70,.45), inset 0 0 0 1.5px #2b2d33; }
+  .shot figcaption { margin-top: 14px; font-weight: 700; font-size: 14px; }
+  .shot span { display: block; color: var(--muted); font-weight: 500; font-size: 13px; }
+
+  /* Download */
+  .download { background: var(--surface); border: 1px solid var(--line); border-radius: 36px; padding: clamp(28px, 5vw, 56px); display: grid; grid-template-columns: 1fr 1.1fr; gap: 40px; align-items: center; }
+  .download .lead { margin-top: 14px; }
+  .apks { display: grid; gap: 10px; }
+  .apk { display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 20px; background: var(--surface-2); text-decoration: none; transition: background .15s, transform .15s; }
+  .apk:hover { background: var(--primary-soft); transform: translateX(3px); }
+  .apk.recommended { background: var(--primary); color: var(--primary-ink); }
+  .apk.recommended .apk-sub { color: inherit; opacity: .85; }
+  .apk-name { font-weight: 800; }
+  .apk-sub { font-size: 13px; color: var(--muted); }
+  .apk .size { margin-left: auto; font-weight: 700; font-size: 14px; white-space: nowrap; }
+  .apk svg { width: 22px; height: 22px; flex: none; }
+  .release-line { margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .release-line a { font-weight: 700; }
+  @media (max-width: 860px) { .download { grid-template-columns: 1fr; } }
+
+  /* FAQ */
+  .faq { max-width: 780px; margin: 40px auto 0; display: grid; gap: 10px; }
+  details { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 0 22px; }
+  summary { cursor: pointer; list-style: none; padding: 20px 0; font-weight: 700; display: flex; justify-content: space-between; gap: 16px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-size: 22px; line-height: 1; color: var(--primary); transition: transform .2s; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { margin: 0 0 20px; color: var(--muted); }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--line); padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
+  .foot { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: start; }
+  .foot p { margin: 6px 0 0; max-width: 520px; }
+  .foot-links { display: flex; gap: 20px; flex-wrap: wrap; }
+  .foot-links a { text-decoration: none; font-weight: 600; }
+  .foot-links a:hover { color: var(--text); }
+
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    html { scroll-behavior: auto; }
+    .btn, .feature, .apk { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-download" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0-12L8 7m4-4 4 4M6 11H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-1"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 7h10m4 0h2M4 17h4m4 0h8"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m14.5 17 2 2 3.5-4"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="16" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="18" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M8.5 6H15a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h6.5"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 6h16M4 12h10M4 18h7"/><path fill="currentColor" d="M16 14.5v6l5-3z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="m11 12 8.5-8.5M16 7l2.5 2.5M18.5 4.5 21 7"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.2-1.7-.4-1 .2-2.3 1.5-2.3H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10Z"/><circle cx="7.5" cy="11" r="1.3" fill="currentColor"/><circle cx="10" cy="7" r="1.3" fill="currentColor"/><circle cx="15" cy="7.5" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 20s-7.5-4.6-9.2-9.4C1.7 7.3 4 4 7.3 4c2 0 3.5 1.1 4.7 2.7C13.2 5.1 14.7 4 16.7 4 20 4 22.3 7.3 21.2 10.6 19.5 15.4 12 20 12 20Z"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m14.5 5-7 7 7 7"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m9.5 5 7 7-7 7"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 2.5v2m0 15v2M4.6 4.6l1.4 1.4m12 12 1.4 1.4M2.5 12h2m15 0h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M10.5 18.5h3"/></symbol>
+</svg>
+
+<header id="top">
+  <div class="wrap nav">
+    <a class="brand" href="#top"><img src="icon.png" alt="">Comfort</a>
+    <nav class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#screens">Screenshots</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/d-gibr1l/comfort">GitHub</a>
+    </nav>
+    <button class="theme-toggle" id="theme" aria-label="Switch light or dark theme"><svg><use href="#i-moon"/></svg></button>
+    <a class="btn btn-primary" href="#download" aria-label="Download"><svg><use href="#i-download"/></svg><span>Download</span></a>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <div class="wordmark" aria-label="Comfort" id="wordmark"></div>
+        <h1>Save anything you can <em>share.</em></h1>
+        <p class="lead">Videos, photo carousels, music and whole playlists from thousands of sites. Paste a link or share it in from any app, pick what you want, and it lands in your gallery.</p>
+        <div class="cta">
+          <a class="btn btn-primary" id="hero-download" href="https://github.com/d-gibr1l/comfort/releases/latest"><svg><use href="#i-download"/></svg>Download for Android</a>
+          <a class="btn btn-tonal" href="https://github.com/d-gibr1l/comfort"><svg><use href="#i-github"/></svg>Source code</a>
+        </div>
+        <div class="meta">
+          <span class="chip" id="version-chip">Latest release</span>
+          <span class="chip"><b>Android 7.0+</b></span>
+          <span class="chip"><b>Free</b> · no ads · no account</span>
+        </div>
+      </div>
+      <div class="phones" aria-hidden="true">
+        <div class="phone p1"><img src="screenshots/home.png" alt=""></div>
+        <div class="phone p2"><img src="screenshots/preview_video.png" alt=""></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="engines">
+    <div class="wrap engines-row">
+      <span>Powered by</span>
+      <strong>yt-dlp</strong><span class="dot"></span>
+      <strong>gallery-dl</strong><span class="dot"></span>
+      <strong>Instaloader</strong><span class="dot"></span>
+      <span><strong>3,000+</strong> supported sites</span>
+    </div>
+  </div>
+
+  <section id="how" style="padding-top:0">
+    <div class="wrap">
+      <div class="eyebrow reveal">How it works</div>
+      <h2 class="reveal">Share it. Pick it. Done.</h2>
+      <div class="demo-grid">
+        <div class="demo reveal">
+          <div class="phone"><img src="media/instagram_carousel.gif" alt="Sharing an Instagram carousel into Comfort and picking items" loading="lazy"></div>
+          <div>
+            <span class="step">Galleries</span>
+            <h3>Pick the pictures you want</h3>
+            <p>Share an Instagram carousel, an X post or a Reddit gallery. Comfort shows every item, you tick the ones you want, and they land in your gallery together, in order.</p>
+          </div>
+        </div>
+        <div class="demo reveal">
+          <div class="phone"><img src="media/spotify_song.gif" alt="Sharing a Spotify song into Comfort" loading="lazy"></div>
+          <div>
+            <span class="step">Music</span>
+            <h3>Songs with the real details</h3>
+            <p>Share a Spotify, YouTube Music or SoundCloud link. You get the right title, artist, album and cover art, with synced lyrics saved inside the song.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" style="padding-top:0">
+    <div class="wrap">
+      <div class="eyebrow reveal">Features</div>
+      <h2 class="reveal">Everything a downloader should be.</h2>
+      <div class="features">
+        <div class="feature wide reveal">
+          <div class="icon"><svg><use href="#i-share"/></svg></div>
+          <h3>Works from any app</h3>
+          <p>Hit Share in X, Instagram, Reddit, YouTube or your browser and pick Comfort. Choose <b>Configure</b> to preview first, or <b>Instant</b> to start right away.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-tune"/></svg></div>
+          <h3>Your quality, your format</h3>
+          <p>Best, 4K, 1080p, 720p or audio only, with the file size shown before you download. MP4 or MKV, and trim to just the part you want.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-grid"/></svg></div>
+          <h3>Galleries and carousels</h3>
+          <p>Choose items one by one from a multi-picture post. Whole profiles download in batches without filling your storage.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-music"/></svg></div>
+          <h3>Music, tagged properly</h3>
+          <p>Spotify tracks, albums and playlists with no login. Real artist, album and square cover art, plus synced lyrics.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-route"/></svg></div>
+          <h3>The right engine for every link</h3>
+          <p>yt-dlp, gallery-dl and Instaloader each do what they're best at, and step in for each other when one comes back empty. You can choose the order, too.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-queue"/></svg></div>
+          <h3>A queue that keeps going</h3>
+          <p>Pause, resume, reorder and schedule downloads for the night. Downloads survive the app being closed and retry on flaky Wi-Fi.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-key"/></svg></div>
+          <h3>Sign in where you need to</h3>
+          <p>Log in through the built-in browser once, and private or age-restricted posts download like any other.</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-folder"/></svg></div>
+          <h3>Tidy by default</h3>
+          <p>Everything saves to Download/Comfort, sorted into Pictures, Videos and Music, with clean names like "Poster - caption".</p>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg><use href="#i-palette"/></svg></div>
+          <h3>Looks the way you like</h3>
+          <p>Material You with dynamic color, light and dark themes, several color themes and a pure-black mode for OLED screens.</p>
+        </div>
+        <div class="feature wide tonal reveal">
+          <div class="icon"><svg><use href="#i-heart"/></svg></div>
+          <h3>Free and open source</h3>
+          <p>No ads, no tracking, no account. GPLv3, and the engines update themselves without waiting for an app update.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens" style="padding-top:0">
+    <div class="wrap">
+      <div class="shots-head">
+        <div>
+          <div class="eyebrow reveal">Screenshots</div>
+          <h2 class="reveal">Have a look around.</h2>
+        </div>
+        <div class="shots-nav">
+          <button class="round" data-dir="-1" aria-label="Previous screenshots"><svg><use href="#i-left"/></svg></button>
+          <button class="round" data-dir="1" aria-label="Next screenshots"><svg><use href="#i-right"/></svg></button>
+        </div>
+      </div>
+      <div class="shots" id="shots">
+        <figure class="shot"><div class="phone"><img src="screenshots/home.png" alt="Home screen" loading="lazy"></div><figcaption>Home<span>Paste or share a link</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/share_sheet.png" alt="Share sheet" loading="lazy"></div><figcaption>Share sheet<span>Configure or Instant</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/preview_video.png" alt="Video preview" loading="lazy"></div><figcaption>Video preview<span>Quality, size and trim</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/picker.png" alt="Gallery picker" loading="lazy"></div><figcaption>Gallery picker<span>Choose the items</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/preview_song.png" alt="Song preview" loading="lazy"></div><figcaption>Song preview<span>Edit title and artist</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/preview_playlist.png" alt="Playlist preview" loading="lazy"></div><figcaption>Playlists<span>Every track, your pick</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/queue.png" alt="Download queue" loading="lazy"></div><figcaption>Queue<span>Live progress</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/library.png" alt="Library" loading="lazy"></div><figcaption>Library<span>Search, filter, favourite</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/appearance_light.png" alt="Appearance settings" loading="lazy"></div><figcaption>Appearance<span>Themes and colors</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/appearance_dark.png" alt="Pure black theme" loading="lazy"></div><figcaption>Pure black<span>For OLED screens</span></figcaption></figure>
+        <figure class="shot"><div class="phone"><img src="screenshots/settings.png" alt="Settings" loading="lazy"></div><figcaption>Settings<span>Everything in one place</span></figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="download" style="padding-top:0">
+    <div class="wrap">
+      <div class="download reveal">
+        <div>
+          <div class="eyebrow">Download</div>
+          <h2>Get Comfort.</h2>
+          <p class="lead">Install the APK, and Comfort keeps itself up to date from then on. Not sure which one? Almost every phone from the last ten years wants <b>arm64-v8a</b>.</p>
+          <p class="release-line" id="release-line">Every version, with release notes, is on <a href="https://github.com/d-gibr1l/comfort/releases">GitHub Releases</a>.</p>
+        </div>
+        <div class="apks" id="apks">
+          <a class="apk recommended" data-abi="arm64-v8a" href="https://github.com/d-gibr1l/comfort/releases/latest">
+            <svg><use href="#i-phone"/></svg>
+            <div><div class="apk-name">arm64-v8a</div><div class="apk-sub">Most phones · recommended</div></div>
+            <span class="size"></span>
+          </a>
+          <a class="apk" data-abi="armeabi-v7a" href="https://github.com/d-gibr1l/comfort/releases/latest">
+            <svg><use href="#i-phone"/></svg>
+            <div><div class="apk-name">armeabi-v7a</div><div class="apk-sub">Older 32-bit phones</div></div>
+            <span class="size"></span>
+          </a>
+          <a class="apk" data-abi="universal" href="https://github.com/d-gibr1l/comfort/releases/latest">
+            <svg><use href="#i-download"/></svg>
+            <div><div class="apk-name">Universal</div><div class="apk-sub">Works everywhere · larger</div></div>
+            <span class="size"></span>
+          </a>
+          <a class="apk" data-abi="x86_64" href="https://github.com/d-gibr1l/comfort/releases/latest">
+            <svg><use href="#i-download"/></svg>
+            <div><div class="apk-name">x86_64</div><div class="apk-sub">Emulators and Chromebooks</div></div>
+            <span class="size"></span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" style="padding-top:0">
+    <div class="wrap">
+      <div class="eyebrow reveal" style="text-align:center">FAQ</div>
+      <h2 class="reveal" style="text-align:center">Questions, answered.</h2>
+      <div class="faq">
+        <details class="reveal"><summary>Is it really free?</summary><p>Yes. No ads, no subscriptions, no account and no tracking. Comfort is open source under the GPLv3, so anyone can read, build and change the code.</p></details>
+        <details class="reveal"><summary>Why isn't it on the Play Store?</summary><p>Google Play doesn't allow apps that download from YouTube and similar sites, so Comfort is installed from its APK instead. Your phone will ask you to allow installs from your browser or file manager the first time.</p></details>
+        <details class="reveal"><summary>Which sites does it work with?</summary><p>Thousands. Comfort uses yt-dlp, gallery-dl and Instaloader, which between them support X, Instagram, Reddit, YouTube, TikTok, Pinterest, Tumblr, SoundCloud and over 3,000 other sites. You can see the full lists, and choose which engine handles a site, in Settings.</p></details>
+        <details class="reveal"><summary>How does it stay up to date?</summary><p>The app checks GitHub for new versions and installs them for you. The download engines update separately, so a fix for a site can arrive the same day it's released.</p></details>
+        <details class="reveal"><summary>Where do my downloads go?</summary><p>To Download/Comfort on your phone, sorted into Pictures, Videos and Music. They show up in your gallery and music player like anything else. You can pick a different folder in Settings.</p></details>
+        <details class="reveal"><summary>Can it download private posts?</summary><p>Only ones your own account can see. Sign in to the site once through Comfort's built-in browser and it uses that login for downloads. Your login stays on your phone.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="brand" href="#top"><img src="icon.png" alt="">Comfort</a>
+      <p>Built on <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a>, <a href="https://github.com/mikf/gallery-dl">gallery-dl</a> and <a href="https://github.com/instaloader/instaloader">Instaloader</a>, with Python and ffmpeg packaging from <a href="https://github.com/deniscerri/ytdlnis-packages">ytdlnis-packages</a>. Licensed under the GPLv3. Download only what you have the right to.</p>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/d-gibr1l/comfort">GitHub</a>
+      <a href="https://github.com/d-gibr1l/comfort/releases">Releases</a>
+      <a href="https://github.com/d-gibr1l/comfort/issues">Report a problem</a>
+      <a href="https://github.com/d-gibr1l/comfort/blob/main/LICENSE">License</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // The app's wordmark, inline so it takes the page's text color in both themes.
+  fetch("wordmark.svg").then(r => r.ok ? r.text() : "").then(svg => {
+    if (svg) document.getElementById("wordmark").innerHTML = svg;
+  }).catch(() => {});
+
+  // Theme: follows the phone/computer unless the visitor picks one.
+  const root = document.documentElement, themeBtn = document.getElementById("theme");
+  const saved = (() => { try { return localStorage.getItem("theme"); } catch { return null; } })();
+  if (saved) root.dataset.theme = saved;
+  const isDark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const syncIcon = () => themeBtn.querySelector("use").setAttribute("href", isDark() ? "#i-sun" : "#i-moon");
+  syncIcon();
+  themeBtn.addEventListener("click", () => {
+    root.dataset.theme = isDark() ? "light" : "dark";
+    try { localStorage.setItem("theme", root.dataset.theme); } catch {}
+    syncIcon();
+  });
+
+  // Header border once scrolled.
+  const header = document.querySelector("header");
+  addEventListener("scroll", () => header.classList.toggle("scrolled", scrollY > 8), { passive: true });
+
+  // Fade sections in as they arrive.
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .12 });
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+  // Screenshot arrows.
+  const shots = document.getElementById("shots");
+  document.querySelectorAll(".shots-nav .round").forEach(b => b.addEventListener("click", () =>
+    shots.scrollBy({ left: Number(b.dataset.dir) * Math.min(shots.clientWidth * .8, 720), behavior: "smooth" })));
+
+  // Latest release: version, date, and direct links to each APK (named Comfort-<version>-<abi>.apk).
+  fetch("https://api.github.com/repos/d-gibr1l/comfort/releases/latest")
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(rel => {
+      const version = rel.tag_name.replace(/^v/, "");
+      const date = new Date(rel.published_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+      document.getElementById("version-chip").innerHTML = `Version <b>${version}</b> · ${date}`;
+      document.getElementById("release-line").innerHTML =
+        `Version ${version}, released ${date}. <a href="${rel.html_url}">What's new</a> · <a href="https://github.com/d-gibr1l/comfort/releases">All releases</a>`;
+      const mb = n => (n / 1048576).toFixed(0) + " MB";
+      document.querySelectorAll(".apk").forEach(a => {
+        const asset = rel.assets.find(x => x.name.endsWith(`-${a.dataset.abi}.apk`));
+        if (!asset) return;
+        a.href = asset.browser_download_url;
+        a.querySelector(".size").textContent = mb(asset.size);
+        if (a.dataset.abi === "arm64-v8a") document.getElementById("hero-download").href = asset.browser_download_url;
+      });
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
