@@ -98,6 +98,8 @@ object GalleryDlPreferences {
     const val KEY_DISABLED_COOKIE_DOMAINS = "disabled_cookie_domains"
     const val KEY_EMBED_THUMBNAIL = "embed_thumbnail"
     const val KEY_EMBED_METADATA = "embed_metadata"
+    const val KEY_LYRICS = "lyrics"
+    const val KEY_LYRICS_LRC = "lyrics_lrc"
     const val KEY_WRITE_INFO_FILES = "write_info_files"
     const val KEY_NO_PLAYLIST = "no_playlist"
     const val KEY_LIVE_FROM_START = "live_from_start"
@@ -464,7 +466,7 @@ object GalleryDlPreferences {
     }
 
     /** A user-chosen SAF folder to save downloads into, or null to use the default
-     * Pictures/gallery-dl location (the only option that's guaranteed to show up in Gallery apps). */
+     * Download/Comfort location (the only option that's guaranteed to show up in Gallery apps). */
     fun getDownloadLocationUri(context: Context): Uri? {
         val stored = prefs(context).getString(KEY_DOWNLOAD_LOCATION_URI, null) ?: return null
         return runCatching { Uri.parse(stored) }.getOrNull()
@@ -589,6 +591,37 @@ object GalleryDlPreferences {
     fun setEmbedMetadata(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_EMBED_METADATA, enabled).apply()
     }
+
+    /** Lyrics added to downloaded songs (from LRCLIB): "synced" (time-stamped, the default),
+     * "plain", or "off". */
+    fun getLyricsMode(context: Context): String =
+        prefs(context).getString(KEY_LYRICS, LYRICS_SYNCED)?.takeIf { it in LYRICS_MODES } ?: LYRICS_SYNCED
+
+    fun setLyricsMode(context: Context, mode: String) {
+        prefs(context).edit().putString(KEY_LYRICS, mode).apply()
+    }
+
+    /** Whether synced lyrics are also saved as a .lrc file beside the song. */
+    fun isLyricsLrcFile(context: Context): Boolean = prefs(context).getBoolean(KEY_LYRICS_LRC, true)
+
+    fun setLyricsLrcFile(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_LYRICS_LRC, enabled).apply()
+    }
+
+    /** Whether downloads saved under the old Pictures/Movies/Music folders have been moved into
+     * Download/Comfort's subfolders (MediaStoreHelper.organizeSavedFiles, once). */
+    fun isSavedFilesOrganized(context: Context): Boolean = prefs(context).getBoolean(KEY_SAVED_FILES_ORGANIZED, false)
+
+    fun setSavedFilesOrganized(context: Context) {
+        prefs(context).edit().putBoolean(KEY_SAVED_FILES_ORGANIZED, true).apply()
+    }
+
+    private const val KEY_SAVED_FILES_ORGANIZED = "saved_files_organized"
+
+    const val LYRICS_SYNCED = "synced"
+    const val LYRICS_PLAIN = "plain"
+    const val LYRICS_OFF = "off"
+    private val LYRICS_MODES = setOf(LYRICS_SYNCED, LYRICS_PLAIN, LYRICS_OFF)
 
     /** Saves a per-item JSON metadata sidecar alongside each download — gallery-dl's
      * --write-metadata, yt-dlp's --write-info-json plus --write-description. */
@@ -1157,7 +1190,7 @@ object GalleryDlPreferences {
     }
 
     /** A user-chosen SAF folder for audio-only downloads specifically — falls back to
-     * [getDownloadLocationUri] (the shared default), then the built-in Pictures/gallery-dl
+     * [getDownloadLocationUri] (the shared default), then the built-in Download/Comfort
      * location, when unset. Mirrors [getVideoLocationUri] for the video side. */
     fun getAudioLocationUri(context: Context): Uri? {
         val stored = prefs(context).getString(KEY_AUDIO_LOCATION_URI, null) ?: return null

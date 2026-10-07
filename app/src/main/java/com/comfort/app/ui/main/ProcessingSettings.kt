@@ -39,6 +39,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
     var saveSubtitleFiles by remember { mutableStateOf(GalleryDlPreferences.isSaveSubtitleFiles(context)) }
     var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
+    var lyricsMode by remember { mutableStateOf(GalleryDlPreferences.getLyricsMode(context)) }
+    var lyricsLrc by remember { mutableStateOf(GalleryDlPreferences.isLyricsLrcFile(context)) }
 
     SettingsSubScaffold(title = "Processing", topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
@@ -306,6 +308,70 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
             )
+        }
+
+        SettingsSection(title = "Music downloads", icon = Icons.Outlined.MusicNote) {
+            Text("Lyrics", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Looked up on LRCLIB by the song's title, artist and length, and saved inside the file. Synced lyrics carry timestamps, so players that support them scroll along with the song; songs without synced lyrics get plain ones.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                val modes = listOf(
+                    GalleryDlPreferences.LYRICS_SYNCED to "Synced",
+                    GalleryDlPreferences.LYRICS_PLAIN to "Plain",
+                    GalleryDlPreferences.LYRICS_OFF to "Off",
+                )
+                modes.forEachIndexed { index, (mode, label) ->
+                    val selected = lyricsMode == mode
+                    val interactionSource = remember { MutableInteractionSource() }
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            lyricsMode = mode
+                            GalleryDlPreferences.setLyricsMode(context, mode)
+                        },
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        interactionSource = interactionSource,
+                        shape = rememberMorphingChipShape(index, modes.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                        label = {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(label, style = MaterialTheme.typography.labelLarge)
+                            }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        border = null,
+                    )
+                }
+            }
+
+            if (lyricsMode != GalleryDlPreferences.LYRICS_OFF) {
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.Description,
+                    title = "Save .lrc file",
+                    subtitle = "Also saves synced lyrics as a .lrc file next to the song, for players that only read those.",
+                    checked = lyricsLrc,
+                    onCheckedChange = {
+                        lyricsLrc = it
+                        GalleryDlPreferences.setLyricsLrcFile(context, it)
+                    },
+                )
+            }
         }
     }
 }

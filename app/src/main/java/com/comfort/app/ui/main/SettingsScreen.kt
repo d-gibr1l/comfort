@@ -111,6 +111,8 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry("Embed thumbnail", "Save the video's thumbnail as cover art inside the file.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed metadata", "Tag the file with its title, uploader, and other details.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed chapters", "Saves chapter markers inside the video file.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Lyrics", "Adds synced or plain lyrics to downloaded songs.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Save .lrc file", "Also saves synced lyrics as a .lrc file next to the song.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Write description / info.json files", "Save a separate JSON metadata file alongside each download.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Download subtitles", "Fetch and embed subtitles when they're available.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Save subtitle files", "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.", SettingsRoute.PROCESSING),

@@ -145,6 +145,24 @@ class DownloadWorker(
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
 
+    /** Adds lyrics to a downloaded song (Settings › Processing › Lyrics; lyrics.py looks it up on
+     * LRCLIB by its tags and embeds them). Returns the .lrc file it wrote beside [song], if any.
+     * Best-effort and capped: a song with no lyrics found, or no network, saves as it is. */
+    private suspend fun addLyrics(song: File, title: String, artist: String): File? {
+        val mode = GalleryDlPreferences.getLyricsMode(applicationContext)
+        if (mode == GalleryDlPreferences.LYRICS_OFF) return null
+        val writeLrc = GalleryDlPreferences.isLyricsLrcFile(applicationContext)
+        runCatching {
+            kotlinx.coroutines.withTimeoutOrNull(LYRICS_CAP_MS) {
+                PythonRuntime.run(
+                    applicationContext, "lyrics.py",
+                    listOf(song.absolutePath, mode, if (writeLrc) "1" else "0", title, artist),
+                ) { }
+            }
+        }
+        return File(song.parentFile, song.nameWithoutExtension + ".lrc").takeIf { writeLrc && it.isFile }
+    }
+
     override suspend fun doWork(): Result {
         // Result.success() here too (never expected to actually trigger — WorkManager's own input
         // is always set by DownloadDispatcher) — same reasoning throughout this file: failure()
@@ -619,9 +637,16 @@ class DownloadWorker(
                                     // video MIME (else the track lands in Movies, not Music).
                                     val isAudioFile = candidate.extension.lowercase() in AUDIO_EXTENSIONS ||
                                         engine == DownloadEngine.SPOTIFY
+                                    // Lyrics go into the staging file's tags before it's saved;
+                                    // a synced .lrc lands beside it and is saved after the song.
+                                    val lrcFile = if (isAudioFile) addLyrics(candidate, overrideTitle, overrideArtist) else null
                                     val savedUri = MediaStoreHelper.saveMediaToGallery(
                                         applicationContext, candidate, forceAudioMime = isAudioFile,
                                     )
+                                    if (savedUri != null && lrcFile != null) {
+                                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrcFile) }
+                                    }
+                                    lrcFile?.delete()
                                     if (savedUri != null) {
                                         lastDataAt.set(System.currentTimeMillis())
                                         candidate.delete()
@@ -971,3 +996,6 @@ private const val STALL_AFTER_MS = 6_000L
 /** How long the pre-download listing may take before the download goes ahead without it. 30 s, not
  * less: a real listing on a slow connection (600 ms round trips seen) takes several seconds. */
 private const val LISTING_CAP_MS = 30_000L
+
+// lyrics.py makes at most two LRCLIB requests (10s timeout each); past this the song saves without.
+private const val LYRICS_CAP_MS = 25_000L
