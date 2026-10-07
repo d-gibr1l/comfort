@@ -88,6 +88,9 @@ object GalleryDlPreferences {
     const val KEY_LIBRARY_GRID_SIZE = "library_grid_size"
     const val KEY_ENGINE_ENABLED_PREFIX = "engine_enabled_"
     const val KEY_ENGINE_ORDER = "engine_order"
+    const val KEY_SITES_YT_DLP = "sites_yt_dlp"
+    const val KEY_SITES_GALLERY_DL = "sites_gallery_dl"
+    const val KEY_SITES_YT_DLP_REMOVED = "sites_yt_dlp_removed"
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
@@ -858,6 +861,14 @@ object GalleryDlPreferences {
             DownloadEngine.SPOTIFY -> Unit
             else -> prefs(context).edit().putBoolean(KEY_ENGINE_ENABLED_PREFIX + engine.name, enabled).apply()
         }
+    }
+
+    /** The Sites lists (Settings › Updates and engines): sites added to yt-dlp, sites added to
+     * gallery-dl, and built-in yt-dlp sites removed — see VideoSiteRouter.applySiteRules. */
+    fun getSiteHosts(context: Context, key: String): Set<String> = prefs(context).getStringSet(key, emptySet()).orEmpty().toSet()
+
+    fun setSiteHosts(context: Context, key: String, hosts: Set<String>) {
+        prefs(context).edit().putStringSet(key, hosts).apply()
     }
 
     /** The order engines try a link more than one of them handles, as DownloadEngine names; null
