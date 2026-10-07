@@ -18,10 +18,74 @@ import kotlinx.coroutines.launch
 
 object MediaStoreHelper {
 
-    private const val IMAGE_RELATIVE_DIR = "Pictures/Comfort"
-    private const val VIDEO_RELATIVE_DIR = "Movies/Comfort"
-    private const val AUDIO_RELATIVE_DIR = "Music/Comfort"
-    private const val OTHER_RELATIVE_DIR = "Download/Comfort"
+    /** Where every download goes by default, sorted into [subfolderFor]'s folders. The Download
+     * folder takes any file type (Music/ refuses anything that isn't audio, so a song's .lrc
+     * lyrics couldn't sit beside it there), and galleries and music players still index the media
+     * in it. */
+    const val RELATIVE_DIR = "Download/Comfort"
+
+    /** Where downloads went before they moved to [RELATIVE_DIR] — [organizeSavedFiles] moves them. */
+    private val OLD_RELATIVE_DIRS = listOf("Pictures/Comfort/", "Movies/Comfort/", "Music/Comfort/", "Download/Comfort/")
+
+    /** The [RELATIVE_DIR] subfolder a file goes in: by type, with sidecars beside what they
+     * belong to — subtitles with the videos, .lrc lyrics with the songs, so players find them —
+     * and info files (.json, .description) in Other. */
+    internal fun subfolderFor(name: String, mimeType: String?): String {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        val mime = mimeType.orEmpty()
+        return when {
+            ext == "lrc" -> "Music"
+            ext == "srt" || ext == "vtt" -> "Videos"
+            mime.startsWith("image/") -> "Pictures"
+            mime.startsWith("video/") -> "Videos"
+            mime.startsWith("audio/") -> "Music"
+            else -> "Other"
+        }
+    }
+
+    /** Moves downloads saved before the Download/Comfort layout (Pictures/, Movies/ and Music/
+     * Comfort, or Download/Comfort's top level) into their [subfolderFor] folders. A MediaStore
+     * move keeps each file's row, so the Library's links to them keep working. Only files this
+     * app owns can be moved; others (saved by an earlier install) stay where they are. Returns
+     * how many moved. */
+    fun organizeSavedFiles(context: Context): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
+        val resolver = context.contentResolver
+        val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val rows = mutableListOf<Triple<Long, String, String?>>()
+        runCatching {
+            resolver.query(
+                files,
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.MIME_TYPE),
+                "${MediaStore.MediaColumns.RELATIVE_PATH} IN (${OLD_RELATIVE_DIRS.joinToString { "?" }}) AND " +
+                    "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
+                (OLD_RELATIVE_DIRS + context.packageName).toTypedArray(),
+                null,
+            )?.use { c ->
+                while (c.moveToNext()) c.getString(1)?.let { rows += Triple(c.getLong(0), it, c.getString(2)) }
+            }
+        }
+        var moved = 0
+        for ((id, name, mime) in rows) {
+            val uri = android.content.ContentUris.withAppendedId(files, id)
+            val target = "$RELATIVE_DIR/${subfolderFor(name, mime)}/"
+            // A same-named file already there makes the move fail: try "name (1).ext" and so on.
+            val dot = name.lastIndexOf('.')
+            val base = if (dot > 0) name.substring(0, dot) else name
+            val ext = if (dot > 0) name.substring(dot) else ""
+            for (attempt in 0..20) {
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, target)
+                    if (attempt > 0) put(MediaStore.MediaColumns.DISPLAY_NAME, "$base ($attempt)$ext")
+                }
+                if (runCatching { resolver.update(uri, values, null, null) }.getOrDefault(0) > 0) {
+                    moved++
+                    break
+                }
+            }
+        }
+        return moved
+    }
 
     /** Whether the Uri a download saved still resolves to a real file — false once the user has
      * deleted it from their gallery (or the SAF folder) outside the app. Errors fail open (return
@@ -40,7 +104,7 @@ object MediaStoreHelper {
     }
 
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if
-     * one is set, otherwise the public Pictures/gallery-dl gallery folder — and returns its
+     * one is set, otherwise Download/Comfort's subfolder for its type — and returns its
      * content Uri. */
     fun saveMediaToGallery(context: Context, sourceFile: File, forceAudioMime: Boolean = false): Uri? {
         // Whatever the engine left as this file's mtime (a server's Last-Modified = upload time,
@@ -75,8 +139,8 @@ object MediaStoreHelper {
         // ffmpeg build can only remux into a bare .webm container (see yt_dlp_wrapper.py's
         // ACODECS remap and DownloadWorker.kt's own isAudioFile comment). Without this, such
         // a track's real MIME guess ("video/webm", MimeTypeMap's own mapping for the
-        // extension) would file it under Movies/Comfort as a "video" instead of
-        // Music/Comfort — extension-only detection can't tell an audio-only webm apart from
+        // extension) would index it as a video instead of a song, and send it to the video
+        // folder setting — extension-only detection can't tell an audio-only webm apart from
         // a real video one, so the caller's own already-established audio/video knowledge
         // is trusted here instead.
         if (forceAudioMime && mimeType.startsWith("video/")) {
@@ -214,23 +278,17 @@ object MediaStoreHelper {
                     // null, silently — see insertIntoMediaStore's own runCatching — turning a
                     // previously-working download into "No downloadable content found at this
                     // link"). Falling back to the plain, always-accepted "video/webm" guess trades
-                    // away the Music-folder placement this override exists for, but a download
-                    // that succeeds into the wrong folder beats one that fails outright.
+                    // away its indexing as a song, but a download that succeeds as a "video"
+                    // beats one that fails outright.
                     "audio/webm" -> insertIntoMediaStore(context, sourceFile, "video/webm")
                     else -> null
                 }
         } else {
             // Pre-scoped-storage devices (API 24-28): write straight into the public dir, then index it.
-            val (collection, relativeDir) = collectionFor(mimeType)
+            val collection = legacyCollectionFor(mimeType)
             @Suppress("DEPRECATION")
-            val publicRoot = Environment.getExternalStoragePublicDirectory(
-                when {
-                    mimeType.startsWith("video/") -> Environment.DIRECTORY_MOVIES
-                    mimeType.startsWith("audio/") -> Environment.DIRECTORY_MUSIC
-                    else -> Environment.DIRECTORY_PICTURES
-                }
-            )
-            val publicDir = File(publicRoot, "Comfort")
+            val publicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val publicDir = File(publicRoot, "Comfort/${subfolderFor(sourceFile.name, mimeType)}")
             if (!publicDir.exists()) publicDir.mkdirs()
             val destFile = uniqueFile(publicDir, sourceFile.name)
             sourceFile.inputStream().use { input ->
@@ -246,32 +304,26 @@ object MediaStoreHelper {
         }
     }
 
-    // gallery-dl posts (Instagram reels/carousels especially) can include video or audio-only
-    // files alongside images — MediaStore rejects any of these MIME types inserted into a
-    // mismatched collection, so route each into its matching one. The `else` branch used to fall
-    // through straight to Images regardless of what the file actually was — fine while every
-    // download really was a picture, video, or audio file, but this app also saves yt-dlp
-    // subtitles (.vtt/.srt, "Download Subtitles" in Settings) and those aren't remotely an image.
-    // On API 29+, MediaStore.Images.Media flatly rejects a "text/vtt" (or any non-image/*) insert
-    // with an IllegalArgumentException — insertIntoMediaStore() below already treats a thrown
-    // insert() the same as a null return, so this failed *silently*: the file was left orphaned in
-    // cacheDir/gallery-dl-staging/ forever (never cleaned up, never counted as saved) with no
-    // visible error anywhere. Anything that isn't image/video/audio now goes to the generic Files
-    // collection instead, which accepts any MIME type.
-    private fun collectionFor(mimeType: String): Pair<Uri, String> = when {
-        mimeType.startsWith("image/") -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI to IMAGE_RELATIVE_DIR
-        mimeType.startsWith("video/") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI to VIDEO_RELATIVE_DIR
-        mimeType.startsWith("audio/") -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI to AUDIO_RELATIVE_DIR
-        else -> MediaStore.Files.getContentUri("external") to OTHER_RELATIVE_DIR
+    // Pre-Q only: the collection a file's row goes in, by type. MediaStore rejects a MIME type
+    // inserted into a mismatched collection, and anything that isn't image/video/audio (yt-dlp's
+    // .vtt/.srt subtitles) goes to the generic Files collection, which accepts any type.
+    private fun legacyCollectionFor(mimeType: String): Uri = when {
+        mimeType.startsWith("image/") -> MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        mimeType.startsWith("video/") -> MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        mimeType.startsWith("audio/") -> MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        else -> MediaStore.Files.getContentUri("external")
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun insertIntoMediaStore(context: Context, sourceFile: File, mimeType: String): Uri? {
         val resolver = context.contentResolver
-        val (collection, relativeDir) = collectionFor(mimeType)
+        // The Downloads collection is the one that accepts Download/ paths, for any file type; the
+        // media scanner still files each row as an image, video or song by its MIME type.
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, sourceFile.name)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, relativeDir)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "$RELATIVE_DIR/${subfolderFor(sourceFile.name, mimeType)}")
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = runCatching { resolver.insert(collection, values) }.getOrNull() ?: return null

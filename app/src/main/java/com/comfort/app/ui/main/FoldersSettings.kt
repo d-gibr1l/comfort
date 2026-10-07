@@ -161,7 +161,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 }
             }
             Text(
-                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Pictures/Comfort folder.",
+                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Download/Comfort folder.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
