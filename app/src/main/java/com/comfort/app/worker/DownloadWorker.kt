@@ -730,6 +730,7 @@ class DownloadWorker(
                     listingTimedOut = listingTimedOut,
                     choice = engineChoice,
                     hasImageItem = hasImageItem,
+                    galleryDlOnly = VideoSiteRouter.isGalleryDlOnly(url),
                 )
 
                 // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl

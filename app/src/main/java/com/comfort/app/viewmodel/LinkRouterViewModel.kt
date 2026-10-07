@@ -58,7 +58,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         listing = viewModelScope.launch {
             launch { _isDuplicate.value = DownloadDispatcher.isDuplicate(context, url) }
             val result = GalleryDlListing.listItemsForSheet(context, url)
-            if (result.timedOut) {
+            if (result.timedOut && !com.comfort.app.data.VideoSiteRouter.isGalleryDlOnly(url)) {
                 // gallery-dl is stuck (a rate limit, typically), but yt-dlp reaches the site its own
                 // way — a video link still gets its normal preview. Only if yt-dlp can't show
                 // anything either (an image post, or the site really is down) does the picker's

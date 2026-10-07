@@ -140,8 +140,15 @@ internal sealed interface EnginePlan {
             listingTimedOut: Boolean = false,
             choice: EngineChoice = EngineChoice.DEFAULT,
             hasImageItem: Boolean = false,
+            galleryDlOnly: Boolean = false,
         ): EnginePlan {
-            fun classic(e: DownloadEngine) = classicPlan(e, supplementVideo, onlyVideos, listingTimedOut, choice, hasImageItem)
+            fun classic(e: DownloadEngine) =
+                if (galleryDlOnly && e == DownloadEngine.GALLERY_DL) {
+                    // The user put this site on gallery-dl's list: gallery-dl alone, videos included.
+                    if (choice.isOn(DownloadEngine.GALLERY_DL)) Single(DownloadEngine.GALLERY_DL) else Unavailable(OFF_GALLERY_DL_ONLY)
+                } else {
+                    classicPlan(e, supplementVideo, onlyVideos, listingTimedOut, choice, hasImageItem)
+                }
             if (engine != DownloadEngine.INSTALOADER) return classic(engine)
             // Instaloader is only routed to while it's on (VideoSiteRouter.resolveEngine); where it
             // sits in the order decides whether it goes before or after the classic engines.
@@ -182,5 +189,6 @@ internal sealed interface EnginePlan {
         const val OFF_YT_DLP = "yt-dlp is turned off (Settings › Updates and engines) — it's the only engine that can download this link."
         const val OFF_SPOTIFY = "Spotify downloads need yt-dlp, which is turned off (Settings › Updates and engines)."
         const val OFF_BOTH = "gallery-dl and yt-dlp are both turned off (Settings › Updates and engines)."
+        const val OFF_GALLERY_DL_ONLY = "This site is set to gallery-dl only, and gallery-dl is turned off (Settings › Updates and engines)."
     }
 }

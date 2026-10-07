@@ -304,7 +304,7 @@ private fun SitesSection() {
             SiteListCard(
                 icon = Icons.Outlined.Image,
                 engine = "gallery-dl",
-                meaning = "gallery-dl first, videos still to yt-dlp",
+                meaning = "Only gallery-dl downloads these, videos too",
                 sites = galleryDlSites,
                 emptyText = "Nothing here yet. Add a site here to take it off yt-dlp.",
                 highlight = { true },
@@ -316,7 +316,7 @@ private fun SitesSection() {
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "Sites not listed try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
+                "Sites on neither list try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
