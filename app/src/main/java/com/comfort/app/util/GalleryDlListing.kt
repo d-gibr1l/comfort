@@ -309,7 +309,8 @@ object GalleryDlListing {
                     // primary listing already succeeded, so there's a real gallery to show; the
                     // affected item(s) just keep gallery-dl's own unfetchable placeholder URL
                     // instead of a real thumbnail.
-                    if (result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
+                    // Not for a gallery-dl-only site: yt-dlp never runs for those.
+                    if (!VideoSiteRouter.isGalleryDlOnly(url) && result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
                         result.copy(items = enrichVideoThumbnails(context, url, result.items))
                     } else {
                         result
@@ -674,8 +675,9 @@ object GalleryDlListing {
         if (!ytDlpOnly && galleryDlRoute && GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.GALLERY_DL)) {
             return@withContext fetchGalleryDlPreviewInfo(context, url)
         }
-        // Everything below runs yt-dlp (Spotify's preview too) — nothing to show while it's off.
-        if (!ytDlpOn(context)) return@withContext null
+        // Everything below runs yt-dlp (Spotify's preview too) — nothing to show while it's off, or
+        // for a site the user set to gallery-dl only.
+        if (!ytDlpOn(context) || VideoSiteRouter.isGalleryDlOnly(url)) return@withContext null
         val json = when (VideoSiteRouter.classify(url)) {
             DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url, onStatus)
             else -> runYtDlpListInfo(context, url, onStatus)

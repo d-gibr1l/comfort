@@ -156,6 +156,17 @@ class EnginePlanTest {
     }
 
     @Test
+    fun aGalleryDlOnlySiteNeverRunsYtDlp() = runTest {
+        val executor = FakeExecutor()
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = true, galleryDlOnly = true).execute(executor)
+        assertEquals(listOf("GALLERY_DL(excludeVideo=false)"), executor.ran)
+
+        val off = FakeExecutor()
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = true, galleryDlOnly = true, choice = choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(GALLERY_DL))).execute(off)
+        assertEquals(listOf("FAIL: ${EnginePlan.OFF_GALLERY_DL_ONLY}"), off.ran)
+    }
+
+    @Test
     fun instaloaderFollowsItsPlaceInTheOrder() = runTest {
         assertEquals(
             listOf("GALLERY_DL(excludeVideo=true)", "YT_DLP", "INSTALOADER"),

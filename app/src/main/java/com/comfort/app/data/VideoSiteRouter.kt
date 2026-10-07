@@ -74,9 +74,15 @@ object VideoSiteRouter {
     /** Sites whose links go to yt-dlp alone: the built-in video sites, minus any removed, plus any added. */
     fun ytDlpSites(): List<String> = ((videoOnlyHosts - removedYtDlp) + addedYtDlp - addedGalleryDl).sorted()
 
-    /** Sites added to gallery-dl: gallery-dl first, with their videos still going to yt-dlp — the
-     * route every unlisted site takes; listing one mainly takes it off yt-dlp's built-in list. */
+    /** Sites added to gallery-dl: gallery-dl only — yt-dlp never runs for them, not even for
+     * their videos (gallery-dl tries those itself). */
     fun galleryDlSites(): List<String> = addedGalleryDl.sorted()
+
+    /** Whether [url]'s site is on the user's gallery-dl list (gallery-dl only). */
+    fun isGalleryDlOnly(url: String): Boolean {
+        val host = normalizedHost(url) ?: return false
+        return !spotifyHosts.matchesHost(host) && addedGalleryDl.matchesHost(host)
+    }
 
     /** Puts [host] on [engine]'s list (and off the other one). */
     fun addSite(context: Context, host: String, engine: DownloadEngine) {

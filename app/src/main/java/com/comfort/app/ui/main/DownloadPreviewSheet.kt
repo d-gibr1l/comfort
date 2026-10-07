@@ -169,6 +169,8 @@ data class DownloadOptions(
  * (gallery-dl sites, Instagram posts), only engines switched on, in Settings' order — empty when
  * there's no real choice (YouTube, Spotify), so the chips don't show. */
 internal fun sheetEngineOptions(context: android.content.Context, url: String): List<com.comfort.app.data.DownloadEngine> {
+    // A site on the user's gallery-dl list has no choice to offer: gallery-dl only.
+    if (VideoSiteRouter.isGalleryDlOnly(url) && !VideoSiteRouter.isInstagramPost(url)) return emptyList()
     val candidates = when {
         VideoSiteRouter.isInstagramPost(url) -> setOf(
             com.comfort.app.data.DownloadEngine.INSTALOADER, com.comfort.app.data.DownloadEngine.GALLERY_DL, com.comfort.app.data.DownloadEngine.YT_DLP,

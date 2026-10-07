@@ -36,6 +36,13 @@ class SiteRulesTest {
     }
 
     @Test
+    fun theGalleryDlListMeansGalleryDlOnly() {
+        VideoSiteRouter.applySiteRules(ytDlp = emptySet(), galleryDl = setOf("reddit.com"), removedDefaults = emptySet())
+        assertTrue(VideoSiteRouter.isGalleryDlOnly("https://www.reddit.com/r/aww/comments/1/x/"))
+        assertFalse(VideoSiteRouter.isGalleryDlOnly("https://x.com/a/status/1"))
+    }
+
+    @Test
     fun spotifyStaysOnItsOwnEngine() {
         VideoSiteRouter.applySiteRules(ytDlp = emptySet(), galleryDl = setOf("spotify.com"), removedDefaults = emptySet())
         assertEquals(DownloadEngine.SPOTIFY, VideoSiteRouter.classify("https://open.spotify.com/track/1"))
