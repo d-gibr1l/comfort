@@ -43,7 +43,110 @@ internal fun UpdatesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     SettingsSubScaffold(title = "Updates", topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
         AppUpdateSection()
         EnginesSection()
+        EngineChoiceSection()
     }
+}
+
+/** Which engines may run, and the order they try a link more than one of them can download
+ * (EngineChoice; read by DownloadWorker's plan and the preview listing). Turning off gallery-dl or
+ * yt-dlp asks first, since it stops whole kinds of links; at least one engine always stays on. */
+@Composable
+private fun EngineChoiceSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var choice by remember { mutableStateOf(com.comfort.app.worker.EngineChoice.load(context)) }
+    var confirmOff by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
+
+    fun setOn(engine: com.comfort.app.data.DownloadEngine, on: Boolean) {
+        GalleryDlPreferences.setEngineEnabled(context, engine, on)
+        choice = com.comfort.app.worker.EngineChoice.load(context)
+    }
+
+    fun move(index: Int, by: Int) {
+        val order = choice.order.toMutableList()
+        val target = index + by
+        if (target !in order.indices) return
+        order[index] = order[target].also { order[target] = order[index] }
+        GalleryDlPreferences.setEngineOrder(context, order.map { it.name })
+        choice = com.comfort.app.worker.EngineChoice.load(context)
+    }
+
+    SettingsSection(title = "Which engines run", icon = Icons.Outlined.Refresh) {
+        Text(
+            "Turn engines on or off, and choose which one tries first when more than one can download a link. YouTube and other video sites always use yt-dlp, and Spotify needs it too.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        choice.order.forEachIndexed { index, engine ->
+            val on = choice.isOn(engine)
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${index + 1}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(24.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(engineLabel(engine), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (on) engineRole(engine) else "Off — never runs or updates",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(onClick = { move(index, -1) }, enabled = index > 0) {
+                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Move ${engineLabel(engine)} up")
+                }
+                IconButton(onClick = { move(index, +1) }, enabled = index < choice.order.lastIndex) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Move ${engineLabel(engine)} down")
+                }
+                Switch(
+                    checked = on,
+                    onCheckedChange = { turnOn ->
+                        when {
+                            turnOn -> setOn(engine, true)
+                            choice.enabled.size <= 1 ->
+                                android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
+                            engine == com.comfort.app.data.DownloadEngine.INSTALOADER -> setOn(engine, false)
+                            else -> confirmOff = engine
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    confirmOff?.let { engine ->
+        ConfirmDeleteSheet(
+            title = "Turn off ${engineLabel(engine)}?",
+            message = if (engine == com.comfort.app.data.DownloadEngine.YT_DLP) {
+                "YouTube, Spotify and every video download will stop working until you turn it back on. It also won't be kept updated."
+            } else {
+                "Image galleries (Pixiv, Twitter/X pictures, Reddit galleries, …) won't download until you turn it back on; links yt-dlp handles still will. It also won't be kept updated."
+            },
+            confirmLabel = "Turn off",
+            onConfirm = {
+                setOn(engine, false)
+                confirmOff = null
+            },
+            onDismiss = { confirmOff = null },
+        )
+    }
+}
+
+private fun engineLabel(engine: com.comfort.app.data.DownloadEngine) = when (engine) {
+    com.comfort.app.data.DownloadEngine.YT_DLP -> "yt-dlp"
+    com.comfort.app.data.DownloadEngine.GALLERY_DL -> "gallery-dl"
+    com.comfort.app.data.DownloadEngine.INSTALOADER -> "Instaloader"
+    com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify"
+}
+
+private fun engineRole(engine: com.comfort.app.data.DownloadEngine) = when (engine) {
+    com.comfort.app.data.DownloadEngine.YT_DLP -> "Video and audio, on YouTube and every other site"
+    com.comfort.app.data.DownloadEngine.GALLERY_DL -> "Images and galleries from hundreds of sites"
+    com.comfort.app.data.DownloadEngine.INSTALOADER -> "Instagram posts, reels and carousels"
+    com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify tracks, via yt-dlp"
 }
 
 @Composable
@@ -257,6 +360,7 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
  * not a permanent fixture). */
 @Composable
 internal fun QuickEngineUpdateSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val updates = updatesViewModel()
     val statuses by updates.engineStatuses.collectAsState()
     val updatingEngines by updates.updatingEngines.collectAsState()
@@ -265,7 +369,7 @@ internal fun QuickEngineUpdateSection() {
     // Installs what it finds when auto-update is on, so opening Settings needs no manual tap.
     LaunchedEffect(Unit) { updates.ensureEnginesChecked() }
 
-    val outdated = statuses?.filter { it.updateAvailable } ?: return
+    val outdated = statuses?.filter { it.updateAvailable && EngineUpdater.isOn(context, it.engine) } ?: return
     if (outdated.isEmpty()) return
 
     SettingsSection(title = "Updates available", icon = Icons.Outlined.Refresh) {

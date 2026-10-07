@@ -7,8 +7,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import compose.icons.FeatherIcons
-import compose.icons.feathericons.Instagram
 import androidx.compose.material.icons.filled.CheckCircle as FilledCheckCircle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,7 +30,6 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
     var verboseLogging by remember { mutableStateOf(GalleryDlPreferences.isVerboseLogging(context)) }
     var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
     var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
-    var instaloaderForInstagram by remember { mutableStateOf(GalleryDlPreferences.isInstaloaderForInstagram(context)) }
 
     SettingsSubScaffold(title = "Advanced", topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
@@ -54,19 +51,6 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 onCheckedChange = {
                     youtubeClientRotation = it
                     GalleryDlPreferences.setYoutubeClientRotationEnabled(context, it)
-                },
-            )
-        }
-
-        SettingsSection(title = "Instagram", icon = FeatherIcons.Instagram) {
-            IconToggleRow(
-                icon = FeatherIcons.Instagram,
-                title = "Use Instaloader for Instagram",
-                subtitle = "Downloads Instagram posts and reels with Instaloader, which handles carousels and captions and works on public posts without cookies. Falls back to gallery-dl and yt-dlp if it can't get a post. Off uses gallery-dl and yt-dlp only.",
-                checked = instaloaderForInstagram,
-                onCheckedChange = {
-                    instaloaderForInstagram = it
-                    GalleryDlPreferences.setInstaloaderForInstagram(context, it)
                 },
             )
         }

@@ -284,6 +284,10 @@ class DownloadWorker(
                 // 6 minutes seen live (2026-10-06), with the queue card showing nothing. Cancelling
                 // kills the Python job (PythonRuntime.run).
                 var listingTimedOut = false
+                // Engines switched on, and their order (Settings › Updates › Engines).
+                val engineChoice = EngineChoice.load(applicationContext)
+                // Pictures alongside videos — so a yt-dlp-first order still hands them to gallery-dl.
+                var hasImageItem = false
                 // Listing runs whenever itemFilter is null, NOT only when totalItems isn't known
                 // yet — those are two separate concerns that used to share one gate. totalItems
                 // already being known (a resumed/retried download whose first attempt already
@@ -294,7 +298,7 @@ class DownloadWorker(
                 // VideoSiteRouter.alwaysSupplementVideoHosts (Reddit, Twitter/X, ...), that
                 // permanently dropped the yt-dlp video-supplement pass for a mixed post's video on
                 // every subsequent resume, with no error and no trace it had ever been there.
-                if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null) {
+                if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null && engineChoice.isOn(DownloadEngine.GALLERY_DL)) {
                     val listing = withTimeoutOrNull(LISTING_CAP_MS) { GalleryDlListing.listItems(applicationContext, url) }
                     listingTimedOut = listing == null
                     val listed = listing?.items.orEmpty()
@@ -305,6 +309,7 @@ class DownloadWorker(
                     hasVideoItem = listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
                     onlyVideos = listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS &&
                         listed.all { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) == true }
+                    hasImageItem = listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) != true }
                 }
                 // Spotify album/playlist links need the same upfront item count a gallery-dl
                 // gallery gets (a track link's own listing is always exactly 1, so this is a
@@ -704,6 +709,10 @@ class DownloadWorker(
                     override suspend fun probe() = EngineProbe.probeBoth(applicationContext, url)
                     override val savedCount: Int get() = savedSoFar.get()
                     override val isStopped: Boolean get() = this@DownloadWorker.isStopped
+                    override fun fail(message: String) {
+                        lastErrorLine.compareAndSet(null, message)
+                        recordEngineError(message)
+                    }
                 }
                 // Which engines run and when one falls back to another — see EnginePlan. A gallery-dl
                 // download also hands its video to yt-dlp when its listing found one, or on hosts
@@ -715,6 +724,8 @@ class DownloadWorker(
                     supplementVideo = hasVideoItem || VideoSiteRouter.alwaysSupplementsVideo(url),
                     onlyVideos = onlyVideos,
                     listingTimedOut = listingTimedOut,
+                    choice = engineChoice,
+                    hasImageItem = hasImageItem,
                 )
 
                 // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl

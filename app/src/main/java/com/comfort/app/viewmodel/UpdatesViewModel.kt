@@ -113,7 +113,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
                 val updated = _engineStatuses.value.orEmpty().map {
                     if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
                 }
-                GalleryDlPreferences.setEngineUpdateAvailable(context, updated.any { it.updateAvailable })
+                GalleryDlPreferences.setEngineUpdateAvailable(context, updated.any { it.updateAvailable && EngineUpdater.isOn(context, it.engine) })
                 publishEngines(updated)
             }
             result.onFailure { e ->
@@ -146,6 +146,6 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
 
     private fun publishEngines(statuses: List<EngineUpdater.VersionStatus>) {
         _engineStatuses.value = statuses
-        engineUpdateAvailable.value = statuses.any { it.updateAvailable }
+        engineUpdateAvailable.value = statuses.any { it.updateAvailable && EngineUpdater.isOn(context, it.engine) }
     }
 }

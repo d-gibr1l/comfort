@@ -118,7 +118,7 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     // Advanced
     SubpageSearchEntry("Extra arguments", "Raw gallery-dl command-line arguments.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Rotate player clients", "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Use Instaloader for Instagram", "Downloads Instagram posts and reels with Instaloader, falling back to gallery-dl and yt-dlp.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("Which engines run", "Turn yt-dlp, gallery-dl or Instaloader off, and choose which tries a link first.", SettingsRoute.UPDATES),
     SubpageSearchEntry("Impersonate a browser", "Makes the app look like a real web browser to bypass bot detection on strict websites.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("yt-dlp extractor arguments", "Site-specific extractor options passed straight to yt-dlp.", SettingsRoute.ADVANCED),
     SubpageSearchEntry("Format sort", "Custom yt-dlp format-selection priority.", SettingsRoute.ADVANCED),

@@ -86,6 +86,8 @@ object GalleryDlPreferences {
     const val KEY_SHARE_MODE = "share_mode"
     const val KEY_LIBRARY_GRID_VIEW = "library_grid_view"
     const val KEY_LIBRARY_GRID_SIZE = "library_grid_size"
+    const val KEY_ENGINE_ENABLED_PREFIX = "engine_enabled_"
+    const val KEY_ENGINE_ORDER = "engine_order"
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
@@ -839,6 +841,32 @@ object GalleryDlPreferences {
 
     fun setImpersonateEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_IMPERSONATE_ENABLED, enabled).apply()
+    }
+
+    /** Whether [engine] may run at all (Settings › Updates › Engines). On by default. Instaloader
+     * keeps its own older key (it was the "Use Instaloader for Instagram" switch); Spotify has no
+     * switch of its own — it downloads through yt-dlp. */
+    fun isEngineEnabled(context: Context, engine: DownloadEngine): Boolean = when (engine) {
+        DownloadEngine.INSTALOADER -> isInstaloaderForInstagram(context)
+        DownloadEngine.SPOTIFY -> isEngineEnabled(context, DownloadEngine.YT_DLP)
+        else -> prefs(context).getBoolean(KEY_ENGINE_ENABLED_PREFIX + engine.name, true)
+    }
+
+    fun setEngineEnabled(context: Context, engine: DownloadEngine, enabled: Boolean) {
+        when (engine) {
+            DownloadEngine.INSTALOADER -> setInstaloaderForInstagram(context, enabled)
+            DownloadEngine.SPOTIFY -> Unit
+            else -> prefs(context).edit().putBoolean(KEY_ENGINE_ENABLED_PREFIX + engine.name, enabled).apply()
+        }
+    }
+
+    /** The order engines try a link more than one of them handles, as DownloadEngine names; null
+     * until the user reorders (callers use the default order). */
+    fun getEngineOrder(context: Context): List<String>? =
+        prefs(context).getString(KEY_ENGINE_ORDER, null)?.split(',')?.filter { it.isNotBlank() }
+
+    fun setEngineOrder(context: Context, order: List<String>) {
+        prefs(context).edit().putString(KEY_ENGINE_ORDER, order.joinToString(",")).apply()
     }
 
     /** Single Instagram posts/reels go to Instaloader first (see VideoSiteRouter.resolveEngine).
