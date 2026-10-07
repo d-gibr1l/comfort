@@ -258,17 +258,27 @@ object EngineUpdater {
         var statuses = checkAll(context)
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
             statuses = statuses.map { status ->
-                if (status.updateAvailable && status.artifactUrl != null) {
+                // A turned-off engine never runs, so it isn't worth the data to keep updated.
+                if (status.updateAvailable && status.artifactUrl != null && isOn(context, status.engine)) {
                     update(context, status).getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
                 } else {
                     status
                 }
             }
         }
-        GalleryDlPreferences.setEngineUpdateAvailable(context, statuses.any { it.updateAvailable })
+        GalleryDlPreferences.setEngineUpdateAvailable(context, statuses.any { it.updateAvailable && isOn(context, it.engine) })
         GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
         statuses
     }
+
+    /** Which app engine [info] is — for its on/off switch. */
+    fun downloadEngineOf(info: EngineInfo): com.comfort.app.data.DownloadEngine = when (info) {
+        YT_DLP -> com.comfort.app.data.DownloadEngine.YT_DLP
+        INSTALOADER -> com.comfort.app.data.DownloadEngine.INSTALOADER
+        else -> com.comfort.app.data.DownloadEngine.GALLERY_DL
+    }
+
+    fun isOn(context: Context, info: EngineInfo) = GalleryDlPreferences.isEngineEnabled(context, downloadEngineOf(info))
 
     private fun sha256Of(file: File): String = file.inputStream().use { stream ->
         val digest = MessageDigest.getInstance("SHA-256")

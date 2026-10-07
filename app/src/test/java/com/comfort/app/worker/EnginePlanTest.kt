@@ -26,6 +26,7 @@ class EnginePlanTest {
             if (engine == stopAfter) isStopped = true
         }
         override suspend fun probe() = probeResult
+        override fun fail(message: String) { ran += "FAIL: $message" }
     }
 
     private suspend fun ranFor(engine: DownloadEngine, classic: DownloadEngine = engine, video: Boolean = false, executor: FakeExecutor): List<String> {
@@ -116,5 +117,58 @@ class EnginePlanTest {
     fun probeThatFailedToRunIsNoReasonToSkipGalleryDl() = runTest {
         val executor = FakeExecutor(probeResult = EngineProbe.Result(galleryDlHasExtractor = null, ytDlpHasExtractor = true))
         assertEquals(listOf("GALLERY_DL(excludeVideo=true)", "YT_DLP"), ranFor(GALLERY_DL, executor = executor))
+    }
+
+    private fun choice(vararg order: DownloadEngine, off: Set<DownloadEngine> = emptySet()) =
+        EngineChoice(EngineChoice.ORDERABLE.toSet() - off, order.toList())
+
+    private suspend fun ranWith(engine: DownloadEngine, choice: EngineChoice, classic: DownloadEngine = engine, executor: FakeExecutor = FakeExecutor(), images: Boolean = false): List<String> {
+        EnginePlan.planFor(engine, classic, supplementVideo = false, choice = choice, hasImageItem = images).execute(executor)
+        return executor.ran
+    }
+
+    @Test
+    fun ytDlpFirstOrderTriesYtDlpThenGalleryDlForImages() = runTest {
+        val order = choice(INSTALOADER, YT_DLP, GALLERY_DL)
+        assertEquals(listOf("YT_DLP"), ranWith(GALLERY_DL, order, executor = FakeExecutor(mapOf(YT_DLP to 1))))
+        assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), ranWith(GALLERY_DL, order, executor = FakeExecutor(mapOf(GALLERY_DL to 2))))
+        // A mixed post: yt-dlp saved its video, gallery-dl still gets the pictures.
+        assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), ranWith(GALLERY_DL, order, executor = FakeExecutor(mapOf(YT_DLP to 1)), images = true))
+    }
+
+    @Test
+    fun galleryDlOffSendsItsLinksToYtDlpAlone() = runTest {
+        assertEquals(listOf("YT_DLP"), ranWith(GALLERY_DL, choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(GALLERY_DL))))
+    }
+
+    @Test
+    fun ytDlpOffLeavesGalleryDlAloneWithItsVideos() = runTest {
+        assertEquals(listOf("GALLERY_DL(excludeVideo=false)"), ranWith(GALLERY_DL, choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(YT_DLP))))
+    }
+
+    @Test
+    fun linksOnlyATurnedOffEngineCanHandleFailWithAReason() = runTest {
+        val ytOff = choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(YT_DLP))
+        assertEquals(listOf("FAIL: ${EnginePlan.OFF_YT_DLP}"), ranWith(YT_DLP, ytOff))
+        assertEquals(listOf("FAIL: ${EnginePlan.OFF_SPOTIFY}"), ranWith(SPOTIFY, ytOff))
+        val bothOff = choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(YT_DLP, GALLERY_DL))
+        assertEquals(listOf("FAIL: ${EnginePlan.OFF_BOTH}"), ranWith(GALLERY_DL, bothOff))
+    }
+
+    @Test
+    fun instaloaderFollowsItsPlaceInTheOrder() = runTest {
+        assertEquals(
+            listOf("GALLERY_DL(excludeVideo=true)", "YT_DLP", "INSTALOADER"),
+            ranWith(INSTALOADER, choice(GALLERY_DL, YT_DLP, INSTALOADER), classic = GALLERY_DL),
+        )
+        assertEquals(
+            listOf("INSTALOADER", "GALLERY_DL(excludeVideo=true)", "YT_DLP"),
+            ranWith(INSTALOADER, choice(INSTALOADER, GALLERY_DL, YT_DLP), classic = GALLERY_DL),
+        )
+        // With both classic engines off, Instaloader is the whole download.
+        assertEquals(
+            listOf("INSTALOADER"),
+            ranWith(INSTALOADER, choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(GALLERY_DL, YT_DLP)), classic = GALLERY_DL),
+        )
     }
 }

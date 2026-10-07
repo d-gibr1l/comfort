@@ -84,8 +84,8 @@ data class TrackPreview(val num: Int, val title: String?, val artist: String?, v
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
  * different situations for the picker: the former falls back to a normal whole-gallery download
  * silently, the latter should tell the user why before doing anything. */
-/** [timedOut]: gallery-dl didn't answer in time (listItemsForSheet) — not a real failure of the
- * link, so a sheet can still try yt-dlp. */
+/** [timedOut]: gallery-dl didn't answer — it ran out of time (listItemsForSheet) or is turned
+ * off — not a real failure of the link, so a sheet can still try yt-dlp. */
 data class ListingResult(val items: List<GalleryItem>, val errorMessage: String? = null, val timedOut: Boolean = false)
 
 /** Whether a listing should land on DownloadPreviewSheet (quality/trim/format/commands controls)
@@ -257,6 +257,11 @@ object GalleryDlListing {
 
     private const val SHEET_LISTING_CAP_MS = 20_000L
 
+    private fun ytDlpOn(context: Context) = GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.YT_DLP)
+
+    private const val GALLERY_DL_OFF =
+        "gallery-dl is turned off (Settings › Updates › Engines), and yt-dlp couldn't preview this link."
+
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
         listingCache[url]?.let { cached ->
             if (System.currentTimeMillis() - cached.atMs < LISTING_CACHE_MS) return@withContext cached.result
@@ -287,9 +292,14 @@ object GalleryDlListing {
             // pseudo-URL as the item's own "url", which isn't a real fetchable preview image (see
             // yt_dlp_wrapper.py's list_info() doc comment). yt-dlp's own extractor already resolves
             // a real thumbnail as part of normal metadata extraction.
-            DownloadEngine.YT_DLP -> listViaYtDlp(context, url)
-            DownloadEngine.SPOTIFY -> listViaSpotify(context, url)
-            DownloadEngine.GALLERY_DL -> {
+            // A turned-off engine never runs (Settings › Updates › Engines) — its links get the
+            // reason instead. gallery-dl being off is reported like a timeout, so a sheet still
+            // tries yt-dlp's preview for the link (LinkRouterViewModel).
+            DownloadEngine.YT_DLP -> if (ytDlpOn(context)) listViaYtDlp(context, url) else ListingResult(emptyList(), com.comfort.app.worker.EnginePlan.OFF_YT_DLP)
+            DownloadEngine.SPOTIFY -> if (ytDlpOn(context)) listViaSpotify(context, url) else ListingResult(emptyList(), com.comfort.app.worker.EnginePlan.OFF_SPOTIFY)
+            DownloadEngine.GALLERY_DL -> if (!GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.GALLERY_DL)) {
+                ListingResult(emptyList(), errorMessage = GALLERY_DL_OFF, timedOut = true)
+            } else {
                 val result = listViaGalleryDl(context, url)
                 if (result.items.isNotEmpty()) {
                     // Only worth the extra process + network round trip when there's actually a
@@ -659,11 +669,13 @@ object GalleryDlListing {
         // is what surfaced this). See fetchGalleryDlPreviewInfo's own doc comment for the rest.
         // Instaloader-routed Instagram posts too: their checklist numbering is the same 1-based
         // carousel order gallery-dl uses, and listItems() already handles their fallback.
-        if (!ytDlpOnly && (VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL ||
-            VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER)
-        ) {
+        val galleryDlRoute = VideoSiteRouter.classify(url) == DownloadEngine.GALLERY_DL ||
+            VideoSiteRouter.resolveEngine(context, url) == DownloadEngine.INSTALOADER
+        if (!ytDlpOnly && galleryDlRoute && GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.GALLERY_DL)) {
             return@withContext fetchGalleryDlPreviewInfo(context, url)
         }
+        // Everything below runs yt-dlp (Spotify's preview too) — nothing to show while it's off.
+        if (!ytDlpOn(context)) return@withContext null
         val json = when (VideoSiteRouter.classify(url)) {
             DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url, onStatus)
             else -> runYtDlpListInfo(context, url, onStatus)
