@@ -15,6 +15,7 @@ import coil.fetch.Fetcher
 import coil.request.Options
 import coil.size.pxOrElse
 import okhttp3.Dispatcher
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
 object AppImageLoader {
@@ -44,8 +45,26 @@ object AppImageLoader {
                     // lookup can't serve.
                     add(VideoFrameDecoder.Factory())
                 }
+                // Coil's default lets downloaded images (previews' and the queue's remote
+                // thumbnails) take 2% of the phone's storage, up to 250 MB — it had grown to 150 MB.
+                // Library thumbnails don't use it (MediaStoreThumbnailFetcher), so a smaller cache
+                // only means an old preview's picture is fetched again.
+                .diskCache {
+                    coil.disk.DiskCache.Builder()
+                        .directory(context.cacheDir.resolve("image_cache"))
+                        .maxSizeBytes(50L * 1024 * 1024)
+                        .build()
+                }
                 .build()
         )
+        // A cache already over that size (from before the limit) only shrinks once Coil next writes
+        // to it; clear it instead, once, rather than leaving it at its old size until then.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching {
+                val cache = Coil.imageLoader(context).diskCache ?: return@runCatching
+                if (cache.size > cache.maxSize) cache.clear()
+            }
+        }
     }
 }
 

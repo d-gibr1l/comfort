@@ -195,6 +195,23 @@ object GalleryDlListing {
         android.util.Log.i("GalleryDlListing", "deleted $deleted stale cookie copies")
     }
 
+    /** Deletes cache files nothing will read again: previews' saved extractions (ytdlp-info,
+     * instaloader-info) over an hour old — the download only reuses one for 20 minutes — and
+     * downloaded app updates that are already installed (app_update.apk is an older build's name
+     * for them). Called once per launch. */
+    suspend fun sweepStaleCache(context: Context) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - 60 * 60 * 1000L
+        for (dir in listOf("ytdlp-info", "instaloader-info")) {
+            java.io.File(context.cacheDir, dir).listFiles { f -> f.isFile && f.lastModified() < cutoff }?.forEach { it.delete() }
+        }
+        java.io.File(context.cacheDir, "app_update.apk").delete()
+        val installed = AppUpdater.installedVersion(context)
+        context.cacheDir.listFiles { f -> f.isFile && f.name.startsWith("Comfort-") && f.name.endsWith(".apk") }?.forEach { apk ->
+            val version = apk.name.removePrefix("Comfort-").removeSuffix(".apk")
+            if (!AppUpdater.isNewer(version, installed)) apk.delete()
+        }
+    }
+
     /** Where a preview's full yt-dlp extraction for [url] is saved (yt_dlp_wrapper.py list_info's
      * info_cache_path) and where the real download looks for it (download()'s info_json_path) —
      * so tapping Download on a loaded preview doesn't extract the whole thing again. One file per
