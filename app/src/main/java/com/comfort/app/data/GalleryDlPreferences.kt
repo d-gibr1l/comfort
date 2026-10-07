@@ -186,7 +186,11 @@ object GalleryDlPreferences {
     // "poster - caption" first. DownloadWorker derives the entity's own display title by
     // stripping that trailing bracket, so the two need to keep matching.
     private const val LEGACY_DEFAULT_FILENAME_FORMAT_2 = "{uploader|category} - {title|id} - {filename}.{extension}"
-    const val DEFAULT_FILENAME_FORMAT = "{uploader|category} - {title|category} [{filename}].{extension}"
+    private const val LEGACY_DEFAULT_FILENAME_FORMAT_3 = "{uploader|category} - {title|category} [{filename}].{extension}"
+    // X posts have neither uploader nor title — their poster is author[name] and their text
+    // content — so they were all named "twitter - twitter [id]". ":? - //" adds " - <text>" only
+    // when there is text; the text is capped at 150 characters and "!W" folds its line breaks.
+    const val DEFAULT_FILENAME_FORMAT = "{uploader|author[name]|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
     private const val DEFAULT_FILENAME_TEMPLATES = """%(title)s.%(ext)s
 %(uploader)s - %(title)s [%(id)s].%(ext)s
 %(playlist_index)s - %(title)s.%(ext)s
@@ -200,7 +204,8 @@ object GalleryDlPreferences {
 
     fun getFilenameFormat(context: Context): String {
         val stored = prefs(context).getString(KEY_FILENAME_FORMAT, null)?.takeIf { it.isNotBlank() }
-        if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT || stored == LEGACY_DEFAULT_FILENAME_FORMAT_2) return DEFAULT_FILENAME_FORMAT
+        if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT || stored == LEGACY_DEFAULT_FILENAME_FORMAT_2 ||
+            stored == LEGACY_DEFAULT_FILENAME_FORMAT_3) return DEFAULT_FILENAME_FORMAT
         return stored
     }
 
@@ -1212,11 +1217,10 @@ object GalleryDlPreferences {
     }
 
     /** yt-dlp's own --restrict-filenames (ASCII-only, no spaces/special characters in the
-     * output filename) — was previously hardcoded on unconditionally in yt_dlp_wrapper.py; now a
-     * real Settings choice. Defaults to true to match that previous always-on behavior exactly,
-     * so leaving this alone changes nothing for an existing install. */
+     * output filename). Off by default: names keep their spaces and punctuation, the same as
+     * gallery-dl's, which this setting doesn't affect. */
     fun isRestrictFilenames(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_RESTRICT_FILENAMES, true)
+        return prefs(context).getBoolean(KEY_RESTRICT_FILENAMES, false)
     }
 
     fun setRestrictFilenames(context: Context, enabled: Boolean) {
