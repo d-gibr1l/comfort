@@ -150,6 +150,15 @@ private fun SitesSection() {
     var ytDlpSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.ytDlpSites()) }
     var galleryDlSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.galleryDlSites()) }
     var open by remember { mutableStateOf(false) }
+    var supported by remember { mutableStateOf<com.comfort.app.util.EngineSites?>(null) }
+    var supportedFailed by remember { mutableStateOf(false) }
+    var browsing by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
+    LaunchedEffect(open) {
+        if (open && supported == null) {
+            supported = com.comfort.app.util.EngineSitesRepository.load(context)
+            supportedFailed = supported == null
+        }
+    }
     fun refresh() {
         ytDlpSites = com.comfort.app.data.VideoSiteRouter.ytDlpSites()
         galleryDlSites = com.comfort.app.data.VideoSiteRouter.galleryDlSites()
@@ -168,6 +177,8 @@ private fun SitesSection() {
             Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+
+    browsing?.let { (title, sites) -> SupportedSitesSheet(title = title, sites = sites, onDismiss = { browsing = null }) }
 
     if (!open) return
     androidx.compose.material3.ModalBottomSheet(
@@ -314,6 +325,63 @@ private fun SitesSection() {
                 },
             )
 
+            // Every site the engines support, read from the engines themselves.
+            Spacer(Modifier.height(12.dp))
+            androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Supported sites", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Every site each engine can download, from the engines themselves",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    val lists = supported
+                    when {
+                        lists != null -> listOf(
+                            Triple("Only gallery-dl", "gallery-dl supports these, yt-dlp doesn't", lists.galleryDlOnly),
+                            Triple("Only yt-dlp", "yt-dlp supports these, gallery-dl doesn't", lists.ytDlpOnly),
+                            Triple("Both", "Either engine can download these", lists.both),
+                        ).forEach { (title, subtitle, sites) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { browsing = title to sites }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(title, style = MaterialTheme.typography.bodyLarge)
+                                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(
+                                    "%,d".format(sites.size),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        supportedFailed -> Text(
+                            "Couldn't read the engines' site lists.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                        else -> Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Reading the engines…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             Text(
                 "Sites on neither list try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
@@ -332,6 +400,72 @@ private fun SitesSection() {
                     Spacer(Modifier.width(6.dp))
                     Text("Restore defaults")
                 }
+            }
+        }
+    }
+}
+
+/** One of the engines' supported-site lists, browsable and searchable — hundreds to thousands of
+ * sites, so a lazy list rather than chips. Read-only: these come from the engines themselves. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SupportedSitesSheet(title: String, sites: List<String>, onDismiss: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val shown = remember(query, sites) { if (query.isBlank()) sites else sites.filter { it.contains(query.trim(), ignoreCase = true) } }
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp).imePadding()) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "%,d sites".format(sites.size),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Search sites") },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+            )
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                items(shown.size) { i ->
+                    val site = shown[i]
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                site.first().uppercase(),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Text(site, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                if (shown.isEmpty()) {
+                    item {
+                        Text(
+                            "No site matches \"${query.trim()}\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 16.dp),
+                        )
+                    }
+                }
+                item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }
