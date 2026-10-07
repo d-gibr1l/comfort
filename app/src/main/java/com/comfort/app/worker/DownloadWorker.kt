@@ -519,6 +519,99 @@ class DownloadWorker(
                 // That monitor's measured speed (MB/s), so a file landing doesn't overwrite it with a
                 // whole-download average.
                 val measuredSpeedMbs = java.util.concurrent.atomic.AtomicReference(0f)
+                // Files are saved to the gallery here, not as each one arrives: the File event holds
+                // them (heldFiles), and saveHeldFiles() saves them together when the download ends —
+                // also on pause or cancel, so nothing finished is lost — or in batches for a big one.
+                val heldFiles = java.util.Collections.synchronizedList(mutableListOf<Pair<File, Boolean>>())
+
+                // [firstOfDownload]: the download's first file, whose thumbnail is the Library's.
+                suspend fun saveFile(candidate: File, isAudioFile: Boolean, firstOfDownload: Boolean = false) {
+                    val fileSize = candidate.length()
+                    // Lyrics go into the staging file's tags before it's saved;
+                    // a synced .lrc lands beside it and is saved after the song.
+                    val lrcFile = if (isAudioFile) addLyrics(candidate, overrideTitle, overrideArtist, downloadId) else null
+                    val savedUri = MediaStoreHelper.saveMediaToGallery(
+                        applicationContext, candidate, forceAudioMime = isAudioFile,
+                    )
+                    if (savedUri != null && lrcFile != null) {
+                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrcFile) }
+                    }
+                    lrcFile?.delete()
+                    if (savedUri == null) {
+                        // Counted when it arrived; it didn't make it to the gallery.
+                        savedCount.decrementAndGet()
+                    } else {
+                        candidate.delete()
+                        val count = savedCount.get()
+                        val totalBytes = bytesSoFar.addAndGet(fileSize)
+                        // This file's bytes now live in bytesSoFar — without resetting
+                        // this, the next file's progress would double-count them.
+                        currentFileBytesRef.set(0)
+                        val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
+                        val speedMbs = measuredSpeedMbs.get().takeIf { it > 0f }
+                            ?: ((totalBytes / (1024f * 1024f)) / elapsedSeconds)
+                        dao.updateLiveProgress(downloadId, count, speedMbs)
+                        // An audio file's own Uri has no frame Coil can decode, so its
+                        // embedded cover art is pulled out to its own file when there
+                        // is one (extractAudioArtworkUri). Only then does thumbnailPath
+                        // stop being the real file's Uri, so only then does mediaUri
+                        // need to carry it separately (Library's tap-to-open).
+                        // isAudio is extension-derived and always right for a given
+                        // file, so it's set unconditionally, not IfAbsent.
+                        if (isAudioFile) dao.setIsAudio(downloadId, true)
+                        val artworkUri = if (isAudioFile) {
+                            MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId)
+                        } else {
+                            null
+                        }
+                        val thumbnailUri = artworkUri ?: savedUri
+                        if (singleItemDownload || firstOfDownload) {
+                            dao.setThumbnail(downloadId, thumbnailUri.toString())
+                            if (artworkUri != null) dao.setMediaUri(downloadId, savedUri.toString())
+                        } else {
+                            dao.setThumbnailIfAbsent(downloadId, thumbnailUri.toString())
+                            if (artworkUri != null) dao.setMediaUriIfAbsent(downloadId, savedUri.toString())
+                        }
+                        dao.addBytes(downloadId, fileSize)
+                        // Its bytes are in totalBytes now; the card adds liveBytes on top.
+                        dao.updateLiveBytes(downloadId, 0, speedMbs)
+                        if (hasPlaceholderTitle && !engineNamedTitle.get()) {
+                            derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
+                        }
+                        // The merged file is the video: show its tags again, and stop
+                        // saying "downloading audio". (Audio-only downloads have no
+                        // video tags and keep their own.)
+                        videoFormatTags.get()?.let { dao.setFormatTags(downloadId, it) }
+                        if (downloadingAudio.getAndSet(false)) dao.setDownloadingAudioTrack(downloadId, false)
+                        // The song preview sheet's editable title/artist — applied
+                        // last, unconditionally, so the user's edit always wins in the
+                        // Library, matching what the wrappers embedded in the file's tags.
+                        if (!overrideTitle.isNullOrBlank()) dao.updateTitle(downloadId, overrideTitle)
+                        if (!overrideArtist.isNullOrBlank()) dao.setArtist(downloadId, overrideArtist)
+                        DownloadNotifications.updateProgress(
+                            applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
+                            speedMbs = speedMbs, currentBytes = totalBytes, expectedBytes = expectedBytesRef.get(),
+                        )
+                    }
+                }
+
+                // Last file first: galleries put the newest first, so a carousel's first picture ends
+                // up first in the gallery too. Saved last, the first file still sets the thumbnail.
+                val firstBatchSaved = java.util.concurrent.atomic.AtomicBoolean(false)
+                suspend fun saveHeldFiles() {
+                    val batch = synchronized(heldFiles) { heldFiles.toList().also { heldFiles.clear() } }
+                    if (batch.isEmpty()) return
+                    val firstBatch = !firstBatchSaved.getAndSet(true)
+                    for ((index, held) in batch.withIndex().reversed()) {
+                        val (file, isAudio) = held
+                        try {
+                            if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0) else savedCount.decrementAndGet()
+                        } catch (e: Exception) {
+                            android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
+                        }
+                    }
+                }
+
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     android.util.Log.d("DownloadEngine", "Python output: $line")
 
@@ -644,79 +737,28 @@ class DownloadWorker(
                                         candidate.delete()
                                         return@actualCallback
                                     }
-                                    val fileSize = candidate.length()
                                     // Extension-derived, except for Spotify: this app's stripped
                                     // ffmpeg has no ogg/opus muxer, so an opus/vorbis extraction
                                     // lands as a bare .webm — a container AUDIO_EXTENSIONS can't
                                     // list without misclassifying real webm video. Every Spotify
-                                    // download is audio, so that engine check covers it. Computed
-                                    // before saveMediaToGallery so it can override webm's default
-                                    // video MIME (else the track lands in Movies, not Music).
+                                    // download is audio, so that engine check covers it.
                                     val isAudioFile = candidate.extension.lowercase() in AUDIO_EXTENSIONS ||
                                         engine == DownloadEngine.SPOTIFY
-                                    // Lyrics go into the staging file's tags before it's saved;
-                                    // a synced .lrc lands beside it and is saved after the song.
-                                    val lrcFile = if (isAudioFile) addLyrics(candidate, overrideTitle, overrideArtist, downloadId) else null
-                                    val savedUri = MediaStoreHelper.saveMediaToGallery(
-                                        applicationContext, candidate, forceAudioMime = isAudioFile,
+                                    // Held back and saved with the rest when the download ends (see
+                                    // saveHeldFiles), so a carousel lands in the gallery all at once.
+                                    // Counted now, so progress still moves file by file.
+                                    lastDataAt.set(System.currentTimeMillis())
+                                    heldFiles += candidate to isAudioFile
+                                    val count = savedCount.incrementAndGet()
+                                    dao.updateLiveProgress(downloadId, count, measuredSpeedMbs.get())
+                                    DownloadNotifications.updateProgress(
+                                        applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
+                                        speedMbs = measuredSpeedMbs.get(), expectedBytes = expectedBytesRef.get(),
                                     )
-                                    if (savedUri != null && lrcFile != null) {
-                                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrcFile) }
-                                    }
-                                    lrcFile?.delete()
-                                    if (savedUri != null) {
-                                        lastDataAt.set(System.currentTimeMillis())
-                                        candidate.delete()
-                                        val count = savedCount.incrementAndGet()
-                                        val totalBytes = bytesSoFar.addAndGet(fileSize)
-                                        // This file's bytes now live in bytesSoFar — without resetting
-                                        // this, the next file's progress would double-count them.
-                                        currentFileBytesRef.set(0)
-                                        val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
-                                        val speedMbs = measuredSpeedMbs.get().takeIf { it > 0f }
-                                            ?: ((totalBytes / (1024f * 1024f)) / elapsedSeconds)
-                                        dao.updateLiveProgress(downloadId, count, speedMbs)
-                                        // An audio file's own Uri has no frame Coil can decode, so its
-                                        // embedded cover art is pulled out to its own file when there
-                                        // is one (extractAudioArtworkUri). Only then does thumbnailPath
-                                        // stop being the real file's Uri, so only then does mediaUri
-                                        // need to carry it separately (Library's tap-to-open).
-                                        // isAudio is extension-derived and always right for a given
-                                        // file, so it's set unconditionally, not IfAbsent.
-                                        if (isAudioFile) dao.setIsAudio(downloadId, true)
-                                        val artworkUri = if (isAudioFile) {
-                                            MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId)
-                                        } else {
-                                            null
-                                        }
-                                        val thumbnailUri = artworkUri ?: savedUri
-                                        if (singleItemDownload) {
-                                            dao.setThumbnail(downloadId, thumbnailUri.toString())
-                                            if (artworkUri != null) dao.setMediaUri(downloadId, savedUri.toString())
-                                        } else {
-                                            dao.setThumbnailIfAbsent(downloadId, thumbnailUri.toString())
-                                            if (artworkUri != null) dao.setMediaUriIfAbsent(downloadId, savedUri.toString())
-                                        }
-                                        dao.addBytes(downloadId, fileSize)
-                                        // Its bytes are in totalBytes now; the card adds liveBytes on top.
-                                        dao.updateLiveBytes(downloadId, 0, speedMbs)
-                                        if (hasPlaceholderTitle && !engineNamedTitle.get()) {
-                                            derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
-                                        }
-                                        // The merged file is the video: show its tags again, and stop
-                                        // saying "downloading audio". (Audio-only downloads have no
-                                        // video tags and keep their own.)
-                                        videoFormatTags.get()?.let { dao.setFormatTags(downloadId, it) }
-                                        if (downloadingAudio.getAndSet(false)) dao.setDownloadingAudioTrack(downloadId, false)
-                                        // The song preview sheet's editable title/artist — applied
-                                        // last, unconditionally, so the user's edit always wins in the
-                                        // Library, matching what the wrappers embedded in the file's tags.
-                                        if (!overrideTitle.isNullOrBlank()) dao.updateTitle(downloadId, overrideTitle)
-                                        if (!overrideArtist.isNullOrBlank()) dao.setArtist(downloadId, overrideArtist)
-                                        DownloadNotifications.updateProgress(
-                                            applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
-                                            speedMbs = speedMbs, currentBytes = totalBytes, expectedBytes = expectedBytesRef.get(),
-                                        )
+                                    // A big download (a whole profile) saves in batches rather than
+                                    // filling the phone's storage with all of it first.
+                                    if (heldFiles.size >= HOLD_MAX_FILES || heldFiles.sumOf { it.first.length() } >= HOLD_MAX_BYTES) {
+                                        saveHeldFiles()
                                     }
                                 }
                             } catch (e: Exception) {
@@ -841,6 +883,7 @@ class DownloadWorker(
                             plan.execute(executor)
                         } finally {
                             DownloadNotes.clear(downloadId)
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { saveHeldFiles() }
                         }
                     } finally {
                         stallWatchdog.cancel()
@@ -1013,6 +1056,11 @@ private const val STALL_AFTER_MS = 6_000L
 /** How long the pre-download listing may take before the download goes ahead without it. 30 s, not
  * less: a real listing on a slow connection (600 ms round trips seen) takes several seconds. */
 private const val LISTING_CAP_MS = 30_000L
+
+/** How many finished files a download holds back before saving them (see saveHeldFiles), and
+ * how many bytes: a carousel saves at once, a whole profile in batches. */
+private const val HOLD_MAX_FILES = 30
+private const val HOLD_MAX_BYTES = 300L * 1024 * 1024
 
 // lyrics.py makes at most two LRCLIB requests (10s timeout each); past this the song saves without.
 private const val LYRICS_CAP_MS = 25_000L
