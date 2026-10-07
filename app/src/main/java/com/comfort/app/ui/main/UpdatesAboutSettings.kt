@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.foundation.verticalScroll
@@ -139,29 +141,35 @@ private fun EngineChoiceSection() {
     }
 }
 
-/** Which engine each site's links go to (VideoSiteRouter's Sites lists). On the page it's one
- * row with the counts; tapping it opens a sheet with both lists — the built-in video sites on
- * yt-dlp plus anything added, and sites moved to gallery-dl — and an add form at the top, which
- * takes a domain or any link from the site. A site's ✕ takes it off its list. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+/** Which engine each site's links go to. On the page it's one row; tapping it opens a sheet with
+ * an add form and the three lists — sites only gallery-dl supports, only yt-dlp, and both — read
+ * from the engines themselves (EngineSitesRepository), with the user's changes on top
+ * (VideoSiteRouter.siteLists). Each list opens as its own searchable sheet where any site can be
+ * moved to another list, or reset. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun SitesSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var ytDlpSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.ytDlpSites()) }
-    var galleryDlSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.galleryDlSites()) }
     var open by remember { mutableStateOf(false) }
-    var supported by remember { mutableStateOf<com.comfort.app.util.EngineSites?>(null) }
-    var supportedFailed by remember { mutableStateOf(false) }
-    var browsing by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
+    var engineSites by remember { mutableStateOf<com.comfort.app.util.EngineSites?>(null) }
+    var loadFailed by remember { mutableStateOf(false) }
+    // Bumped after every change, so the lists are recomputed.
+    var revision by remember { mutableStateOf(0) }
+    var browsing by remember { mutableStateOf<com.comfort.app.data.VideoSiteRouter.SiteRoute?>(null) }
     LaunchedEffect(open) {
-        if (open && supported == null) {
-            supported = com.comfort.app.util.EngineSitesRepository.load(context)
-            supportedFailed = supported == null
+        if (open && engineSites == null) {
+            engineSites = com.comfort.app.util.EngineSitesRepository.load(context)
+            loadFailed = engineSites == null
         }
     }
-    fun refresh() {
-        ytDlpSites = com.comfort.app.data.VideoSiteRouter.ytDlpSites()
-        galleryDlSites = com.comfort.app.data.VideoSiteRouter.galleryDlSites()
+    val lists = remember(engineSites, revision) {
+        engineSites?.let { com.comfort.app.data.VideoSiteRouter.siteLists(it.galleryDlOnly, it.ytDlpOnly, it.both) }
+    }
+    val changes = remember(revision) { com.comfort.app.data.VideoSiteRouter.siteChangeCount() }
+    fun route(host: String, to: com.comfort.app.data.VideoSiteRouter.SiteRoute?) {
+        if (to == null) com.comfort.app.data.VideoSiteRouter.resetSite(context, host)
+        else com.comfort.app.data.VideoSiteRouter.setSiteRoute(context, host, to)
+        revision++
     }
 
     SettingsSection(title = "Sites", icon = Icons.Outlined.Public, onClick = { open = true }) {
@@ -169,7 +177,7 @@ private fun SitesSection() {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Which engine each site uses", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "${ytDlpSites.size} on yt-dlp · ${galleryDlSites.size} on gallery-dl",
+                    if (changes == 0) "Every supported site, by engine" else "$changes ${if (changes == 1) "site" else "sites"} changed by you",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -178,29 +186,33 @@ private fun SitesSection() {
         }
     }
 
-    browsing?.let { (title, sites) -> SupportedSitesSheet(title = title, sites = sites, onDismiss = { browsing = null }) }
+    browsing?.let { which ->
+        SiteListSheet(
+            route = which,
+            sites = lists?.get(which).orEmpty(),
+            onMove = { host, to -> route(host, to) },
+            onDismiss = { browsing = null },
+        )
+    }
 
     if (!open) return
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = { open = false },
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        // Edge to edge: the content runs under the navigation bar instead of stopping above it.
+        contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0) },
     ) {
         var input by remember { mutableStateOf("") }
-        var toYtDlp by remember { mutableStateOf(true) }
+        var addTo by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY) }
         var justAdded by remember { mutableStateOf<String?>(null) }
-        var changed by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.hasSiteChanges()) }
         val site = com.comfort.app.data.VideoSiteRouter.siteFromInput(input)
         val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-        fun afterEdit() {
-            refresh()
-            changed = com.comfort.app.data.VideoSiteRouter.hasSiteChanges()
-        }
 
         Column(
             modifier = Modifier
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp)
+                .padding(bottom = 16.dp)
                 .imePadding()
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
         ) {
@@ -224,12 +236,9 @@ private fun SitesSection() {
                 }
             }
 
-            // Add a site
+            // Add or move a site
             Spacer(Modifier.height(20.dp))
-            androidx.compose.material3.Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
+            androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Text("Add a site", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
@@ -248,7 +257,6 @@ private fun SitesSection() {
                         isError = input.isNotBlank() && site == null,
                         modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     )
-                    // What will be added (the link turned into its site), or why it can't be.
                     Text(
                         when {
                             justAdded != null -> "Added $justAdded"
@@ -265,109 +273,63 @@ private fun SitesSection() {
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                     )
                     Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
-                            listOf(true to "yt-dlp", false to "gallery-dl").forEachIndexed { index, (yt, label) ->
-                                SegmentedButton(
-                                    selected = toYtDlp == yt,
-                                    onClick = { toYtDlp = yt },
-                                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, 2),
-                                ) { Text(label) }
-                            }
+                    androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        val options = com.comfort.app.data.VideoSiteRouter.SiteRoute.entries
+                        options.forEachIndexed { index, option ->
+                            SegmentedButton(
+                                selected = addTo == option,
+                                onClick = { addTo = option },
+                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, options.size),
+                            ) { Text(siteRouteShortLabel(option), maxLines = 1) }
                         }
-                        Spacer(Modifier.width(10.dp))
-                        Button(
-                            enabled = site != null,
-                            onClick = {
-                                site?.let {
-                                    com.comfort.app.data.VideoSiteRouter.addSite(
-                                        context, it,
-                                        if (toYtDlp) com.comfort.app.data.DownloadEngine.YT_DLP else com.comfort.app.data.DownloadEngine.GALLERY_DL,
-                                    )
-                                    justAdded = it
-                                }
-                                input = ""
-                                focusManager.clearFocus()
-                                afterEdit()
-                            },
-                        ) {
-                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Add")
-                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        enabled = site != null,
+                        onClick = {
+                            site?.let { route(it, addTo); justAdded = it }
+                            input = ""
+                            focusManager.clearFocus()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add to ${siteRouteTitle(addTo)}")
                     }
                 }
             }
 
-            // The two lists
-            SiteListCard(
-                icon = Icons.Outlined.Terminal,
-                engine = "yt-dlp",
-                meaning = "Only yt-dlp downloads these",
-                sites = ytDlpSites,
-                emptyText = "No sites: every link tries gallery-dl first.",
-                highlight = { it == justAdded || !com.comfort.app.data.VideoSiteRouter.isBuiltInYtDlpSite(it) },
-                onRemove = {
-                    com.comfort.app.data.VideoSiteRouter.removeSite(context, it)
-                    afterEdit()
-                },
-            )
-            SiteListCard(
-                icon = Icons.Outlined.Image,
-                engine = "gallery-dl",
-                meaning = "Only gallery-dl downloads these, videos too",
-                sites = galleryDlSites,
-                emptyText = "Nothing here yet. Add a site here to take it off yt-dlp.",
-                highlight = { true },
-                onRemove = {
-                    com.comfort.app.data.VideoSiteRouter.removeSite(context, it)
-                    afterEdit()
-                },
-            )
-
-            // Every site the engines support, read from the engines themselves.
+            // The three lists
             Spacer(Modifier.height(12.dp))
             androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text("Supported sites", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "Every site each engine can download, from the engines themselves",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    val lists = supported
+                    Text(
+                        "Supported sites",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
                     when {
-                        lists != null -> listOf(
-                            Triple("Only gallery-dl", "gallery-dl supports these, yt-dlp doesn't", lists.galleryDlOnly),
-                            Triple("Only yt-dlp", "yt-dlp supports these, gallery-dl doesn't", lists.ytDlpOnly),
-                            Triple("Both", "Either engine can download these", lists.both),
-                        ).forEach { (title, subtitle, sites) ->
+                        lists != null -> com.comfort.app.data.VideoSiteRouter.SiteRoute.entries.forEach { which ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { browsing = title to sites }
+                                    .clickable { browsing = which }
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
+                                Icon(siteRouteIcon(which), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                Spacer(Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(title, style = MaterialTheme.typography.bodyLarge)
-                                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(siteRouteTitle(which), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                    Text(siteRouteMeaning(which), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Text(
-                                    "%,d".format(sites.size),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
+                                Text("%,d".format(lists[which].orEmpty().size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                                 Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        supportedFailed -> Text(
+                        loadFailed -> Text(
                             "Couldn't read the engines' site lists.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
@@ -384,46 +346,85 @@ private fun SitesSection() {
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "Sites on neither list try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
+                "A site on no list tries gallery-dl first, with yt-dlp for its videos. Instagram posts use Instaloader and Spotify its own engine either way.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
-            if (changed) {
+            if (changes > 0) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = {
                     com.comfort.app.data.VideoSiteRouter.resetSites(context)
                     justAdded = null
-                    afterEdit()
+                    revision++
                 }) {
                     Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Restore defaults")
                 }
             }
+            Spacer(Modifier.windowInsetsBottomHeight(androidx.compose.foundation.layout.WindowInsets.navigationBars))
         }
     }
 }
 
-/** One of the engines' supported-site lists, browsable and searchable — hundreds to thousands of
- * sites, so a lazy list rather than chips. Read-only: these come from the engines themselves. */
+private fun siteRouteTitle(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> "Only gallery-dl"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> "Only yt-dlp"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> "Both"
+}
+
+private fun siteRouteShortLabel(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> "gallery-dl"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> "yt-dlp"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> "Both"
+}
+
+private fun siteRouteMeaning(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> "gallery-dl downloads these, videos too"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> "yt-dlp downloads these"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> "gallery-dl first, yt-dlp for videos"
+}
+
+private fun siteRouteIcon(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> Icons.Outlined.Image
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> Icons.Outlined.Terminal
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> Icons.Outlined.Public
+}
+
+/** One Sites list, searchable — hundreds to thousands of sites, so a lazy list. Each site's ⋮ menu
+ * moves it to another list, or resets a site the user changed back to its default. */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun SupportedSitesSheet(title: String, sites: List<String>, onDismiss: () -> Unit) {
+private fun SiteListSheet(
+    route: com.comfort.app.data.VideoSiteRouter.SiteRoute,
+    sites: List<String>,
+    onMove: (String, com.comfort.app.data.VideoSiteRouter.SiteRoute?) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var query by remember { mutableStateOf("") }
     val shown = remember(query, sites) { if (query.isBlank()) sites else sites.filter { it.contains(query.trim(), ignoreCase = true) } }
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        // Edge to edge: the content runs under the navigation bar instead of stopping above it.
+        contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0) },
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp).imePadding()) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "%,d sites".format(sites.size),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        // Full height whatever the search leaves, so the sheet doesn't jump as results shrink.
+        Column(modifier = Modifier.fillMaxHeight(0.92f).padding(horizontal = 20.dp).imePadding()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(siteRouteIcon(route), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(siteRouteTitle(route), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(
+                        "%,d sites · ".format(sites.size) + siteRouteMeaning(route),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = query,
@@ -435,113 +436,63 @@ private fun SupportedSitesSheet(title: String, sites: List<String>, onDismiss: (
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
             )
             Spacer(Modifier.height(8.dp))
-            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
-                items(shown.size) { i ->
+            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                items(shown.size, key = { shown[it] }) { i ->
                     val site = shown[i]
-                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val changed = com.comfort.app.data.VideoSiteRouter.siteOverride(site) != null
+                    var menu by remember { mutableStateOf(false) }
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.foundation.layout.Box(
-                            modifier = Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(MaterialTheme.colorScheme.secondaryContainer),
+                            modifier = Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (changed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
                                 site.first().uppercase(),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                color = if (changed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
                             )
                         }
                         Spacer(Modifier.width(14.dp))
-                        Text(site, style = MaterialTheme.typography.bodyLarge)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(site, style = MaterialTheme.typography.bodyLarge)
+                            if (changed) Text("Changed by you", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                        androidx.compose.foundation.layout.Box {
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Move $site") }
+                            androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                com.comfort.app.data.VideoSiteRouter.SiteRoute.entries.filter { it != route }.forEach { to ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text("Move to ${siteRouteTitle(to)}") },
+                                        leadingIcon = { Icon(siteRouteIcon(to), contentDescription = null) },
+                                        onClick = { menu = false; onMove(site, to) },
+                                    )
+                                }
+                                if (changed) {
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text("Reset to default") },
+                                        leadingIcon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
+                                        onClick = { menu = false; onMove(site, null) },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 if (shown.isEmpty()) {
                     item {
                         Text(
-                            "No site matches \"${query.trim()}\"",
+                            if (sites.isEmpty()) "No sites in this list." else "No site matches \"${query.trim()}\"",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 16.dp),
                         )
                     }
                 }
-                item { Spacer(Modifier.height(24.dp)) }
-            }
-        }
-    }
-}
-
-/** One engine's list in the Sites sheet: a header (icon, engine, what it means, count) over the
- * sites as chips, each with a letter avatar and a remove button. [highlight] tints the sites the
- * user added. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun SiteListCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    engine: String,
-    meaning: String,
-    sites: List<String>,
-    emptyText: String,
-    highlight: (String) -> Boolean,
-    onRemove: (String) -> Unit,
-) {
-    Spacer(Modifier.height(12.dp))
-    androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(engine, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(meaning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                androidx.compose.material3.Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                    Text(
-                        "${sites.size}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            if (sites.isEmpty()) {
-                Text(emptyText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                androidx.compose.foundation.layout.FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    sites.forEach { s ->
-                        val tinted = highlight(s)
-                        androidx.compose.material3.InputChip(
-                            selected = tinted,
-                            onClick = { onRemove(s) },
-                            label = { Text(s) },
-                            avatar = {
-                                androidx.compose.foundation.layout.Box(
-                                    modifier = Modifier.size(24.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                        .background(if (tinted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        s.first().uppercase(),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (tinted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "Remove $s", modifier = Modifier.size(16.dp)) },
-                            shape = RoundedCornerShape(50),
-                            border = null,
-                            colors = androidx.compose.material3.InputChipDefaults.inputChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                        )
-                    }
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.windowInsetsBottomHeight(androidx.compose.foundation.layout.WindowInsets.navigationBars))
                 }
             }
         }
