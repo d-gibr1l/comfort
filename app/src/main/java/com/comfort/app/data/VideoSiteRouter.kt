@@ -52,12 +52,80 @@ object VideoSiteRouter {
     // ".$it") }` predicate was copy-pasted at every host-set check site.
     private fun Set<String>.matchesHost(host: String): Boolean = any { host == it || host.endsWith(".$it") }
 
+    // The user's Sites lists (Settings › Updates and engines) — kept here, not read per call, since
+    // classify() has no Context. Loaded at process start (ComfortApp) and after every edit.
+    @Volatile private var addedYtDlp: Set<String> = emptySet()
+    @Volatile private var addedGalleryDl: Set<String> = emptySet()
+    @Volatile private var removedYtDlp: Set<String> = emptySet()
+
+    /** Sets the user's lists; [loadSiteRules] reads them from Settings. */
+    internal fun applySiteRules(ytDlp: Set<String>, galleryDl: Set<String>, removedDefaults: Set<String>) {
+        addedYtDlp = ytDlp
+        addedGalleryDl = galleryDl
+        removedYtDlp = removedDefaults
+    }
+
+    fun loadSiteRules(context: Context) = applySiteRules(
+        GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP),
+        GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_GALLERY_DL),
+        GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED),
+    )
+
+    /** Sites whose links go to yt-dlp alone: the built-in video sites, minus any removed, plus any added. */
+    fun ytDlpSites(): List<String> = ((videoOnlyHosts - removedYtDlp) + addedYtDlp - addedGalleryDl).sorted()
+
+    /** Sites added to gallery-dl: gallery-dl first, with their videos still going to yt-dlp — the
+     * route every unlisted site takes; listing one mainly takes it off yt-dlp's built-in list. */
+    fun galleryDlSites(): List<String> = addedGalleryDl.sorted()
+
+    /** Puts [host] on [engine]'s list (and off the other one). */
+    fun addSite(context: Context, host: String, engine: DownloadEngine) {
+        val yt = addedYtDlp.toMutableSet()
+        val gdl = addedGalleryDl.toMutableSet()
+        val removed = removedYtDlp.toMutableSet()
+        yt -= host; gdl -= host
+        when (engine) {
+            DownloadEngine.YT_DLP -> if (host in videoOnlyHosts) removed -= host else yt += host
+            else -> { gdl += host; if (host in videoOnlyHosts) removed += host }
+        }
+        saveSiteRules(context, yt, gdl, removed)
+    }
+
+    /** Takes [host] off whichever list it's on — it goes back to the route unlisted sites take. */
+    fun removeSite(context: Context, host: String) {
+        val removed = removedYtDlp.toMutableSet()
+        if (host in videoOnlyHosts) removed += host
+        saveSiteRules(context, addedYtDlp - host, addedGalleryDl - host, removed)
+    }
+
+    fun resetSites(context: Context) = saveSiteRules(context, emptySet(), emptySet(), emptySet())
+
+    private fun saveSiteRules(context: Context, yt: Set<String>, gdl: Set<String>, removed: Set<String>) {
+        GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP, yt)
+        GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_GALLERY_DL, gdl)
+        GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED, removed)
+        applySiteRules(yt, gdl, removed)
+    }
+
+    /** A site typed or pasted into the Sites list — a bare domain or a whole link — as the host the
+     * lists match ("www.tiktok.com/@x/video/1" -> "tiktok.com"); null if it isn't one. */
+    fun siteFromInput(input: String): String? {
+        val trimmed = input.trim().lowercase()
+        if (trimmed.isEmpty() || trimmed.contains(' ')) return null
+        val withScheme = if (trimmed.contains("://")) trimmed else "https://$trimmed"
+        return normalizedHost(withScheme)?.takeIf { it.contains('.') && !it.startsWith('.') && !it.endsWith('.') }
+    }
+
     fun classify(url: String): DownloadEngine {
         val host = normalizedHost(url) ?: return DownloadEngine.GALLERY_DL
 
         if (spotifyHosts.matchesHost(host)) {
             return DownloadEngine.SPOTIFY
         }
+
+        // The user's Sites lists come before every built-in rule below.
+        if (addedGalleryDl.matchesHost(host)) return DownloadEngine.GALLERY_DL
+        if (addedYtDlp.matchesHost(host)) return DownloadEngine.YT_DLP
 
         // Instagram reels are always videos and handle much better in yt-dlp immediately.
         // Checked against the URI's own path (lowercased), not a raw substring search over the
@@ -72,7 +140,7 @@ object VideoSiteRouter {
             return DownloadEngine.YT_DLP
         }
 
-        return if (videoOnlyHosts.matchesHost(host)) {
+        return if ((videoOnlyHosts - removedYtDlp).matchesHost(host)) {
             DownloadEngine.YT_DLP
         } else {
             DownloadEngine.GALLERY_DL

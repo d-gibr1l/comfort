@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.*
 internal fun UpdatesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     SettingsSubScaffold(title = "Updates and engines", topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
         EngineChoiceSection()
+        SitesSection()
         AppUpdateSection()
         EnginesSection()
     }
@@ -131,6 +132,115 @@ private fun EngineChoiceSection() {
                 confirmOff = null
             },
             onDismiss = { confirmOff = null },
+        )
+    }
+}
+
+/** Which engine each site's links go to (VideoSiteRouter's Sites lists): the built-in video sites
+ * on yt-dlp plus anything added, and sites moved to gallery-dl. A site can be added by domain or
+ * by pasting any link from it; tapping a site's ✕ takes it off its list. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SitesSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var ytDlpSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.ytDlpSites()) }
+    var galleryDlSites by remember { mutableStateOf(com.comfort.app.data.VideoSiteRouter.galleryDlSites()) }
+    var adding by remember { mutableStateOf(false) }
+    fun refresh() {
+        ytDlpSites = com.comfort.app.data.VideoSiteRouter.ytDlpSites()
+        galleryDlSites = com.comfort.app.data.VideoSiteRouter.galleryDlSites()
+    }
+
+    SettingsSection(title = "Sites", icon = Icons.Outlined.Public) {
+        Text(
+            "Which engine a site's links go to. Sites not listed try gallery-dl first, with yt-dlp for their videos. Instagram posts use Instaloader and Spotify its own engine either way.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        listOf(
+            Triple("yt-dlp", ytDlpSites, "Only yt-dlp"),
+            Triple("gallery-dl", galleryDlSites, "gallery-dl first"),
+        ).forEach { (name, sites, meaning) ->
+            Spacer(Modifier.height(14.dp))
+            Text("$name · $meaning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            if (sites.isEmpty()) {
+                Text("None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    sites.forEach { site ->
+                        androidx.compose.material3.InputChip(
+                            selected = false,
+                            onClick = {
+                                com.comfort.app.data.VideoSiteRouter.removeSite(context, site)
+                                refresh()
+                            },
+                            label = { Text(site) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "Remove $site", modifier = Modifier.size(16.dp)) },
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { adding = true }) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Add site")
+            }
+            TextButton(onClick = {
+                com.comfort.app.data.VideoSiteRouter.resetSites(context)
+                refresh()
+            }) { Text("Restore defaults") }
+        }
+    }
+
+    if (adding) {
+        var input by remember { mutableStateOf("") }
+        var toYtDlp by remember { mutableStateOf(true) }
+        val site = com.comfort.app.data.VideoSiteRouter.siteFromInput(input)
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { adding = false },
+            title = { Text("Add a site") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = input,
+                        onValueChange = { input = it },
+                        label = { Text("Site or any link from it") },
+                        placeholder = { Text("tiktok.com") },
+                        singleLine = true,
+                        supportingText = { Text(if (input.isBlank()) " " else site ?: "Not a site") },
+                        isError = input.isNotBlank() && site == null,
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.FilterChip(selected = toYtDlp, onClick = { toYtDlp = true }, label = { Text("yt-dlp") })
+                        androidx.compose.material3.FilterChip(selected = !toYtDlp, onClick = { toYtDlp = false }, label = { Text("gallery-dl") })
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = site != null,
+                    onClick = {
+                        site?.let {
+                            com.comfort.app.data.VideoSiteRouter.addSite(
+                                context, it,
+                                if (toYtDlp) com.comfort.app.data.DownloadEngine.YT_DLP else com.comfort.app.data.DownloadEngine.GALLERY_DL,
+                            )
+                        }
+                        refresh()
+                        adding = false
+                    },
+                ) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = { adding = false }) { Text("Cancel") } },
         )
     }
 }
