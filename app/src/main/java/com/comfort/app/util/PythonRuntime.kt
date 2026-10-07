@@ -60,7 +60,7 @@ object PythonRuntime {
     private const val SCRIPTS_MARKER = "scripts.txt"
     private val SCRIPTS = listOf(
         "gallery_dl_wrapper.py", "yt_dlp_wrapper.py", "spotify_wrapper.py", "instaloader_wrapper.py",
-        "py_server.py", "net_resilience.py", "comfort_events.py", "cacert.pem",
+        "py_server.py", "net_resilience.py", "comfort_events.py", "engine_sites.py", "cacert.pem",
     )
 
     private fun runtimeRoot(context: Context) = File(context.noBackupFilesDir, RUNTIME_DIR_NAME)
