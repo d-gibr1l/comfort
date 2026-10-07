@@ -148,15 +148,32 @@ class DownloadWorker(
     /** Adds lyrics to a downloaded song (Settings › Processing › Lyrics; lyrics.py looks it up on
      * LRCLIB by its tags and embeds them). Returns the .lrc file it wrote beside [song], if any.
      * Best-effort and capped: a song with no lyrics found, or no network, saves as it is. */
-    private suspend fun addLyrics(song: File, title: String, artist: String): File? {
+    private suspend fun addLyrics(song: File, title: String, artist: String, downloadId: String): File? {
         val mode = GalleryDlPreferences.getLyricsMode(applicationContext)
         if (mode == GalleryDlPreferences.LYRICS_OFF) return null
         val writeLrc = GalleryDlPreferences.isLyricsLrcFile(applicationContext)
+        // What the app already knows about the song, for a file whose own tags can't be read
+        // (a .webm): the engine's artist and track, or its "Artist - Title" title.
+        val entity = runCatching { AppDatabase.getDatabase(applicationContext).downloadDao().getById(downloadId) }.getOrNull()
+        val knownArtist = entity?.artist.orEmpty()
+        val knownTitle = entity?.track?.takeIf { it.isNotBlank() }
+            ?: entity?.title.orEmpty().removePrefix("$knownArtist - ").takeIf { knownArtist.isNotBlank() }.orEmpty()
+        val seconds = runCatching {
+            android.media.MediaMetadataRetriever().run {
+                try {
+                    setDataSource(song.absolutePath)
+                    extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.div(1000)
+                } finally { release() }
+            }
+        }.getOrNull()
         runCatching {
             kotlinx.coroutines.withTimeoutOrNull(LYRICS_CAP_MS) {
                 PythonRuntime.run(
                     applicationContext, "lyrics.py",
-                    listOf(song.absolutePath, mode, if (writeLrc) "1" else "0", title, artist),
+                    listOf(
+                        song.absolutePath, mode, if (writeLrc) "1" else "0", title, artist,
+                        knownTitle, knownArtist, seconds?.toString().orEmpty(),
+                    ),
                 ) { }
             }
         }
@@ -639,7 +656,7 @@ class DownloadWorker(
                                         engine == DownloadEngine.SPOTIFY
                                     // Lyrics go into the staging file's tags before it's saved;
                                     // a synced .lrc lands beside it and is saved after the song.
-                                    val lrcFile = if (isAudioFile) addLyrics(candidate, overrideTitle, overrideArtist) else null
+                                    val lrcFile = if (isAudioFile) addLyrics(candidate, overrideTitle, overrideArtist, downloadId) else null
                                     val savedUri = MediaStoreHelper.saveMediaToGallery(
                                         applicationContext, candidate, forceAudioMime = isAudioFile,
                                     )

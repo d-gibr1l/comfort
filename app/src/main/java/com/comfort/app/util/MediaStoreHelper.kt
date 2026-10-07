@@ -27,6 +27,55 @@ object MediaStoreHelper {
     /** Where downloads went before they moved to [RELATIVE_DIR] — [organizeSavedFiles] moves them. */
     private val OLD_RELATIVE_DIRS = listOf("Pictures/Comfort/", "Movies/Comfort/", "Music/Comfort/", "Download/Comfort/")
 
+    /** Renames files saved under the old naming to today's (see [OldNames.tidy]) — the poster
+     * no longer repeated, no links, X files named after their poster rather than "twitter".
+     * [urlFor] gives the link a file was downloaded from, for the poster of an X file. A rename
+     * keeps the file's MediaStore row, so the Library's links keep working; only files this app
+     * owns can be renamed. Returns how many were. */
+    suspend fun tidyOldNames(context: Context, urlFor: suspend (String) -> String?): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return 0
+        val resolver = context.contentResolver
+        val files = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val rows = mutableListOf<Pair<Long, String>>()
+        runCatching {
+            resolver.query(
+                files,
+                arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME),
+                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? AND ${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
+                arrayOf("$RELATIVE_DIR/%", context.packageName),
+                null,
+            )?.use { c -> while (c.moveToNext()) c.getString(1)?.let { rows += c.getLong(0) to it } }
+        }
+        // An X file's poster, by its "[id]" — sidecars (.json) share the id but have no record.
+        val idOf = Regex(""" \[([^\[\]]+)]""")
+        val posters = HashMap<String, String>()
+        for ((_, name) in rows) {
+            if (!name.startsWith("twitter - ", ignoreCase = true)) continue
+            val id = idOf.find(name)?.groupValues?.get(1) ?: continue
+            if (id in posters) continue
+            OldNames.xPoster(urlFor(name))?.let { posters[id] = it }
+        }
+        var renamed = 0
+        for ((id, name) in rows) {
+            val poster = idOf.find(name)?.groupValues?.get(1)?.let { posters[it] }
+            val tidied = OldNames.tidy(name, poster) ?: continue
+            val uri = android.content.ContentUris.withAppendedId(files, id)
+            // A same-named file already there makes the rename fail: try "name (1).ext" and so on.
+            val dot = tidied.lastIndexOf('.')
+            val base = if (dot > 0) tidied.substring(0, dot) else tidied
+            val ext = if (dot > 0) tidied.substring(dot) else ""
+            for (attempt in 0..20) {
+                val candidate = if (attempt == 0) tidied else "$base ($attempt)$ext"
+                val values = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, candidate) }
+                if (runCatching { resolver.update(uri, values, null, null) }.getOrDefault(0) > 0) {
+                    renamed++
+                    break
+                }
+            }
+        }
+        return renamed
+    }
+
     /** The [RELATIVE_DIR] subfolder a file goes in: by type, with sidecars beside what they
      * belong to — subtitles with the videos, .lrc lyrics with the songs, so players find them —
      * and info files (.json, .description) in Other. */
@@ -90,9 +139,9 @@ object MediaStoreHelper {
     /** Whether the Uri a download saved still resolves to a real file — false once the user has
      * deleted it from their gallery (or the SAF folder) outside the app. Errors fail open (return
      * true) since wrongly flagging a still-live file as deleted is worse than occasionally missing
-     * a real deletion. */
-    fun exists(context: Context, uriString: String): Boolean {
-        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return true
+     * a real deletion. [failOpen] false reverses that, for confirming a file is really back. */
+    fun exists(context: Context, uriString: String, failOpen: Boolean = true): Boolean {
+        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return failOpen
         return runCatching {
             if (uri.authority == MediaStore.AUTHORITY) {
                 context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)
@@ -100,7 +149,7 @@ object MediaStoreHelper {
             } else {
                 DocumentFile.fromSingleUri(context, uri)?.exists() ?: false
             }
-        }.getOrDefault(true)
+        }.getOrDefault(failOpen)
     }
 
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if

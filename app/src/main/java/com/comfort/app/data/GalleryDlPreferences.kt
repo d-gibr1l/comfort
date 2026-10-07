@@ -626,6 +626,15 @@ object GalleryDlPreferences {
 
     private const val KEY_SAVED_FILES_ORGANIZED = "saved_files_organized"
 
+    /** Whether files saved under the old naming have been renamed (MediaStoreHelper.tidyOldNames, once). */
+    fun isOldNamesTidied(context: Context): Boolean = prefs(context).getBoolean(KEY_OLD_NAMES_TIDIED, false)
+
+    fun setOldNamesTidied(context: Context) {
+        prefs(context).edit().putBoolean(KEY_OLD_NAMES_TIDIED, true).apply()
+    }
+
+    private const val KEY_OLD_NAMES_TIDIED = "old_names_tidied"
+
     const val LYRICS_SYNCED = "synced"
     const val LYRICS_PLAIN = "plain"
     const val LYRICS_OFF = "off"

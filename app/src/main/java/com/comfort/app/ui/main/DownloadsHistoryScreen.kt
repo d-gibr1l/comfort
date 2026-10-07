@@ -321,6 +321,12 @@ fun DownloadsHistoryScreen(
         }
     }
 
+    // Back turns an active filter chip off before it leaves the Library. Registered before the
+    // selection handler, so with both active Back clears the selection first.
+    val chipActive = favoritesOnly || showDeletedOnly || showDuplicatesOnly || audioOnly
+    BackHandler(enabled = chipActive && !isQueueOpen) {
+        favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false
+    }
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
 
     // Checks each finished download's thumbnail against the real MediaStore once per Library
@@ -419,6 +425,8 @@ fun DownloadsHistoryScreen(
                         if (showDuplicatesOnly) { favoritesOnly = false; showDeletedOnly = false; audioOnly = false }
                     },
                     duplicateAttemptsCount = duplicateAttempts.size,
+                    deletedCount = deletedItems.size,
+                    onClearDeleted = { requestDelete(deletedItems.map { it.id }.toSet()) },
                     audioOnly = audioOnly,
                     onToggleAudioOnly = {
                         audioOnly = !audioOnly
@@ -777,6 +785,8 @@ private fun LibraryHeader(
     showDuplicatesOnly: Boolean,
     onToggleShowDuplicatesOnly: () -> Unit,
     duplicateAttemptsCount: Int,
+    deletedCount: Int,
+    onClearDeleted: () -> Unit,
     audioOnly: Boolean,
     onToggleAudioOnly: () -> Unit,
 ) {
@@ -958,6 +968,21 @@ private fun LibraryHeader(
                     onClick = onToggleAudioOnly,
                     groupIndex = 3, groupSize = 4,
                 )
+            }
+        }
+        // Deleted: their files are gone, so all that's left to do with them is clear them out.
+        if (showDeletedOnly && deletedCount > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "$deletedCount ${if (deletedCount == 1) "download" else "downloads"} whose files were deleted",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onClearDeleted) { Text("Clear all") }
             }
         }
         }

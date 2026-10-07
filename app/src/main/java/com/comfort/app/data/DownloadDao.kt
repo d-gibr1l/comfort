@@ -21,6 +21,9 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE status = 'DELETED' ORDER BY dateAdded DESC")
     fun getDeletedFlow(): Flow<List<DownloadEntity>>
 
+    @Query("SELECT * FROM downloads WHERE status = 'DELETED'")
+    suspend fun getDeletedOnce(): List<DownloadEntity>
+
     // ERRORED first (rank 0, everything else rank 1) so a failed download always surfaces at the
     // top instead of wherever plain chronological order happened to leave it — reproduced live: a
     // download that fails immediately keeps the queueOrder/dateAdded of when it was *added*, which
@@ -252,6 +255,10 @@ interface DownloadDao {
 
     @Query("DELETE FROM downloaded_files WHERE downloadId = :downloadId")
     suspend fun clearDownloadedFileRecords(downloadId: String)
+
+    /** The link of the download that saved a file named [filename]. */
+    @Query("SELECT d.url FROM downloads d JOIN downloaded_files f ON f.downloadId = d.id WHERE f.filename = :filename LIMIT 1")
+    suspend fun urlForSavedFile(filename: String): String?
 
     @Query("SELECT * FROM duplicate_attempts ORDER BY dateAdded DESC")
     fun getDuplicateAttemptsFlow(): Flow<List<DuplicateAttempt>>
