@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import shlex
@@ -33,6 +34,22 @@ def _poster_name(kwdict):
     return None
 
 
+def short_id(value):
+    """The id a default filename ends with: as is up to 11 characters (a YouTube id), otherwise
+    a 6-character code from its SHA-1 — X post ids are 19 digits and Instagram's file names ~50
+    characters. A code, not the id's last characters: those repeat (Instagram's all end "_n").
+    OldNames.shortId in the app computes the same code."""
+    value = str(value or "")
+    if len(value) <= 11:
+        return value
+    n = int(hashlib.sha1(value.encode("utf-8")).hexdigest()[:12], 16)
+    digits = ""
+    while n:
+        n, r = divmod(n, 36)
+        digits = "0123456789abcdefghijklmnopqrstuvwxyz"[r] + digits
+    return digits[:6]
+
+
 _original_update_kwdict = gallery_dl.job.Job.update_kwdict
 
 
@@ -42,6 +59,8 @@ def _update_kwdict(self, kwdict):
         name = _poster_name(kwdict)
         if name:
             kwdict["poster_name"] = name
+    if "short_id" not in kwdict and kwdict.get("filename"):
+        kwdict["short_id"] = short_id(kwdict["filename"])
 
 
 gallery_dl.job.Job.update_kwdict = _update_kwdict

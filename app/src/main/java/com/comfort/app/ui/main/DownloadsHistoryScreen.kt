@@ -1758,7 +1758,28 @@ private fun HistoryRow(
                 }
 
                 // No item-count or status overlay here (unlike the grid): the row's own text beside
-                // the thumbnail already shows both.
+                // the thumbnail already shows both. A video's or song's length ("▶ 0:13") sits in the
+                // bottom-left corner, inside the thumbnail.
+                if (durationMs != null) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .padding(start = 3.dp, end = 5.dp, top = 1.dp, bottom = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            formatGridDuration(durationMs),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
                 if (item.isFavorite) {
                     Box(
                         modifier = Modifier
@@ -1774,16 +1795,6 @@ private fun HistoryRow(
                 }
             }
 
-            // A video's or song's length ("▶ 0:13"), bottom-centre and outside the clip: the
-            // thumbnail's wavy shape cuts into its corners, which clipped a corner badge.
-            if (durationMs != null) {
-                MediaBadge(
-                    icon = Icons.Filled.PlayArrow,
-                    text = formatGridDuration(durationMs),
-                    compact = true,
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp),
-                )
-            }
 
             if (selected) {
                 Box(

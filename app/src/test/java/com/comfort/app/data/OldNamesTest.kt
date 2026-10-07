@@ -7,17 +7,17 @@ import org.junit.Test
 
 class OldNamesTest {
     @Test fun repeatedPosterAndLinkOnlyCaption() = assertEquals(
-        "Shitpost_2048 [2107543837467889664].mkv",
+        "Shitpost_2048 [1eglnp].mkv",
         OldNames.tidy("Shitpost_2048 - Shitpost_2048_-_https_-_t.co_cFUYmh8Vc6 [2107543837467889664].mkv"),
     )
 
     @Test fun repeatedPosterWithCaption() = assertEquals(
-        "ITSBIZKIT - New_York_is_not_a_real_place_lol [2107438375510605825].mkv",
+        "ITSBIZKIT - New_York_is_not_a_real_place_lol [rkp5wh].mkv",
         OldNames.tidy("ITSBIZKIT - ITSBIZKIT_-_New_York_is_not_a_real_place_lol [2107438375510605825].mkv"),
     )
 
     @Test fun posterOnly() = assertEquals(
-        "Everxon_Terra [2107413781852848128].mkv",
+        "Everxon_Terra [22c10l].mkv",
         OldNames.tidy("Everxon_Terra - Everxon_Terra [2107413781852848128].mkv"),
     )
 
@@ -27,7 +27,7 @@ class OldNamesTest {
     )
 
     @Test fun siteNameGetsPosterFromLink() = assertEquals(
-        "NASA [HS2-6fybsAAwhqp].jpg",
+        "NASA [2lx6ya].jpg",
         OldNames.tidy("twitter - twitter [HS2-6fybsAAwhqp].jpg", "NASA"),
     )
 
@@ -40,6 +40,20 @@ class OldNamesTest {
         assertNull(OldNames.tidy("ITSBIZKIT - New York is not a real place lol [abc].mp4"))
         assertEquals("twitter [x].jpg", OldNames.tidy("twitter - twitter [x].jpg"))
         assertNull(OldNames.tidy("no id here.jpg"))
+    }
+
+    @Test fun shortIdMatchesTheWrappers() {
+        assertEquals("1eglnp", OldNames.shortId("2107543837467889664"))
+        assertEquals("2bgyfc", OldNames.shortId("802030041_18445976851198186_8150678025604663036_n"))
+        assertEquals("dQw4w9WgXcQ", OldNames.shortId("dQw4w9WgXcQ"))
+    }
+
+    @Test fun libraryTitles() {
+        assertEquals("Shitpost 2048", OldNames.tidyTitle("Shitpost 2048 - https://t.co/cFUYmh8Vc6"))
+        assertEquals("ClipsTubeX", OldNames.tidyTitle("twitter - twitter", "ClipsTubeX"))
+        assertEquals("Everxon Terra", OldNames.tidyTitle("Everxon Terra - \uD83D\uDE02"))
+        assertNull(OldNames.tidyTitle("Gunna - on one tonight"))
+        assertNull(OldNames.tidyTitle("vids that go hard"))
     }
 
     @Test fun xPosterFromLink() {

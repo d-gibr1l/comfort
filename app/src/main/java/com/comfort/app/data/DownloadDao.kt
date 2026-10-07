@@ -256,6 +256,9 @@ interface DownloadDao {
     @Query("DELETE FROM downloaded_files WHERE downloadId = :downloadId")
     suspend fun clearDownloadedFileRecords(downloadId: String)
 
+    @Query("SELECT * FROM downloads")
+    suspend fun getAllOnce(): List<DownloadEntity>
+
     /** The link of the download that saved a file named [filename]. */
     @Query("SELECT d.url FROM downloads d JOIN downloaded_files f ON f.downloadId = d.id WHERE f.filename = :filename LIMIT 1")
     suspend fun urlForSavedFile(filename: String): String?

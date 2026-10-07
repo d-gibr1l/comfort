@@ -193,7 +193,9 @@ object GalleryDlPreferences {
     // and Reddit's "reddit - <title>". X posts' text is "content", not "title". ":? - //" adds
     // " - <text>" only when there is text; it's capped at 150 characters and "!W" folds its
     // line breaks.
-    const val DEFAULT_FILENAME_FORMAT = "{poster_name|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
+    // short_id: the file's id as a 6-character code when it's long (see gallery_dl_wrapper.py).
+    const val DEFAULT_FILENAME_FORMAT = "{poster_name|category}{title|content[:150]!W:? - //} [{short_id|filename}].{extension}"
+    private const val LEGACY_DEFAULT_FILENAME_FORMAT_5 = "{poster_name|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
     private const val DEFAULT_FILENAME_TEMPLATES = """%(title)s.%(ext)s
 %(uploader)s - %(title)s [%(id)s].%(ext)s
 %(playlist_index)s - %(title)s.%(ext)s
@@ -208,7 +210,8 @@ object GalleryDlPreferences {
     fun getFilenameFormat(context: Context): String {
         val stored = prefs(context).getString(KEY_FILENAME_FORMAT, null)?.takeIf { it.isNotBlank() }
         if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT || stored == LEGACY_DEFAULT_FILENAME_FORMAT_2 ||
-            stored == LEGACY_DEFAULT_FILENAME_FORMAT_3 || stored == LEGACY_DEFAULT_FILENAME_FORMAT_4) return DEFAULT_FILENAME_FORMAT
+            stored == LEGACY_DEFAULT_FILENAME_FORMAT_3 || stored == LEGACY_DEFAULT_FILENAME_FORMAT_4 ||
+            stored == LEGACY_DEFAULT_FILENAME_FORMAT_5) return DEFAULT_FILENAME_FORMAT
         return stored
     }
 
@@ -633,7 +636,8 @@ object GalleryDlPreferences {
         prefs(context).edit().putBoolean(KEY_OLD_NAMES_TIDIED, true).apply()
     }
 
-    private const val KEY_OLD_NAMES_TIDIED = "old_names_tidied"
+    // "_2": ids got shortened after the first rename ran.
+    private const val KEY_OLD_NAMES_TIDIED = "old_names_tidied_2"
 
     const val LYRICS_SYNCED = "synced"
     const val LYRICS_PLAIN = "plain"
