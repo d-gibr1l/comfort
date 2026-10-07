@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import os
@@ -566,6 +567,22 @@ class _LocalTrimPP(FFmpegPostProcessor):
 _URL_RE = re.compile(r"https?://\S+")
 
 
+def short_id(value):
+    """The id a default filename ends with: as is up to 11 characters (a YouTube id), otherwise
+    a 6-character code from its SHA-1 — X post ids are 19 digits and Instagram's file names ~50
+    characters. A code, not the id's last characters: those repeat (Instagram's all end "_n").
+    OldNames.shortId in the app computes the same code."""
+    value = str(value or "")
+    if len(value) <= 11:
+        return value
+    n = int(hashlib.sha1(value.encode("utf-8")).hexdigest()[:12], 16)
+    digits = ""
+    while n:
+        n, r = divmod(n, 36)
+        digits = "0123456789abcdefghijklmnopqrstuvwxyz"[r] + digits
+    return digits[:6]
+
+
 def _caption(info):
     """The post's own words for the filename and the queue card: its title (or description when
     it has none), without the poster's name in front, links or extra spaces. X posts need all
@@ -600,6 +617,7 @@ class _CaptionPP(PostProcessor):
         if self._trim and len(caption.encode("utf-8")) > 150:
             caption = caption.encode("utf-8")[:150].decode("utf-8", "ignore").rstrip() + "…"
         info["comfort_name"] = " - ".join(p for p in (poster, caption) if p) or "Unknown"
+        info["comfort_id"] = short_id(info.get("id"))
         return [], info
 
 
@@ -1117,7 +1135,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # or a per-download override) is used exactly as given.
     # "comfort_name" is "<poster> - <caption>" with the caption cleaned up (_CaptionPP), or just
     # the poster when a post is only a link. trim_filenames (Settings > Folders) caps the caption at 150 bytes.
-    outtmpl = filename_format or "%(comfort_name,uploader,channel,creator|Unknown)s [%(id)s].%(ext)s"
+    outtmpl = filename_format or "%(comfort_name,uploader,channel,creator|Unknown)s [%(comfort_id,id)s].%(ext)s"
     ydl_opts = {
         "outtmpl": os.path.join(download_dir, outtmpl),
         "format": chosen_format,
