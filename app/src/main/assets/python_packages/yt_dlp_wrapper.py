@@ -563,6 +563,46 @@ class _LocalTrimPP(FFmpegPostProcessor):
 
         return [], info
 
+_URL_RE = re.compile(r"https?://\S+")
+
+
+def _caption(info):
+    """The post's own words for the filename and the queue card: its title (or description when
+    it has none), without the poster's name in front, links or extra spaces. X posts need all
+    three — yt-dlp titles them "<poster> - <text>", and a post that's only a link is titled
+    "<poster> - https://t.co/…" — and music uploads are often "<artist> - <song>" by that same
+    artist. Empty when nothing's left: the name is then just the poster."""
+    poster = str(info.get("uploader") or info.get("channel") or info.get("creator") or "").strip()
+    for raw in (info.get("title"), info.get("description")):
+        text = re.sub(r"\s+", " ", _URL_RE.sub(" ", str(raw or ""))).strip()
+        if poster and text.lower().startswith(poster.lower()):
+            text = text[len(poster):]
+        text = text.strip(" -–—|:·")
+        # No letters or digits (a lone emoji) names nothing, and restricted filenames turn it to "_".
+        if re.search(r"\w", text) and text.lower() != poster.lower():
+            return text
+    return ""
+
+
+class _CaptionPP(PostProcessor):
+    """Stores the default filename's "<poster> - <caption>" (or just the poster, or just the
+    caption) as "comfort_name". One field, not a conditional " - " in the template: restricted
+    filenames sanitize each field on its own and strip a separator at a field's edge. Runs
+    pre_process, after the "- Topic" uploader cleanup, before the filename is worked out."""
+
+    def __init__(self, downloader, trim=True):
+        super().__init__(downloader)
+        self._trim = trim
+
+    def run(self, info):
+        poster = str(info.get("uploader") or info.get("channel") or info.get("creator") or "").strip()
+        caption = _caption(info)
+        if self._trim and len(caption.encode("utf-8")) > 150:
+            caption = caption.encode("utf-8")[:150].decode("utf-8", "ignore").rstrip() + "…"
+        info["comfort_name"] = " - ".join(p for p in (poster, caption) if p) or "Unknown"
+        return [], info
+
+
 class _FinalFilePP(PostProcessor):
     """Reports the download's real final file to `callback` once every other requested
     postprocessor (whichever combination of ExtractAudio/EmbedThumbnail/Metadata/EmbedSubtitle/
@@ -947,15 +987,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # downloading well before the first byte lands, not just a "Downloading from X"
                 # placeholder for the whole transfer.
                 poster = info.get("uploader") or info.get("channel") or info.get("creator")
-                caption = info.get("title") or info.get("description")
+                caption = _caption(info)
                 if poster or caption:
                     reported_title[0] = True
-                    # Music uploads are often already titled "Artist - Song" by that same artist —
-                    # prefixing again gave "Rick Astley - Rick Astley - Never Gonna Give You Up".
-                    if poster and caption and not caption.lower().startswith(poster.lower()):
-                        title = f"{poster} - {caption}"
-                    else:
-                        title = caption or poster
+                    # Same words as the filename: "Poster - caption", or just whichever exists.
+                    title = f"{poster} - {caption}" if poster and caption else (caption or poster)
                     callback(event("title", title=title[:200]))
                 # Same idea, same timing — the extractor already picked a thumbnail URL by now.
                 # Sent from this same one-shot block (guarded by reported_title, not its own flag)
@@ -1075,17 +1111,13 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # back to plain "bestaudio" (Opus include) when a video has no m4a-native audio format at
     # all, same as before this preference existed.
     chosen_format = "bestaudio[ext=m4a]/bestaudio/best" if audio_only else (format_selector or default_format)
-    # Poster name, then caption — "%(a,b|default)s" tries each field left to right and falls back
-    # to the literal default only once every field in the list is empty; DownloadWorker derives
-    # the entity's own display title from this same "name - caption [id]" shape (see its own
-    # comment on that), so the two need to keep matching.
-    # ".150B" caps the title field at 150 bytes so an overlong caption doesn't produce an
-    # unreasonably long filename — trim_filenames (Settings > Folders) toggles this cap off,
-    # matching YTDLnis's own "Trim filenames" setting. Only affects this *default* template; a
-    # caller-supplied filename_format (a saved template, or a per-download override) is used
-    # exactly as given either way.
-    title_field = "%(title,description|Unknown).150B" if trim_filenames else "%(title,description|Unknown)s"
-    outtmpl = filename_format or f"%(uploader,channel,creator|Unknown)s - {title_field} [%(id)s].%(ext)s"
+    # Poster name, then caption; DownloadWorker derives the entity's own display title from this
+    # same "name - caption [id]" shape (see its own comment on that), so the two need to keep
+    # matching. Only this *default* template; a caller-supplied filename_format (a saved template,
+    # or a per-download override) is used exactly as given.
+    # "comfort_name" is "<poster> - <caption>" with the caption cleaned up (_CaptionPP), or just
+    # the poster when a post is only a link. trim_filenames (Settings > Folders) caps the caption at 150 bytes.
+    outtmpl = filename_format or "%(comfort_name,uploader,channel,creator|Unknown)s [%(id)s].%(ext)s"
     ydl_opts = {
         "outtmpl": os.path.join(download_dir, outtmpl),
         "format": chosen_format,
@@ -1469,6 +1501,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     def _attempt(opts, reuse_info):
         with yt_dlp.YoutubeDL(opts) as ydl:
+            # Added after ydl_opts' own pre_process MetadataParser, so it sees the cleaned uploader.
+            ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames), when="pre_process")
             if embed_subtitles:
                 # Same place the stock step had: after metadata/thumbnail, before trimming and
                 # _FinalFilePP. already_have_subtitle keeps the subtitle file on disk when "Save
