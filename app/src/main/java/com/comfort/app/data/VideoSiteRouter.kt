@@ -52,16 +52,23 @@ object VideoSiteRouter {
     // ".$it") }` predicate was copy-pasted at every host-set check site.
     private fun Set<String>.matchesHost(host: String): Boolean = any { host == it || host.endsWith(".$it") }
 
-    // The user's Sites lists (Settings › Updates and engines) — kept here, not read per call, since
+    // The user's Sites changes (Settings › Updates and engines) — kept here, not read per call, since
     // classify() has no Context. Loaded at process start (ComfortApp) and after every edit.
     @Volatile private var addedYtDlp: Set<String> = emptySet()
     @Volatile private var addedGalleryDl: Set<String> = emptySet()
+    @Volatile private var addedBoth: Set<String> = emptySet()
     @Volatile private var removedYtDlp: Set<String> = emptySet()
 
-    /** Sets the user's lists; [loadSiteRules] reads them from Settings. */
-    internal fun applySiteRules(ytDlp: Set<String>, galleryDl: Set<String>, removedDefaults: Set<String>) {
+    /** Where a site's links go, as the Sites lists name it: one engine only, or both (gallery-dl
+     * first, yt-dlp for its videos — the route a site takes unless something says otherwise). */
+    enum class SiteRoute { GALLERY_DL_ONLY, YT_DLP_ONLY, BOTH }
+
+    /** Sets the user's changes; [loadSiteRules] reads them from Settings. [removedDefaults] are
+     * built-in yt-dlp-only sites moved elsewhere. */
+    internal fun applySiteRules(ytDlp: Set<String>, galleryDl: Set<String>, removedDefaults: Set<String>, both: Set<String> = emptySet()) {
         addedYtDlp = ytDlp
         addedGalleryDl = galleryDl
+        addedBoth = both
         removedYtDlp = removedDefaults
     }
 
@@ -69,54 +76,72 @@ object VideoSiteRouter {
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP),
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_GALLERY_DL),
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED),
+        GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_BOTH),
     )
 
-    /** Sites whose links go to yt-dlp alone: the built-in video sites, minus any removed, plus any added. */
-    fun ytDlpSites(): List<String> = ((videoOnlyHosts - removedYtDlp) + addedYtDlp - addedGalleryDl).sorted()
+    /** Sites whose links go to yt-dlp alone: the built-in video sites still on it, plus any added. */
+    fun ytDlpSites(): List<String> = ((videoOnlyHosts - removedYtDlp) + addedYtDlp - addedGalleryDl - addedBoth).sorted()
 
-    /** Sites added to gallery-dl: gallery-dl only — yt-dlp never runs for them, not even for
-     * their videos (gallery-dl tries those itself). */
+    /** Sites set to gallery-dl only — yt-dlp never runs for them, not even for their videos. */
     fun galleryDlSites(): List<String> = addedGalleryDl.sorted()
 
-    /** Whether [url]'s site is on the user's gallery-dl list (gallery-dl only). */
+    /** Whether [url]'s site is set to gallery-dl only. */
     fun isGalleryDlOnly(url: String): Boolean {
         val host = normalizedHost(url) ?: return false
         return !spotifyHosts.matchesHost(host) && addedGalleryDl.matchesHost(host)
     }
 
-    /** Puts [host] on [engine]'s list (and off the other one). */
-    fun addSite(context: Context, host: String, engine: DownloadEngine) {
-        val yt = addedYtDlp.toMutableSet()
-        val gdl = addedGalleryDl.toMutableSet()
-        val removed = removedYtDlp.toMutableSet()
-        yt -= host; gdl -= host
-        when (engine) {
-            DownloadEngine.YT_DLP -> if (host in videoOnlyHosts) removed -= host else yt += host
-            else -> { gdl += host; if (host in videoOnlyHosts) removed += host }
+    /** The route the user picked for [host], or null where it follows the default. */
+    fun siteOverride(host: String): SiteRoute? = when (host) {
+        in addedGalleryDl -> SiteRoute.GALLERY_DL_ONLY
+        in addedYtDlp -> SiteRoute.YT_DLP_ONLY
+        in addedBoth -> SiteRoute.BOTH
+        in removedYtDlp -> SiteRoute.BOTH
+        else -> null
+    }
+
+    /** The three Sites lists: every site the engines support ([galleryDlSupported] only gallery-dl
+     * does, [ytDlpSupported] only yt-dlp, [bothSupported] either) — plus the built-in video sites,
+     * which go to yt-dlp only — with the user's changes applied on top. */
+    fun siteLists(galleryDlSupported: List<String>, ytDlpSupported: List<String>, bothSupported: List<String>): Map<SiteRoute, List<String>> {
+        val route = HashMap<String, SiteRoute>()
+        galleryDlSupported.forEach { route[it] = SiteRoute.GALLERY_DL_ONLY }
+        ytDlpSupported.forEach { route[it] = SiteRoute.YT_DLP_ONLY }
+        bothSupported.forEach { route[it] = SiteRoute.BOTH }
+        videoOnlyHosts.forEach { route[it] = SiteRoute.YT_DLP_ONLY }
+        (addedGalleryDl + addedYtDlp + addedBoth + removedYtDlp).forEach { host -> siteOverride(host)?.let { route[host] = it } }
+        return SiteRoute.entries.associateWith { r -> route.filterValues { it == r }.keys.sorted() }
+    }
+
+    /** Sends [host]'s links on [routeTo] from now on. */
+    fun setSiteRoute(context: Context, host: String, routeTo: SiteRoute) {
+        val yt = addedYtDlp - host
+        val gdl = addedGalleryDl - host
+        val both = addedBoth - host
+        val removed = removedYtDlp - host
+        val builtIn = host in videoOnlyHosts
+        when (routeTo) {
+            SiteRoute.GALLERY_DL_ONLY -> saveSiteRules(context, yt, gdl + host, if (builtIn) removed + host else removed, both)
+            SiteRoute.YT_DLP_ONLY -> saveSiteRules(context, if (builtIn) yt else yt + host, gdl, removed, both)
+            SiteRoute.BOTH -> saveSiteRules(context, yt, gdl, if (builtIn) removed + host else removed, both + host)
         }
-        saveSiteRules(context, yt, gdl, removed)
     }
 
-    /** Takes [host] off whichever list it's on — it goes back to the route unlisted sites take. */
-    fun removeSite(context: Context, host: String) {
-        val removed = removedYtDlp.toMutableSet()
-        if (host in videoOnlyHosts) removed += host
-        saveSiteRules(context, addedYtDlp - host, addedGalleryDl - host, removed)
-    }
+    /** Undoes the user's change to [host]: back to its default route. */
+    fun resetSite(context: Context, host: String) =
+        saveSiteRules(context, addedYtDlp - host, addedGalleryDl - host, removedYtDlp - host, addedBoth - host)
 
-    /** Whether [host] is one of the built-in yt-dlp sites (not one the user added). */
-    fun isBuiltInYtDlpSite(host: String) = host in videoOnlyHosts
+    /** How many sites the user changed. */
+    fun siteChangeCount() = (addedYtDlp + addedGalleryDl + addedBoth + removedYtDlp).size
 
-    /** Whether the lists differ from the built-in defaults at all. */
-    fun hasSiteChanges() = addedYtDlp.isNotEmpty() || addedGalleryDl.isNotEmpty() || removedYtDlp.isNotEmpty()
+    fun resetSites(context: Context) = saveSiteRules(context, emptySet(), emptySet(), emptySet(), emptySet())
 
-    fun resetSites(context: Context) = saveSiteRules(context, emptySet(), emptySet(), emptySet())
-
-    private fun saveSiteRules(context: Context, yt: Set<String>, gdl: Set<String>, removed: Set<String>) {
+    private fun saveSiteRules(context: Context, yt: Set<String>, gdl: Set<String>, removed: Set<String>, both: Set<String>) {
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP, yt)
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_GALLERY_DL, gdl)
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED, removed)
-        applySiteRules(yt, gdl, removed)
+        GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_BOTH, both)
+        applySiteRules(yt, gdl, removed, both)
     }
 
     /** A site typed or pasted into the Sites list — a bare domain or a whole link — as the host the
@@ -138,6 +163,7 @@ object VideoSiteRouter {
         // The user's Sites lists come before every built-in rule below.
         if (addedGalleryDl.matchesHost(host)) return DownloadEngine.GALLERY_DL
         if (addedYtDlp.matchesHost(host)) return DownloadEngine.YT_DLP
+        if (addedBoth.matchesHost(host)) return DownloadEngine.GALLERY_DL
 
         // Instagram reels are always videos and handle much better in yt-dlp immediately.
         // Checked against the URI's own path (lowercased), not a raw substring search over the

@@ -91,6 +91,7 @@ object GalleryDlPreferences {
     const val KEY_SITES_YT_DLP = "sites_yt_dlp"
     const val KEY_SITES_GALLERY_DL = "sites_gallery_dl"
     const val KEY_SITES_YT_DLP_REMOVED = "sites_yt_dlp_removed"
+    const val KEY_SITES_BOTH = "sites_both"
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
