@@ -1149,7 +1149,7 @@ private fun MainPreviewScreen(
             // not a song source) gets the same chip set as a single VIDEO — Format toggle, no
             // song-only "cover art" wording — minus Trim, which doesn't make sense across several
             // selected videos at once. song.mode == VIDEO keeps Trim since there's exactly one.
-            // Which engine downloads this link: Auto follows Settings › Updates › Engines;
+            // Which engine downloads this link: Auto follows Settings › Updates and engines;
             // picking one runs only that engine. Only for links more than one can handle.
             if (engineOptions.isNotEmpty()) {
                 Row(

@@ -162,7 +162,7 @@ data class DownloadEntity(
     val overrideTitle: String? = null,
     val overrideArtist: String? = null,
     /** The one engine to use for this download (a DownloadEngine name), picked in the Configure
-     * sheet; null follows Settings › Updates › Engines. */
+     * sheet; null follows Settings › Updates and engines. */
     val engineOverride: String? = null,
     /** Each engine's own error when this download failed, as a JSON array of
      * {"engine": ..., "message": ...} in the order the engines ran — shown by the errored card's

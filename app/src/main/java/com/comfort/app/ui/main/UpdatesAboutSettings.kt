@@ -40,10 +40,10 @@ import androidx.compose.material.icons.outlined.*
  * moved out of About into their own page so updating isn't buried under version info and credits. */
 @Composable
 internal fun UpdatesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
-    SettingsSubScaffold(title = "Updates", topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = "Updates and engines", topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
+        EngineChoiceSection()
         AppUpdateSection()
         EnginesSection()
-        EngineChoiceSection()
     }
 }
 

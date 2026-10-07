@@ -42,7 +42,7 @@ private fun SettingsRoute.displayName(): String = when (this) {
     SettingsRoute.PROCESSING -> "Processing"
     SettingsRoute.ADVANCED -> "Advanced"
     SettingsRoute.COOKIES -> "Cookies & Login"
-    SettingsRoute.UPDATES -> "Updates"
+    SettingsRoute.UPDATES -> "Updates and engines"
     SettingsRoute.ABOUT -> "About"
 }
 
@@ -230,7 +230,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             SettingsItemSpec(Icons.Outlined.Movie, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
             SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra arguments for each engine", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
             SettingsItemSpec(Icons.Outlined.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
-            SettingsItemSpec(Icons.Outlined.Update, "Updates", "App, yt-dlp, gallery-dl & Instaloader", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
+            SettingsItemSpec(Icons.Outlined.Update, "Updates and engines", "App, yt-dlp, gallery-dl & Instaloader", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
         )
     }
     val aboutItems = remember {

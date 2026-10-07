@@ -284,7 +284,7 @@ class DownloadWorker(
                 // 6 minutes seen live (2026-10-06), with the queue card showing nothing. Cancelling
                 // kills the Python job (PythonRuntime.run).
                 var listingTimedOut = false
-                // Engines switched on, and their order (Settings › Updates › Engines).
+                // Engines switched on, and their order (Settings › Updates and engines).
                 val engineChoice = EngineChoice.load(applicationContext)
                 // Pictures alongside videos — so a yt-dlp-first order still hands them to gallery-dl.
                 var hasImageItem = false

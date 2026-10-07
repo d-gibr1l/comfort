@@ -19,7 +19,7 @@ internal interface EngineExecutor {
 }
 
 /** Which engines the user has switched on, and the order they try a link that more than one of
- * them can handle (Settings › Updates › Engines). Spotify isn't an engine of its own here: it
+ * them can handle (Settings › Updates and engines). Spotify isn't an engine of its own here: it
  * downloads through yt-dlp, so it's available exactly when yt-dlp is. */
 data class EngineChoice(val enabled: Set<DownloadEngine>, val order: List<DownloadEngine>) {
     fun isOn(engine: DownloadEngine) = engine in enabled
@@ -179,8 +179,8 @@ internal sealed interface EnginePlan {
             }
         }
 
-        const val OFF_YT_DLP = "yt-dlp is turned off (Settings › Updates › Engines) — it's the only engine that can download this link."
-        const val OFF_SPOTIFY = "Spotify downloads need yt-dlp, which is turned off (Settings › Updates › Engines)."
-        const val OFF_BOTH = "gallery-dl and yt-dlp are both turned off (Settings › Updates › Engines)."
+        const val OFF_YT_DLP = "yt-dlp is turned off (Settings › Updates and engines) — it's the only engine that can download this link."
+        const val OFF_SPOTIFY = "Spotify downloads need yt-dlp, which is turned off (Settings › Updates and engines)."
+        const val OFF_BOTH = "gallery-dl and yt-dlp are both turned off (Settings › Updates and engines)."
     }
 }
