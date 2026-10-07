@@ -260,7 +260,7 @@ object GalleryDlListing {
     private fun ytDlpOn(context: Context) = GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.YT_DLP)
 
     private const val GALLERY_DL_OFF =
-        "gallery-dl is turned off (Settings › Updates › Engines), and yt-dlp couldn't preview this link."
+        "gallery-dl is turned off (Settings › Updates and engines), and yt-dlp couldn't preview this link."
 
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
         listingCache[url]?.let { cached ->
@@ -292,7 +292,7 @@ object GalleryDlListing {
             // pseudo-URL as the item's own "url", which isn't a real fetchable preview image (see
             // yt_dlp_wrapper.py's list_info() doc comment). yt-dlp's own extractor already resolves
             // a real thumbnail as part of normal metadata extraction.
-            // A turned-off engine never runs (Settings › Updates › Engines) — its links get the
+            // A turned-off engine never runs (Settings › Updates and engines) — its links get the
             // reason instead. gallery-dl being off is reported like a timeout, so a sheet still
             // tries yt-dlp's preview for the link (LinkRouterViewModel).
             DownloadEngine.YT_DLP -> if (ytDlpOn(context)) listViaYtDlp(context, url) else ListingResult(emptyList(), com.comfort.app.worker.EnginePlan.OFF_YT_DLP)

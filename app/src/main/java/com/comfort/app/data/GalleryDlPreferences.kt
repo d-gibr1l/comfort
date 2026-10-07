@@ -843,7 +843,7 @@ object GalleryDlPreferences {
         prefs(context).edit().putBoolean(KEY_IMPERSONATE_ENABLED, enabled).apply()
     }
 
-    /** Whether [engine] may run at all (Settings › Updates › Engines). On by default. Instaloader
+    /** Whether [engine] may run at all (Settings › Updates and engines). On by default. Instaloader
      * keeps its own older key (it was the "Use Instaloader for Instagram" switch); Spotify has no
      * switch of its own — it downloads through yt-dlp. */
     fun isEngineEnabled(context: Context, engine: DownloadEngine): Boolean = when (engine) {
