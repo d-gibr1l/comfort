@@ -94,6 +94,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
             saveThumbnail = options.saveThumbnail,
             overrideTitle = options.overrideTitle,
             overrideArtist = options.overrideArtist,
+            engineOverride = options.engine,
             forceDuplicate = true,
         )
     }

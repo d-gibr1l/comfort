@@ -298,7 +298,11 @@ class DownloadWorker(
                 // VideoSiteRouter.alwaysSupplementVideoHosts (Reddit, Twitter/X, ...), that
                 // permanently dropped the yt-dlp video-supplement pass for a mixed post's video on
                 // every subsequent resume, with no error and no trace it had ever been there.
-                if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null && engineChoice.isOn(DownloadEngine.GALLERY_DL)) {
+                // The Configure sheet's engine pick, if any: that engine alone runs (see below).
+                val engineOverride = entity?.engineOverride?.let { name -> DownloadEngine.entries.firstOrNull { it.name == name } }
+                if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null && engineChoice.isOn(DownloadEngine.GALLERY_DL) &&
+                    (engineOverride == null || engineOverride == DownloadEngine.GALLERY_DL)
+                ) {
                     val listing = withTimeoutOrNull(LISTING_CAP_MS) { GalleryDlListing.listItems(applicationContext, url) }
                     listingTimedOut = listing == null
                     val listed = listing?.items.orEmpty()
@@ -718,7 +722,7 @@ class DownloadWorker(
                 // download also hands its video to yt-dlp when its listing found one, or on hosts
                 // whose listings miss them (VideoSiteRouter.alwaysSupplementsVideo — an Instagram
                 // carousel's video can be missing from the API response entirely).
-                val plan = EnginePlan.planFor(
+                val plan = if (engineOverride != null) EnginePlan.Single(engineOverride) else EnginePlan.planFor(
                     engine,
                     classicEngine = VideoSiteRouter.classify(url),
                     supplementVideo = hasVideoItem || VideoSiteRouter.alwaysSupplementsVideo(url),

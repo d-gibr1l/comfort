@@ -156,6 +156,8 @@ object DownloadDispatcher {
         // DownloadEntity's own doc comment on these two fields for exactly what they override.
         overrideTitle: String? = null,
         overrideArtist: String? = null,
+        // The Configure sheet's engine pick — see DownloadEntity.engineOverride.
+        engineOverride: DownloadEngine? = null,
         // Set true for the explicit "Redownload anyway" action on a duplicate's own Snackbar/
         // Library entry — skips the check below for just this one deliberate retry, same shape as
         // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
@@ -217,6 +219,7 @@ object DownloadDispatcher {
                 saveThumbnail = saveThumbnail,
                 overrideTitle = overrideTitle,
                 overrideArtist = overrideArtist,
+                engineOverride = engineOverride?.name,
                 // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
                 // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
                 // this as (a plain Settings switch, not a per-download picker).

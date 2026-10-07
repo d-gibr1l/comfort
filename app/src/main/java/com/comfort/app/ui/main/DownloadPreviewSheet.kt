@@ -161,7 +161,26 @@ data class DownloadOptions(
      * DownloadEntity.overrideTitle/overrideArtist's own doc comment). */
     val overrideTitle: String? = null,
     val overrideArtist: String? = null,
+    /** The engine picked for this download in the sheet's Engine chips; null = Auto (Settings). */
+    val engine: com.comfort.app.data.DownloadEngine? = null,
 )
+
+/** The engines the Configure sheet offers for [url]: only links more than one engine can download
+ * (gallery-dl sites, Instagram posts), only engines switched on, in Settings' order — empty when
+ * there's no real choice (YouTube, Spotify), so the chips don't show. */
+internal fun sheetEngineOptions(context: android.content.Context, url: String): List<com.comfort.app.data.DownloadEngine> {
+    val candidates = when {
+        VideoSiteRouter.isInstagramPost(url) -> setOf(
+            com.comfort.app.data.DownloadEngine.INSTALOADER, com.comfort.app.data.DownloadEngine.GALLERY_DL, com.comfort.app.data.DownloadEngine.YT_DLP,
+        )
+        VideoSiteRouter.classify(url) == com.comfort.app.data.DownloadEngine.GALLERY_DL -> setOf(
+            com.comfort.app.data.DownloadEngine.GALLERY_DL, com.comfort.app.data.DownloadEngine.YT_DLP,
+        )
+        else -> emptySet()
+    }
+    val choice = com.comfort.app.worker.EngineChoice.load(context)
+    return choice.order.filter { it in candidates && choice.isOn(it) }.takeIf { it.size >= 2 }.orEmpty()
+}
 
 /** Same spoofed User-Agent/Referer the queue and share picker already use for remote preview
  * thumbnails — many sites (Instagram among them) reject a hotlinked image request without them,
@@ -250,6 +269,9 @@ fun DownloadPreviewSheet(
     var quality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
     var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
     var saveThumbnail by remember { mutableStateOf(false) }
+    // Per-download engine (null = Auto) and the engines the link can use.
+    var engineOverride by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
+    val engineOptions = remember(url) { sheetEngineOptions(context, url) }
     var commands by remember { mutableStateOf<List<String>>(emptyList()) }
     var segments by remember { mutableStateOf<List<TrimSegment>>(emptyList()) }
     // False for the default segment onOpenTrim below seeds just to give the Trim screen something
@@ -475,6 +497,9 @@ fun DownloadPreviewSheet(
             },
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
+            engineOptions = engineOptions,
+            engineOverride = engineOverride,
+            onEngineChange = { engineOverride = it },
             segments = segments,
             onSegmentsChange = { segments = it },
             segmentsEdited = segmentsEdited,
@@ -519,6 +544,9 @@ private fun PreviewSheetOverlayHost(
     onToggleFormat: () -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
+    engineOptions: List<com.comfort.app.data.DownloadEngine>,
+    engineOverride: com.comfort.app.data.DownloadEngine?,
+    onEngineChange: (com.comfort.app.data.DownloadEngine?) -> Unit,
     segments: List<TrimSegment>,
     onSegmentsChange: (List<TrimSegment>) -> Unit,
     segmentsEdited: Boolean,
@@ -597,6 +625,9 @@ private fun PreviewSheetOverlayHost(
             onToggleFormat = onToggleFormat,
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = onToggleSaveThumbnail,
+            engineOptions = engineOptions,
+            engine = engineOverride,
+            onEngineChange = onEngineChange,
             trimmed = segmentsEdited,
             commandCount = commands.size,
             filenameTemplate = filenameTemplate,
@@ -637,6 +668,7 @@ private fun PreviewSheetOverlayHost(
                             // same as if this sheet had never had an editable field to begin with.
                             overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE },
                             overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE },
+                            engine = engineOverride,
                         ),
                     )
                 }
@@ -970,6 +1002,9 @@ private fun MainPreviewScreen(
     onToggleFormat: () -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
+    engineOptions: List<com.comfort.app.data.DownloadEngine>,
+    engine: com.comfort.app.data.DownloadEngine?,
+    onEngineChange: (com.comfort.app.data.DownloadEngine?) -> Unit,
     trimmed: Boolean,
     commandCount: Int,
     filenameTemplate: String?,
@@ -1114,6 +1149,40 @@ private fun MainPreviewScreen(
             // not a song source) gets the same chip set as a single VIDEO — Format toggle, no
             // song-only "cover art" wording — minus Trim, which doesn't make sense across several
             // selected videos at once. song.mode == VIDEO keeps Trim since there's exactly one.
+            // Which engine downloads this link: Auto follows Settings › Updates › Engines;
+            // picking one runs only that engine. Only for links more than one can handle.
+            if (engineOptions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    PreviewChip(
+                        label = "Auto engine",
+                        selected = engine == null,
+                        icon = Icons.Outlined.Tune,
+                        shape = FIRST_CHIP_SHAPE,
+                        onClick = { onEngineChange(null) },
+                    )
+                    engineOptions.forEachIndexed { index, option ->
+                        PreviewChip(
+                            label = when (option) {
+                                com.comfort.app.data.DownloadEngine.YT_DLP -> "yt-dlp"
+                                com.comfort.app.data.DownloadEngine.GALLERY_DL -> "gallery-dl"
+                                com.comfort.app.data.DownloadEngine.INSTALOADER -> "Instaloader"
+                                com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify"
+                            },
+                            selected = engine == option,
+                            icon = null,
+                            shape = if (index == engineOptions.lastIndex) LAST_CHIP_SHAPE else MIDDLE_CHIP_SHAPE,
+                            onClick = { onEngineChange(option) },
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+            }
+
             val videoStyledChips = song.mode == PreviewMode.VIDEO || song.showQualityRow
             if (videoStyledChips) {
                     Row(
