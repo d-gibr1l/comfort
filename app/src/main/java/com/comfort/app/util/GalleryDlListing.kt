@@ -6,6 +6,7 @@ import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -204,6 +205,10 @@ object GalleryDlListing {
         for (dir in listOf("ytdlp-info", "instaloader-info")) {
             java.io.File(context.cacheDir, dir).listFiles { f -> f.isFile && f.lastModified() < cutoff }?.forEach { it.delete() }
         }
+        // Spotify track → YouTube match (spotify_wrapper.py): kept a month, since the same songs
+        // tend to come back.
+        val monthAgo = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+        java.io.File(context.cacheDir, "spotify-match").listFiles { f -> f.isFile && f.lastModified() < monthAgo }?.forEach { it.delete() }
         java.io.File(context.cacheDir, "app_update.apk").delete()
         // The sign-in browser's saved pages and images. Logins aren't in here — WebView keeps
         // cookies in the app's data folder (app_webview) — so they survive this. At process
@@ -560,7 +565,23 @@ object GalleryDlListing {
         }
         val error = info.optString("error", "").takeIf { it.isNotBlank() }
         if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error))
+        prefetchSpotifyMatch(context, url)
         return ListingResult(listOf(spotifyEntryToGalleryItem(info, 1, listIndex = 0)))
+    }
+
+    /** A single Spotify track's preview is up: look up its YouTube match now, in the background,
+     * while the sheet is open — spotify_wrapper.py caches it, and the download skips that ~3.5 s
+     * search (it already skips the details lookup, which the listing cached). Never awaited. */
+    private val prefetchScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+    private fun prefetchSpotifyMatch(context: Context, url: String) {
+        val appContext = context.applicationContext
+        prefetchScope.launch {
+            runCatching {
+                PythonRuntime.run(appContext, "spotify_wrapper.py",
+                    listOf("prefetch", url, QuickJsRuntime.getExecutablePath(appContext).orEmpty())) { }
+            }
+        }
     }
 
     private fun spotifyEntryToGalleryItem(entry: JSONObject, num: Int, listIndex: Int): GalleryItem {
