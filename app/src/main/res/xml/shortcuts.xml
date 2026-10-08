@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the launcher icon. Each opens MainActivity with its action (MainActivity.SHORTCUT_*). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="paste_download"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_paste"
+        android:shortcutShortLabel="@string/shortcut_paste_short"
+        android:shortcutLongLabel="@string/shortcut_paste_long">
+        <intent
+            android:action="com.comfort.app.action.PASTE_DOWNLOAD"
+            android:targetPackage="com.comfort.app"
+            android:targetClass="com.comfort.app.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="library"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_library"
+        android:shortcutShortLabel="@string/shortcut_library_short"
+        android:shortcutLongLabel="@string/shortcut_library_long">
+        <intent
+            android:action="com.comfort.app.action.OPEN_LIBRARY"
+            android:targetPackage="com.comfort.app"
+            android:targetClass="com.comfort.app.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="queue"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_queue"
+        android:shortcutShortLabel="@string/shortcut_queue_short"
+        android:shortcutLongLabel="@string/shortcut_queue_long">
+        <intent
+            android:action="com.comfort.app.action.OPEN_QUEUE"
+            android:targetPackage="com.comfort.app"
+            android:targetClass="com.comfort.app.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="search_library"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_search"
+        android:shortcutShortLabel="@string/shortcut_search_short"
+        android:shortcutLongLabel="@string/shortcut_search_long">
+        <intent
+            android:action="com.comfort.app.action.SEARCH_LIBRARY"
+            android:targetPackage="com.comfort.app"
+            android:targetClass="com.comfort.app.MainActivity" />
+    </shortcut>
+</shortcuts>

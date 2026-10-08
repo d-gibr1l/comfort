@@ -43,7 +43,16 @@ class MainActivity : ComponentActivity() {
      * Queue — used by the download-in-progress notifications (DownloadNotifications.kt) so
      * tapping one while a download is running takes you right to it instead of just to Home. */
     const val EXTRA_OPEN_QUEUE = "open_queue"
+
+    // The launcher icon's long-press shortcuts (res/xml/shortcuts.xml).
+    const val SHORTCUT_PASTE_DOWNLOAD = "com.comfort.app.action.PASTE_DOWNLOAD"
+    const val SHORTCUT_OPEN_LIBRARY = "com.comfort.app.action.OPEN_LIBRARY"
+    const val SHORTCUT_OPEN_QUEUE = "com.comfort.app.action.OPEN_QUEUE"
+    const val SHORTCUT_SEARCH_LIBRARY = "com.comfort.app.action.SEARCH_LIBRARY"
   }
+
+  /** The last shortcut used, with a count so using the same one twice still acts. */
+  private val shortcut = mutableStateOf<com.comfort.app.ui.main.ShortcutRequest?>(null)
 
   // A plain Compose State field (not `remember`ed — this Activity, not a composable, owns it) so
   // onNewIntent below can bump it from outside composition and still have setContent's read of it
@@ -59,6 +68,12 @@ class MainActivity : ComponentActivity() {
   private fun consumeOpenQueueExtra(intent: Intent) {
     if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
       openQueueSignal.intValue++
+    }
+    val action = intent.action
+    if (action in setOf(SHORTCUT_PASTE_DOWNLOAD, SHORTCUT_OPEN_LIBRARY, SHORTCUT_OPEN_QUEUE, SHORTCUT_SEARCH_LIBRARY)) {
+      shortcut.value = com.comfort.app.ui.main.ShortcutRequest(action!!, (shortcut.value?.seq ?: 0) + 1)
+      // Handled: a later recreation mustn't act on it again.
+      intent.action = Intent.ACTION_MAIN
     }
   }
 
@@ -215,7 +230,7 @@ class MainActivity : ComponentActivity() {
       CompositionLocalProvider(LocalThemeState provides themeState) {
         GalleryDLTheme(themeMode = themeMode, lightTheme = lightTheme, darkTheme = darkTheme, pureBlack = pureBlack) {
           Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            MainNavigation(openQueueSignal = openQueueSignal.intValue)
+            MainNavigation(openQueueSignal = openQueueSignal.intValue, shortcut = shortcut.value)
           }
         }
       }

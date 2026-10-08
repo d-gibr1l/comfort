@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -130,9 +131,12 @@ fun ConstrainedWidth(modifier: Modifier = Modifier, content: @Composable () -> U
 }
 
 
+/** A launcher shortcut to act on ([action], MainActivity.SHORTCUT_*); [seq] makes a repeat a new value. */
+data class ShortcutRequest(val action: String, val seq: Int)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0) {
+fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0, shortcut: ShortcutRequest? = null) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
     // Owned here, not inside DownloadsHistoryScreen's own Scaffold — see that screen's own
@@ -246,6 +250,20 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         }
     }
 
+    // The launcher icon's shortcuts (MainActivity.SHORTCUT_*): straight to their page. Paste &
+    // download and Search hand over to Home and Library, which act on their signal.
+    var pasteDownloadSignal by remember { mutableIntStateOf(0) }
+    var librarySearchSignal by remember { mutableIntStateOf(0) }
+    LaunchedEffect(shortcut) {
+        val request = shortcut ?: return@LaunchedEffect
+        showQueueScreen = request.action == com.comfort.app.MainActivity.SHORTCUT_OPEN_QUEUE
+        when (request.action) {
+            com.comfort.app.MainActivity.SHORTCUT_PASTE_DOWNLOAD -> { selectedTab = 0; pasteDownloadSignal++ }
+            com.comfort.app.MainActivity.SHORTCUT_OPEN_LIBRARY -> selectedTab = 1
+            com.comfort.app.MainActivity.SHORTCUT_SEARCH_LIBRARY -> { selectedTab = 1; librarySearchSignal++ }
+        }
+    }
+
     val useNavRail = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= NAV_RAIL_MIN_WIDTH_DP
     CompositionLocalProvider(LocalUseNavRail provides useNavRail) {
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -277,6 +295,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 viewModel = viewModel,
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = openQueue,
+                pasteDownloadSignal = pasteDownloadSignal,
             )
             }
         }
@@ -309,6 +328,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         onOpenQueue = openQueue,
                         isQueueOpen = showQueueScreen,
                         snackbarHostState = librarySnackbarHostState,
+                        openSearchSignal = librarySearchSignal,
                     )
                     2 -> ConstrainedWidth {
                     MoreScreen(
@@ -547,6 +567,8 @@ fun HomeScreen(
     viewModel: DownloadsViewModel,
     onOpenLibrary: () -> Unit = {},
     onOpenQueue: () -> Unit = {},
+    // Bumped by the "Paste & download" shortcut.
+    pasteDownloadSignal: Int = 0,
 ) {
     var url by remember { mutableStateOf("") }
     val homeContext = androidx.compose.ui.platform.LocalContext.current
@@ -567,6 +589,22 @@ fun HomeScreen(
     // full Queue is one tap away (onOpenQueue) for anything more than that.
     val activeDownload = remember(queueItems) { queueItems.firstOrNull { it.status == DownloadStatus.RUNNING } }
     val recentDownloads = remember(historyItems) { historyItems.filter { !it.thumbnailPath.isNullOrBlank() }.take(10) }
+
+    // "Paste & download" shortcut: download the copied link straight away. Android only lets an
+    // app read the clipboard while its window has focus, so this waits for that first.
+    val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    LaunchedEffect(pasteDownloadSignal) {
+        if (pasteDownloadSignal == 0) return@LaunchedEffect
+        snapshotFlow { windowInfo.isWindowFocused }.first { it }
+        val clipText = clipboardManager.getText()?.text?.trim()
+        if (!clipText.isNullOrBlank() && android.util.Patterns.WEB_URL.matcher(clipText).matches()) {
+            ClipboardSuggestionState.lastHandled = clipText
+            clipboardSuggestion = null
+            downloadNow(clipText)
+        } else {
+            android.widget.Toast.makeText(homeContext, "No link copied", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     LaunchedEffect(Unit) {
         val clipText = clipboardManager.getText()?.text?.trim()
