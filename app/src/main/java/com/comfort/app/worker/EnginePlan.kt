@@ -51,9 +51,11 @@ data class EngineChoice(val enabled: Set<DownloadEngine>, val order: List<Downlo
 
         /** The engines the order covers: the ones a link can have more than one of. */
         val ORDERABLE = listOf(DownloadEngine.INSTALOADER, DownloadEngine.GALLERY_DL, DownloadEngine.YT_DLP)
-        /** The ones the user can reorder; Instaloader keeps its place first. */
-        val REORDERABLE = listOf(DownloadEngine.GALLERY_DL, DownloadEngine.YT_DLP)
-        val DEFAULT = EngineChoice(ORDERABLE.toSet(), ORDERABLE)
+        /** The ones the user can reorder, in the default order; Instaloader keeps its place first.
+         * yt-dlp first by default: most shared links are videos, and with gallery-dl's listing
+         * running alongside it (EnginePlan.YtDlpFirst) a video never waits for gallery-dl. */
+        val REORDERABLE = listOf(DownloadEngine.YT_DLP, DownloadEngine.GALLERY_DL)
+        val DEFAULT = EngineChoice(ORDERABLE.toSet(), listOf(DownloadEngine.INSTALOADER) + REORDERABLE)
     }
 }
 
@@ -80,6 +82,14 @@ internal sealed interface EnginePlan {
      * it: whether there are pictures is asked once yt-dlp is done (EngineExecutor.listedImages). */
     data class YtDlpFirst(val alsoImages: Boolean, val listingAlongside: Boolean = false) : EnginePlan {
         override suspend fun execute(executor: EngineExecutor) {
+            // A site only gallery-dl knows (Pixiv, ...): gallery-dl alone, videos included, no
+            // doomed yt-dlp attempt first. Only a confirmed "no" from yt-dlp plus a confirmed "yes"
+            // from gallery-dl counts — a probe that failed to run (null) is no evidence.
+            val probe = executor.probe()
+            if (probe.ytDlpHasExtractor == false && probe.galleryDlHasExtractor == true) {
+                executor.run(DownloadEngine.GALLERY_DL)
+                return
+            }
             executor.run(DownloadEngine.YT_DLP)
             if (executor.isStopped) return
             val images = executor.savedCount == 0 || alsoImages || (listingAlongside && executor.listedImages())
