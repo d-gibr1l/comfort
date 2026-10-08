@@ -101,6 +101,8 @@ fun DownloadsHistoryScreen(
     viewModel: DownloadsViewModel,
     onOpenQueue: () -> Unit,
     isQueueOpen: Boolean = false,
+    // Bumped by the "Search Library" shortcut: opens the search, keyboard up.
+    openSearchSignal: Int = 0,
     // Hoisted up to MainScreen's own outer Box instead of a plain remember { SnackbarHostState() }
     // here — this screen's own Scaffold draws *before* FloatingNavBar in that Box (it's one of the
     // three tab contents, composed ahead of the persistent floating pill), so a SnackbarHost
@@ -142,6 +144,7 @@ fun DownloadsHistoryScreen(
     // the Settings root header's own search icon (see SettingsScreen.kt's SettingsRootScreen) — this
     // replaces the old always-visible PillSearchBar that used to sit permanently below the title.
     var searchExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(openSearchSignal) { if (openSearchSignal > 0) searchExpanded = true }
     var sortOption by remember { mutableStateOf(LibrarySort.DATE_NEWEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var gridView by remember { mutableStateOf(GalleryDlPreferences.isLibraryGridView(context)) }
@@ -803,14 +806,8 @@ private fun LibraryHeader(
     ) {
         // Favorites/Grid-List/Queue, pinned at a fixed top=12dp position independent of the
         // icon+title/search row below, same long-standing spot near the status bar as before.
-        // Hidden while searching — floating above an otherwise-empty search field read as
-        // leftover clutter, not part of the search UI.
-        androidx.compose.animation.AnimatedVisibility(
-            visible = !searchExpanded,
-            enter = fadeIn(tween(150)),
-            exit = fadeOut(tween(150)),
-            modifier = Modifier.align(Alignment.TopEnd),
-        ) {
+        // Kept while searching too: favourites and the grid/list switch apply to the results.
+        Box(modifier = Modifier.align(Alignment.TopEnd)) {
             Row(modifier = Modifier.padding(end = 12.dp, top = 12.dp)) {
                 LibraryHeaderActions(
                     favoritesOnly = favoritesOnly,

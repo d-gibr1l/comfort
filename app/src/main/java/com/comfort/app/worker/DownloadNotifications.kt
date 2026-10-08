@@ -108,6 +108,9 @@ object DownloadNotifications {
      * cancellable, no service lifecycle involved. */
     const val FOREGROUND_SERVICE_NOTIFICATION_ID = 0x646C664B // "dlfK" — arbitrary but stable
 
+    /** Running downloads' progress notifications, with the foreground one as their summary. */
+    private const val GROUP_DOWNLOADS = "com.comfort.app.DOWNLOADS"
+
     /** Tapping either of the two "downloading right now" notifications ([progressNotification],
      * [foregroundServiceNotification]) opens the app straight to the Download Queue, instead of
      * just to whatever tab Home last was — that's the one place actually showing what these
@@ -162,6 +165,12 @@ object DownloadNotifications {
             .setContentTitle("Downloading…")
             .setContentText("Comfort is downloading in the background")
             .setContentIntent(openQueuePendingIntent(context))
+            // The summary of the downloads' group: Android shows the group's own notifications
+            // (each download's progress) under the app's heading and hides the summary itself, so
+            // this required-but-generic one no longer shows as a second entry beside them.
+            .setGroup(GROUP_DOWNLOADS)
+            .setGroupSummary(true)
+            .setSilent(true)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -192,6 +201,7 @@ object DownloadNotifications {
         val byteDetail = listOfNotNull(sizeText, speedText).joinToString(" · ")
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_logo)
+            .setGroup(GROUP_DOWNLOADS)
             .setContentTitle(title)
             .setContentText(
                 when {

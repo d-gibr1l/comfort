@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Comfort</string>
+    <string name="shortcut_paste_short">Paste &amp; download</string>
+    <string name="shortcut_paste_long">Download the copied link</string>
+    <string name="shortcut_library_short">Library</string>
+    <string name="shortcut_library_long">Open the Library</string>
+    <string name="shortcut_queue_short">Download queue</string>
+    <string name="shortcut_queue_long">Open the download queue</string>
+    <string name="shortcut_search_short">Search Library</string>
+    <string name="shortcut_search_long">Search your downloads</string>
 </resources>
