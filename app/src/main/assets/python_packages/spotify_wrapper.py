@@ -32,6 +32,7 @@ from comfort_events import event, file_path
 import os
 import re
 import ssl
+import time
 import urllib.parse
 import urllib.request
 
@@ -84,6 +85,74 @@ def _fetch_entity(entity_type, entity_id):
         raise ValueError("Spotify embed page structure not recognized")
     data = json.loads(match.group(1))
     return data["props"]["pageProps"]["state"]["data"]["entity"]
+
+
+# What a Spotify download needs before its first byte — the track's details (~2 s to fetch) and
+# its YouTube match (~3.5 s to search) — kept per track in the app's cache folder: the preview
+# writes the details, prefetch() (run while the preview is open) the match, and a download, or a
+# second download of the same track, uses what's there. <app>/cache/spotify-match, found from
+# this script's own place (<app>/no_backup/python_runtime/).
+_MATCH_CACHE_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "cache", "spotify-match")
+_MATCH_MAX_AGE_SECONDS = 30 * 24 * 3600  # a match is looked up again after this; details never
+
+
+def _cache_get(track_id):
+    try:
+        with open(os.path.join(_MATCH_CACHE_DIR, f"{track_id}.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _cache_put(track_id, **fields):
+    try:
+        os.makedirs(_MATCH_CACHE_DIR, exist_ok=True)
+        entry = _cache_get(track_id)
+        entry.update({k: v for k, v in fields.items() if v is not None})
+        tmp = os.path.join(_MATCH_CACHE_DIR, f"{track_id}.json.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(entry, f)
+        os.replace(tmp, os.path.join(_MATCH_CACHE_DIR, f"{track_id}.json"))
+    except Exception:
+        pass
+
+
+def _track_metadata(track_id):
+    """_get_track_metadata, from the cache when it has the title and artist."""
+    c = _cache_get(track_id)
+    if c.get("title") and c.get("artist"):
+        return c["title"], c["artist"], c.get("duration"), c.get("thumbnail")
+    title, artist, duration, thumbnail = _get_track_metadata(track_id)
+    if title and artist:
+        _cache_put(track_id, title=title, artist=artist, duration=duration, thumbnail=thumbnail)
+    return title, artist, duration, thumbnail
+
+
+def _youtube_match(track_id, artist, title, js_runtime_path):
+    """_resolve_youtube_match, from the cache when it has a recent one."""
+    c = _cache_get(track_id)
+    if c.get("youtube_url") and time.time() - c.get("matched_at", 0) < _MATCH_MAX_AGE_SECONDS:
+        return c["youtube_url"]
+    url = _resolve_youtube_match(artist, title, js_runtime_path)
+    if url:
+        _cache_put(track_id, youtube_url=url, matched_at=time.time())
+    return url
+
+
+def prefetch(url, js_runtime_path=None):
+    """Run while a single track's preview is open: caches its details and YouTube match, so the
+    download that usually follows starts with the YouTube extraction. Albums and playlists are
+    left alone — a search per track would be minutes of work for tracks that may not be picked."""
+    try:
+        match = _SPOTIFY_URL_RE.search(_resolve_redirect(url))
+        if not match or match.group(1) != "track":
+            return
+        title, artist, _duration, _thumbnail = _track_metadata(match.group(2))
+        if title and artist:
+            _youtube_match(match.group(2), artist, title, js_runtime_path)
+    except Exception:
+        pass
 
 
 def _get_track_metadata(track_id):
@@ -144,7 +213,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         entity_type, entity_id = match.group(1), match.group(2)
 
         if entity_type == "track":
-            title, artist, duration, thumbnail = _get_track_metadata(entity_id)
+            title, artist, duration, thumbnail = _track_metadata(entity_id)
             return json.dumps({
                 "title": title, "thumbnail": thumbnail, "uploader": artist, "artist": artist,
                 # Not exposed on a single track's own embed page — see this module's own top
@@ -350,7 +419,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
         any_success = False
         for track_id in track_ids:
-            title, artist, _duration, thumbnail_url = _get_track_metadata(track_id)
+            title, artist, _duration, thumbnail_url = _track_metadata(track_id)
             if not title or not artist:
                 if callback:
                     callback(event("error", message="Couldn't resolve metadata for a track — skipping"))
@@ -382,7 +451,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 if album_name:
                     callback(event("album", album=album_name[:200]))
 
-            matched_url = _resolve_youtube_match(artist, title, js_runtime_path)
+            matched_url = _youtube_match(track_id, artist, title, js_runtime_path)
             if not matched_url:
                 if callback:
                     callback(f'[error] No YouTube match found for "{artist} - {title}"')
@@ -450,6 +519,10 @@ if __name__ == "__main__":
 
     def _emit(line):
         print(line, flush=True)
+
+    if len(_sys.argv) >= 3 and _sys.argv[1] == "prefetch":
+        prefetch(_sys.argv[2], _s(_sys.argv[3]) if len(_sys.argv) > 3 else None)
+        _sys.exit(0)
 
     if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list"):
         print("Usage: spotify_wrapper.py download <23 positional args> | list <4 positional args>", file=_sys.stderr)
