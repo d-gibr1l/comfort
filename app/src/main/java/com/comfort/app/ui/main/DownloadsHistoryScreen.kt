@@ -621,18 +621,7 @@ fun DownloadsHistoryScreen(
             }
         }
 
-        // A visual "floor" at the bottom: nothing softens where it meets
-        // the floating nav pill, reading as an abrupt edge rather than an intentional one.
-        // FloatingNavBar itself (MainScreen.kt) composes after — on top of —
-        // this whole screen, so this scrim sits correctly behind the pill without this screen
-        // needing to know anything about it directly.
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(navBarClearance())
-                .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
-        )
+        // The fade behind the floating nav pill is MainScreen's, shared by every page under it.
 
         val showScrollToTopFab by remember {
             derivedStateOf {
