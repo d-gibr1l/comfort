@@ -35,17 +35,21 @@ data class EngineChoice(val enabled: Set<DownloadEngine>, val order: List<Downlo
         /** The user's current choice, from Settings. */
         fun load(context: android.content.Context): EngineChoice {
             val saved = com.comfort.app.data.GalleryDlPreferences.getEngineOrder(context)
-                ?.mapNotNull { name -> ORDERABLE.firstOrNull { it.name == name } }
+                ?.mapNotNull { name -> REORDERABLE.firstOrNull { it.name == name } }
                 .orEmpty()
             return EngineChoice(
                 enabled = ORDERABLE.filter { com.comfort.app.data.GalleryDlPreferences.isEngineEnabled(context, it) }.toSet(),
-                // Anything missing from a saved order (a newer engine) goes at the end.
-                order = saved + ORDERABLE.filter { it !in saved },
+                // Instaloader always first (it only takes Instagram links, where it's the best
+                // pick); then the user's order. Anything missing from a saved order (a newer
+                // engine) goes at the end.
+                order = listOf(DownloadEngine.INSTALOADER) + saved + REORDERABLE.filter { it !in saved },
             )
         }
 
         /** The engines the order covers: the ones a link can have more than one of. */
         val ORDERABLE = listOf(DownloadEngine.INSTALOADER, DownloadEngine.GALLERY_DL, DownloadEngine.YT_DLP)
+        /** The ones the user can reorder; Instaloader keeps its place first. */
+        val REORDERABLE = listOf(DownloadEngine.GALLERY_DL, DownloadEngine.YT_DLP)
         val DEFAULT = EngineChoice(ORDERABLE.toSet(), ORDERABLE)
     }
 }

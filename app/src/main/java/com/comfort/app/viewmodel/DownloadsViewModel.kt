@@ -119,6 +119,18 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** "Download again" on a download whose file was deleted from the phone: a fresh download of
+     * the same link (past the duplicate check, which would otherwise stop it), replacing the old
+     * entry. */
+    fun redownloadDeleted(id: String) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val entity = dao.getById(id) ?: return@launch
+            DownloadDispatcher.enqueueDownload(context, entity.url, entity.title, forceDuplicate = true)
+            DownloadDispatcher.deleteDownload(context, id)
+        }
+    }
+
     fun dismissDuplicateAttempt(id: String) {
         viewModelScope.launch { dao.deleteDuplicateAttempt(id) }
     }
