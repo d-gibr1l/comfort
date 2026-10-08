@@ -16,6 +16,9 @@ internal interface EngineExecutor {
     val isStopped: Boolean
     /** The download can't run at all — reported as its error (an engine it needs is turned off). */
     fun fail(message: String)
+    /** Whether gallery-dl's listing, running alongside the download (see YtDlpFirst), found
+     * pictures — waits for it to finish. False when no listing runs alongside. */
+    suspend fun listedImages(): Boolean = false
 }
 
 /** Which engines the user has switched on, and the order they try a link that more than one of
@@ -72,13 +75,15 @@ internal sealed interface EnginePlan {
 
     /** yt-dlp first (the user put it above gallery-dl, or gallery-dl's listing timed out): then
      * gallery-dl with video excluded — for an image post yt-dlp saved nothing from, or for the
-     * pictures of a post whose listing showed some ([alsoImages]). */
-    data class YtDlpFirst(val alsoImages: Boolean) : EnginePlan {
+     * pictures of a post whose listing showed some ([alsoImages]). With [listingAlongside] the
+     * listing runs at the same time as yt-dlp instead of before it, so a video doesn't wait for
+     * it: whether there are pictures is asked once yt-dlp is done (EngineExecutor.listedImages). */
+    data class YtDlpFirst(val alsoImages: Boolean, val listingAlongside: Boolean = false) : EnginePlan {
         override suspend fun execute(executor: EngineExecutor) {
             executor.run(DownloadEngine.YT_DLP)
-            if (!executor.isStopped && (executor.savedCount == 0 || alsoImages)) {
-                executor.run(DownloadEngine.GALLERY_DL, excludeVideo = true)
-            }
+            if (executor.isStopped) return
+            val images = executor.savedCount == 0 || alsoImages || (listingAlongside && executor.listedImages())
+            if (images && !executor.isStopped) executor.run(DownloadEngine.GALLERY_DL, excludeVideo = true)
         }
     }
 
@@ -135,7 +140,9 @@ internal sealed interface EnginePlan {
          * without Instaloader (VideoSiteRouter.classify); [supplementVideo] whether a gallery-dl
          * download should also give its video to yt-dlp (a listed video, or a host whose listings
          * miss them — VideoSiteRouter.alwaysSupplementsVideo); [onlyVideos] whether its listing
-         * found nothing but videos; [listingTimedOut] whether it gave up waiting for one. */
+         * found nothing but videos; [listingTimedOut] whether it gave up waiting for one;
+         * [listingAlongside] that it's running alongside a yt-dlp-first download instead (see
+         * YtDlpFirst), so [hasImageItem] isn't known yet. */
         fun planFor(
             engine: DownloadEngine,
             classicEngine: DownloadEngine,
@@ -145,13 +152,14 @@ internal sealed interface EnginePlan {
             choice: EngineChoice = EngineChoice.DEFAULT,
             hasImageItem: Boolean = false,
             galleryDlOnly: Boolean = false,
+            listingAlongside: Boolean = false,
         ): EnginePlan {
             fun classic(e: DownloadEngine) =
                 if (galleryDlOnly && e == DownloadEngine.GALLERY_DL) {
                     // The user put this site on gallery-dl's list: gallery-dl alone, videos included.
                     if (choice.isOn(DownloadEngine.GALLERY_DL)) Single(DownloadEngine.GALLERY_DL) else Unavailable(OFF_GALLERY_DL_ONLY)
                 } else {
-                    classicPlan(e, supplementVideo, onlyVideos, listingTimedOut, choice, hasImageItem)
+                    classicPlan(e, supplementVideo, onlyVideos, listingTimedOut, choice, hasImageItem, listingAlongside)
                 }
             if (engine != DownloadEngine.INSTALOADER) return classic(engine)
             // Instaloader is only routed to while it's on (VideoSiteRouter.resolveEngine); where it
@@ -173,6 +181,7 @@ internal sealed interface EnginePlan {
             listingTimedOut: Boolean,
             choice: EngineChoice,
             hasImageItem: Boolean,
+            listingAlongside: Boolean,
         ): EnginePlan {
             val galleryDl = choice.isOn(DownloadEngine.GALLERY_DL)
             val ytDlp = choice.isOn(DownloadEngine.YT_DLP)
@@ -182,7 +191,7 @@ internal sealed interface EnginePlan {
                     !galleryDl -> Single(DownloadEngine.YT_DLP)
                     !ytDlp -> Single(DownloadEngine.GALLERY_DL)
                     choice.before(DownloadEngine.GALLERY_DL, DownloadEngine.YT_DLP) -> GalleryDlFirst(supplementVideo, onlyVideos, listingTimedOut)
-                    else -> YtDlpFirst(alsoImages = hasImageItem)
+                    else -> YtDlpFirst(alsoImages = hasImageItem, listingAlongside = listingAlongside)
                 }
                 DownloadEngine.YT_DLP -> if (ytDlp) Single(engine) else Unavailable(OFF_YT_DLP)
                 DownloadEngine.SPOTIFY -> if (ytDlp) Single(engine) else Unavailable(OFF_SPOTIFY)
