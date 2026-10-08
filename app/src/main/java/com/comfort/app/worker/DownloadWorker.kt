@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -335,9 +336,17 @@ class DownloadWorker(
                 // every subsequent resume, with no error and no trace it had ever been there.
                 // The Configure sheet's engine pick, if any: that engine alone runs (see below).
                 val engineOverride = entity?.engineOverride?.let { name -> DownloadEngine.entries.firstOrNull { it.name == name } }
-                if (engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null && engineChoice.isOn(DownloadEngine.GALLERY_DL) &&
-                    (engineOverride == null || engineOverride == DownloadEngine.GALLERY_DL)
-                ) {
+                val wantsListing = engine == DownloadEngine.GALLERY_DL && entity?.itemFilter == null &&
+                    engineChoice.isOn(DownloadEngine.GALLERY_DL) && (engineOverride == null || engineOverride == DownloadEngine.GALLERY_DL)
+                // yt-dlp set to go first (Settings › Updates and engines): the listing only decides
+                // whether gallery-dl fetches pictures after it, so it runs alongside yt-dlp rather
+                // than before — a video no longer waits for it (see EnginePlan.YtDlpFirst).
+                val listingAlongside = wantsListing && engineOverride == null &&
+                    engineChoice.isOn(DownloadEngine.YT_DLP) && !VideoSiteRouter.isGalleryDlOnly(url) &&
+                    !engineChoice.before(DownloadEngine.GALLERY_DL, DownloadEngine.YT_DLP)
+                // Set when that listing starts (inside the engines' scope below); the plan asks it.
+                val alongsideListing = java.util.concurrent.atomic.AtomicReference<kotlinx.coroutines.Deferred<Boolean>?>(null)
+                if (wantsListing && !listingAlongside) {
                     val listing = withTimeoutOrNull(LISTING_CAP_MS) { GalleryDlListing.listItems(applicationContext, url) }
                     listingTimedOut = listing == null
                     val listed = listing?.items.orEmpty()
@@ -691,7 +700,9 @@ class DownloadWorker(
                         is EngineEvent.Artist -> dao.setArtistIfAbsent(downloadId, event.artist)
                         is EngineEvent.Album -> dao.setAlbumIfAbsent(downloadId, event.album)
                         is EngineEvent.Track -> dao.setTrackIfAbsent(downloadId, event.track)
-                        // First error wins, unless it's unusable garbage: when gallery-dl and a
+                        // First error wins, unless it's unusable garbage — or only an engine saying
+                        // the post isn't its kind (isNotItsKind), which a later engine's real error
+                        // replaces. When gallery-dl and a
                         // yt-dlp fallback both fail, gallery-dl's message is normally the real cause
                         // and yt-dlp's a symptom — except gallery-dl's raw HTML/CSS-blob
                         // AbortExtraction (reproduced on Reddit), where yt-dlp's message ("Account
@@ -699,7 +710,7 @@ class DownloadWorker(
                         // changing the text is the signal that the kept error is that garbage.
                         is EngineEvent.Error -> {
                             lastErrorLine.getAndUpdate { current ->
-                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) event.message else current
+                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current || (isNotItsKind(current) && !isNotItsKind(event.message))) event.message else current
                             }
                             recordEngineError(event.message)
                         }
@@ -710,7 +721,7 @@ class DownloadWorker(
                         is EngineEvent.NoResults -> {
                             recordEngineError("No content found at this link (gallery-dl found no results)")
                             lastErrorLine.getAndUpdate { current ->
-                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current) {
+                                if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current || isNotItsKind(current)) {
                                     "No content found at this link — it may need cookies for a logged-in session, or be unavailable"
                                 } else current
                             }
@@ -801,6 +812,7 @@ class DownloadWorker(
                         lastErrorLine.compareAndSet(null, message)
                         recordEngineError(message)
                     }
+                    override suspend fun listedImages(): Boolean = alongsideListing.get()?.await() ?: false
                 }
                 // Which engines run and when one falls back to another — see EnginePlan. A gallery-dl
                 // download also hands its video to yt-dlp when its listing found one, or on hosts
@@ -815,6 +827,7 @@ class DownloadWorker(
                     choice = engineChoice,
                     hasImageItem = hasImageItem,
                     galleryDlOnly = VideoSiteRouter.isGalleryDlOnly(url),
+                    listingAlongside = listingAlongside,
                 )
 
                 // Transfer monitor. Only yt-dlp reports progress while a file downloads; gallery-dl
@@ -827,6 +840,17 @@ class DownloadWorker(
                 // only the stall check applies: measuring its folder would count its ffmpeg merge
                 // output as download speed.
                 kotlinx.coroutines.coroutineScope {
+                    if (listingAlongside) {
+                        alongsideListing.set(async {
+                            val listed = withTimeoutOrNull(LISTING_CAP_MS) { GalleryDlListing.listItems(applicationContext, url) }
+                                ?.items.orEmpty()
+                            if ((entity?.totalItems ?: 0) <= 0 && listed.isNotEmpty() && listed.size < GalleryDlListing.MAX_ITEMS) {
+                                dao.setTotalItems(downloadId, listed.size)
+                                totalItemsRef.set(listed.size)
+                            }
+                            listed.any { item -> item.filename?.let(VideoSiteRouter::isVideoFilename) != true }
+                        })
+                    }
                     val stallWatchdog = launch {
                         var previousTotal = -1L
                         var previousAt = 0L
@@ -1048,6 +1072,16 @@ private fun derivePosterCaptionTitle(filename: String): String? {
     val withoutExtension = filename.substringBeforeLast('.', "").ifBlank { return null }
     val stripped = withoutExtension.replace(Regex("\\s*\\[[^\\[\\]]*]$"), "").trim()
     return stripped.ifBlank { null }
+}
+
+/** An engine saying only that the link isn't its kind — yt-dlp's "No video could be found in
+ * this tweet" on a picture post — rather than why it failed. With yt-dlp set to run first, that
+ * used to become a failed download's summary even when gallery-dl, after it, had the real reason
+ * (a private account, a login needed). */
+private fun isNotItsKind(message: String): Boolean {
+    val m = message.lowercase()
+    return "no video could be found" in m || "there's no video in this" in m || "no video formats found" in m ||
+        "unsupported url" in m
 }
 
 /** No data for this long counts as stalled; see the stall watchdog in doWork(). */

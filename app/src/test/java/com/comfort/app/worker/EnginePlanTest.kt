@@ -16,6 +16,7 @@ class EnginePlanTest {
         private val saves: Map<DownloadEngine, Int> = emptyMap(),
         private val probeResult: EngineProbe.Result = EngineProbe.Result(galleryDlHasExtractor = true, ytDlpHasExtractor = true),
         private val stopAfter: DownloadEngine? = null,
+        private val listed: Boolean = false,
     ) : EngineExecutor {
         val ran = mutableListOf<String>()
         override var savedCount = 0
@@ -27,6 +28,7 @@ class EnginePlanTest {
         }
         override suspend fun probe() = probeResult
         override fun fail(message: String) { ran += "FAIL: $message" }
+        override suspend fun listedImages(): Boolean { ran += "LISTING"; return listed }
     }
 
     private suspend fun ranFor(engine: DownloadEngine, classic: DownloadEngine = engine, video: Boolean = false, executor: FakeExecutor): List<String> {
@@ -134,6 +136,21 @@ class EnginePlanTest {
         assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), ranWith(GALLERY_DL, order, executor = FakeExecutor(mapOf(GALLERY_DL to 2))))
         // A mixed post: yt-dlp saved its video, gallery-dl still gets the pictures.
         assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), ranWith(GALLERY_DL, order, executor = FakeExecutor(mapOf(YT_DLP to 1)), images = true))
+    }
+
+    @Test
+    fun ytDlpFirstWithTheListingAlongsideAsksForPicturesAfterYtDlp() = runTest {
+        val order = choice(INSTALOADER, YT_DLP, GALLERY_DL)
+        fun run(executor: FakeExecutor) = kotlinx.coroutines.runBlocking {
+            EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = false, choice = order, listingAlongside = true).execute(executor)
+            executor.ran
+        }
+        // A video post: yt-dlp saves it, the listing found no pictures — gallery-dl never runs.
+        assertEquals(listOf("YT_DLP", "LISTING"), run(FakeExecutor(mapOf(YT_DLP to 1), listed = false)))
+        // A mixed post: the listing found pictures, so gallery-dl fetches them after the video.
+        assertEquals(listOf("YT_DLP", "LISTING", "GALLERY_DL(excludeVideo=true)"), run(FakeExecutor(mapOf(YT_DLP to 1), listed = true)))
+        // yt-dlp saved nothing: gallery-dl runs without waiting on the listing.
+        assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), run(FakeExecutor(mapOf(GALLERY_DL to 2))))
     }
 
     @Test
