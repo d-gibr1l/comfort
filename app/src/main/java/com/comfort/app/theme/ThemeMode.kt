@@ -37,6 +37,32 @@ object ThemePreferences {
             .edit()
             .putString(KEY_THEME_MODE, mode.name)
             .apply()
+        applyNightMode(context, mode)
+    }
+
+    /** Tells Android (12+) which of light/dark the app is in, so the app's own resources follow
+     * it rather than the phone's setting: the theme's status bar icon colour (values vs
+     * values-night windowLightStatusBar), the splash screen, and the share sheet. Without it a
+     * light app on a phone in dark mode got white status bar icons on a white page whenever
+     * Android restored the theme's bar style — after the splash screen closed, on some phones a
+     * beat after the app had set dark icons itself. Called at start-up and on every change. */
+    fun applyNightMode(context: Context, mode: ThemeMode = getThemeMode(context)) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) return
+        val manager = context.getSystemService(android.app.UiModeManager::class.java) ?: return
+        val night = when (mode) {
+            ThemeMode.SYSTEM -> android.app.UiModeManager.MODE_NIGHT_AUTO
+            ThemeMode.LIGHT -> android.app.UiModeManager.MODE_NIGHT_NO
+            ThemeMode.DARK -> android.app.UiModeManager.MODE_NIGHT_YES
+        }
+        runCatching { manager.setApplicationNightMode(night) }
+    }
+
+    /** Whether the app is showing its dark theme, for screens outside MainActivity's theme state. */
+    fun isDark(context: Context): Boolean = when (getThemeMode(context)) {
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+        ThemeMode.SYSTEM -> (context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
     }
 
     fun getLightTheme(context: Context): AppTheme = getAppTheme(context, KEY_LIGHT_THEME)
