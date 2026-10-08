@@ -555,6 +555,10 @@ fun DownloadsHistoryScreen(
                                 }
                             },
                             onLongPress = { selectedIds = selectedIds + item.id },
+                            onDelete = { requestDelete(setOf(item.id)) },
+                            onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
+                            onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
+                            onRedownload = { viewModel.redownloadDeleted(item.id) },
                         )
                     }
                 }
@@ -582,6 +586,7 @@ fun DownloadsHistoryScreen(
                             onDelete = { requestDelete(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
+                            onRedownload = { viewModel.redownloadDeleted(item.id) },
                         )
                     }
                     // Same entrance/removal pattern as the grid above and the Download Queue's own
@@ -1222,6 +1227,12 @@ internal fun SwipeToDeleteCard(
             true
         },
     )
+    // The swipe state is saved with the list item, so a row brought back by the snackbar's Undo
+    // came back still swiped away (only the red delete background showing). A row that's
+    // composed at all is one that should be visible: start it settled.
+    LaunchedEffect(Unit) {
+        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+    }
     // A tick the moment a drag crosses the delete threshold (and a lighter one if it's dragged
     // back under it), so the point of no return is felt, not just seen. targetValue is what flips
     // at that threshold mid-drag; drop(1) skips its initial Settled emission.
@@ -1450,11 +1461,24 @@ private fun HistoryGridItem(
     selectionMode: Boolean,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
+    onDelete: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onRename: (String) -> Unit,
+    onRedownload: () -> Unit,
 ) {
     val context = LocalContext.current
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
     // can only fail, and don't offer open/share actions that would just error out.
     val hasThumbnail = !item.thumbnailPath.isNullOrBlank() && item.status != DownloadStatus.DELETED
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    if (showRenameDialog) {
+        RenameDialog(
+            currentTitle = item.title.ifBlank { item.url },
+            onDismiss = { showRenameDialog = false },
+            onConfirm = { newTitle -> onRename(newTitle); showRenameDialog = false },
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -1542,9 +1566,34 @@ private fun HistoryGridItem(
             MediaBadge(icon = null, text = quality, modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
         }
 
-        // Top-right: favourite, in the same dark pill as the other badges.
-        if (item.isFavorite) {
-            MediaBadge(icon = Icons.Filled.Star, text = null, tint = Color(0xFFFFD54F), modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
+        // Top-right: favourite, in the same dark pill as the other badges, then the ⋮ menu (the
+        // list rows' actions; long-press still selects). Hidden while selecting, like the list's.
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(start = 6.dp, top = 2.dp, end = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (item.isFavorite) {
+                MediaBadge(icon = Icons.Filled.Star, text = null, tint = Color(0xFFFFD54F), modifier = Modifier.padding(top = 4.dp))
+            }
+            if (!selectionMode) Box {
+                IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                    Box(
+                        modifier = Modifier.size(24.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = "More options", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+                DownloadActionsMenu(
+                    item = item,
+                    expanded = menuExpanded,
+                    onDismiss = { menuExpanded = false },
+                    onToggleFavorite = onToggleFavorite,
+                    onRename = { showRenameDialog = true },
+                    onRedownload = onRedownload,
+                    onDelete = onDelete,
+                )
+            }
         }
 
         // Bottom-right: the download's size, and the failure badge when it failed.
@@ -1667,10 +1716,9 @@ private fun HistoryRow(
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRename: (String) -> Unit,
+    onRedownload: () -> Unit,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
     // can only fail, and don't offer open/share actions that would just error out.
     val hasThumbnail = !item.thumbnailPath.isNullOrBlank() && item.status != DownloadStatus.DELETED
@@ -1850,59 +1898,97 @@ private fun HistoryRow(
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
             }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text(if (item.isFavorite) "Remove from Favorites" else "Add to Favorites") },
-                    leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
-                    onClick = { menuExpanded = false; onToggleFavorite() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Rename") },
-                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                    onClick = { menuExpanded = false; showRenameDialog = true },
-                )
-                DropdownMenuItem(
-                    text = { Text("Share Image") },
-                    leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
-                    enabled = hasThumbnail,
-                    onClick = {
-                        menuExpanded = false
-                        val uri = Uri.parse(item.thumbnailPath)
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "image/*"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        runCatching { context.startActivity(Intent.createChooser(intent, "Share image")) }
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("View Original Source") },
-                    leadingIcon = { Icon(Icons.Outlined.OpenInNew, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url))) }
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Copy Post Link") },
-                    leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        scope.launch {
-                            clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Post link", item.url)))
-                            Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                )
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text("Remove") },
-                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
-                    onClick = { menuExpanded = false; onDelete() },
-                )
-            }
+            DownloadActionsMenu(
+                item = item,
+                expanded = menuExpanded,
+                onDismiss = { menuExpanded = false },
+                onToggleFavorite = onToggleFavorite,
+                onRename = { showRenameDialog = true },
+                onRedownload = onRedownload,
+                onDelete = onDelete,
+            )
         }
+    }
+}
+
+/** A download's ⋮ menu, shared by the list rows and the grid tiles. A download whose file was
+ * deleted from the phone gets what still makes sense for it — download it again, open or copy its
+ * link, remove it — rather than actions on a file that isn't there. */
+@Composable
+private fun DownloadActionsMenu(
+    item: DownloadEntity,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onRename: () -> Unit,
+    onRedownload: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val fileGone = item.status == DownloadStatus.DELETED
+    // The real file: a song's thumbnailPath is its cover art, and mediaUri the song.
+    val fileUri = (item.mediaUri ?: item.thumbnailPath)?.takeIf { it.isNotBlank() && !fileGone }
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        if (fileGone) {
+            DropdownMenuItem(
+                text = { Text("Download again") },
+                leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                onClick = { onDismiss(); onRedownload() },
+            )
+        } else {
+            DropdownMenuItem(
+                text = { Text(if (item.isFavorite) "Remove from Favorites" else "Add to Favorites") },
+                leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
+                onClick = { onDismiss(); onToggleFavorite() },
+            )
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                onClick = { onDismiss(); onRename() },
+            )
+            DropdownMenuItem(
+                text = { Text("Share") },
+                leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
+                enabled = fileUri != null,
+                onClick = {
+                    onDismiss()
+                    val uri = Uri.parse(fileUri)
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = context.contentResolver.getType(uri) ?: "*/*"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    runCatching { context.startActivity(Intent.createChooser(intent, "Share")) }
+                },
+            )
+        }
+        DropdownMenuItem(
+            text = { Text("View Original Source") },
+            leadingIcon = { Icon(Icons.Outlined.OpenInNew, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url))) }
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Copy Post Link") },
+            leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                scope.launch {
+                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Post link", item.url)))
+                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text(if (fileGone) "Remove from Library" else "Remove") },
+            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+            onClick = { onDismiss(); onDelete() },
+        )
     }
 }
 

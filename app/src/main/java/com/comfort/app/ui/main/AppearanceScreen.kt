@@ -88,15 +88,19 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 .padding(horizontal = 20.dp)
                 .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
         ) {
-            Text(
-                "APP THEME",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "APP THEME",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             Spacer(Modifier.height(16.dp))
 
-            Text("Light theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = highlightRowModifier("Light theme"))
+            ThemeHeading(Icons.Outlined.LightMode, "Light theme")
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -137,7 +141,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
             Spacer(Modifier.height(24.dp))
 
-            Text("Dark theme", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = highlightRowModifier("Dark theme"))
+            ThemeHeading(Icons.Outlined.DarkMode, "Dark theme")
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -176,6 +180,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ThemeToggleRow(
+                        icon = Icons.Outlined.BrightnessAuto,
                         title = "Follow system theme",
                         subtitle = "Switch between your light and dark theme automatically.",
                         checked = themeState.mode == ThemeMode.SYSTEM,
@@ -185,6 +190,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     )
                     if (themeState.mode != ThemeMode.LIGHT) {
                         ThemeToggleRow(
+                            icon = Icons.Outlined.Contrast,
                             title = "Pure black dark mode",
                             subtitle = "Use true black backgrounds in dark theme.",
                             checked = themeState.pureBlack,
@@ -216,8 +222,24 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
     }
 }
 
+/** "Light theme" / "Dark theme" above their rows of theme cards. */
 @Composable
-private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun ThemeHeading(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = highlightRowModifier(title)) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun ThemeToggleRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
     // Compose's own Switch (unlike the platform's View-based SwitchCompat) never calls
     // performHapticFeedback internally — see IconToggleRow's own comment in SettingsComponents.kt, where
     // this same gap was found and fixed identically.
@@ -227,6 +249,8 @@ private fun ThemeToggleRow(title: String, subtitle: String, checked: Boolean, on
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(2.dp))

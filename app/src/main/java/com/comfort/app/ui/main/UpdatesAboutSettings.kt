@@ -68,7 +68,7 @@ private fun EngineChoiceSection() {
     }
 
     fun move(index: Int, by: Int) {
-        val order = choice.order.toMutableList()
+        val order = choice.order.filter { it in com.comfort.app.worker.EngineChoice.REORDERABLE }.toMutableList()
         val target = index + by
         if (target !in order.indices) return
         order[index] = order[target].also { order[target] = order[index] }
@@ -76,14 +76,15 @@ private fun EngineChoiceSection() {
         choice = com.comfort.app.worker.EngineChoice.load(context)
     }
 
-    SettingsSection(title = "Which engines run", icon = Icons.Outlined.Refresh) {
+    SettingsSection(title = "Which engines run", icon = Icons.Outlined.Tune) {
         Text(
-            "Turn engines on or off, and choose which one tries first when more than one can download a link. YouTube and other video sites always use yt-dlp, and Spotify needs it too.",
+            "Turn engines on or off, and choose which one tries first when both can download a link. YouTube and other video sites always use yt-dlp, and Spotify needs it too.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        choice.order.forEachIndexed { index, engine ->
+        val reorderable = choice.order.filter { it in com.comfort.app.worker.EngineChoice.REORDERABLE }
+        reorderable.forEachIndexed { index, engine ->
             val on = choice.isOn(engine)
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -93,6 +94,8 @@ private fun EngineChoiceSection() {
                     color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(24.dp),
                 )
+                Icon(engineIcon(engine), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(engineLabel(engine), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                     Text(
@@ -104,7 +107,7 @@ private fun EngineChoiceSection() {
                 IconButton(onClick = { move(index, -1) }, enabled = index > 0) {
                     Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Move ${engineLabel(engine)} up")
                 }
-                IconButton(onClick = { move(index, +1) }, enabled = index < choice.order.lastIndex) {
+                IconButton(onClick = { move(index, +1) }, enabled = index < reorderable.lastIndex) {
                     Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Move ${engineLabel(engine)} down")
                 }
                 Switch(
@@ -114,12 +117,41 @@ private fun EngineChoiceSection() {
                             turnOn -> setOn(engine, true)
                             choice.enabled.size <= 1 ->
                                 android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
-                            engine == com.comfort.app.data.DownloadEngine.INSTALOADER -> setOn(engine, false)
                             else -> confirmOff = engine
                         }
                     },
                 )
             }
+        }
+
+        // Instaloader isn't in the order: it only takes Instagram links, and always goes first there.
+        val instaloader = com.comfort.app.data.DownloadEngine.INSTALOADER
+        val instaloaderOn = choice.isOn(instaloader)
+        Spacer(Modifier.height(8.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(8.dp))
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(24.dp))
+            Icon(engineIcon(instaloader), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(engineLabel(instaloader), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (instaloaderOn) "Instagram posts, reels and carousels — always tried first for Instagram" else "Off — Instagram goes to gallery-dl and yt-dlp",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = instaloaderOn,
+                onCheckedChange = { turnOn ->
+                    if (!turnOn && choice.enabled.size <= 1) {
+                        android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        setOn(instaloader, turnOn)
+                    }
+                },
+            )
         }
     }
 
@@ -174,6 +206,8 @@ private fun SitesSection() {
 
     SettingsSection(title = "Sites", icon = Icons.Outlined.Public, onClick = { open = true }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.AltRoute, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Which engine each site uses", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -506,6 +540,22 @@ private fun engineLabel(engine: com.comfort.app.data.DownloadEngine) = when (eng
     com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify"
 }
 
+/** Each engine's icon, the same as on its Engines card. */
+private fun engineIcon(engine: com.comfort.app.data.DownloadEngine): ImageVector = when (engine) {
+    com.comfort.app.data.DownloadEngine.YT_DLP -> Icons.Outlined.Terminal
+    com.comfort.app.data.DownloadEngine.GALLERY_DL -> Icons.Outlined.Image
+    com.comfort.app.data.DownloadEngine.INSTALOADER -> FeatherIcons.Instagram
+    com.comfort.app.data.DownloadEngine.SPOTIFY -> Icons.Outlined.MusicNote
+}
+
+/** [engineIcon] for an updater entry, which names its engine rather than using DownloadEngine. */
+private fun engineIconByName(name: String): ImageVector? = when {
+    name.contains("yt-dlp", ignoreCase = true) -> Icons.Outlined.Terminal
+    name.contains("gallery-dl", ignoreCase = true) -> Icons.Outlined.Image
+    name.contains("instaloader", ignoreCase = true) -> FeatherIcons.Instagram
+    else -> null
+}
+
 private fun engineRole(engine: com.comfort.app.data.DownloadEngine) = when (engine) {
     com.comfort.app.data.DownloadEngine.YT_DLP -> "Video and audio, on YouTube and every other site"
     com.comfort.app.data.DownloadEngine.GALLERY_DL -> "Images and galleries from hundreds of sites"
@@ -648,7 +698,7 @@ private fun AppUpdateSection() {
 
     LaunchedEffect(Unit) { updates.checkApp() }
 
-    SettingsSection(title = "App Update", icon = Icons.Outlined.Download) {
+    SettingsSection(title = "App Update", icon = Icons.Outlined.SystemUpdate) {
         val current = status
         if (current == null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -683,6 +733,12 @@ private fun AppUpdateSection() {
 @Composable
 private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Float?, onUpdate: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Image(
+            painter = androidx.compose.ui.res.painterResource(com.comfort.app.R.drawable.ic_app_logo),
+            contentDescription = null,
+            modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)),
+        )
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text("Comfort", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(
@@ -736,7 +792,7 @@ internal fun QuickEngineUpdateSection() {
     val outdated = statuses?.filter { it.updateAvailable && EngineUpdater.isOn(context, it.engine) } ?: return
     if (outdated.isEmpty()) return
 
-    SettingsSection(title = "Updates available", icon = Icons.Outlined.Refresh) {
+    SettingsSection(title = "Updates available", icon = Icons.Outlined.Update) {
         outdated.forEachIndexed { index, status ->
             EngineUpdateRow(
                 status = status,
@@ -773,7 +829,7 @@ private fun EnginesSection() {
     // channel preference itself, so Stable -> Nightly/Master needs one against that new source.
     LaunchedEffect(ytDlpChannel, galleryDlChannel, instaloaderChannel) { updates.checkEngines() }
 
-    SettingsSection(title = "Engines", icon = Icons.Outlined.Refresh) {
+    SettingsSection(title = "Engines", icon = Icons.Outlined.Extension) {
         IconToggleRow(
             icon = Icons.Outlined.SystemUpdateAlt,
             title = "Auto-update",
@@ -850,6 +906,10 @@ private fun EnginesSection() {
 @Composable
 private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boolean, onUpdate: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        engineIconByName(status.engine.displayName)?.let {
+            Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(
