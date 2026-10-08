@@ -61,6 +61,8 @@ private fun EngineChoiceSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var choice by remember { mutableStateOf(com.comfort.app.worker.EngineChoice.load(context)) }
     var confirmOff by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
+    // Same toggle feel as every other Settings switch (IconToggleRow); a tick on each reorder.
+    val haptics = LocalHapticFeedback.current
 
     fun setOn(engine: com.comfort.app.data.DownloadEngine, on: Boolean) {
         GalleryDlPreferences.setEngineEnabled(context, engine, on)
@@ -72,6 +74,7 @@ private fun EngineChoiceSection() {
         val target = index + by
         if (target !in order.indices) return
         order[index] = order[target].also { order[target] = order[index] }
+        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
         GalleryDlPreferences.setEngineOrder(context, order.map { it.name })
         choice = com.comfort.app.worker.EngineChoice.load(context)
     }
@@ -113,6 +116,7 @@ private fun EngineChoiceSection() {
                 Switch(
                     checked = on,
                     onCheckedChange = { turnOn ->
+                        haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                         when {
                             turnOn -> setOn(engine, true)
                             choice.enabled.size <= 1 ->
@@ -145,6 +149,7 @@ private fun EngineChoiceSection() {
             Switch(
                 checked = instaloaderOn,
                 onCheckedChange = { turnOn ->
+                    haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                     if (!turnOn && choice.enabled.size <= 1) {
                         android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
                     } else {
@@ -540,6 +545,42 @@ private fun engineLabel(engine: com.comfort.app.data.DownloadEngine) = when (eng
     com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify"
 }
 
+/** The app's icon as the launcher shows it, drawn from the launcher's own vector — used wherever
+ * the app shows its own icon (About, App Update), so none can show an outdated export. */
+@Composable
+private fun AppIconTile(size: androidx.compose.ui.unit.Dp) {
+    // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
+    // AdaptiveIconDrawable, not a plain vector/raster) — composed by hand here from the same two
+    // layers instead: ic_launcher_background.xml (a plain white rect, approximated directly rather
+    // than parsed) behind ic_launcher_foreground.xml, the actual wordmark, so it's always the
+    // launcher's own artwork.
+    // Colors come from the in-app theme, not @color/splash_icon (which the foreground
+    // vector's own fill references): resources resolve against the *system* night
+    // mode, so with the app's own Light/Dark setting overriding it the wordmark could
+    // end up black-on-dark or the tile a stray white block. Light keeps the launcher's
+    // own white tile and black wordmark; dark inverts to a raised dark tile.
+    val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val tileColor = if (darkTheme) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
+    val logoColor = if (darkTheme) MaterialTheme.colorScheme.onSurface else Color.Black
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(MaterialTheme.shapes.medium)
+            .background(tileColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            imageVector = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(logoColor),
+            // The vector is the whole adaptive-icon canvas, with the artwork in its safe zone (about
+            // a third of the width): drawn larger than the tile, clipped by it, so the wordmark
+            // fills the tile the way it does on the home screen.
+            modifier = Modifier.requiredSize(size * 1.8f),
+        )
+    }
+}
+
 /** Each engine's icon, the same as on its Engines card. */
 private fun engineIcon(engine: com.comfort.app.data.DownloadEngine): ImageVector = when (engine) {
     com.comfort.app.data.DownloadEngine.YT_DLP -> Icons.Outlined.Terminal
@@ -580,36 +621,7 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
-                // AdaptiveIconDrawable, not a plain vector/raster) — composed by hand here from
-                // the same two layers instead: ic_launcher_background.xml (a plain white rect,
-                // approximated directly rather than parsed) behind ic_launcher_foreground.xml,
-                // the actual wordmark. This used to be a separate static ic_app_logo.png export
-                // that silently drifted out of sync with the real launcher icon once it changed
-                // (reported live: "still using the old app icon") — rendering the *same* vector
-                // the launcher itself uses guarantees they can't drift again.
-                // Colors come from the in-app theme, not @color/splash_icon (which the foreground
-                // vector's own fill references): resources resolve against the *system* night
-                // mode, so with the app's own Light/Dark setting overriding it the wordmark could
-                // end up black-on-dark or the tile a stray white block. Light keeps the launcher's
-                // own white tile and black wordmark; dark inverts to a raised dark tile.
-                val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                val tileColor = if (darkTheme) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
-                val logoColor = if (darkTheme) MaterialTheme.colorScheme.onSurface else Color.Black
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(tileColor),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(
-                        imageVector = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_launcher_foreground),
-                        contentDescription = null,
-                        colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(logoColor),
-                        modifier = Modifier.size(40.dp),
-                    )
-                }
+                AppIconTile(size = 48.dp)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Comfort", style = MaterialTheme.typography.titleSmall)
@@ -733,11 +745,7 @@ private fun AppUpdateSection() {
 @Composable
 private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Float?, onUpdate: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Image(
-            painter = androidx.compose.ui.res.painterResource(com.comfort.app.R.drawable.ic_app_logo),
-            contentDescription = null,
-            modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)),
-        )
+        AppIconTile(size = 32.dp)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text("Comfort", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
