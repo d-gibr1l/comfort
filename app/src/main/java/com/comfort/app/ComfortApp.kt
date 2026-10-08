@@ -18,6 +18,7 @@ class ComfortApp : Application() {
     override fun onCreate() {
         super.onCreate()
         VideoSiteRouter.loadSiteRules(this)
+        com.comfort.app.theme.ThemePreferences.applyNightMode(this)
         // Every process start, not just the main screen's: the app can run for days on
         // downloads and shares alone.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

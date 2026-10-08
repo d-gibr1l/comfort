@@ -68,6 +68,15 @@ class MainActivity : ComponentActivity() {
     consumeOpenQueueExtra(intent)
   }
 
+  // A theme switch in Appearance changes the app's night mode (ThemePreferences.applyNightMode),
+  // which reaches this activity as a uiMode change (handled, see the manifest) — and the window
+  // re-applies its theme's bar style with it, after the app's own. Put the app's back once that's
+  // done.
+  override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+    super.onConfigurationChanged(newConfig)
+    window.decorView.post { applySystemBarStyle?.invoke() }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Must be called before super.onCreate() — it reads the activity's theme (Theme.App.Starting,
     // set in the manifest) to know which splash to show, and installs the exit-animation hook

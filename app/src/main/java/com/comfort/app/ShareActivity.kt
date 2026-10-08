@@ -127,7 +127,14 @@ class ShareActivity : ComponentActivity() {
         // properly inset purely by luck. Nothing else needs to change for that button to stay
         // reachable once this is on; Scaffold's default already reserves the right space now that
         // there's a real inset for it to see.
-        enableEdgeToEdge()
+        // The app's theme, not the phone's: a light app on a phone in dark mode got light (white)
+        // bar icons from the default auto style.
+        val barStyle = if (com.comfort.app.theme.ThemePreferences.isDark(this)) {
+            androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        } else {
+            androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
         super.onCreate(savedInstanceState)
 
         com.comfort.app.util.AppImageLoader.install(applicationContext)
