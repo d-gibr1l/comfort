@@ -32,7 +32,8 @@ class EnginePlanTest {
     }
 
     private suspend fun ranFor(engine: DownloadEngine, classic: DownloadEngine = engine, video: Boolean = false, executor: FakeExecutor): List<String> {
-        EnginePlan.planFor(engine, classic, video).execute(executor)
+        // These tests are about the gallery-dl-first route, so they ask for it.
+        EnginePlan.planFor(engine, classic, video, choice = EngineChoice(EngineChoice.ORDERABLE.toSet(), listOf(INSTALOADER, GALLERY_DL, YT_DLP))).execute(executor)
         return executor.ran
     }
 
@@ -151,6 +152,20 @@ class EnginePlanTest {
         assertEquals(listOf("YT_DLP", "LISTING", "GALLERY_DL(excludeVideo=true)"), run(FakeExecutor(mapOf(YT_DLP to 1), listed = true)))
         // yt-dlp saved nothing: gallery-dl runs without waiting on the listing.
         assertEquals(listOf("YT_DLP", "GALLERY_DL(excludeVideo=true)"), run(FakeExecutor(mapOf(GALLERY_DL to 2))))
+    }
+
+    @Test
+    fun defaultOrderIsYtDlpFirst() = runTest {
+        val executor = FakeExecutor(mapOf(YT_DLP to 1))
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = false).execute(executor)
+        assertEquals(listOf("YT_DLP"), executor.ran)
+    }
+
+    @Test
+    fun ytDlpFirstSkipsYtDlpOnASiteOnlyGalleryDlKnows() = runTest {
+        val executor = FakeExecutor(mapOf(GALLERY_DL to 3), EngineProbe.Result(galleryDlHasExtractor = true, ytDlpHasExtractor = false))
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = false).execute(executor)
+        assertEquals(listOf("GALLERY_DL(excludeVideo=false)"), executor.ran)
     }
 
     @Test
