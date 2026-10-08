@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -343,6 +344,22 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         }
         }
 
+        // A soft floor behind the floating nav pill on every page it floats over (Home, Library,
+        // Settings): content fades into the page colour instead of meeting the pill at a hard edge.
+        // It also takes every touch in that strip, so what's faded out under the pill (a grid
+        // tile, a settings row) can't be tapped or dragged by a touch that missed the pill.
+        if (!useNavRail) Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(navBarClearance())
+                .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.background)))
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                    }
+                }
+        )
         if (!useNavRail) FloatingNavBar(
             selectedTab = selectedTab,
             activeDownloadsCount = activeDownloadsCount,
