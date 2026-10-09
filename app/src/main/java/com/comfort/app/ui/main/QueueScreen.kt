@@ -339,9 +339,13 @@ fun QueueScreen(
             // reducedMotion happened to read when the effect first started — that stale captured
             // value, not a live re-read, is what the check below sees since it's a plain Boolean,
             // not a State, by the time it's used here.
+            // Only the first few times the page opens (GalleryDlPreferences.takeQueueChipsHint):
+            // on every visit it was more distraction than hint.
+            val hintContext = LocalContext.current
             LaunchedEffect(reducedMotion) {
                 delay(500)
-                if (!reducedMotion && filterListState.canScrollForward) {
+                if (!reducedMotion && filterListState.canScrollForward &&
+                    com.comfort.app.data.GalleryDlPreferences.takeQueueChipsHint(hintContext)) {
                     filterListState.animateScrollBy(filterNudgePx, animationSpec = tween(450))
                     delay(250)
                     filterListState.animateScrollBy(-filterNudgePx, animationSpec = tween(450))

@@ -639,6 +639,19 @@ object GalleryDlPreferences {
     // "_2": ids got shortened after the first rename ran.
     private const val KEY_OLD_NAMES_TIDIED = "old_names_tidied_2"
 
+    /** The Queue page's chip row slides to its end and back to show there's more past the edge —
+     * only the first few times the page opens; after that it's known and the motion just distracts.
+     * Counts one more showing and says whether this one still gets it. */
+    fun takeQueueChipsHint(context: Context): Boolean {
+        val shown = prefs(context).getInt(KEY_QUEUE_CHIPS_HINTS, 0)
+        if (shown >= QUEUE_CHIPS_HINT_TIMES) return false
+        prefs(context).edit().putInt(KEY_QUEUE_CHIPS_HINTS, shown + 1).apply()
+        return true
+    }
+
+    private const val KEY_QUEUE_CHIPS_HINTS = "queue_chips_hints_shown"
+    private const val QUEUE_CHIPS_HINT_TIMES = 3
+
     const val LYRICS_SYNCED = "synced"
     const val LYRICS_PLAIN = "plain"
     const val LYRICS_OFF = "off"
