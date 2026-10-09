@@ -155,7 +155,10 @@ class MediaSniffer {
         private const val MAX_ITEMS = 400
         // Smaller than this is a site's own sound or a placeholder clip, not what you came for.
         private const val MIN_MEDIA_BYTES = 150_000L
+        // A picture needs one side this long and neither side shorter than MIN_IMAGE_SHORT_SIDE:
+        // a 568×53 logo strip is long but no picture.
         private const val MIN_IMAGE_SIDE = 300
+        private const val MIN_IMAGE_SHORT_SIDE = 150
         private val FORWARDED_HEADERS = setOf("referer", "origin", "user-agent")
 
         private val STREAM = Regex("""\.(m3u8|mpd)$""")
@@ -173,6 +176,8 @@ class MediaSniffer {
             "imasdk.googleapis.com", "amazon-adsystem.com", "adnxs.com", "criteo.", "taboola.com",
             "outbrain.com", "pubmatic.com", "rubiconproject.com", "moatads.com", "scorecardresearch.com",
             "adsrvr.org", "teads.tv", "spotxchange.com", "springserve.com", "innovid.com",
+            // Cookie-consent banners' own logos and pictures.
+            "onetrust.com", "cookielaw.org", "cookiebot.com", "trustarc.com", "quantcast.com", "usercentrics.eu",
         )
 
         /** What a URL is, from its path's extension; null for anything that isn't media. */
@@ -189,14 +194,17 @@ class MediaSniffer {
             }
         }
 
-        /** Pixels: the element's real size when the page script saw it, else a size in the name. */
-        fun pixelsOf(item: Caught): Long {
-            if (item.width > 0 && item.height > 0) return item.width.toLong() * item.height
+        /** Width × height: the element's real size when the page script saw it, else a size in
+         * the file name ("1440_2560", "1080p" taken as 16:9); null when neither says. */
+        fun sizeOf(item: Caught): Pair<Int, Int>? {
+            if (item.width > 0 && item.height > 0) return item.width to item.height
             val name = item.url.substringBefore('?').substringAfterLast('/')
-            SIZE_IN_NAME.find(name)?.let { m -> return m.groupValues[1].toLong() * m.groupValues[2].toLong() }
-            HEIGHT_IN_NAME.find(name)?.let { m -> val h = m.groupValues[1].toLong(); return h * h * 16 / 9 }
-            return 0
+            SIZE_IN_NAME.find(name)?.let { m -> return m.groupValues[1].toInt() to m.groupValues[2].toInt() }
+            HEIGHT_IN_NAME.find(name)?.let { m -> val h = m.groupValues[1].toInt(); return h * 16 / 9 to h }
+            return null
         }
+
+        fun pixelsOf(item: Caught): Long = sizeOf(item)?.let { (w, h) -> w.toLong() * h } ?: 0
 
         private fun hostOf(url: String) = runCatching { java.net.URI(url).host }.getOrNull().orEmpty().lowercase()
 
@@ -205,8 +213,8 @@ class MediaSniffer {
 
         /**
          * What's worth listing for the page at [pageUrl], best first. Left out: a stream's pieces,
-         * a stream's quality variants once its master is caught, images under 300 px (or never
-         * seen on the page), files the check found under 150 KB, anything from an ad host.
+         * a stream's quality variants once its master is caught, images under 300 px, or under
+         * 150 px on their short side (or never seen on the page), files the check found under 150 KB, anything from an ad host.
          * Order: videos and streams, then audio, then images; within that the largest (pixels,
          * then bytes), then the page's own site, then what's playing.
          */
@@ -217,7 +225,7 @@ class MediaSniffer {
                 val host = hostOf(c.url)
                 AD_HOSTS.none { host.contains(it) } && when (c.kind) {
                     Kind.SEGMENT -> false
-                    Kind.IMAGE -> c.width >= MIN_IMAGE_SIDE || c.height >= MIN_IMAGE_SIDE
+                    Kind.IMAGE -> maxOf(c.width, c.height) >= MIN_IMAGE_SIDE && minOf(c.width, c.height) >= MIN_IMAGE_SHORT_SIDE
                     Kind.STREAM -> !(hasMaster && c.isMaster == false)
                     Kind.VIDEO, Kind.AUDIO -> c.bytes < 0 || c.bytes >= MIN_MEDIA_BYTES
                 }
