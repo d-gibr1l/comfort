@@ -14,9 +14,9 @@ net_resilience.install()  # stalled connects retry on a fresh connection; see it
 
 
 # Sites name a file's poster differently — uploader, author (Reddit's "name", X's {"name": ...}),
-# user, owner, username, artist — so the default filename can't list them all without picking up
+# user, owner, username (Redgifs' userName), artist — so the default filename can't list them all without picking up
 # a record or a link somewhere. "poster_name" is the first of them that's a real name.
-_POSTER_KEYS = ("uploader", "author", "user", "owner", "username", "artist", "creator", "channel")
+_POSTER_KEYS = ("uploader", "author", "user", "owner", "username", "userName", "artist", "creator", "channel")
 _POSTER_SUBKEYS = ("name", "username", "handle", "screen_name", "nick")
 
 
@@ -55,12 +55,22 @@ _original_update_kwdict = gallery_dl.job.Job.update_kwdict
 
 def _update_kwdict(self, kwdict):
     _original_update_kwdict(self, kwdict)
+    # A file reached through a post's link (a Reddit post of a Redgifs video) is named after that
+    # post: gallery-dl hands the post's details to the linked site's extractor as "_parent".
+    parent = kwdict.get("_parent") if isinstance(kwdict.get("_parent"), dict) else {}
     if "poster_name" not in kwdict:
-        name = _poster_name(kwdict)
+        name = _poster_name(parent) or _poster_name(kwdict)
         if name:
             kwdict["poster_name"] = name
+    if not kwdict.get("title") and isinstance(parent.get("title"), str) and parent["title"].strip():
+        kwdict["title"] = parent["title"]
     if "short_id" not in kwdict and kwdict.get("filename"):
         kwdict["short_id"] = short_id(kwdict["filename"])
+    # The filename format's "{title|content[:150]!W...}": with neither field (a direct image link
+    # like i.redd.it has no post around it), !W gets gallery-dl's None and the whole name fails.
+    # An empty content just leaves the caption out.
+    if not kwdict.get("title") and kwdict.get("content") is None:
+        kwdict["content"] = ""
 
 
 gallery_dl.job.Job.update_kwdict = _update_kwdict
