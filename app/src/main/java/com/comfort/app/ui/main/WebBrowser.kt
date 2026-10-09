@@ -14,6 +14,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.launch
 
 /** The browser's one main action, shown as the bottom bar's button ("Extract cookies"); gets the
  * URL of the page on screen. */
@@ -98,6 +100,10 @@ fun WebBrowser(
     var findTotal by remember { mutableIntStateOf(0) }
     var fullScreenView by remember { mutableStateOf<View?>(null) }
     var fullScreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+    // The media this page loads (MediaSniffer), listed from the ⋮ menu.
+    val sniffer = remember { com.comfort.app.util.MediaSniffer() }
+    val caughtMedia by sniffer.items.collectAsState()
+    var mediaSheetOpen by remember { mutableStateOf(false) }
 
     fun navigateTo(input: String) {
         val target = normalizeBrowserAddress(input)
@@ -129,6 +135,7 @@ fun WebBrowser(
 
     DisposableEffect(Unit) {
         onDispose {
+            sniffer.close()
             webView?.apply {
                 stopLoading()
                 destroy()
@@ -219,6 +226,7 @@ fun WebBrowser(
                                 settings.displayZoomControls = false
                                 applyDesktopMode(this, desktopMode)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                addJavascriptInterface(sniffer, com.comfort.app.util.MediaSniffer.JS_NAME)
                                 setFindListener { activeMatchOrdinal, numberOfMatches, _ ->
                                     findTotal = numberOfMatches
                                     findActive = if (numberOfMatches == 0) 0 else activeMatchOrdinal + 1
@@ -250,9 +258,16 @@ fun WebBrowser(
                                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
                                         handleNonWebLink(view.context, view, request)
 
+                                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                                        // Only noted; the request goes ahead untouched.
+                                        sniffer.onRequest(request.url.toString(), request.requestHeaders.orEmpty())
+                                        return null
+                                    }
+
                                     override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                                         isLoading = true
                                         loadError = null
+                                        sniffer.reset()
                                         if (url != null) currentUrl = url
                                         canGoBack = view.canGoBack()
                                         canGoForward = view.canGoForward()
@@ -260,6 +275,7 @@ fun WebBrowser(
 
                                     override fun onPageFinished(view: WebView, url: String?) {
                                         isLoading = false
+                                        view.evaluateJavascript(com.comfort.app.util.MediaSniffer.PAGE_SCRIPT, null)
                                         if (url != null) currentUrl = url
                                         canGoBack = view.canGoBack()
                                         canGoForward = view.canGoForward()
@@ -303,6 +319,16 @@ fun WebBrowser(
                     }
                 }
 
+                if (mediaSheetOpen) {
+                    CaughtMediaSheet(
+                        items = caughtMedia,
+                        pageUrl = currentUrl,
+                        pageTitle = pageTitle,
+                        userAgent = webView?.settings?.userAgentString.orEmpty(),
+                        onDismiss = { mediaSheetOpen = false },
+                    )
+                }
+
                 if (fullScreenView == null && !WindowInsets.isImeVisible) {
                     BottomAppBar(
                         actions = {
@@ -320,6 +346,14 @@ fun WebBrowser(
                                     Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Media on this page (${com.comfort.app.util.MediaSniffer.ranked(caughtMedia, currentUrl).size})") },
+                                        leadingIcon = { Icon(Icons.Outlined.VideoLibrary, contentDescription = null) },
+                                        onClick = {
+                                            menuOpen = false
+                                            mediaSheetOpen = true
+                                        },
+                                    )
                                     DropdownMenuItem(
                                         text = { Text("Find in page") },
                                         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
@@ -375,6 +409,129 @@ fun WebBrowser(
         }
     }
 }
+
+/** The media worth downloading from the page (MediaSniffer.ranked), best first. A tap queues
+ * it (queueCaught); a queued row shows a check. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CaughtMediaSheet(
+    items: List<com.comfort.app.util.MediaSniffer.Caught>,
+    pageUrl: String,
+    pageTitle: String,
+    userAgent: String,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val shown = remember(items, pageUrl) { com.comfort.app.util.MediaSniffer.ranked(items, pageUrl) }
+    val hidden = items.size - shown.size
+    var queued by remember { mutableStateOf(setOf<String>()) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "Media on this page",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        Text(
+            if (shown.isEmpty()) "Nothing to download yet. If there's a video, play it." else
+                "Tap to download" + if (hidden > 0) " · $hidden small or duplicate hidden" else "",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+        )
+        androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            items(shown.size) { i ->
+                val item = shown[i]
+                val uri = Uri.parse(item.url)
+                ListItem(
+                    headlineContent = {
+                        Text(uri.lastPathSegment ?: item.url, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    },
+                    supportingContent = {
+                        Text(
+                            listOfNotNull(
+                                item.kind.name.lowercase(),
+                                if (item.width > 0) "${item.width}×${item.height}" else null,
+                                item.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
+                                if (item.playing) "playing" else null,
+                                uri.host,
+                            ).joinToString(" · "),
+                            maxLines = 1,
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            when (item.kind) {
+                                com.comfort.app.util.MediaSniffer.Kind.IMAGE -> Icons.Outlined.Image
+                                com.comfort.app.util.MediaSniffer.Kind.AUDIO -> Icons.Outlined.MusicNote
+                                com.comfort.app.util.MediaSniffer.Kind.STREAM -> Icons.Outlined.Stream
+                                else -> Icons.Outlined.Movie
+                            },
+                            contentDescription = null,
+                        )
+                    },
+                    trailingContent = {
+                        if (item.url in queued) {
+                            Icon(Icons.Outlined.CheckCircle, contentDescription = "Added to Queue", tint = MaterialTheme.colorScheme.primary)
+                        } else {
+                            Icon(Icons.Outlined.Download, contentDescription = "Download")
+                        }
+                    },
+                    modifier = Modifier.clickable(enabled = item.url !in queued) {
+                        queued = queued + item.url
+                        scope.launch {
+                            queueCaught(context, item, pageUrl, pageTitle, userAgent)
+                            android.widget.Toast.makeText(context, "Added to Queue", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * Queues a caught file as an ordinary download, for yt-dlp alone: it takes a plain file, an HLS
+ * playlist or a DASH manifest alike and merges streams with ffmpeg. It gets what the browser had:
+ * the page as Referer (or the Referer the page itself sent), the browser's User-Agent, and — when
+ * the browser holds cookies for the file's site — those cookies, saved to cookies.txt the same way
+ * "Extract cookies" does, since that's where every download reads them from.
+ */
+private suspend fun queueCaught(
+    context: Context,
+    item: com.comfort.app.util.MediaSniffer.Caught,
+    pageUrl: String,
+    pageTitle: String,
+    userAgent: String,
+) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    CookieManager.getInstance().getCookie(item.url)?.takeIf { it.isNotBlank() }?.let { cookies ->
+        com.comfort.app.data.CookieStore.saveFromBrowser(context, item.url, cookies)
+    }
+    val referer = item.headers.entries.firstOrNull { it.key.equals("Referer", ignoreCase = true) }?.value ?: pageUrl
+    // A bare file has no poster or title of its own ("Unknown - 14498465_1440_2560_30fps"): the
+    // page's site and title stand in. yt-dlp's --parse-metadata sets them before the name is
+    // worked out; the "#" keeps a one-word value from being read as a field name, and ":" / "%"
+    // are escaped for its FROM:TO and template syntax.
+    fun literal(value: String) = "#" + value.replace("\\", "/").replace("%", "%%").replace(":", "\\:")
+    val site = runCatching { java.net.URI(pageUrl).host }.getOrNull()?.removePrefix("www.").orEmpty()
+    val extra = buildString {
+        append("--referer ").append(shellQuote(referer))
+        if (userAgent.isNotBlank()) append(" --user-agent ").append(shellQuote(userAgent))
+        if (site.isNotBlank()) append(" --parse-metadata ").append(shellQuote(literal(site) + ":#(?P<uploader>.+)"))
+        if (pageTitle.isNotBlank()) append(" --parse-metadata ").append(shellQuote(literal(pageTitle.trim()) + ":#(?P<title>.+)"))
+    }
+    com.comfort.app.data.DownloadDispatcher.enqueueDownload(
+        context,
+        url = item.url,
+        title = pageTitle.ifBlank { Uri.parse(item.url).lastPathSegment ?: item.url },
+        extraCommands = extra,
+        engineOverride = com.comfort.app.data.DownloadEngine.YT_DLP,
+    )
+}
+
+/** Single-quoted for the shell-style split the yt-dlp wrapper does (shlex). */
+private fun shellQuote(value: String) = "'" + value.replace("'", "'\\''") + "'"
 
 @Composable
 private fun AddressBar(
