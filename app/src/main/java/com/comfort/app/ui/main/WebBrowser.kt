@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -77,6 +78,7 @@ fun WebBrowser(
     startDesktop: Boolean = false,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // Set from inside the Dialog: the dialog is its own window, and the focus manager read out
     // here (the app's window) can't clear the address bar's focus.
     var focusManager by remember { mutableStateOf<androidx.compose.ui.focus.FocusManager?>(null) }
@@ -103,7 +105,10 @@ fun WebBrowser(
     // The media this page loads (MediaSniffer), listed from the ⋮ menu.
     val sniffer = remember { com.comfort.app.util.MediaSniffer() }
     val caughtMedia by sniffer.items.collectAsState()
+    val rankedMedia = remember(caughtMedia, currentUrl) { com.comfort.app.util.MediaSniffer.ranked(caughtMedia, currentUrl) }
     var mediaSheetOpen by remember { mutableStateOf(false) }
+    // What's been queued from this browser, so a row keeps its check after the sheet closes.
+    var queuedMedia by remember { mutableStateOf(setOf<String>()) }
 
     fun navigateTo(input: String) {
         val target = normalizeBrowserAddress(input)
@@ -321,10 +326,18 @@ fun WebBrowser(
 
                 if (mediaSheetOpen) {
                     CaughtMediaSheet(
-                        items = caughtMedia,
-                        pageUrl = currentUrl,
-                        pageTitle = pageTitle,
-                        userAgent = webView?.settings?.userAgentString.orEmpty(),
+                        shown = rankedMedia,
+                        queued = queuedMedia,
+                        onQueue = { item ->
+                            queuedMedia = queuedMedia + item.url
+                            val userAgent = webView?.settings?.userAgentString.orEmpty()
+                            val page = currentUrl
+                            val title = pageTitle
+                            scope.launch {
+                                queueCaught(context, item, page, title, userAgent)
+                                android.widget.Toast.makeText(context, "Added to Queue", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         onDismiss = { mediaSheetOpen = false },
                     )
                 }
@@ -338,8 +351,26 @@ fun WebBrowser(
                             IconButton(onClick = { webView?.goForward() }, enabled = canGoForward) {
                                 Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Forward")
                             }
-                            IconButton(onClick = { sharePage(context, currentUrl, pageTitle) }) {
-                                Icon(Icons.Outlined.Share, contentDescription = "Share page")
+                            // The media found on the page, counted live. The badge sits in the
+                            // button's own corner (as on the Library's queue button), where it
+                            // can't be clipped.
+                            Box {
+                                IconButton(onClick = { mediaSheetOpen = true }) {
+                                    Icon(
+                                        Icons.Outlined.VideoLibrary,
+                                        contentDescription = "Media on this page, ${rankedMedia.size} found",
+                                        tint = if (rankedMedia.isNotEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                    )
+                                }
+                                if (rankedMedia.isNotEmpty()) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 2.dp),
+                                    ) {
+                                        Text(badgeCountText(rankedMedia.size))
+                                    }
+                                }
                             }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
@@ -347,11 +378,11 @@ fun WebBrowser(
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Media on this page (${com.comfort.app.util.MediaSniffer.ranked(caughtMedia, currentUrl).size})") },
-                                        leadingIcon = { Icon(Icons.Outlined.VideoLibrary, contentDescription = null) },
+                                        text = { Text("Share page") },
+                                        leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
-                                            mediaSheetOpen = true
+                                            sharePage(context, currentUrl, pageTitle)
                                         },
                                     )
                                     DropdownMenuItem(
@@ -392,16 +423,30 @@ fun WebBrowser(
                                 }
                             }
                         },
-                        floatingActionButton = primaryAction?.let { action ->
-                            {
-                                ExtendedFloatingActionButton(
-                                    onClick = { action.onClick(currentUrl) },
-                                    icon = { Icon(action.icon, contentDescription = null) },
-                                    text = { Text(action.label) },
-                                    containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
-                                    elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
-                                )
+                        floatingActionButton = when {
+                            primaryAction != null -> {
+                                {
+                                    ExtendedFloatingActionButton(
+                                        onClick = { primaryAction.onClick(currentUrl) },
+                                        icon = { Icon(primaryAction.icon, contentDescription = null) },
+                                        text = { Text(primaryAction.label) },
+                                        containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
+                                        elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
+                                    )
+                                }
                             }
+                            rankedMedia.isNotEmpty() -> {
+                                {
+                                    ExtendedFloatingActionButton(
+                                        onClick = { mediaSheetOpen = true },
+                                        icon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                                        text = { Text("Download") },
+                                        containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
+                                        elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
+                                    )
+                                }
+                            }
+                            else -> null
                         },
                     )
                 }
@@ -410,84 +455,160 @@ fun WebBrowser(
     }
 }
 
-/** The media worth downloading from the page (MediaSniffer.ranked), best first. A tap queues
- * it (queueCaught); a queued row shows a check. */
+/**
+ * The media worth downloading from the page, best first (MediaSniffer.ranked): a preview (the
+ * picture itself for an image), what it is and how big, and a download button; the first row is
+ * marked as the best match. A queued row shows a check instead. Empty, it says what usually helps.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CaughtMediaSheet(
-    items: List<com.comfort.app.util.MediaSniffer.Caught>,
-    pageUrl: String,
-    pageTitle: String,
-    userAgent: String,
+    shown: List<com.comfort.app.util.MediaSniffer.Caught>,
+    queued: Set<String>,
+    onQueue: (com.comfort.app.util.MediaSniffer.Caught) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val shown = remember(items, pageUrl) { com.comfort.app.util.MediaSniffer.ranked(items, pageUrl) }
-    val hidden = items.size - shown.size
-    var queued by remember { mutableStateOf(setOf<String>()) }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(
-            "Media on this page",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(horizontal = 24.dp),
-        )
-        Text(
-            if (shown.isEmpty()) "Nothing to download yet. If there's a video, play it." else
-                "Tap to download" + if (hidden > 0) " · $hidden small or duplicate hidden" else "",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-        )
-        androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
-            items(shown.size) { i ->
-                val item = shown[i]
-                val uri = Uri.parse(item.url)
-                ListItem(
-                    headlineContent = {
-                        Text(uri.lastPathSegment ?: item.url, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    },
-                    supportingContent = {
-                        Text(
-                            listOfNotNull(
-                                item.kind.name.lowercase(),
-                                if (item.width > 0) "${item.width}×${item.height}" else null,
-                                item.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
-                                if (item.playing) "playing" else null,
-                                uri.host,
-                            ).joinToString(" · "),
-                            maxLines = 1,
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            when (item.kind) {
-                                com.comfort.app.util.MediaSniffer.Kind.IMAGE -> Icons.Outlined.Image
-                                com.comfort.app.util.MediaSniffer.Kind.AUDIO -> Icons.Outlined.MusicNote
-                                com.comfort.app.util.MediaSniffer.Kind.STREAM -> Icons.Outlined.Stream
-                                else -> Icons.Outlined.Movie
-                            },
-                            contentDescription = null,
-                        )
-                    },
-                    trailingContent = {
-                        if (item.url in queued) {
-                            Icon(Icons.Outlined.CheckCircle, contentDescription = "Added to Queue", tint = MaterialTheme.colorScheme.primary)
-                        } else {
-                            Icon(Icons.Outlined.Download, contentDescription = "Download")
-                        }
-                    },
-                    modifier = Modifier.clickable(enabled = item.url !in queued) {
-                        queued = queued + item.url
-                        scope.launch {
-                            queueCaught(context, item, pageUrl, pageTitle, userAgent)
-                            android.widget.Toast.makeText(context, "Added to Queue", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    },
+        Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
+            Text("Media on this page", style = MaterialTheme.typography.titleLarge)
+            Text(
+                when (shown.size) {
+                    0 -> "Nothing found yet"
+                    1 -> "1 found"
+                    else -> "${shown.size} found, best match first"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (shown.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    Icons.Outlined.PlayCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Play the video, or scroll to where the pictures are. Media shows up here as the page loads it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
             }
+        } else {
+            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+                items(shown.size, key = { shown[it].url }) { i ->
+                    val item = shown[i]
+                    val isQueued = item.url in queued
+                    val uri = Uri.parse(item.url)
+                    val size = com.comfort.app.util.MediaSniffer.sizeOf(item)
+                    ListItem(
+                        overlineContent = if (i == 0 && shown.size > 1) {
+                            { Text("Best match", color = MaterialTheme.colorScheme.primary) }
+                        } else null,
+                        headlineContent = {
+                            Text(
+                                listOfNotNull(
+                                    when (item.kind) {
+                                        com.comfort.app.util.MediaSniffer.Kind.STREAM -> "Video stream"
+                                        com.comfort.app.util.MediaSniffer.Kind.AUDIO -> "Audio"
+                                        com.comfort.app.util.MediaSniffer.Kind.IMAGE -> "Picture"
+                                        else -> "Video"
+                                    },
+                                    size?.let { (w, h) -> qualityLabel(item.kind, w, h) },
+                                    item.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
+                                ).joinToString(" · "),
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                listOfNotNull(uri.lastPathSegment, uri.host?.removePrefix("www.")).joinToString(" · "),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        },
+                        leadingContent = { MediaThumb(item) },
+                        // The sheet's own color behind every row, not ListItem's surface white.
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        trailingContent = {
+                            if (isQueued) {
+                                Icon(
+                                    Icons.Outlined.CheckCircle,
+                                    contentDescription = "Added to Queue",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(40.dp).padding(8.dp),
+                                )
+                            } else {
+                                FilledTonalIconButton(onClick = {
+                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
+                                    onQueue(item)
+                                }) {
+                                    Icon(Icons.Outlined.Download, contentDescription = "Download")
+                                }
+                            }
+                        },
+                        modifier = Modifier.clickable(enabled = !isQueued) {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
+                            onQueue(item)
+                        },
+                    )
+                }
+            }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** "1080p", "4K" for video (from its shorter side, so portrait clips read right); "1200×800" for
+ * pictures. */
+private fun qualityLabel(kind: com.comfort.app.util.MediaSniffer.Kind, w: Int, h: Int): String {
+    if (kind == com.comfort.app.util.MediaSniffer.Kind.IMAGE) return "${w}×${h}"
+    val short = minOf(w, h)
+    return when {
+        short >= 2160 -> "4K"
+        short >= 1440 -> "1440p"
+        else -> "${short}p"
+    }
+}
+
+/** 56 dp rounded: the picture itself for an image, else the kind's icon on a tonal tile. */
+@Composable
+private fun MediaThumb(item: com.comfort.app.util.MediaSniffer.Caught) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.secondaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (item.kind == com.comfort.app.util.MediaSniffer.Kind.IMAGE) {
+            // Under the picture, so the tile isn't blank while it loads or if it can't be shown.
+            Icon(Icons.Outlined.Image, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            coil.compose.AsyncImage(
+                model = item.url,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                when (item.kind) {
+                    com.comfort.app.util.MediaSniffer.Kind.AUDIO -> Icons.Outlined.MusicNote
+                    com.comfort.app.util.MediaSniffer.Kind.STREAM -> Icons.Outlined.Stream
+                    else -> Icons.Outlined.Movie
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
     }
 }
 
