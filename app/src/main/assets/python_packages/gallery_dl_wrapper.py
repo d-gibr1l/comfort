@@ -64,7 +64,10 @@ def _update_kwdict(self, kwdict):
             kwdict["poster_name"] = name
     if not kwdict.get("title") and isinstance(parent.get("title"), str) and parent["title"].strip():
         kwdict["title"] = parent["title"]
-    if "short_id" not in kwdict and kwdict.get("filename"):
+    # Worked out again for every file: an extractor can hand the same dict to each item of a post
+    # (Reddit's gallery does, changing only filename), and a kept short_id named all of them after
+    # the first, so every later one was skipped as "already downloaded".
+    if kwdict.get("filename"):
         kwdict["short_id"] = short_id(kwdict["filename"])
     # The filename format's "{title|content[:150]!W...}": with neither field (a direct image link
     # like i.redd.it has no post around it), !W gets gallery-dl's None and the whole name fails.
