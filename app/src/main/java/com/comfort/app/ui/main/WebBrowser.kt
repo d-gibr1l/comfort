@@ -297,7 +297,7 @@ fun WebBrowser(
                                         if (request.isForMainFrame) loadError = error.description?.toString()?.ifBlank { null } ?: "The page didn't load."
                                     }
                                 }
-                                loadUrl(startUrl)
+                                loadUrl(normalizeBrowserAddress(startUrl))
                                 webView = this
                             }
                         },

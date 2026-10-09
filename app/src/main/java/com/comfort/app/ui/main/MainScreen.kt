@@ -588,6 +588,8 @@ fun HomeScreen(
     pasteDownloadSignal: Int = 0,
 ) {
     var url by remember { mutableStateOf("") }
+    // The in-app browser (WebBrowser), open at this address; null when closed.
+    var browserUrl by remember { mutableStateOf<String?>(null) }
     val homeContext = androidx.compose.ui.platform.LocalContext.current
     val router: LinkRouterViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     // Download: starts right away with the default settings — the same thing sharing a link into
@@ -758,6 +760,52 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Browse: for sites the engines don't know — the browser finds the media a page loads
+            // and downloads it from there. A link in the box above opens in it; otherwise search.
+            Surface(
+                onClick = {
+                    browserUrl = url.trim().ifBlank { "https://www.google.com" }
+                    url = ""
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Outlined.TravelExplore, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (url.isNotBlank()) "Open this link in the browser" else "Browse the web",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            "Find videos and pictures on any site",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            browserUrl?.let { start ->
+                WebBrowser(startUrl = start, onDismiss = { browserUrl = null })
             }
 
             Spacer(Modifier.height(24.dp))
