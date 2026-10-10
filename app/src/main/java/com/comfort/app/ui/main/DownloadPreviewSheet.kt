@@ -360,7 +360,11 @@ fun DownloadPreviewSheet(
             // visibly collapsing and then being forced back open.
             confirmValueChange = { target ->
                 if (target == SheetValue.Hidden && screen != PreviewScreen.MAIN) {
-                    revertOverlay()
+                    if (screen == PreviewScreen.VIEW_TEMPLATES) {
+                        screen = PreviewScreen.TEMPLATES
+                    } else {
+                        revertOverlay()
+                    }
                     false
                 } else {
                     true
@@ -407,14 +411,26 @@ fun DownloadPreviewSheet(
     // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
     // the whole sheet, matching the forward navigation — and, like every other non-Done way out,
     // discards whatever this visit changed rather than leaving it silently applied.
-    BackHandler(enabled = screen != PreviewScreen.MAIN) { revertOverlay() }
+    BackHandler(enabled = screen != PreviewScreen.MAIN) {
+        if (screen == PreviewScreen.VIEW_TEMPLATES) {
+            screen = PreviewScreen.TEMPLATES
+        } else {
+            revertOverlay()
+        }
+    }
 
     ModalBottomSheet(
         // Tapping the scrim outside the sheet's own bounds fires this directly (it doesn't go
         // through sheetState/confirmValueChange above, which only guards drag-to-hide). With an
         // overlay panel open this should back out to MAIN first, same as Back and the overlay's
         // own scrim — only a tap with nothing open should actually dismiss the sheet.
-        onDismissRequest = { if (screen != PreviewScreen.MAIN) revertOverlay() else onDismiss() },
+        onDismissRequest = {
+            when {
+                screen == PreviewScreen.VIEW_TEMPLATES -> screen = PreviewScreen.TEMPLATES
+                screen != PreviewScreen.MAIN -> revertOverlay()
+                else -> onDismiss()
+            }
+        },
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         // The default (BottomSheetDefaults.windowInsets) pads our whole content lambda above the
@@ -751,7 +767,7 @@ private fun PreviewSheetOverlayHost(
                     // room to scroll — this only takes over once a scroll is already at its bound
                     // (or there's no scrollable under the finger at all), which is also normal
                     // "drag past the top to dismiss" behavior for a sheet like this.
-                    .pointerInput(Unit) {
+                    .pointerInput(onRevertOverlay) {
                         detectVerticalDragGestures(
                             onVerticalDrag = { change, dragAmount ->
                                 change.consume()
@@ -1146,7 +1162,9 @@ private fun MainPreviewScreen(
                             artist = song.collectionArtist,
                             thumbnail = song.collectionThumbnail,
                             trackCount = song.tracks.size,
-                            totalDurationMs = song.tracks.mapNotNull { it.durationMs }.sum().takeIf { it > 0L },
+                            totalDurationMs = remember(song.tracks) {
+                                song.tracks.mapNotNull { it.durationMs }.sum().takeIf { it > 0L }
+                            },
                         )
                     }
                 }
@@ -1312,9 +1330,11 @@ private fun MainPreviewScreen(
         val downloadEnabled = song.mode != PreviewMode.SONG_LIST || song.selectedNums.isNotEmpty()
         // The selection's size too, when every selected item's is known — a sum over only some of
         // them would read as the whole download's.
-        val selectedSize = song.tracks.filter { it.num in song.selectedNums }
-            .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
-            ?.sumOf { it.sizeBytes!! }
+        val selectedSize = remember(song.tracks, song.selectedNums) {
+            song.tracks.filter { it.num in song.selectedNums }
+                .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
+                ?.sumOf { it.sizeBytes!! }
+        }
         val countSuffix = if (song.mode == PreviewMode.SONG_LIST) {
             " ${song.selectedNums.size}" + (selectedSize?.let { " · ${formatFilesize(it)}" } ?: "")
         } else ""
@@ -1888,17 +1908,19 @@ private fun ExtraCommandsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val context = androidx.compose.ui.platform.LocalContext.current
-        val fullCommand = buildPreviewCommand(
-            context = context,
-            url = url,
-            quality = quality,
-            outputFormat = outputFormat,
-            saveThumbnail = saveThumbnail,
-            segments = segments,
-            durationMs = durationMs,
-            filenameTemplate = filenameTemplate,
-            extraCommands = commands,
-        )
+        val fullCommand = remember(url, quality, outputFormat, saveThumbnail, segments, durationMs, filenameTemplate, commands) {
+            buildPreviewCommand(
+                context = context,
+                url = url,
+                quality = quality,
+                outputFormat = outputFormat,
+                saveThumbnail = saveThumbnail,
+                segments = segments,
+                durationMs = durationMs,
+                filenameTemplate = filenameTemplate,
+                extraCommands = commands,
+            )
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1939,6 +1961,31 @@ private fun ExtraCommandsScreen(
             }
         }
 
+        if (commands.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                commands.forEachIndexed { index, cmd ->
+                    InputChip(
+                        selected = true,
+                        onClick = { onCommandsChange(commands.filterIndexed { i, _ -> i != index }) },
+                        label = { Text(cmd, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        trailingIcon = {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "Remove $cmd",
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
@@ -1953,6 +2000,7 @@ private fun ExtraCommandsScreen(
             singleLine = true,
             shape = MaterialTheme.shapes.medium,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { add() }),
         )
 
         Row(
@@ -2419,6 +2467,20 @@ private fun FilenameTemplatesScreen(
             )
         }
 
+        val onAddTemplate = {
+            val trimmed = input.trim()
+            when {
+                trimmed.isEmpty() -> message = "Enter a template first"
+                !GalleryDlPreferences.addFilenameTemplate(context, trimmed) ->
+                    message = "That template is already saved"
+                else -> {
+                    onApply(trimmed)
+                    input = ""
+                    message = "Template saved and applied"
+                }
+            }
+        }
+
         OutlinedTextField(
             value = input,
             onValueChange = { input = it; message = null },
@@ -2429,6 +2491,7 @@ private fun FilenameTemplatesScreen(
             shape = MaterialTheme.shapes.medium,
             supportingText = message?.let { { Text(it) } },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onAddTemplate() }),
         )
 
         Row(
@@ -2439,19 +2502,7 @@ private fun FilenameTemplatesScreen(
             PreviewChip(label = "View Templates", onClick = onViewTemplates)
             PreviewChip(
                 label = "Add",
-                onClick = {
-                    val trimmed = input.trim()
-                    when {
-                        trimmed.isEmpty() -> message = "Enter a template first"
-                        !GalleryDlPreferences.addFilenameTemplate(context, trimmed) ->
-                            message = "That template is already saved"
-                        else -> {
-                            onApply(trimmed)
-                            input = ""
-                            message = "Template saved and applied"
-                        }
-                    }
-                },
+                onClick = onAddTemplate,
             )
         }
 
