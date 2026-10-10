@@ -35,12 +35,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import android.content.ClipData
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -262,7 +270,7 @@ fun DownloadPreviewSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
 
     var screen by remember { mutableStateOf(PreviewScreen.MAIN) }
 
@@ -530,7 +538,7 @@ private fun PreviewSheetOverlayHost(
     url: String,
     context: android.content.Context,
     scope: kotlinx.coroutines.CoroutineScope,
-    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    clipboard: androidx.compose.ui.platform.Clipboard,
     previewTitle: String?,
     previewUploader: String?,
     previewThumbnail: String?,
@@ -633,7 +641,14 @@ private fun PreviewSheetOverlayHost(
             trimmed = segmentsEdited,
             commandCount = commands.size,
             filenameTemplate = filenameTemplate,
-            onCopyLink = { clipboard.setText(AnnotatedString(url)) },
+            onCopyLink = {
+                scope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Link", url)))
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
             onCancel = onDismiss,
             onOpenCommands = { onOpenOverlay(PreviewScreen.COMMANDS) },
             onOpenTrim = {
@@ -798,7 +813,7 @@ private fun PreviewSheetOverlayHost(
                                     commands = commands,
                                     onCommandsChange = onCommandsChange,
                                     onCopy = {
-                                        clipboard.setText(AnnotatedString(buildPreviewCommand(
+                                        val fullCmd = buildPreviewCommand(
                                             context = context,
                                             url = url,
                                             quality = quality,
@@ -808,7 +823,13 @@ private fun PreviewSheetOverlayHost(
                                             durationMs = previewDurationMs,
                                             filenameTemplate = filenameTemplate,
                                             extraCommands = commands,
-                                        )))
+                                        )
+                                        scope.launch {
+                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("yt-dlp command", fullCmd)))
+                                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                                Toast.makeText(context, "Command copied", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     },
                                     onCancel = onRevertOverlay,
                                     onDone = onCommitOverlay,
@@ -922,11 +943,14 @@ private val VideoQuality.chipLabel: String
     }
 
 /** Bytes as the compact size the preview card shows ("10mb"). */
-internal fun formatFilesize(bytes: Long): String = when {
-    bytes >= 1024L * 1024L * 1024L -> "%.1fgb".format(bytes / (1024.0 * 1024.0 * 1024.0))
-    bytes >= 1024L * 1024L -> "${bytes / (1024L * 1024L)}mb"
-    bytes >= 1024L -> "${bytes / 1024L}kb"
-    else -> "${bytes}b"
+internal fun formatFilesize(bytes: Long): String {
+    val b = bytes.coerceAtLeast(0L)
+    return when {
+        b >= 1024L * 1024L * 1024L -> "%.1fgb".format(b / (1024.0 * 1024.0 * 1024.0))
+        b >= 1024L * 1024L -> "${b / (1024L * 1024L)}mb"
+        b >= 1024L -> "${b / 1024L}kb"
+        else -> "${b}b"
+    }
 }
 
 /** "3:42" / "1:02:11" — no existing formatter has this shape: formatTimestamp (Trim screen) is
@@ -1237,7 +1261,7 @@ private fun MainPreviewScreen(
                             onClick = onToggleFormat,
                         )
                         PreviewChip(
-                            label = "Filename Templates.",
+                            label = "Filename Templates",
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
                             shape = LAST_CHIP_SHAPE,
@@ -1270,7 +1294,7 @@ private fun MainPreviewScreen(
                             onClick = onOpenCommands,
                         )
                         PreviewChip(
-                            label = "Filename Templates.",
+                            label = "Filename Templates",
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
                             shape = LAST_CHIP_SHAPE,
@@ -1655,6 +1679,10 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .semantics {
+                this.selected = selected
+                this.role = Role.Checkbox
+            }
             .clickable(onClick = onToggle)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
