@@ -131,7 +131,7 @@ fun QueueScreen(
     // of the item, remembers which ids have already played their entrance once and never resets —
     // Modifier.animateItem() below already handles the smooth reflow/removal animation on its own,
     // so this only ever needs to gate the one-time entrance.
-    val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
+    val alreadyAnimatedIds = remember { mutableSetOf<String>() }
     // better-interface review: the entrance slide below (and the wavy progress indicator's wave
     // motion in QueueItemCard) animated unconditionally, with nothing checking the OS-level
     // reduce-motion setting.
@@ -195,15 +195,17 @@ fun QueueScreen(
     // Hoisted above the Scaffold so the FAB can react to both the current filter tab (Errored/
     // Cancelled get "Retry All" instead of Pause/Resume) and what's actually in it. No more
     // catch-all "All" tab — every status has its own explicit chip now, so this is exhaustive.
-    val filteredItems = queueItems.filter { item ->
-        when (selectedFilter) {
-            "Running" -> item.status == DownloadStatus.RUNNING
-            "In Queue" -> item.status == DownloadStatus.QUEUED
-            "Scheduled" -> item.status == DownloadStatus.SCHEDULED
-            "Paused" -> item.status == DownloadStatus.PAUSED
-            "Errored" -> item.status == DownloadStatus.ERRORED
-            "Cancelled" -> item.status == DownloadStatus.CANCELLED
-            else -> false
+    val filteredItems = remember(queueItems, selectedFilter) {
+        queueItems.filter { item ->
+            when (selectedFilter) {
+                "Running" -> item.status == DownloadStatus.RUNNING
+                "In Queue" -> item.status == DownloadStatus.QUEUED
+                "Scheduled" -> item.status == DownloadStatus.SCHEDULED
+                "Paused" -> item.status == DownloadStatus.PAUSED
+                "Errored" -> item.status == DownloadStatus.ERRORED
+                "Cancelled" -> item.status == DownloadStatus.CANCELLED
+                else -> false
+            }
         }
     }
     val retryAllStatus = when (selectedFilter) {
@@ -234,29 +236,31 @@ fun QueueScreen(
         // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
         snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            if (retryAllStatus != null && filteredItems.isNotEmpty()) {
-                ExtendedFloatingActionButton(
-                    onClick = { viewModel.retryAll(retryAllStatus) },
-                    icon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
-                    text = { Text("Retry All") },
-                )
-            } else if (hasActiveDownload || hasPausedDownload || isGloballyPaused) {
-                // isGloballyPaused on its own (queue otherwise empty) still needs this FAB shown —
-                // it's the only surface anywhere in the app for isGloballyPaused/setGloballyPaused.
-                // Without it, pausing everything and then clearing the queue (cancel/delete every
-                // item) hid the only control that could flip it back off, leaving every download
-                // added afterward silently stuck PAUSED until the queue happened to gain a
-                // RUNNING/PAUSED item again on its own.
-                ExtendedFloatingActionButton(
-                    onClick = { if (showResumeAction) viewModel.resumeAll() else viewModel.pauseAll() },
-                    icon = {
-                        Icon(
-                            if (showResumeAction) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
-                            contentDescription = null,
-                        )
-                    },
-                    text = { Text(if (showResumeAction) "Resume" else "Pause") },
-                )
+            if (!selectionMode) {
+                if (retryAllStatus != null && filteredItems.isNotEmpty()) {
+                    ExtendedFloatingActionButton(
+                        onClick = { viewModel.retryAll(retryAllStatus) },
+                        icon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
+                        text = { Text("Retry All") },
+                    )
+                } else if (hasActiveDownload || hasPausedDownload || isGloballyPaused) {
+                    // isGloballyPaused on its own (queue otherwise empty) still needs this FAB shown —
+                    // it's the only surface anywhere in the app for isGloballyPaused/setGloballyPaused.
+                    // Without it, pausing everything and then clearing the queue (cancel/delete every
+                    // item) hid the only control that could flip it back off, leaving every download
+                    // added afterward silently stuck PAUSED until the queue happened to gain a
+                    // RUNNING/PAUSED item again on its own.
+                    ExtendedFloatingActionButton(
+                        onClick = { if (showResumeAction) viewModel.resumeAll() else viewModel.pauseAll() },
+                        icon = {
+                            Icon(
+                                if (showResumeAction) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                                contentDescription = null,
+                            )
+                        },
+                        text = { Text(if (showResumeAction) "Resume" else "Pause") },
+                    )
+                }
             }
         },
         topBar = {
@@ -318,19 +322,26 @@ fun QueueScreen(
             expandedBottomPadding = 0.dp,
             collapsedBottomPadding = 0.dp,
         )
-        var maxHeaderHeightPx by remember { mutableStateOf(0) }
-        var selectionHeaderHeightPx by remember { mutableStateOf(0) }
+        val density = LocalDensity.current
+        val defaultHeaderHeightPx = remember(density) { with(density) { 180.dp.roundToPx() } }
+        val defaultSelectionHeaderHeightPx = remember(density) { with(density) { 104.dp.roundToPx() } }
+        var maxHeaderHeightPx by remember { mutableStateOf(defaultHeaderHeightPx) }
+        var selectionHeaderHeightPx by remember { mutableStateOf(defaultSelectionHeaderHeightPx) }
         // Only the top inset is taken from Scaffold (in selection mode, its TopAppBar, measured
         // together with the chips under it); bottom clearance comes solely from the LazyColumn's
         // own contentPadding, since reserving Scaffold's FAB-driven bottom inset as well
         // double-counted it.
-        val topReserve = with(LocalDensity.current) {
+        val topReserve = with(density) {
             (if (selectionMode) selectionHeaderHeightPx else maxHeaderHeightPx).toDp()
         }
         // A new tab starts from the top, with the header fully expanded again, rather than
         // inheriting the previous tab's scroll position (possibly past the new tab's end).
         LaunchedEffect(selectedFilter) { listState.scrollToItem(0) }
-        Box(modifier = Modifier.fillMaxSize().nestedScroll(headerState.nestedScrollConnection!!)) {
+        val scrollConnection = remember(selectionMode, headerState.nestedScrollConnection) {
+            if (selectionMode) object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {}
+            else headerState.nestedScrollConnection!!
+        }
+        Box(modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection)) {
             // better-interface review: this filter row (6 chips: Running/In Queue/Scheduled/
             // Paused/Errored/Cancelled) has the same undiscoverable-overflow problem the Library
             // toolbar row had — nothing on screen hints that "Cancelled" sits off past the visible
@@ -434,6 +445,7 @@ fun QueueScreen(
                         includeHorizontalPadding = true,
                     )
                 }
+            val countsByStatus = remember(queueItems) { queueItems.groupingBy { it.status }.eachCount() }
             LazyRow(
                 state = filterListState,
                 // contentPadding (not an outer Modifier.padding) so the scrollable viewport spans
@@ -447,14 +459,14 @@ fun QueueScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filters) { filter ->
+                items(filters, key = { it }) { filter ->
                     val count = when (filter) {
-                        "Running" -> queueItems.count { it.status == DownloadStatus.RUNNING }
-                        "In Queue" -> queueItems.count { it.status == DownloadStatus.QUEUED }
-                        "Scheduled" -> queueItems.count { it.status == DownloadStatus.SCHEDULED }
-                        "Paused" -> queueItems.count { it.status == DownloadStatus.PAUSED }
-                        "Errored" -> queueItems.count { it.status == DownloadStatus.ERRORED }
-                        "Cancelled" -> queueItems.count { it.status == DownloadStatus.CANCELLED }
+                        "Running" -> countsByStatus[DownloadStatus.RUNNING] ?: 0
+                        "In Queue" -> countsByStatus[DownloadStatus.QUEUED] ?: 0
+                        "Scheduled" -> countsByStatus[DownloadStatus.SCHEDULED] ?: 0
+                        "Paused" -> countsByStatus[DownloadStatus.PAUSED] ?: 0
+                        "Errored" -> countsByStatus[DownloadStatus.ERRORED] ?: 0
+                        "Cancelled" -> countsByStatus[DownloadStatus.CANCELLED] ?: 0
                         else -> 0
                     }
                     BadgedBox(
@@ -515,9 +527,9 @@ fun QueueScreen(
                         // animateItem()'s own built-in fade-out + placement animation below, not
                         // this AnimatedVisibility's exit (deliberately ExitTransition.None).
                         val visibleState = remember(item.id) {
-                            MutableTransitionState(alreadyAnimatedIds.containsKey(item.id)).apply { targetState = true }
+                            MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
                         }
-                        SideEffect { alreadyAnimatedIds[item.id] = true }
+                        SideEffect { alreadyAnimatedIds.add(item.id) }
                         val isSelected = item.id in selectedIds
                         val row = @Composable {
                             if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED) {
@@ -593,15 +605,19 @@ fun QueueScreen(
 @Composable
 private fun QueueThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    SubcomposeAsyncImage(
-        model = ImageRequest.Builder(context)
+    val imageRequest = remember(item.thumbnailPath, item.url, context) {
+        val safeReferer = runCatching { android.net.Uri.encode(item.url, ":/?#[]@!$&'()*+,;=") }.getOrNull() ?: item.url
+        ImageRequest.Builder(context)
             .data(item.thumbnailPath)
             .addHeader(
                 "User-Agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
             )
-            .addHeader("Referer", item.url)
-            .build(),
+            .addHeader("Referer", safeReferer)
+            .build()
+    }
+    SubcomposeAsyncImage(
+        model = imageRequest,
         contentDescription = item.title,
         contentScale = ContentScale.Crop,
         modifier = modifier,
@@ -792,7 +808,7 @@ private fun StoppedRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
+            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), enabled = !selectionMode)
         }
 
             if (!selectionMode) {
@@ -1087,7 +1103,7 @@ fun QueueItemCard(
                     }
                     // A live note (an engine waiting out a site's rate limit) replaces the speed,
                     // which would otherwise sit at 0 KB/s with no explanation — see DownloadNotes.
-                    val note = com.comfort.app.data.DownloadNotes.notes.collectAsState().value[item.id]
+                    val note = com.comfort.app.data.DownloadNotes.notes.collectAsStateWithLifecycle().value[item.id]
                     val speedStr = when {
                         !isNetworkAvailable -> "0.00 KB/s"
                         item.speedMbs == 0f -> "0.00 KB/s"
@@ -1155,7 +1171,7 @@ fun QueueItemCard(
                         }
                     }
                     // The link this download came from, in the space the pills leave free (QueueLink).
-                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
+                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), enabled = !selectionMode)
                     if (byteProgress != null && item.speedMbs > 0f) {
                         val remainingBytes = item.expectedBytes - (item.totalBytes + item.liveBytes)
                         val remainingSeconds = (remainingBytes / (item.speedMbs * 1024f * 1024f)).toInt()
@@ -1245,7 +1261,7 @@ fun QueueItemCard(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), enabled = !selectionMode)
             }
 
             if (!selectionMode) {
@@ -1480,7 +1496,7 @@ internal fun scheduleTexts(context: android.content.Context): Pair<String, Strin
  * own handler, so a long-press here copies instead of starting the card's selection. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun QueueLink(url: String, modifier: Modifier = Modifier) {
+internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val context = LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -1489,6 +1505,7 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier) {
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .combinedClickable(
+                enabled = enabled,
                 onClickLabel = "Open link",
                 onLongClickLabel = "Copy link",
                 onClick = { runCatching { uriHandler.openUri(url) } },
