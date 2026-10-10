@@ -43,7 +43,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import java.util.Locale
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -481,10 +487,20 @@ private fun SideNavRail(
                 icon = {
                     when {
                         index == 1 && activeDownloadsCount > 0 -> BadgedBox(badge = {
-                            Badge(containerColor = MaterialTheme.colorScheme.error) { Text(badgeCountText(activeDownloadsCount)) }
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.semantics {
+                                    contentDescription = "$activeDownloadsCount active downloads"
+                                },
+                            ) { Text(badgeCountText(activeDownloadsCount)) }
                         }) { Icon(tab.icon, contentDescription = tab.label) }
                         index == 2 && hasEngineUpdate -> BadgedBox(badge = {
-                            Badge(containerColor = MaterialTheme.colorScheme.error)
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.semantics {
+                                    contentDescription = "Updates available"
+                                },
+                            )
                         }) { Icon(tab.icon, contentDescription = tab.label) }
                         else -> Icon(tab.icon, contentDescription = tab.label)
                     }
@@ -543,21 +559,42 @@ private fun FloatingNavBar(
                         modifier = Modifier
                             .clip(PillShape)
                             .background(bg)
-                            .clickable { onSelect(index) }
+                            .semantics {
+                                role = Role.Tab
+                                this.selected = selected
+                            }
+                            .clickable(
+                                role = Role.Tab,
+                                onClickLabel = if (selected) {
+                                    if (index == 1) "Open queue" else if (index == 2) "Reset settings" else null
+                                } else "Switch to ${tab.label}",
+                            ) { onSelect(index) }
                             .padding(horizontal = if (selected) 20.dp else 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val iconModifier = Modifier.size(22.dp)
                         if (index == 1 && activeDownloadsCount > 0) {
                             BadgedBox(badge = {
-                                Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.semantics {
+                                        contentDescription = "$activeDownloadsCount active downloads"
+                                    },
+                                ) {
                                     Text(badgeCountText(activeDownloadsCount))
                                 }
                             }) {
                                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                             }
                         } else if (index == 2 && hasEngineUpdate) {
-                            BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) }) {
+                            BadgedBox(badge = {
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.semantics {
+                                        contentDescription = "Updates available"
+                                    },
+                                )
+                            }) {
                                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                             }
                         } else {
@@ -605,7 +642,12 @@ fun HomeScreen(
             android.widget.Toast.makeText(homeContext, startedMessage(result), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val clipboard = androidx.compose.ui.platform.LocalClipboard.current
+    val homeScope = rememberCoroutineScope()
+    suspend fun readClipboardText(): String? {
+        val clip = clipboard.getClipEntry() ?: return null
+        return if (clip.clipData.itemCount > 0) clip.clipData.getItemAt(0)?.text?.toString()?.trim() else null
+    }
     var clipboardSuggestion by remember { mutableStateOf<String?>(null) }
     val queueItems by viewModel.queueFlow.collectAsStateWithLifecycle()
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
@@ -620,7 +662,7 @@ fun HomeScreen(
     LaunchedEffect(pasteDownloadSignal) {
         if (pasteDownloadSignal == 0) return@LaunchedEffect
         snapshotFlow { windowInfo.isWindowFocused }.first { it }
-        val clipText = clipboardManager.getText()?.text?.trim()
+        val clipText = readClipboardText()
         if (!clipText.isNullOrBlank() && android.util.Patterns.WEB_URL.matcher(clipText).matches()) {
             ClipboardSuggestionState.lastHandled = clipText
             clipboardSuggestion = null
@@ -631,7 +673,7 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        val clipText = clipboardManager.getText()?.text?.trim()
+        val clipText = readClipboardText()
         if (!clipText.isNullOrBlank() &&
             clipText != ClipboardSuggestionState.lastHandled &&
             android.util.Patterns.WEB_URL.matcher(clipText).matches()
@@ -719,7 +761,7 @@ fun HomeScreen(
                         trailingIcon = {
                             if (url.isNotEmpty()) {
                                 IconButton(onClick = { url = "" }) {
-                                    Icon(Icons.Outlined.Close, contentDescription = "Clear")
+                                    Icon(Icons.Outlined.Close, contentDescription = "Clear link")
                                 }
                             }
                         },
@@ -989,13 +1031,22 @@ fun HomeScreen(
         // when a fresh link was already spotted on open.
         ExtendedFloatingActionButton(
             onClick = {
-                val clipText = clipboardSuggestion ?: clipboardManager.getText()?.text?.trim()
-                if (clipText.isNullOrBlank()) {
-                    android.widget.Toast.makeText(homeContext, "Nothing to paste", android.widget.Toast.LENGTH_SHORT).show()
-                } else {
-                    url = clipText
-                    ClipboardSuggestionState.lastHandled = clipText
+                val suggested = clipboardSuggestion
+                if (!suggested.isNullOrBlank()) {
+                    url = suggested
+                    ClipboardSuggestionState.lastHandled = suggested
                     clipboardSuggestion = null
+                } else {
+                    homeScope.launch {
+                        val clipText = readClipboardText()
+                        if (clipText.isNullOrBlank()) {
+                            android.widget.Toast.makeText(homeContext, "Nothing to paste", android.widget.Toast.LENGTH_SHORT).show()
+                        } else {
+                            url = clipText
+                            ClipboardSuggestionState.lastHandled = clipText
+                            clipboardSuggestion = null
+                        }
+                    }
                 }
             },
             icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = null) },
@@ -1114,7 +1165,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                         )
                     } else if (item.speedMbs > 0f) {
                         Text(
-                            "${String.format("%.2f", item.speedMbs)} MB/s",
+                            "${String.format(Locale.getDefault(), "%.2f", item.speedMbs)} MB/s",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1136,7 +1187,11 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
             // screen's own equivalent thumbnail box (DownloadsHistoryScreen.kt's HistoryRow).
             .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClick = onClick),
+            .clickable(
+                role = Role.Button,
+                onClickLabel = "Open in library",
+                onClick = onClick,
+            ),
     ) {
         HomeCardThumbnail(item.thumbnailPath, item.url, item.title, Modifier.fillMaxSize())
     }
