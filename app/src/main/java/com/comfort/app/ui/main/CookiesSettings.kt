@@ -46,6 +46,10 @@ import com.comfort.app.data.VideoSiteRouter
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 
@@ -153,16 +157,22 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             OutlinedTextField(
                 value = pastedCookies,
-                onValueChange = { pastedCookies = it; pasteError = null },
+                onValueChange = {
+                    pastedCookies = it
+                    pasteError = null
+                    savedConfirmation = false
+                },
                 modifier = Modifier.fillMaxWidth().height(160.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("cookies.txt contents") },
                 maxLines = 10,
                 shape = MaterialTheme.shapes.medium,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
             )
             Spacer(Modifier.height(12.dp))
 
             OutlinedButton(
                 onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     // Merges into whatever's already saved rather than replacing it wholesale (see
                     // CookieStore.mergePasted). A paste where nothing parses is refused, and the
                     // textbox kept so it can be fixed — it used to merge as a no-op and still say
@@ -214,7 +224,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         // Still sourced from the real cookies.txt (see savedCookiesContent's own comment), so it
         // always reflects exactly what a download would actually send. (cookieSites itself is
         // declared up with parsedCookies, not here — see that declaration's own comment for why.)
-        SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = Icons.Outlined.List) {
+        SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = Icons.AutoMirrored.Outlined.List) {
             if (cookieSites.isEmpty()) {
                 Text(
                     "No cookies saved yet.",
@@ -228,14 +238,24 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(MaterialTheme.shapes.small)
-                            .clickable { viewingSite = site }
+                            .clickable(
+                                onClickLabel = "View cookies for ${site.label}",
+                                onClick = { viewingSite = site },
+                            )
+                            .semantics(mergeDescendants = false) {
+                                role = Role.Button
+                                contentDescription = "View cookies for ${site.label}, ${site.cookies.size} cookie${if (site.cookies.size == 1) "" else "s"}"
+                            }
                             .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Delete stays at the lead position; Copy moved to sit right beside the
                         // toggle at the trailing end instead, next to the one other cookie-related
                         // action a user might reach for around the same time as flipping the switch.
-                        IconButton(onClick = { pendingDelete = PendingCookieDelete.Site(site) }) {
+                        IconButton(onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            pendingDelete = PendingCookieDelete.Site(site)
+                        }) {
                             Icon(Icons.Outlined.Delete, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
@@ -256,9 +276,12 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             )
                         }
                         IconButton(onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             val text = site.cookies.joinToString("\n") { it.rawLine }
                             scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
+                                runCatching {
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
+                                }
                             }
                         }) {
                             Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
@@ -273,6 +296,9 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             onCheckedChange = { checked ->
                                 haptics.performHapticFeedback(if (checked) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                                 cookiesViewModel.setSiteEnabled(site.rootDomain, checked)
+                            },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Enable cookies for ${site.label}"
                             },
                             // Same fix as IconToggleRow's own Switch: the default unchecked thumb
                             // color is nearly invisible against the unchecked track in this theme
@@ -293,8 +319,11 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
                         onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("cookies.txt", savedCookiesContent)))
+                                runCatching {
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("cookies.txt", savedCookiesContent)))
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f).height(50.dp),
@@ -305,7 +334,10 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                         Text("Copy all")
                     }
                     OutlinedButton(
-                        onClick = { pendingDelete = PendingCookieDelete.All },
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            pendingDelete = PendingCookieDelete.All
+                        },
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = MaterialTheme.shapes.medium,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -378,6 +410,7 @@ private fun SiteCookiesSheet(
     onDismiss: () -> Unit,
 ) {
     val edits = remember(site) { mutableStateMapOf<ParsedCookie, String>() }
+    val haptics = LocalHapticFeedback.current
     fun currentValue(cookie: ParsedCookie) = edits[cookie] ?: cookie.value
     val changed = edits.filter { (cookie, value) -> value != cookie.value }
     ModalBottomSheet(
@@ -406,8 +439,12 @@ private fun SiteCookiesSheet(
                         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
                         maxLines = 4,
                         shape = MaterialTheme.shapes.medium,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                         trailingIcon = {
-                            IconButton(onClick = { onCopy("${cookie.name} cookie", currentValue(cookie)) }) {
+                            IconButton(onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onCopy("${cookie.name} cookie", currentValue(cookie))
+                            }) {
                                 Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${cookie.name}", modifier = Modifier.size(18.dp))
                             }
                         },
@@ -421,6 +458,7 @@ private fun SiteCookiesSheet(
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedButton(
                     onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         val text = site.cookies.joinToString("\n") { cookie ->
                             (edits[cookie]?.let { cookie.withValue(it) } ?: cookie).rawLine
                         }
@@ -435,7 +473,10 @@ private fun SiteCookiesSheet(
                 ConfirmCancelSplitButton(
                     label = "Save",
                     icon = Icons.Outlined.Save,
-                    onConfirm = { onSave(changed) },
+                    onConfirm = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSave(changed)
+                    },
                     onCancel = onDismiss,
                     confirmEnabled = changed.isNotEmpty(),
                 )
