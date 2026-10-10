@@ -8,20 +8,47 @@ import java.io.File
 // rules are testable and every writer (the page, the login browser) goes through the same code.
 
 /** Reads and writes the cookies file gallery-dl and yt-dlp are handed. The file is the source of
- * truth; KEY_COOKIES in SharedPreferences is a same-content mirror written alongside it. */
+ * truth, kept in [Context.getNoBackupFilesDir] so credentials never sync to Google Drive via Auto Backup. */
 object CookieStore {
     /** gallery-dl/yt-dlp's cookie-jar parser (Python's http.cookiejar) requires this as the file's
      * literal first line, or rejects it as "does not look like a Netscape format cookies file" and
      * every download fails — parseCookiesFile() drops it, so every rewrite adds it back. */
     const val HEADER = "# Netscape HTTP Cookie File"
 
-    fun file(context: Context) = File(context.filesDir, "cookies.txt")
+    fun migrateLegacyCookies(noBackupDir: File, legacyDir: File): File {
+        val noBackup = File(noBackupDir, "cookies.txt")
+        val legacy = File(legacyDir, "cookies.txt")
+        if (!noBackup.exists() && legacy.exists()) {
+            runCatching {
+                legacy.copyTo(noBackup, overwrite = true)
+                legacy.delete()
+            }
+        }
+        return noBackup
+    }
 
-    fun read(context: Context): String = runCatching { file(context).takeIf { it.exists() }?.readText() }.getOrNull().orEmpty()
+    fun file(context: Context): File = migrateLegacyCookies(context.noBackupFilesDir, context.filesDir)
+
+    fun read(context: Context): String {
+        val f = file(context)
+        if (f.exists()) {
+            return runCatching { f.readText() }.getOrNull().orEmpty()
+        }
+        val legacyPrefs = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        val fromPrefs = legacyPrefs.getString(GalleryDlPreferences.KEY_COOKIES, null)
+        if (!fromPrefs.isNullOrBlank()) {
+            runCatching {
+                f.writeText(fromPrefs)
+                legacyPrefs.edit().remove(GalleryDlPreferences.KEY_COOKIES).apply()
+            }
+            return fromPrefs
+        }
+        return ""
+    }
 
     fun write(context: Context, content: String) {
         context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(GalleryDlPreferences.KEY_COOKIES, content).apply()
+            .edit().remove(GalleryDlPreferences.KEY_COOKIES).apply()
         file(context).writeText(content)
     }
 

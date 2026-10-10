@@ -306,7 +306,7 @@ object GalleryDlPreferences {
     }
 
     fun getCookies(context: Context): String {
-        return prefs(context).getString(KEY_COOKIES, "") ?: ""
+        return CookieStore.read(context)
     }
 
     fun getConcurrentDownloads(context: Context): Int {

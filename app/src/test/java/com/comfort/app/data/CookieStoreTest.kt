@@ -4,7 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 
 class CookieStoreTest {
     private fun row(domain: String, name: String, value: String, expiry: Long = 2_000_000_000L) =
@@ -143,5 +146,35 @@ class CookieStoreTest {
         assertEquals(".example.com", sessionCookie.domain)
         assertFalse(merged.contains("www.example.com"))
         assertFalse(merged.contains("old_csrf"))
+    }
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
+    @Test
+    fun `migrateLegacyCookies moves legacy file to noBackupDir and deletes original`() {
+        val legacyDir = tempFolder.newFolder("legacy")
+        val noBackupDir = tempFolder.newFolder("nobackup")
+        val legacyFile = File(legacyDir, "cookies.txt").apply { writeText("legacy-cookie-content") }
+
+        val result = CookieStore.migrateLegacyCookies(noBackupDir, legacyDir)
+
+        assertEquals(File(noBackupDir, "cookies.txt"), result)
+        assertTrue(result.exists())
+        assertEquals("legacy-cookie-content", result.readText())
+        assertFalse(legacyFile.exists())
+    }
+
+    @Test
+    fun `migrateLegacyCookies does not overwrite existing noBackup file`() {
+        val legacyDir = tempFolder.newFolder("legacy2")
+        val noBackupDir = tempFolder.newFolder("nobackup2")
+        File(legacyDir, "cookies.txt").writeText("legacy-cookie-content")
+        val existingNoBackup = File(noBackupDir, "cookies.txt").apply { writeText("nobackup-cookie-content") }
+
+        val result = CookieStore.migrateLegacyCookies(noBackupDir, legacyDir)
+
+        assertEquals(existingNoBackup, result)
+        assertEquals("nobackup-cookie-content", result.readText())
     }
 }

@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.comfort.app.data.AppDatabase
+import com.comfort.app.data.CookieStore
 import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.DownloadNotes
 import com.comfort.app.data.DownloadEngine
@@ -396,7 +397,7 @@ class DownloadWorker(
                 // line close together (one worker's writeText() truncating the file out from under
                 // another worker's concurrent readText()). A private copy per worker sidesteps the
                 // shared-mutable-file problem entirely instead of trying to lock around it.
-                val cookiesPath = applicationContext.filesDir.resolve("cookies.txt")
+                val cookiesPath = CookieStore.file(applicationContext)
                 // length() > 0, not just exists() — an empty cookies.txt (reproduced live: a
                 // corrupted 0-byte file, from the very race this normalization step used to cause)
                 // still "exists" but gallery-dl/yt-dlp both hard-reject it as not looking like a
