@@ -115,6 +115,9 @@ fun QueueScreen(
     // sitting on an unsatisfied CONNECTIVITY constraint because the current Wi-Fi network was
     // connected but never validated by the OS (some hotspot/captive-portal setups never do).
     val isNetworkAvailable = rememberIsNetworkAvailable()
+    // Downloads held only for a connection (see the Running tab's empty state).
+    val waitingForNetwork = if (isNetworkAvailable) 0 else queueItems.count { it.status == DownloadStatus.QUEUED }
+    val queueContext = LocalContext.current
     // Hoisted here, not inside each card's own `remember(item.id)` below — a LazyColumn destroys
     // and recreates an item's composable as it scrolls off-screen and back on, which reset a
     // purely-local remember back to its initial "not yet animated" state every time. Reproduced
@@ -365,7 +368,13 @@ fun QueueScreen(
                     "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
                     "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
                     "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
-                    else -> "No downloads in queue" to "Paste a link on Home to start one."
+                    // Nothing running only because there's no usable connection: say so, rather than
+                    // "No downloads in queue" with the In Queue chip showing a count beside it.
+                    else -> if (selectedFilter == "Running" && waitingForNetwork > 0) {
+                        "Waiting for a network connection" to networkWaitSubtitle(queueContext, waitingForNetwork)
+                    } else {
+                        "No downloads in queue" to "Paste a link on Home to start one."
+                    }
                 }
                 Box(
                     modifier = Modifier
@@ -373,7 +382,11 @@ fun QueueScreen(
                         .padding(top = topReserve, bottom = navBarClearance()),
                     contentAlignment = Alignment.Center,
                 ) {
-                    EmptyState(icon = Icons.Outlined.Inbox, title = emptyTitle, subtitle = emptySubtitle)
+                    EmptyState(
+                        icon = if (selectedFilter == "Running" && waitingForNetwork > 0) Icons.Outlined.WifiOff else Icons.Outlined.Inbox,
+                        title = emptyTitle,
+                        subtitle = emptySubtitle,
+                    )
                 }
             }
 
@@ -716,8 +729,13 @@ private fun StoppedRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val domain = remember(item.url) { runCatching { URI(item.url).host?.removePrefix("www.") }.getOrNull() ?: "Unknown" }
+            // When, beside the site: on the status line below it was cut off ("Paused · nothing
+            // saved yet · a…").
+            val whenText = remember(item.downloadStartTime, item.dateAdded) {
+                (if (item.downloadStartTime > 0) "started " else "added ") + shortWhen(context, item.effectiveDate)
+            }
             Text(
-                text = domain,
+                text = "$domain · $whenText",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -725,7 +743,28 @@ private fun StoppedRow(
             )
             Spacer(Modifier.height(6.dp))
 
-            val sdf = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+            // How far it got, measured the way the running card measures it (item count for a
+            // gallery, bytes for a single file): a paused download keeps a thin bar where it stopped.
+            val savedBytes = item.totalBytes + item.liveBytes
+            val stoppedProgress = when {
+                item.totalItems > 1 -> (item.downloadedItems.toFloat() / item.totalItems).coerceIn(0f, 1f)
+                item.expectedBytes > 0 -> (savedBytes.toFloat() / item.expectedBytes).coerceIn(0f, 1f)
+                else -> null
+            }
+            if (isPaused && stoppedProgress != null) {
+                LinearProgressIndicator(
+                    progress = { stoppedProgress },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                )
+                Spacer(Modifier.height(6.dp))
+            }
+            val progressText = when {
+                item.totalItems > 1 -> "${item.downloadedItems} of ${item.totalItems}"
+                item.expectedBytes > 0 && savedBytes > 0 -> "${formatFileSize(savedBytes)} of ${formatFileSize(item.expectedBytes)}"
+                item.downloadedItems > 0 -> "${item.downloadedItems} saved"
+                else -> "nothing saved yet"
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     if (isPaused) Icons.Outlined.Pause else Icons.Outlined.Close,
@@ -735,11 +774,14 @@ private fun StoppedRow(
                 )
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    text = "${if (isPaused) "Paused" else "Cancelled"} • ${item.downloadedItems} saved • ${sdf.format(Date(item.effectiveDate))}",
+                    text = "${if (isPaused) "Paused" else "Cancelled"} · $progressText",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp))
         }
 
             if (!selectionMode) {
@@ -1093,37 +1135,8 @@ fun QueueItemCard(
                             }
                         }
                     }
-                    // The link this download came from, in the space the pills leave free — tap
-                    // opens it in the browser. Shown without the scheme/"www." and cut off with an
-                    // ellipsis, so it never pushes the pills or the ETA around.
-                    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-                    val shortLink = remember(item.url) {
-                        item.url.substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/')
-                    }
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(onClickLabel = "Open link") { runCatching { uriHandler.openUri(item.url) } }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Outlined.Link,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = shortLink,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    // The link this download came from, in the space the pills leave free (QueueLink).
+                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
                     if (byteProgress != null && item.speedMbs > 0f) {
                         val remainingBytes = item.expectedBytes - (item.totalBytes + item.liveBytes)
                         val remainingSeconds = (remainingBytes / (item.speedMbs * 1024f * 1024f)).toInt()
@@ -1165,10 +1178,34 @@ fun QueueItemCard(
                     }
                 }
             } else if (item.status == DownloadStatus.SCHEDULED) {
+                // When it starts, counted down live, and the window from Settings › Downloads.
+                val context = LocalContext.current
+                val now by produceState(System.currentTimeMillis()) {
+                    while (true) {
+                        kotlinx.coroutines.delay(30_000)
+                        value = System.currentTimeMillis()
+                    }
+                }
+                val (startsText, windowText) = remember(now) { scheduleTexts(context) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = startsText,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Text(
-                    text = "Waiting for the scheduled time window…",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "$windowText · Up next starts it now",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -1189,6 +1226,7 @@ fun QueueItemCard(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
+                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
             }
 
             if (!selectionMode) {
@@ -1255,14 +1293,7 @@ fun QueueItemCard(
                             TextButton(onClick = onRetry) {
                                 Text("Retry")
                             }
-                            IconButton(onClick = {
-                                scope.launch {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Download link", item.url)))
-                                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
-                                }
-                            }) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy link")
-                            }
+                            // No copy button: a long-press on the card's link copies it (QueueLink).
                             IconButton(onClick = onDelete) {
                                 Icon(Icons.Outlined.Delete, contentDescription = "Remove")
                             }
@@ -1381,5 +1412,93 @@ private fun ErrorDetailsSheet(
                 ) { Text("Done") }
             }
         }
+    }
+}
+
+/** "Waiting for a network connection" copy, shared by Home's notice and the Queue's Running tab:
+ * how many downloads are held, and that Wi-Fi only is why when it's on. */
+internal fun networkWaitSubtitle(context: android.content.Context, count: Int): String {
+    val what = if (count == 1) "1 download starts" else "$count downloads start"
+    return if (com.comfort.app.data.GalleryDlPreferences.isWifiOnly(context)) "$what once you're on Wi-Fi (Wi-Fi only is on)."
+    else "$what as soon as you're back online."
+}
+
+/** A time today ("10:42"), or a date ("Oct 9") for anything older — in the phone's 12/24-hour style. */
+internal fun shortWhen(context: android.content.Context, millis: Long): String {
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    val today = java.util.Calendar.getInstance()
+    val sameDay = then.get(java.util.Calendar.YEAR) == today.get(java.util.Calendar.YEAR) &&
+        then.get(java.util.Calendar.DAY_OF_YEAR) == today.get(java.util.Calendar.DAY_OF_YEAR)
+    return if (sameDay) android.text.format.DateFormat.getTimeFormat(context).format(Date(millis))
+    else SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(millis))
+}
+
+/** A scheduled download's two lines: "Starts at 1:00 AM · in 3 h 20 min" (or "Starting soon"
+ * once the window is open), and "Downloads run 1:00 AM–6:00 AM". Uses the same delay the
+ * dispatcher waited on (DownloadDispatcher.scheduleDelayMillis). */
+internal fun scheduleTexts(context: android.content.Context): Pair<String, String> {
+    val timeFormat = android.text.format.DateFormat.getTimeFormat(context)
+    fun clock(minutesOfDay: Int): String = timeFormat.format(
+        java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, minutesOfDay / 60)
+            set(java.util.Calendar.MINUTE, minutesOfDay % 60)
+        }.time,
+    )
+    val start = com.comfort.app.data.GalleryDlPreferences.getScheduleStartMinutes(context)
+    val end = com.comfort.app.data.GalleryDlPreferences.getScheduleEndMinutes(context)
+    val window = "Downloads run ${clock(start)}–${clock(end)}"
+    val delay = com.comfort.app.data.DownloadDispatcher.scheduleDelayMillis(context)
+    if (delay <= 0) return "Starting soon, the window is open" to window
+    val minutes = (delay + 59_999) / 60_000
+    val inText = when {
+        minutes < 60 -> "$minutes min"
+        minutes % 60 == 0L -> "${minutes / 60} h"
+        else -> "${minutes / 60} h ${minutes % 60} min"
+    }
+    val startsAt = timeFormat.format(Date(System.currentTimeMillis() + delay))
+    return "Starts at $startsAt · in $inText" to window
+}
+
+/** A queue card's link, without the scheme/"www." and cut off with an ellipsis so it never pushes
+ * anything around: a tap opens it, a long-press copies it (with a buzz and "Link copied"). Its
+ * own handler, so a long-press here copies instead of starting the card's selection. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun QueueLink(url: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val shortLink = remember(url) { url.substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/') }
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .combinedClickable(
+                onClickLabel = "Open link",
+                onLongClickLabel = "Copy link",
+                onClick = { runCatching { uriHandler.openUri(url) } },
+                onLongClick = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager)
+                        ?.setPrimaryClip(ClipData.newPlainText("Download link", url))
+                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                },
+            )
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Outlined.Link,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = shortLink,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
