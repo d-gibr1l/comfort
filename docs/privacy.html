@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comfort Privacy Policy</title>
+<meta name="description" content="Comfort collects no personal data: no accounts, no ads, no analytics. What the app connects to and what stays on your phone.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Unbounded:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f3f7; --surface: #ffffff; --text: #15161a; --muted: #5d6070; --line: #dcdde6; --primary: #2f6bff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0e12; --surface: #17181e; --text: #f1f2f6; --muted: #a2a6b6; --line: #2a2c36; --primary: #6f97ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0e12; --surface: #17181e; --text: #f1f2f6; --muted: #a2a6b6; --line: #2a2c36; --primary: #6f97ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.7 "Plus Jakarta Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { width: min(760px, 100% - 32px); margin: 0 auto; padding: 48px 0 72px; }
+  .back { display: inline-flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 700; }
+  .back img { width: 32px; height: 32px; border-radius: 8px; }
+  h1 { font: 900 clamp(28px, 5vw, 40px)/1.1 "Unbounded", sans-serif; letter-spacing: -.02em; margin: 32px 0 8px; }
+  h2 { font-size: 20px; margin: 36px 0 8px; }
+  .updated { color: var(--muted); margin: 0 0 28px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: 8px 28px 24px; }
+  p, li { color: var(--text); }
+  ul { padding-left: 22px; }
+  li { margin: 6px 0; }
+  a { color: var(--primary); }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="back" href="./"><img src="icon.svg" alt="">Comfort</a>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: October 10, 2026</p>
+
+  <div class="card">
+    <h2>In short</h2>
+    <p>Comfort doesn't collect, store or share any personal data. There are no accounts, no ads, no analytics and no crash reporting. Everything you download, and every setting you change, stays on your phone.</p>
+
+    <h2>What stays on your phone</h2>
+    <ul>
+      <li><strong>Your downloads and library:</strong> the files you save, and the list of them in the app (titles, links, thumbnails), are stored only on your device.</li>
+      <li><strong>Cookies you add:</strong> if you sign in to a site through the built-in browser, or paste cookies yourself, they're saved in the app's private storage and only sent to that same site, to download what needs a login. They never go anywhere else.</li>
+      <li><strong>Settings:</strong> stored on your device only.</li>
+    </ul>
+    <p>Uninstalling Comfort removes all of this, except the downloaded files themselves, which stay in your Download folder.</p>
+
+    <h2>What Comfort connects to</h2>
+    <p>Comfort has no server of its own. It only connects to:</p>
+    <ul>
+      <li><strong>The sites you download from,</strong> directly from your phone, to fetch the link you gave it, as a web browser would.</li>
+      <li><strong>Song matching, for music links:</strong> Spotify's public pages for a track's details, YouTube to find the matching audio, Apple's iTunes catalog for cover art, and LRCLIB for lyrics. These receive the song's title and artist.</li>
+      <li><strong>Update checks:</strong> GitHub, for new versions of Comfort, and GitHub, Codeberg and PyPI, for updates to its download engines (yt-dlp, gallery-dl and Instaloader).</li>
+    </ul>
+    <p>Each of these services sees your IP address, like any website you visit, and handles it under its own privacy policy. Comfort doesn't send them anything about you beyond what each request needs.</p>
+
+    <h2>Permissions</h2>
+    <ul>
+      <li><strong>Internet and network state:</strong> to download, and to tell you when a download is waiting for a connection.</li>
+      <li><strong>Notifications:</strong> to show download progress.</li>
+      <li><strong>Storage:</strong> on older Android versions, to save files to your Download folder.</li>
+      <li><strong>Install packages:</strong> only to install a Comfort update you choose to download.</li>
+    </ul>
+
+    <h2>Children</h2>
+    <p>Comfort doesn't knowingly collect information from anyone, including children, since it collects no information at all.</p>
+
+    <h2>Open source</h2>
+    <p>Comfort's full source code is public, so all of the above can be checked: <a href="https://github.com/d-gibr1l/comfort">github.com/d-gibr1l/comfort</a>.</p>
+
+    <h2>Changes and contact</h2>
+    <p>If this policy changes, the new version will be posted on this page with a new date. For questions, open an issue at <a href="https://github.com/d-gibr1l/comfort/issues">github.com/d-gibr1l/comfort/issues</a>.</p>
+  </div>
+  <p class="muted" style="margin-top:24px">Please download only content you have the right to save.</p>
+</main>
+</body>
+</html>
