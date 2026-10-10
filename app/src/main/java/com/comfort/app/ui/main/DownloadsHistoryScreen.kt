@@ -702,15 +702,33 @@ fun DownloadsHistoryScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        val selectedItems = historyItems.filter { it.id in selectedIds }
-                        val uris = selectedItems.mapNotNull { it.thumbnailPath?.let { p -> Uri.parse(p) } }
+                        val candidateItems = (historyItems + deletedItems).filter { it.id in selectedIds && it.status != DownloadStatus.DELETED }
+                        val uris = candidateItems.mapNotNull {
+                            (it.mediaUri ?: it.thumbnailPath)?.takeIf { p -> p.isNotBlank() }?.let { p -> Uri.parse(p) }
+                        }
                         if (uris.isNotEmpty()) {
-                            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                                type = "image/*"
-                                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            val mimeTypes = uris.mapNotNull { context.contentResolver.getType(it) }.toSet()
+                            val resolvedType = when {
+                                mimeTypes.size == 1 -> mimeTypes.single()
+                                mimeTypes.isNotEmpty() && mimeTypes.all { it.startsWith("image/") } -> "image/*"
+                                mimeTypes.isNotEmpty() && mimeTypes.all { it.startsWith("video/") } -> "video/*"
+                                mimeTypes.isNotEmpty() && mimeTypes.all { it.startsWith("audio/") } -> "audio/*"
+                                else -> "*/*"
                             }
-                            runCatching { context.startActivity(Intent.createChooser(intent, "Share images")) }
+                            val intent = if (uris.size == 1) {
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = resolvedType
+                                    putExtra(Intent.EXTRA_STREAM, uris.first())
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                            } else {
+                                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                    type = resolvedType
+                                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                            }
+                            runCatching { context.startActivity(Intent.createChooser(intent, if (uris.size == 1) "Share" else "Share files")) }
                         }
                     }) {
                         Icon(Icons.Outlined.Share, contentDescription = "Share selected")
