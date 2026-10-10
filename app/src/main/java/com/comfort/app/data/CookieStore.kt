@@ -55,8 +55,8 @@ object CookieStore {
      * nothing to save (no host, no cookies). */
     fun saveFromBrowser(context: Context, url: String, cookieHeader: String?): String? {
         val host = runCatching { java.net.URI(url).host }.getOrNull()
-        if (host == null || cookieHeader.isNullOrBlank()) return null
-        val existing = GalleryDlPreferences.getCookies(context)
+        if (host.isNullOrBlank() || cookieHeader.isNullOrBlank()) return null
+        val existing = read(context)
         return mergeNetscapeCookies(existing, host, cookieHeader).also { write(context, it) }
     }
 }
@@ -180,7 +180,8 @@ fun groupCookiesBySite(cookies: List<ParsedCookie>): List<SiteCookies> {
  * into [existing], dropping any prior lines for [host] first so re-extracting replaces rather than
  * duplicates/conflicts with them. */
 fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): String {
-    val domain = if (host.startsWith(".")) host else ".$host"
+    val cleanHost = host.removePrefix(".").removePrefix("www.")
+    val domain = if (cleanHost.startsWith(".")) cleanHost else ".$cleanHost"
     val bareDomain = domain.removePrefix(".")
     // Five years out — CookieManager doesn't expose each cookie's real expiry, and a long-lived
     // session cookie being treated as farther in the future than it really is just means it stops
@@ -202,7 +203,8 @@ fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): 
             if (isComment) return@filter true
             val dataLine = trimmed.removePrefix("#HttpOnly_")
             val lineDomain = dataLine.split(Regex("\\s+"), limit = 2).firstOrNull().orEmpty()
-            !(lineDomain == domain || lineDomain == bareDomain)
+            val lineBare = lineDomain.removePrefix(".").removePrefix("www.")
+            lineBare != bareDomain
         }
         .toList()
     val header = if (keptExisting.any { it.startsWith("# Netscape") }) emptyList() else listOf("# Netscape HTTP Cookie File")

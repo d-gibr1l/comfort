@@ -108,4 +108,22 @@ class CookieStoreTest {
         assertEquals("fresh", cookies.single { it.name == "session" }.value)
         assertFalse(merged.contains("old"))
     }
+
+    @Test
+    fun `browser merge strips leading www from host so cookies apply to apex domain`() {
+        val existing = listOf(
+            CookieStore.HEADER,
+            row("www.example.com", "session", "old"),
+            row(".example.com", "csrf", "old_csrf"),
+            row(".other.org", "id", "ccc"),
+        ).joinToString("\n")
+        val merged = mergeNetscapeCookies(existing, "www.example.com", "session=fresh; theme=dark")
+        val cookies = parseCookiesFile(merged)
+        assertEquals(listOf("id", "session", "theme"), cookies.map { it.name }.sorted())
+        val sessionCookie = cookies.single { it.name == "session" }
+        assertEquals("fresh", sessionCookie.value)
+        assertEquals(".example.com", sessionCookie.domain)
+        assertFalse(merged.contains("www.example.com"))
+        assertFalse(merged.contains("old_csrf"))
+    }
 }

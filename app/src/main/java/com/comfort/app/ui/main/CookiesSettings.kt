@@ -468,6 +468,7 @@ fun CookieLoginDialog(
         onDismiss = onDismiss,
         startDesktop = true,
         primaryAction = BrowserAction("Extract cookies", Icons.Outlined.Cookie) { url ->
+            CookieManager.getInstance().flush()
             val merged = CookieStore.saveFromBrowser(context, url, CookieManager.getInstance().getCookie(url))
             if (merged != null) onCookiesSaved(merged) else onDismiss()
         },
