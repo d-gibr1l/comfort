@@ -656,6 +656,19 @@ fun HomeScreen(
     val activeDownload = remember(queueItems) { queueItems.firstOrNull { it.status == DownloadStatus.RUNNING } }
     val recentDownloads = remember(historyItems) { historyItems.filter { !it.thumbnailPath.isNullOrBlank() }.take(10) }
 
+    fun normalizeInputUrl(input: String): String {
+        val trimmed = input.trim()
+        return if (!trimmed.startsWith("http://", ignoreCase = true) &&
+            !trimmed.startsWith("https://", ignoreCase = true) &&
+            trimmed.contains('.') &&
+            !trimmed.contains(' ')
+        ) {
+            "https://$trimmed"
+        } else {
+            trimmed
+        }
+    }
+
     // "Paste & download" shortcut: download the copied link straight away. Android only lets an
     // app read the clipboard while its window has focus, so this waits for that first.
     val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
@@ -664,15 +677,17 @@ fun HomeScreen(
         snapshotFlow { windowInfo.isWindowFocused }.first { it }
         val clipText = readClipboardText()
         if (!clipText.isNullOrBlank() && android.util.Patterns.WEB_URL.matcher(clipText).matches()) {
-            ClipboardSuggestionState.lastHandled = clipText
+            val target = normalizeInputUrl(clipText)
+            ClipboardSuggestionState.lastHandled = target
             clipboardSuggestion = null
-            downloadNow(clipText)
+            downloadNow(target)
         } else {
             android.widget.Toast.makeText(homeContext, "No link copied", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
     LaunchedEffect(Unit) {
+        snapshotFlow { windowInfo.isWindowFocused }.first { it }
         val clipText = readClipboardText()
         if (!clipText.isNullOrBlank() &&
             clipText != ClipboardSuggestionState.lastHandled &&
@@ -777,7 +792,8 @@ fun HomeScreen(
                         OutlinedButton(
                             onClick = {
                                 if (url.isNotBlank()) {
-                                    onConfigure(url.trim())
+                                    val target = normalizeInputUrl(url)
+                                    onConfigure(target)
                                     url = ""
                                 }
                             },
@@ -793,7 +809,8 @@ fun HomeScreen(
                         Button(
                             onClick = {
                                 if (url.isNotBlank()) {
-                                    downloadNow(url.trim())
+                                    val target = normalizeInputUrl(url)
+                                    downloadNow(target)
                                     url = ""
                                 }
                             },
@@ -815,7 +832,8 @@ fun HomeScreen(
             // and downloads it from there. A link in the box above opens in it; otherwise search.
             Surface(
                 onClick = {
-                    browserUrl = url.trim().ifBlank { "https://www.google.com" }
+                    val raw = url.trim()
+                    browserUrl = if (raw.isBlank()) "https://www.google.com" else normalizeInputUrl(raw)
                     url = ""
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -968,8 +986,9 @@ fun HomeScreen(
                 // isDragged check below just avoids wastefully *starting* a new one while they're
                 // still holding it, on top of that.
                 val isRecentListDragged by recentListState.interactionSource.collectIsDraggedAsState()
-                LaunchedEffect(recentDownloads.size) {
-                    if (recentDownloads.size <= 1) return@LaunchedEffect
+                val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
+                LaunchedEffect(recentDownloads.size, reducedMotion) {
+                    if (recentDownloads.size <= 1 || reducedMotion) return@LaunchedEffect
                     kotlinx.coroutines.delay(3500)
                     while (true) {
                         if (isRecentListDragged) {
