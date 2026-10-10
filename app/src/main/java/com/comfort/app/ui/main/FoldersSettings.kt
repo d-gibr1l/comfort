@@ -7,11 +7,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -87,6 +91,13 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             )
             Spacer(Modifier.height(12.dp))
 
+            val saveFormat = {
+                val toSave = filenameFormat.ifBlank { GalleryDlPreferences.DEFAULT_FILENAME_FORMAT }
+                filenameFormat = toSave
+                sharedPreferences.edit().putString(GalleryDlPreferences.KEY_FILENAME_FORMAT, toSave).apply()
+                filenameFormatSaved = true
+            }
+
             OutlinedTextField(
                 value = filenameFormat,
                 onValueChange = { filenameFormat = it; filenameFormatSaved = false },
@@ -94,6 +105,8 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 label = { Text("Filename format") },
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { saveFormat() }),
             )
             Spacer(Modifier.height(4.dp))
             Text(
@@ -104,12 +117,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Spacer(Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = {
-                    val toSave = filenameFormat.ifBlank { GalleryDlPreferences.DEFAULT_FILENAME_FORMAT }
-                    filenameFormat = toSave
-                    sharedPreferences.edit().putString(GalleryDlPreferences.KEY_FILENAME_FORMAT, toSave).apply()
-                    filenameFormatSaved = true
-                },
+                onClick = saveFormat,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
@@ -237,7 +245,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Text(
                 cacheSizeBytes?.let { bytes ->
                     val mb = bytes / (1024f * 1024f)
-                    if (mb >= 1f) "Cache: %.1f MB".format(mb) else "Cache: ${bytes / 1024} KB"
+                    if (mb >= 1f) String.format(Locale.getDefault(), "Cache: %.1f MB", mb) else "Cache: ${bytes / 1024} KB"
                 } ?: "Calculating cache size…",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
