@@ -580,9 +580,7 @@ object GalleryDlPreferences {
             val dataLine = trimmed.removePrefix("#HttpOnly_")
             if (trimmed.isBlank() || (dataLine.startsWith("#") && dataLine == trimmed)) return@filter true
             val domainField = dataLine.split(Regex("\\s+")).firstOrNull() ?: return@filter true
-            val bare = domainField.removePrefix(".")
-            val parts = bare.split(".")
-            val registrable = if (parts.size <= 2) bare else parts.takeLast(2).joinToString(".")
+            val registrable = CookieStore.registrableDomain(domainField)
             registrable !in disabledDomains
         }.joinToString("\n")
     }

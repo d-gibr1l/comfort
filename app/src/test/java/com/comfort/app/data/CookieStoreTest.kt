@@ -45,6 +45,24 @@ class CookieStoreTest {
     }
 
     @Test
+    fun `mergePasted replaces subdomains of pasted site based on registrable domain`() {
+        val existing = listOf(
+            CookieStore.HEADER,
+            row("www.example.com", "session", "old_www"),
+            row(".sub.example.com", "csrf", "old_sub"),
+            row(".other.org", "id", "ccc"),
+        ).joinToString("\n")
+        val merged = CookieStore.mergePasted(existing, row(".example.com", "session", "fresh"))!!
+        val cookies = parseCookiesFile(merged)
+        assertEquals(listOf("id", "session"), cookies.map { it.name }.sorted())
+        val sessionCookie = cookies.single { it.name == "session" }
+        assertEquals("fresh", sessionCookie.value)
+        assertEquals(".example.com", sessionCookie.domain)
+        assertFalse(merged.contains("old_www"))
+        assertFalse(merged.contains("old_sub"))
+    }
+
+    @Test
     fun `mergePasted refuses text with no valid rows`() {
         assertNull(CookieStore.mergePasted(saved, "session=aaa; csrf=bbb"))
     }
