@@ -868,6 +868,40 @@ fun HomeScreen(
                 ActiveDownloadCard(item = activeDownload, onClick = onOpenQueue)
             }
 
+            // Downloads held for a connection: WorkManager won't start them without one, and with
+            // nothing running Home otherwise looked idle while the Queue had work in it.
+            val networkOk = com.comfort.app.util.rememberIsNetworkAvailable()
+            val waitingCount = remember(queueItems) { queueItems.count { it.status == DownloadStatus.QUEUED } }
+            if (activeDownload == null && waitingCount > 0 && !networkOk) {
+                Spacer(Modifier.height(24.dp))
+                Surface(
+                    onClick = onOpenQueue,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.WifiOff, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Waiting for a network connection",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Text(
+                                networkWaitSubtitle(homeContext, waitingCount),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                        }
+                    }
+                }
+            }
+
             if (recentDownloads.isNotEmpty()) {
                 Spacer(Modifier.height(24.dp))
                 Text(
