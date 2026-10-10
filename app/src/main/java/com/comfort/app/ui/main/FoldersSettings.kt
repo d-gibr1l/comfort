@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import java.util.Locale
+import com.comfort.app.data.AppDatabase
 import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -39,10 +40,22 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     var restrictFilenames by remember { mutableStateOf(GalleryDlPreferences.isRestrictFilenames(context)) }
     var trimFilenames by remember { mutableStateOf(GalleryDlPreferences.isTrimFilenames(context)) }
     var downloadLocationUri by remember { mutableStateOf(GalleryDlPreferences.getDownloadLocationUri(context)) }
+    var audioLocationUri by remember { mutableStateOf(GalleryDlPreferences.getAudioLocationUri(context)) }
+    var videoLocationUri by remember { mutableStateOf(GalleryDlPreferences.getVideoLocationUri(context)) }
+
     val downloadLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
+            val oldUri = downloadLocationUri
+            if (oldUri != null && oldUri != uri && oldUri != audioLocationUri && oldUri != videoLocationUri) {
+                runCatching {
+                    context.contentResolver.releasePersistableUriPermission(
+                        oldUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                }
+            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -57,11 +70,19 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     // Imported from YTDLnis's own separate music/video folder settings — each independently
     // optional, falling back to the shared downloadLocationUri above (then the built-in default)
     // when unset. Same take-persistable-permission dance as the shared picker.
-    var audioLocationUri by remember { mutableStateOf(GalleryDlPreferences.getAudioLocationUri(context)) }
     val audioLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
+            val oldUri = audioLocationUri
+            if (oldUri != null && oldUri != uri && oldUri != downloadLocationUri && oldUri != videoLocationUri) {
+                runCatching {
+                    context.contentResolver.releasePersistableUriPermission(
+                        oldUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                }
+            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -72,11 +93,19 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             GalleryDlPreferences.setAudioLocationUri(context, uri)
         }
     }
-    var videoLocationUri by remember { mutableStateOf(GalleryDlPreferences.getVideoLocationUri(context)) }
     val videoLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
+            val oldUri = videoLocationUri
+            if (oldUri != null && oldUri != uri && oldUri != downloadLocationUri && oldUri != audioLocationUri) {
+                runCatching {
+                    context.contentResolver.releasePersistableUriPermission(
+                        oldUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                }
+            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -100,7 +129,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             val saveFormat = {
                 val toSave = filenameFormat.ifBlank { GalleryDlPreferences.DEFAULT_FILENAME_FORMAT }
                 filenameFormat = toSave
-                sharedPreferences.edit().putString(GalleryDlPreferences.KEY_FILENAME_FORMAT, toSave).apply()
+                GalleryDlPreferences.setFilenameFormat(context, toSave)
                 filenameFormatSaved = true
             }
 
@@ -169,18 +198,24 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         }
 
         SettingsSection(title = "Download location", icon = Icons.Outlined.Folder) {
-            val locationName = remember(downloadLocationUri) {
-                downloadLocationUri?.let { uri ->
-                    runCatching {
-                        val doc = DocumentFile.fromTreeUri(context, uri)
-                        if (doc != null && doc.exists() && doc.canWrite()) doc.name else null
-                    }.getOrNull()
+            val locationName by produceState<String?>(initialValue = null, downloadLocationUri) {
+                value = withContext(Dispatchers.IO) {
+                    downloadLocationUri?.let { uri ->
+                        runCatching {
+                            val doc = DocumentFile.fromTreeUri(context, uri)
+                            if (doc != null && doc.exists() && doc.canWrite()) doc.name else null
+                        }.getOrNull()
+                    }
                 }
             }
             Text(
-                if (locationName != null) "Saving to \"$locationName\"." else "Saving to the default Download/Comfort folder.",
+                when {
+                    downloadLocationUri == null -> "Saving to the default Download/Comfort folder."
+                    locationName != null -> "Saving to \"$locationName\"."
+                    else -> "Selected folder is inaccessible or permission was lost. Falling back to default Download/Comfort folder."
+                },
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (downloadLocationUri != null && locationName == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (locationName != null) {
                 Spacer(Modifier.height(4.dp))
@@ -204,15 +239,17 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     Spacer(Modifier.width(8.dp))
                     Text("Choose folder")
                 }
-                if (locationName != null) {
+                if (downloadLocationUri != null) {
                     OutlinedButton(
                         onClick = {
                             downloadLocationUri?.let { uri ->
-                                runCatching {
-                                    context.contentResolver.releasePersistableUriPermission(
-                                        uri,
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                                    )
+                                if (uri != audioLocationUri && uri != videoLocationUri) {
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(
+                                            uri,
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                        )
+                                    }
                                 }
                             }
                             downloadLocationUri = null
@@ -237,11 +274,13 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 onChoose = { audioLocationLauncher.launch(null) },
                 onUseDefault = {
                     audioLocationUri?.let { uri ->
-                        runCatching {
-                            context.contentResolver.releasePersistableUriPermission(
-                                uri,
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                            )
+                        if (uri != downloadLocationUri && uri != videoLocationUri) {
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                )
+                            }
                         }
                     }
                     audioLocationUri = null
@@ -260,11 +299,13 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 onChoose = { videoLocationLauncher.launch(null) },
                 onUseDefault = {
                     videoLocationUri?.let { uri ->
-                        runCatching {
-                            context.contentResolver.releasePersistableUriPermission(
-                                uri,
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                            )
+                        if (uri != downloadLocationUri && uri != audioLocationUri) {
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                )
+                            }
                         }
                     }
                     videoLocationUri = null
@@ -275,6 +316,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
         SettingsSection(title = "Storage", icon = Icons.Outlined.SdStorage) {
             var cacheSizeBytes by remember { mutableStateOf<Long?>(null) }
+            var isClearingCache by remember { mutableStateOf(false) }
             var cacheCleared by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 cacheSizeBytes = withContext(Dispatchers.IO) {
@@ -298,20 +340,71 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick = {
+                    if (isClearingCache) return@OutlinedButton
+                    isClearingCache = true
                     scope.launch {
-                        withContext(Dispatchers.IO) {
-                            runCatching { context.cacheDir?.listFiles()?.forEach { it.deleteRecursively() } }
+                        val remaining = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val dao = AppDatabase.getDatabase(context).downloadDao()
+                                val activeIds = dao.getActiveInQueueOrderOnce().map { it.id }.toSet()
+                                val allKnownIds = dao.getAllOnce().map { it.id }.toSet()
+
+                                val cacheRoot = context.cacheDir ?: return@runCatching 0L
+                                val rootItems = cacheRoot.listFiles() ?: return@runCatching 0L
+
+                                for (item in rootItems) {
+                                    when {
+                                        // Active staging folders
+                                        item.isDirectory && item.name == "gallery-dl-staging" -> {
+                                            item.listFiles()?.forEach { sub ->
+                                                if (sub.name !in activeIds) {
+                                                    sub.deleteRecursively()
+                                                }
+                                            }
+                                        }
+                                        // Cookies files for downloads
+                                        item.isFile && item.name.startsWith("cookies-normalized-") && item.name.endsWith(".txt") -> {
+                                            val fileDownloadId = item.name.removePrefix("cookies-normalized-").removeSuffix(".txt")
+                                            if (fileDownloadId !in activeIds) {
+                                                item.delete()
+                                            }
+                                        }
+                                        // Extracted audio album art - preserve for any downloads currently in the library
+                                        item.isDirectory && item.name == "audio_art" -> {
+                                            item.listFiles()?.forEach { artFile ->
+                                                val artId = artFile.nameWithoutExtension
+                                                if (artId !in allKnownIds) {
+                                                    artFile.delete()
+                                                }
+                                            }
+                                        }
+                                        // Other caches (image_cache, WebView, update-*.apk, etc.)
+                                        else -> {
+                                            item.deleteRecursively()
+                                        }
+                                    }
+                                }
+                                cacheRoot.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                            }.getOrDefault(0L)
                         }
-                        cacheSizeBytes = 0L
+                        cacheSizeBytes = remaining
                         cacheCleared = true
+                        isClearingCache = false
                     }
                 },
+                enabled = !isClearingCache,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Clear cache")
+                if (isClearingCache) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Clearing cache…")
+                } else {
+                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Clear cache")
+                }
             }
             if (cacheCleared) {
                 Spacer(Modifier.height(8.dp))
@@ -335,20 +428,26 @@ private fun FolderOverrideRow(
     onUseDefault: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val name = remember(uri) {
-        uri?.let {
-            runCatching {
-                val doc = DocumentFile.fromTreeUri(context, it)
-                if (doc != null && doc.exists() && doc.canWrite()) doc.name else null
-            }.getOrNull()
+    val name by produceState<String?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            uri?.let {
+                runCatching {
+                    val doc = DocumentFile.fromTreeUri(context, it)
+                    if (doc != null && doc.exists() && doc.canWrite()) doc.name else null
+                }.getOrNull()
+            }
         }
     }
     Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(4.dp))
     Text(
-        if (name != null) "Saving to \"$name\"." else "Not set — $fallbackDescription",
+        when {
+            uri == null -> "Not set — $fallbackDescription"
+            name != null -> "Saving to \"$name\"."
+            else -> "Folder inaccessible or permission lost — $fallbackDescription"
+        },
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (uri != null && name == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Spacer(Modifier.height(12.dp))
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -361,7 +460,7 @@ private fun FolderOverrideRow(
             Spacer(Modifier.width(8.dp))
             Text("Choose folder")
         }
-        if (name != null) {
+        if (uri != null) {
             OutlinedButton(
                 onClick = onUseDefault,
                 modifier = Modifier.weight(1f).height(50.dp),

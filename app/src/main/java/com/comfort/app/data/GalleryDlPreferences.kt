@@ -215,6 +215,10 @@ object GalleryDlPreferences {
         return stored
     }
 
+    fun setFilenameFormat(context: Context, format: String) {
+        prefs(context).edit().putString(KEY_FILENAME_FORMAT, format).apply()
+    }
+
     fun getExtraArgs(context: Context): String {
         return prefs(context).getString(KEY_EXTRA_ARGS, "") ?: ""
     }
