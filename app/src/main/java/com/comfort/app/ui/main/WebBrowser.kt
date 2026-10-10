@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -140,6 +141,7 @@ fun WebBrowser(
     }
 
     fun exitFullScreen() {
+        (fullScreenView?.parent as? ViewGroup)?.removeView(fullScreenView)
         fullScreenCallback?.onCustomViewHidden()
         fullScreenView = null
         fullScreenCallback = null
@@ -156,15 +158,21 @@ fun WebBrowser(
     DisposableEffect(Unit) {
         onDispose {
             sniffer.close()
+            exitFullScreen()
             webView?.apply {
                 stopLoading()
+                (parent as? ViewGroup)?.removeView(this)
                 destroy()
             }
+            webView = null
         }
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            exitFullScreen()
+            onDismiss()
+        },
         // Without this the platform's dialog width leaves margins around the page.
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
@@ -275,6 +283,7 @@ fun WebBrowser(
                                     }
 
                                     override fun onHideCustomView() {
+                                        (fullScreenView?.parent as? ViewGroup)?.removeView(fullScreenView)
                                         fullScreenView = null
                                         fullScreenCallback = null
                                     }
@@ -695,6 +704,12 @@ private suspend fun queueCaught(
     val extra = buildString {
         append("--referer ").append(shellQuote(referer))
         if (userAgent.isNotBlank()) append(" --user-agent ").append(shellQuote(userAgent))
+        val skippedHeaderKeys = setOf("referer", "user-agent", "cookie", "host", "content-length", "accept-encoding", "connection", "range")
+        for ((key, value) in item.headers) {
+            if (key.lowercase() !in skippedHeaderKeys && value.isNotBlank()) {
+                append(" --add-header ").append(shellQuote("$key:$value"))
+            }
+        }
         if (site.isNotBlank()) append(" --parse-metadata ").append(shellQuote(literal(site) + ":#(?P<uploader>.+)"))
         if (pageTitle.isNotBlank()) append(" --parse-metadata ").append(shellQuote(literal(pageTitle.trim()) + ":#(?P<title>.+)"))
     }
