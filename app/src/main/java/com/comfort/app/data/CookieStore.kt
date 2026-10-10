@@ -28,6 +28,13 @@ object CookieStore {
     /** [cookies] as a whole file, header first. */
     fun render(cookies: List<ParsedCookie>): String = (listOf(HEADER) + cookies.map { it.rawLine }).joinToString("\n")
 
+    /** Extracts the registrable domain (e.g. "reddit.com" from "www.reddit.com" or ".reddit.com"). */
+    fun registrableDomain(domain: String): String {
+        val bare = domain.removePrefix(".")
+        val parts = bare.split(".")
+        return if (parts.size <= 2) bare else parts.takeLast(2).joinToString(".")
+    }
+
     /** A pasted cookies.txt merged into [existing]: only the registrable domains the paste touches
      * are replaced, every other saved site is kept as it was. Works on the parsed rawLine form, not
      * mergeNetscapeCookies (which rebuilds lines with a fixed expiry and TRUE/TRUE flags), so a
@@ -37,8 +44,8 @@ object CookieStore {
     fun mergePasted(existing: String, pasted: String): String? {
         val pastedParsed = parseCookiesFile(pasted)
         if (pastedParsed.isEmpty()) return null
-        val touchedDomains = pastedParsed.map { it.domain.removePrefix(".") }.toSet()
-        val keptExisting = parseCookiesFile(existing).filterNot { it.domain.removePrefix(".") in touchedDomains }
+        val touchedDomains = pastedParsed.map { registrableDomain(it.domain) }.toSet()
+        val keptExisting = parseCookiesFile(existing).filterNot { registrableDomain(it.domain) in touchedDomains }
         return render(keptExisting + pastedParsed)
     }
 
@@ -165,11 +172,7 @@ data class SiteCookies(
  * predictable display order rather than whatever order cookies.txt's own lines happen to be in. */
 fun groupCookiesBySite(cookies: List<ParsedCookie>): List<SiteCookies> {
     return cookies
-        .groupBy { cookie ->
-            val bare = cookie.domain.removePrefix(".")
-            val labelParts = bare.split(".")
-            if (labelParts.size <= 2) bare else labelParts.takeLast(2).joinToString(".")
-        }
+        .groupBy { CookieStore.registrableDomain(it.domain) }
         .map { (rootDomain, group) -> SiteCookies(label = VideoSiteRouter.siteName("https://$rootDomain"), rootDomain = rootDomain, cookies = group) }
         .sortedBy { it.label.lowercase() }
 }
