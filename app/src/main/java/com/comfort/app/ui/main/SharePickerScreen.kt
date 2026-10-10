@@ -86,6 +86,15 @@ fun SharePickerScreen(
     // the quality chips below — a per-download override, not a change to the global default.
     var selectedQuality by remember { mutableStateOf<VideoQuality?>(null) }
     val isNetworkAvailable = rememberIsNetworkAvailable()
+    var wasNetworkUnavailable by remember { mutableStateOf(false) }
+    LaunchedEffect(isNetworkAvailable) {
+        if (!isNetworkAvailable) {
+            wasNetworkUnavailable = true
+        } else if (wasNetworkUnavailable && state == ListingState.ERROR) {
+            wasNetworkUnavailable = false
+            picker.retry()
+        }
+    }
 
     // Whether any item this listing found is a video — gates both the play-icon overlay on that
     // item's thumbnail and the quality picker strip, since there's nothing to pick a quality for
@@ -127,9 +136,9 @@ fun SharePickerScreen(
             val gridHeight = rowHeight * rows + spacing * (rows - 1).coerceAtLeast(0) + gridPadding
             topBarHeight + qualityStripHeight + gridHeight + bottomBarHeight
         } else if (state == ListingState.ERROR) {
-            // Icon + title + message + up to three stacked buttons (Log in / Try anyway / Cancel)
+            // Icon + title + message + up to four stacked buttons (Log in / Retry / Try anyway / Cancel)
             // needs more room than the plain LOADING/UNAVAILABLE spinner frame below.
-            440.dp
+            480.dp
         } else {
             280.dp
         }
@@ -326,6 +335,16 @@ fun SharePickerScreen(
                             Spacer(Modifier.height(10.dp))
                         }
                         OutlinedButton(
+                            onClick = { picker.retry() },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Retry preview")
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedButton(
                             // Same "no confirmed duplicate-aware button" reasoning as the
                             // UNAVAILABLE branch above — a genuine listing failure means there was
                             // never a real isDuplicate check to have shown the user in the first
@@ -343,8 +362,14 @@ fun SharePickerScreen(
                         }
                     }
                     if (showLoginDialog) {
+                        val loginHost = remember(url) {
+                            runCatching { android.net.Uri.parse(url).host }.getOrNull()
+                        }
+                        val targetLoginUrl = remember(url, loginHost) {
+                            if (!loginHost.isNullOrBlank()) "https://$loginHost" else url
+                        }
                         CookieLoginDialog(
-                            loginUrl = "https://instagram.com",
+                            loginUrl = targetLoginUrl,
                             onDismiss = { showLoginDialog = false },
                             onCookiesSaved = {
                                 showLoginDialog = false
