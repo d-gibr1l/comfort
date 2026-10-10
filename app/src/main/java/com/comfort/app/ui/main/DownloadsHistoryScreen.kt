@@ -199,7 +199,9 @@ fun DownloadsHistoryScreen(
     // is 0 for as long as ANY part of the header is still visible (so the compact bar stays
     // unmounted the entire time), and only becomes 1 once the header has fully scrolled past —
     // the exact instant nothing of it remains on screen for the compact bar to ever overlap.
-    var selectionBarHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val defaultSelectionBarHeightPx = remember(density) { with(density) { 64.dp.toPx() } }
+    var selectionBarHeightPx by remember { mutableFloatStateOf(defaultSelectionBarHeightPx) }
     // NOT `firstVisibleItemIndex > 0` alone, despite that being what actually eliminated the
     // double-title ghost above — live-testing that version surfaced a different bug: the header's
     // own natural height (icon+title+subtitle+chip row, plus its own statusBarsPadding) is much
@@ -213,7 +215,6 @@ fun DownloadsHistoryScreen(
     // there's never a moment the compact bar's opaque background would need to cover a still-
     // visible title — the compact bar takes over, which simply paints over that remaining chip-row
     // sliver instead of leaving it exposed against the status bar.
-    val density = LocalDensity.current
     val compactBarThresholdPx = remember(density) { with(density) { 170.dp.toPx() } }
     // A LazyListState/LazyGridState has no single running "total scrolled px" the way
     // ScrollState.value does (what Settings' own rememberCollapsingHeaderState reads directly) —
@@ -252,13 +253,14 @@ fun DownloadsHistoryScreen(
     // threshold; a reversal back into downward movement near the top disarms it immediately, same
     // as scrolling down should never show the compact bar there at all, transformed or not.
     var nearTopTransformActive by remember { mutableStateOf(false) }
-    val libraryHeaderScrollConnection = remember(compactBarThresholdPx) {
+    val libraryHeaderScrollConnection = remember(compactBarThresholdPx, selectionMode) {
         object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
             override fun onPostScroll(
                 consumed: androidx.compose.ui.geometry.Offset,
                 available: androidx.compose.ui.geometry.Offset,
                 source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
             ): androidx.compose.ui.geometry.Offset {
+                if (selectionMode) return androidx.compose.ui.geometry.Offset.Zero
                 // consumed.y < 0 means the content moved up, i.e. scrolled toward its end.
                 val delta = -consumed.y
                 if (delta == 0f) return androidx.compose.ui.geometry.Offset.Zero
@@ -346,23 +348,33 @@ fun DownloadsHistoryScreen(
     // DownloadsViewModel.mediaShapes.
     val shapes by viewModel.mediaShapes.collectAsStateWithLifecycle()
 
-    val visibleItems = (if (showDeletedOnly) deletedItems else historyItems)
-        .let { if (favoritesOnly) it.filter { item -> item.isFavorite } else it }
-        .let { if (audioOnly) it.filter { item -> item.isAudio } else it }
-        .let { list ->
-            if (searchQuery.isBlank()) list
-            else list.filter {
-                it.title.contains(searchQuery, ignoreCase = true) || it.url.contains(searchQuery, ignoreCase = true)
+    val visibleItems = remember(
+        showDeletedOnly,
+        deletedItems,
+        historyItems,
+        favoritesOnly,
+        audioOnly,
+        searchQuery,
+        sortOption,
+    ) {
+        (if (showDeletedOnly) deletedItems else historyItems)
+            .let { if (favoritesOnly) it.filter { item -> item.isFavorite } else it }
+            .let { if (audioOnly) it.filter { item -> item.isAudio } else it }
+            .let { list ->
+                if (searchQuery.isBlank()) list
+                else list.filter {
+                    it.title.contains(searchQuery, ignoreCase = true) || it.url.contains(searchQuery, ignoreCase = true)
+                }
             }
-        }
-        .let { list ->
-            when (sortOption) {
-                LibrarySort.DATE_NEWEST -> list.sortedByDescending { it.effectiveDate }
-                LibrarySort.DATE_OLDEST -> list.sortedBy { it.effectiveDate }
-                LibrarySort.NAME -> list.sortedBy { it.title.ifBlank { it.url }.lowercase() }
-                LibrarySort.SIZE -> list.sortedByDescending { it.totalBytes }
+            .let { list ->
+                when (sortOption) {
+                    LibrarySort.DATE_NEWEST -> list.sortedByDescending { it.effectiveDate }
+                    LibrarySort.DATE_OLDEST -> list.sortedBy { it.effectiveDate }
+                    LibrarySort.NAME -> list.sortedBy { it.title.ifBlank { it.url }.lowercase() }
+                    LibrarySort.SIZE -> list.sortedByDescending { it.totalBytes }
+                }
             }
-        }
+    }
     // Both the "duplicates, but none right now" and "nothing matches the current filter" branches
     // below render fullHeaderContent() unconditionally at the top of a plain Column — not as a
     // real list item behind a scroll-position-driven compact bar. Toggling a filter (e.g. tapping
@@ -632,7 +644,7 @@ fun DownloadsHistoryScreen(
             derivedStateOf {
                 // Index 0 is the header itself now, so a real row's Nth position is index N+1 —
                 // the +1 keeps the FAB appearing after the same number of real rows as before.
-                !showDuplicatesOnly &&
+                !selectionMode && !showDuplicatesOnly &&
                     (if (gridView) gridState.firstVisibleItemIndex else listState.firstVisibleItemIndex) >= 7
             }
         }
