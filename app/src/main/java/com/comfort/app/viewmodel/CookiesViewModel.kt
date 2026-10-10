@@ -9,12 +9,14 @@ import com.comfort.app.data.ParsedCookie
 import com.comfort.app.data.SiteCookies
 import com.comfort.app.data.groupCookiesBySite
 import com.comfort.app.data.parseCookiesFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 /** The Cookies & Login page's data: the saved cookies.txt, parsed and grouped by site, and which
  * sites' cookies are switched off. Every change is written straight through CookieStore. */
@@ -37,7 +39,9 @@ class CookiesViewModel(application: Application) : AndroidViewModel(application)
 
     /** Re-reads the file — after the login browser saved into it. */
     fun reload() {
-        _content.value = CookieStore.read(context)
+        viewModelScope.launch(Dispatchers.IO) {
+            _content.value = CookieStore.read(context)
+        }
     }
 
     /** Merges a pasted cookies.txt in; false (nothing saved) when none of it parsed. */
@@ -56,12 +60,16 @@ class CookiesViewModel(application: Application) : AndroidViewModel(application)
     /** Kept but not sent: a switched-off site's cookies are filtered out of every download and
      * preview (GalleryDlPreferences.filterCookiesByDisabledDomains) until switched back on. */
     fun setSiteEnabled(rootDomain: String, enabled: Boolean) {
-        GalleryDlPreferences.setCookieDomainEnabled(context, rootDomain, enabled)
-        _disabledDomains.value = GalleryDlPreferences.getDisabledCookieDomains(context)
+        viewModelScope.launch(Dispatchers.IO) {
+            GalleryDlPreferences.setCookieDomainEnabled(context, rootDomain, enabled)
+            _disabledDomains.value = GalleryDlPreferences.getDisabledCookieDomains(context)
+        }
     }
 
     private fun persist(content: String) {
-        CookieStore.write(context, content)
         _content.value = content
+        viewModelScope.launch(Dispatchers.IO) {
+            CookieStore.write(context, content)
+        }
     }
 }
