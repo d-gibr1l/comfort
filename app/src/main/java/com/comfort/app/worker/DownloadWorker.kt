@@ -768,7 +768,10 @@ class DownloadWorker(
                                     )
                                     // A big download (a whole profile) saves in batches rather than
                                     // filling the phone's storage with all of it first.
-                                    if (heldFiles.size >= HOLD_MAX_FILES || heldFiles.sumOf { it.first.length() } >= HOLD_MAX_BYTES) {
+                                    val shouldSave = synchronized(heldFiles) {
+                                        heldFiles.size >= HOLD_MAX_FILES || heldFiles.sumOf { it.first.length() } >= HOLD_MAX_BYTES
+                                    }
+                                    if (shouldSave) {
                                         saveHeldFiles()
                                     }
                                 }
@@ -859,12 +862,12 @@ class DownloadWorker(
                         while (true) {
                             kotlinx.coroutines.delay(1_000)
                             val now = System.currentTimeMillis()
-                            val staged = runCatching {
+                            val engineReporting = lastProgressLineAt.get() > 0L
+                            val staged = if (engineReporting) currentFileBytesRef.get() else runCatching {
                                 stagingDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
                             }.getOrDefault(0L)
                             val total = bytesSoFar.get() + staged
                             if (previousTotal >= 0 && total > previousTotal) lastDataAt.set(now)
-                            val engineReporting = lastProgressLineAt.get() > 0L
                             if (previousTotal >= 0 && !engineReporting) {
                                 val seconds = ((now - previousAt) / 1000f).coerceAtLeast(0.2f)
                                 // A saved file leaves staging a moment before bytesSoFar counts it,
