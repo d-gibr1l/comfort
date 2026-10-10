@@ -94,4 +94,18 @@ class CookieStoreTest {
         assertEquals(1, merged.lines().count { it.startsWith("# Netscape") })
         assertFalse(cookies.any { it.name == "csrf" })
     }
+
+    @Test
+    fun `browser merge drops previous HttpOnly rows for that host`() {
+        val withHttpOnly = listOf(
+            CookieStore.HEADER,
+            "#HttpOnly_" + row(".example.com", "session", "old"),
+            row(".other.org", "id", "ccc"),
+        ).joinToString("\n")
+        val merged = mergeNetscapeCookies(withHttpOnly, "example.com", "session=fresh")
+        val cookies = parseCookiesFile(merged)
+        assertEquals(listOf("id", "session"), cookies.map { it.name }.sorted())
+        assertEquals("fresh", cookies.single { it.name == "session" }.value)
+        assertFalse(merged.contains("old"))
+    }
 }
