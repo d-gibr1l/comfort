@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -12,6 +13,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,6 +41,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -156,7 +165,10 @@ fun WebBrowser(
         // Resize for the keyboard rather than pan: panning slid the whole browser up, find bar and
         // address bar off the top, as soon as the keyboard opened.
         val dialogWindow = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
-        SideEffect { dialogWindow?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE) }
+        SideEffect {
+            @Suppress("DEPRECATION")
+            dialogWindow?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
         val dialogFocusManager = LocalFocusManager.current
         SideEffect { focusManager = dialogFocusManager }
 
@@ -358,7 +370,11 @@ fun WebBrowser(
                                 IconButton(onClick = { mediaSheetOpen = true }) {
                                     Icon(
                                         Icons.Outlined.VideoLibrary,
-                                        contentDescription = "Media on this page, ${rankedMedia.size} found",
+                                        contentDescription = when (rankedMedia.size) {
+                                            0 -> "Media on this page"
+                                            1 -> "Media on this page, 1 found"
+                                            else -> "Media on this page, ${rankedMedia.size} found"
+                                        },
                                         tint = if (rankedMedia.isNotEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     )
                                 }
@@ -397,6 +413,10 @@ fun WebBrowser(
                                         text = { Text("Desktop site") },
                                         leadingIcon = { Icon(Icons.Outlined.DesktopWindows, contentDescription = null) },
                                         trailingIcon = { Checkbox(checked = desktopMode, onCheckedChange = null) },
+                                        modifier = Modifier.semantics {
+                                            role = Role.Checkbox
+                                            toggleableState = ToggleableState(desktopMode)
+                                        },
                                         onClick = {
                                             menuOpen = false
                                             desktopMode = !desktopMode
@@ -410,6 +430,9 @@ fun WebBrowser(
                                             menuOpen = false
                                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
                                                 ?.setPrimaryClip(ClipData.newPlainText("Link", currentUrl))
+                                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                                Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                            }
                                         },
                                     )
                                     DropdownMenuItem(
@@ -554,10 +577,20 @@ private fun CaughtMediaSheet(
                                 }
                             }
                         },
-                        modifier = Modifier.clickable(enabled = !isQueued) {
-                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
-                            onQueue(item)
-                        },
+                        modifier = Modifier
+                            .semantics {
+                                if (isQueued) {
+                                    stateDescription = "Added to Queue"
+                                }
+                            }
+                            .clickable(
+                                enabled = !isQueued,
+                                role = Role.Button,
+                                onClickLabel = "Download",
+                            ) {
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
+                                onQueue(item)
+                            },
                     )
                 }
             }
@@ -738,7 +771,7 @@ private fun AddressBar(
                 if (editing) {
                     if (addressField.text.isNotEmpty()) {
                         IconButton(onClick = { onAddressChange(TextFieldValue("")) }) {
-                            Icon(Icons.Outlined.Clear, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Outlined.Clear, contentDescription = "Clear address", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 } else {
@@ -806,6 +839,9 @@ private fun FindInPageBar(
                         "$active/$total",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.semantics {
+                            contentDescription = if (total == 0) "No matches found" else "$active of $total matches"
+                        },
                     )
                 }
             }
