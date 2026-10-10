@@ -5,8 +5,13 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
@@ -129,7 +134,7 @@ fun DownloadsHistoryScreen(
     // ids have already played their entrance once and never resets — Modifier.animateItem() below
     // already handles the smooth reflow/removal animation on its own, so this only ever needs to
     // gate the one-time entrance.
-    val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
+    val alreadyAnimatedIds = remember { mutableSetOf<String>() }
     // better-interface review: the entrance slide below animated unconditionally, with nothing
     // checking the OS-level reduce-motion setting — same finding already fixed on QueueScreen.kt.
     val reducedMotion = rememberIsReducedMotionEnabled()
@@ -534,9 +539,9 @@ fun DownloadsHistoryScreen(
                     // entirely animateItem()'s own built-in fade-out + placement animation below,
                     // not this AnimatedVisibility's exit (deliberately ExitTransition.None).
                     val visibleState = remember(item.id) {
-                        MutableTransitionState(alreadyAnimatedIds.containsKey(item.id)).apply { targetState = true }
+                        MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
                     }
-                    SideEffect { alreadyAnimatedIds[item.id] = true }
+                    SideEffect { alreadyAnimatedIds.add(item.id) }
                     AnimatedVisibility(
                         visibleState = visibleState,
                         // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
@@ -595,9 +600,9 @@ fun DownloadsHistoryScreen(
                     // Same entrance/removal pattern as the grid above and the Download Queue's own
                     // cards — see either's own comment on why exit is deliberately ExitTransition.None.
                     val visibleState = remember(item.id) {
-                        MutableTransitionState(alreadyAnimatedIds.containsKey(item.id)).apply { targetState = true }
+                        MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
                     }
-                    SideEffect { alreadyAnimatedIds[item.id] = true }
+                    SideEffect { alreadyAnimatedIds.add(item.id) }
                     AnimatedVisibility(
                         visibleState = visibleState,
                         // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
@@ -1167,7 +1172,7 @@ private fun LibraryHeaderActions(
     }
     IconButton(onClick = onToggleGridView) {
         Icon(
-            if (gridView) Icons.Outlined.List else Icons.Outlined.GridView,
+            if (gridView) Icons.AutoMirrored.Outlined.List else Icons.Outlined.GridView,
             contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
         )
     }
@@ -1275,14 +1280,14 @@ private fun DuplicatesList(
     // never collide with a real download's own id) rather than sharing the outer screen's
     // alreadyAnimatedIds: a Lazy layout recycling this composable in and out of view shouldn't
     // replay the slide-in every time, same reasoning as that other map's own doc comment.
-    val alreadyAnimatedIds = remember { mutableStateMapOf<String, Boolean>() }
+    val alreadyAnimatedIds = remember { mutableSetOf<String>() }
     val reducedMotion = rememberIsReducedMotionEnabled()
     LazyColumn(contentPadding = contentPadding.let { PaddingValues(top = it.calculateTopPadding(), bottom = it.calculateBottomPadding(), start = 16.dp, end = 16.dp) }) {
         items(attempts, key = { it.id }) { attempt ->
             val visibleState = remember(attempt.id) {
-                MutableTransitionState(alreadyAnimatedIds.containsKey(attempt.id)).apply { targetState = true }
+                MutableTransitionState(alreadyAnimatedIds.contains(attempt.id)).apply { targetState = true }
             }
-            SideEffect { alreadyAnimatedIds[attempt.id] = true }
+            SideEffect { alreadyAnimatedIds.add(attempt.id) }
             AnimatedVisibility(
                 visibleState = visibleState,
                 enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
@@ -1432,7 +1437,7 @@ private fun LibraryToolbarChip(
                 // -10dp so roughly half the badge overlaps the chip's own corner (the usual
                 // notification-badge look) instead of sitting fully outside it.
                 modifier = Modifier.offset(x = with(density) { chipWidthPx.toDp() } - 10.dp, y = (-6).dp),
-            ) { Text(count.toString()) }
+            ) { Text(badgeCountText(count)) }
         }
     }
 }
@@ -1474,6 +1479,14 @@ private fun HistoryGridItem(
             .height(height)
             .clip(RectangleShape)
             .background(MaterialTheme.colorScheme.surfaceContainer)
+            .then(
+                if (selectionMode) {
+                    Modifier.semantics {
+                        this.selected = selected
+                        role = Role.Checkbox
+                    }
+                } else Modifier
+            )
             .combinedClickable(
                 onClick = {
                     if (selectionMode) {
@@ -1731,6 +1744,14 @@ private fun HistoryRow(
             // not onPrimaryContainer) assumes a fully-opaque container guarantees — full-opacity
             // primaryContainer instead.
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+            .then(
+                if (selectionMode) {
+                    Modifier.semantics {
+                        this.selected = selected
+                        role = Role.Checkbox
+                    }
+                } else Modifier
+            )
             .combinedClickable(
                 onClick = {
                     if (selectionMode) {
@@ -1952,7 +1973,7 @@ private fun DownloadActionsMenu(
         }
         DropdownMenuItem(
             text = { Text("View Original Source") },
-            leadingIcon = { Icon(Icons.Outlined.OpenInNew, contentDescription = null) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
             onClick = {
                 onDismiss()
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.url))) }
@@ -1965,7 +1986,9 @@ private fun DownloadActionsMenu(
                 onDismiss()
                 scope.launch {
                     clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Post link", item.url)))
-                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
         )
