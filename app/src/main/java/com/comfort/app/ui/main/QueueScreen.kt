@@ -293,6 +293,10 @@ fun QueueScreen(
                         // "Clear Queue" trash icon this replaces used to sit here unconditionally
                         // and did nothing (a dead TODO), so this is a real, scoped action instead.
                         IconButton(onClick = {
+                            val activeItems = filteredItems.filter {
+                                it.id in selectedIds && (it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED)
+                            }
+                            activeItems.forEach { viewModel.cancelDownload(it.id) }
                             requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
@@ -551,8 +555,9 @@ fun QueueScreen(
                                     onRetry = { viewModel.retryDownload(item.id) },
                                     onStartNow = { viewModel.startNow(item.id) },
                                     onAddCookies = {
-                                        val host = runCatching { URI(item.url).host }.getOrNull()
-                                        if (host != null) cookieLoginTarget = "https://$host" to item.id
+                                        val host = runCatching { android.net.Uri.parse(item.url).host }.getOrNull()
+                                        val targetUrl = if (!host.isNullOrBlank()) "https://$host" else item.url
+                                        cookieLoginTarget = targetUrl to item.id
                                     },
                                     onShowError = { errorSheetItemId = item.id },
                                     selectionMode = selectionMode,
@@ -755,7 +760,9 @@ private fun StoppedRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val domain = remember(item.url) { runCatching { URI(item.url).host?.removePrefix("www.") }.getOrNull() ?: "Unknown" }
+            val domain = remember(item.url) {
+                runCatching { android.net.Uri.parse(item.url).host?.removePrefix("www.") }.getOrNull().takeUnless { it.isNullOrBlank() } ?: "Unknown"
+            }
             // When, beside the site: on the status line below it was cut off ("Paused · nothing
             // saved yet · a…").
             val whenText = remember(item.downloadStartTime, item.dateAdded) {
