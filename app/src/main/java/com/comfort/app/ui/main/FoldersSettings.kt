@@ -43,10 +43,12 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
             downloadLocationUri = uri
             GalleryDlPreferences.setDownloadLocationUri(context, uri)
         }
@@ -60,10 +62,12 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
             audioLocationUri = uri
             GalleryDlPreferences.setAudioLocationUri(context, uri)
         }
@@ -73,10 +77,12 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
             videoLocationUri = uri
             GalleryDlPreferences.setVideoLocationUri(context, uri)
         }
@@ -165,7 +171,10 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         SettingsSection(title = "Download location", icon = Icons.Outlined.Folder) {
             val locationName = remember(downloadLocationUri) {
                 downloadLocationUri?.let { uri ->
-                    runCatching { DocumentFile.fromTreeUri(context, uri)?.name }.getOrNull()
+                    runCatching {
+                        val doc = DocumentFile.fromTreeUri(context, uri)
+                        if (doc != null && doc.exists() && doc.canWrite()) doc.name else null
+                    }.getOrNull()
                 }
             }
             Text(
@@ -198,6 +207,14 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 if (locationName != null) {
                     OutlinedButton(
                         onClick = {
+                            downloadLocationUri?.let { uri ->
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        uri,
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                                    )
+                                }
+                            }
                             downloadLocationUri = null
                             GalleryDlPreferences.setDownloadLocationUri(context, null)
                         },
@@ -218,7 +235,18 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 fallbackDescription = "audio downloads land in the folder above (or the default) unless this is set.",
                 uri = audioLocationUri,
                 onChoose = { audioLocationLauncher.launch(null) },
-                onUseDefault = { audioLocationUri = null; GalleryDlPreferences.setAudioLocationUri(context, null) },
+                onUseDefault = {
+                    audioLocationUri?.let { uri ->
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                uri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                            )
+                        }
+                    }
+                    audioLocationUri = null
+                    GalleryDlPreferences.setAudioLocationUri(context, null)
+                },
             )
 
             Spacer(Modifier.height(16.dp))
@@ -230,7 +258,18 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 fallbackDescription = "video downloads land in the folder above (or the default) unless this is set.",
                 uri = videoLocationUri,
                 onChoose = { videoLocationLauncher.launch(null) },
-                onUseDefault = { videoLocationUri = null; GalleryDlPreferences.setVideoLocationUri(context, null) },
+                onUseDefault = {
+                    videoLocationUri?.let { uri ->
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                uri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                            )
+                        }
+                    }
+                    videoLocationUri = null
+                    GalleryDlPreferences.setVideoLocationUri(context, null)
+                },
             )
         }
 
@@ -297,7 +336,12 @@ private fun FolderOverrideRow(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val name = remember(uri) {
-        uri?.let { runCatching { DocumentFile.fromTreeUri(context, it)?.name }.getOrNull() }
+        uri?.let {
+            runCatching {
+                val doc = DocumentFile.fromTreeUri(context, it)
+                if (doc != null && doc.exists() && doc.canWrite()) doc.name else null
+            }.getOrNull()
+        }
     }
     Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(4.dp))
