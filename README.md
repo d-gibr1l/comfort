@@ -12,6 +12,11 @@ video, gallery, or song behind it with real quality, format, and trim control.
 
 Package: `com.comfort.app` · minSdk 24 · targetSdk 36 · Jetpack Compose (Material 3 Expressive)
 
+Download the APK from [Releases](https://github.com/d-gibr1l/comfort/releases/latest), or get updates
+straight from them with Obtainium:
+
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-gibr1l/comfort"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" width="161"></a>
+
 <p align="center">
   <img src="docs/screenshots/home.png" width="200" alt="Home">&nbsp;
   <img src="docs/screenshots/preview_video.png" width="200" alt="Video preview sheet">&nbsp;
