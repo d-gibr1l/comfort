@@ -626,6 +626,7 @@ private suspend fun queueCaught(
     pageTitle: String,
     userAgent: String,
 ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    CookieManager.getInstance().flush()
     CookieManager.getInstance().getCookie(item.url)?.takeIf { it.isNotBlank() }?.let { cookies ->
         com.comfort.app.data.CookieStore.saveFromBrowser(context, item.url, cookies)
     }
