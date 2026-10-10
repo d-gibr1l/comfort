@@ -97,6 +97,12 @@ fun WebBrowser(
     var pageTitle by remember { mutableStateOf("") }
     var addressField by remember { mutableStateOf(TextFieldValue(startUrl)) }
     var editingAddress by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentUrl) {
+        if (!editingAddress) {
+            addressField = TextFieldValue(currentUrl)
+        }
+    }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
@@ -212,6 +218,8 @@ fun WebBrowser(
                             onEditingChange = { focused ->
                                 if (focused && !editingAddress) {
                                     addressField = TextFieldValue(currentUrl, selection = TextRange(0, currentUrl.length))
+                                } else if (!focused) {
+                                    addressField = TextFieldValue(currentUrl)
                                 }
                                 editingAddress = focused
                             },
@@ -355,6 +363,14 @@ fun WebBrowser(
                 }
 
                 if (fullScreenView == null && !WindowInsets.isImeVisible) {
+                    val mediaBadgeText = remember(rankedMedia.size) { badgeCountText(rankedMedia.size) }
+                    val mediaContentDesc = remember(rankedMedia.size) {
+                        when (rankedMedia.size) {
+                            0 -> "Media on this page"
+                            1 -> "Media on this page, 1 found"
+                            else -> "Media on this page, ${rankedMedia.size} found"
+                        }
+                    }
                     BottomAppBar(
                         actions = {
                             IconButton(onClick = { webView?.goBack() }, enabled = canGoBack) {
@@ -370,11 +386,7 @@ fun WebBrowser(
                                 IconButton(onClick = { mediaSheetOpen = true }) {
                                     Icon(
                                         Icons.Outlined.VideoLibrary,
-                                        contentDescription = when (rankedMedia.size) {
-                                            0 -> "Media on this page"
-                                            1 -> "Media on this page, 1 found"
-                                            else -> "Media on this page, ${rankedMedia.size} found"
-                                        },
+                                        contentDescription = mediaContentDesc,
                                         tint = if (rankedMedia.isNotEmpty()) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                                     )
                                 }
@@ -384,7 +396,7 @@ fun WebBrowser(
                                         contentColor = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 2.dp),
                                     ) {
-                                        Text(badgeCountText(rankedMedia.size))
+                                        Text(mediaBadgeText)
                                     }
                                 }
                             }
@@ -659,9 +671,19 @@ private suspend fun queueCaught(
     pageTitle: String,
     userAgent: String,
 ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    CookieManager.getInstance().flush()
-    CookieManager.getInstance().getCookie(item.url)?.takeIf { it.isNotBlank() }?.let { cookies ->
-        com.comfort.app.data.CookieStore.saveFromBrowser(context, item.url, cookies)
+    runCatching {
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.flush()
+        if (pageUrl.isNotBlank()) {
+            cookieManager.getCookie(pageUrl)?.takeIf { it.isNotBlank() }?.let { pageCookies ->
+                com.comfort.app.data.CookieStore.saveFromBrowser(context, pageUrl, pageCookies)
+            }
+        }
+        if (item.url.isNotBlank() && item.url != pageUrl) {
+            cookieManager.getCookie(item.url)?.takeIf { it.isNotBlank() }?.let { itemCookies ->
+                com.comfort.app.data.CookieStore.saveFromBrowser(context, item.url, itemCookies)
+            }
+        }
     }
     val referer = item.headers.entries.firstOrNull { it.key.equals("Referer", ignoreCase = true) }?.value ?: pageUrl
     // A bare file has no poster or title of its own ("Unknown - 14498465_1440_2560_30fps"): the
