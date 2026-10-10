@@ -396,6 +396,11 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             }
         }
 
+        // Neither engine knows the site: the in-app browser, to find the media on the page.
+        (route as? LinkRoute.Browse)?.let { browse ->
+            WebBrowser(startUrl = browse.url, onDismiss = { router.close() })
+        }
+
         (route as? LinkRoute.Preview)?.let { preview ->
             DownloadPreviewSheet(
                 url = preview.url,

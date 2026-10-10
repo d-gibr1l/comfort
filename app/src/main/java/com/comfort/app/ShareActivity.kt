@@ -419,6 +419,8 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             },
         )
         is LinkRoute.Picker -> SharePickerSheet(url = url, preloadedResult = current.listing, router = router, onFinished = onFinished)
+        // Neither engine knows the site: the in-app browser, to find the media on the page.
+        is LinkRoute.Browse -> com.comfort.app.ui.main.WebBrowser(startUrl = url, onDismiss = onFinished)
     }
 }
 
