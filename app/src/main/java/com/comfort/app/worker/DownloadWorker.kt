@@ -275,7 +275,7 @@ class DownloadWorker(
                 // own cancellation ever catches up — showing "Downloading..." for a download the
                 // user just explicitly stopped.
                 val freshStatus = dao.getById(downloadId)?.status
-                if (freshStatus == DownloadStatus.PAUSED || freshStatus == DownloadStatus.CANCELLED) {
+                if (freshStatus == null || freshStatus == DownloadStatus.PAUSED || freshStatus == DownloadStatus.CANCELLED) {
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
                 }
@@ -616,6 +616,7 @@ class DownloadWorker(
                         try {
                             if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0) else savedCount.decrementAndGet()
                         } catch (e: Exception) {
+                            savedCount.decrementAndGet()
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
                         }
                     }
