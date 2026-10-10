@@ -1,6 +1,7 @@
 package com.comfort.app.util
 
 import android.content.Context
+import com.comfort.app.data.CookieStore
 import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
@@ -154,7 +155,7 @@ object GalleryDlListing {
      * copy only when something's actually disabled; otherwise just hands back the real file's own
      * path, avoiding pointless I/O on every listing when nothing's toggled off. */
     private fun effectiveCookiesPath(context: Context): Pair<String, java.io.File?> {
-        val cookiesPath = context.filesDir.resolve("cookies.txt")
+        val cookiesPath = CookieStore.file(context)
         if (!cookiesPath.exists() || cookiesPath.length() <= 0) return "" to null
         val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
         if (disabledDomains.isEmpty()) return cookiesPath.absolutePath to null
