@@ -195,7 +195,15 @@ fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): 
         "$domain\tTRUE\t/\tTRUE\t$expiry\t$name\t$value"
     }
     val keptExisting = existing.lineSequence()
-        .filter { line -> line.isBlank() || line.startsWith("#") || !(line.startsWith(domain) || line.startsWith(bareDomain)) }
+        .filter { line ->
+            val trimmed = line.trimEnd('\r')
+            if (trimmed.isBlank()) return@filter true
+            val isComment = trimmed.startsWith("#") && !trimmed.startsWith("#HttpOnly_")
+            if (isComment) return@filter true
+            val dataLine = trimmed.removePrefix("#HttpOnly_")
+            val lineDomain = dataLine.split(Regex("\\s+"), limit = 2).firstOrNull().orEmpty()
+            !(lineDomain == domain || lineDomain == bareDomain)
+        }
         .toList()
     val header = if (keptExisting.any { it.startsWith("# Netscape") }) emptyList() else listOf("# Netscape HTTP Cookie File")
     return (header + keptExisting + newLines).joinToString("\n").trim()
