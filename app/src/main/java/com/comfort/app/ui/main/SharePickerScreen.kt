@@ -39,6 +39,11 @@ import com.comfort.app.viewmodel.SharePickerViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 
 
 /** Shown when a link is shared in from another app (and instant mode is off): lets the user
@@ -265,7 +270,12 @@ fun SharePickerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        CircularWavyProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Loading gallery preview"
+                            },
+                        )
                         Spacer(Modifier.height(16.dp))
                         Text(
                             "Looking at what's there…",
@@ -390,8 +400,17 @@ fun SharePickerScreen(
                                             shape = MaterialTheme.shapes.medium,
                                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
                                             onClick = { selectedQuality = quality },
+                                            modifier = Modifier
+                                                .defaultMinSize(minHeight = 44.dp)
+                                                .semantics {
+                                                    role = Role.RadioButton
+                                                    this.selected = isSelected
+                                                },
                                         ) {
-                                            Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                            Box(
+                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
                                                 Text(
                                                     quality.label,
                                                     style = MaterialTheme.typography.labelLarge,
@@ -430,8 +449,23 @@ fun SharePickerScreen(
                             // same grid looked broken rather than intentional (reported live: "make
                             // the video thumbnail the same size as the picture thumbnail").
                             val compactVideo = isVideo && items.size == 1
+                            val itemA11yLabel = remember(item, selected, isVideo) {
+                                val type = if (isVideo) "Video" else "Image"
+                                val name = item.title ?: item.filename ?: "item ${item.num}"
+                                "$type $name, ${if (selected) "selected" else "not selected"}"
+                            }
                             Column(
-                                modifier = Modifier.clickable(onClick = toggle),
+                                modifier = Modifier
+                                    .semantics(mergeDescendants = true) {
+                                        role = Role.Checkbox
+                                        this.selected = selected
+                                        contentDescription = itemA11yLabel
+                                    }
+                                    .clickable(
+                                        onClick = toggle,
+                                        onClickLabel = if (selected) "Deselect item" else "Select item",
+                                        role = Role.Checkbox,
+                                    ),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                             Box(
@@ -452,7 +486,7 @@ fun SharePickerScreen(
                                         )
                                         .addHeader("Referer", url)
                                         .build(),
-                                    contentDescription = item.filename,
+                                    contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize(),
                                     loading = {
@@ -486,7 +520,7 @@ fun SharePickerScreen(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     if (selected) {
-                                        Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
+                                        Icon(Icons.Outlined.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
                                     }
                                 }
                                 if (isVideo) {
@@ -500,7 +534,7 @@ fun SharePickerScreen(
                                     ) {
                                         Icon(
                                             Icons.Outlined.PlayArrow,
-                                            contentDescription = "Video",
+                                            contentDescription = null,
                                             tint = MaterialTheme.colorScheme.onSurface,
                                             // Nudged right so the triangle's own visual weight
                                             // (its point sits left of the glyph's bounding box)
