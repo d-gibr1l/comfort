@@ -17,11 +17,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** The Cookies & Login page's data: the saved cookies.txt, parsed and grouped by site, and which
  * sites' cookies are switched off. Every change is written straight through CookieStore. */
 class CookiesViewModel(application: Application) : AndroidViewModel(application) {
     private val context get() = getApplication<Application>()
+    private val writeMutex = Mutex()
 
     private val _content = MutableStateFlow(CookieStore.read(application))
     /** The file as saved — what a download actually sends. */
@@ -40,22 +43,57 @@ class CookiesViewModel(application: Application) : AndroidViewModel(application)
     /** Re-reads the file — after the login browser saved into it. */
     fun reload() {
         viewModelScope.launch(Dispatchers.IO) {
-            _content.value = CookieStore.read(context)
+            writeMutex.withLock {
+                _content.value = CookieStore.read(context)
+            }
         }
     }
 
     /** Merges a pasted cookies.txt in; false (nothing saved) when none of it parsed. */
     fun savePasted(text: String): Boolean {
-        val merged = CookieStore.mergePasted(_content.value, text) ?: return false
-        persist(merged)
+        val current = CookieStore.read(context).ifBlank { _content.value }
+        val merged = CookieStore.mergePasted(current, text) ?: return false
+        viewModelScope.launch(Dispatchers.IO) {
+            writeMutex.withLock {
+                val latest = CookieStore.read(context).ifBlank { current }
+                val remerged = CookieStore.mergePasted(latest, text) ?: merged
+                CookieStore.write(context, remerged)
+                _content.value = remerged
+            }
+        }
         return true
     }
 
-    fun saveEdits(edits: Map<ParsedCookie, String>) = persist(CookieStore.withValues(_content.value, edits))
+    fun saveEdits(edits: Map<ParsedCookie, String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            writeMutex.withLock {
+                val current = CookieStore.read(context).ifBlank { _content.value }
+                val updated = CookieStore.withValues(current, edits)
+                CookieStore.write(context, updated)
+                _content.value = updated
+            }
+        }
+    }
 
-    fun deleteSite(site: SiteCookies) = persist(CookieStore.without(_content.value, site.cookies.toSet()))
+    fun deleteSite(site: SiteCookies) {
+        viewModelScope.launch(Dispatchers.IO) {
+            writeMutex.withLock {
+                val current = CookieStore.read(context).ifBlank { _content.value }
+                val updated = CookieStore.without(current, site.cookies.toSet())
+                CookieStore.write(context, updated)
+                _content.value = updated
+            }
+        }
+    }
 
-    fun clearAll() = persist("")
+    fun clearAll() {
+        viewModelScope.launch(Dispatchers.IO) {
+            writeMutex.withLock {
+                CookieStore.write(context, "")
+                _content.value = ""
+            }
+        }
+    }
 
     /** Kept but not sent: a switched-off site's cookies are filtered out of every download and
      * preview (GalleryDlPreferences.filterCookiesByDisabledDomains) until switched back on. */
@@ -63,13 +101,6 @@ class CookiesViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             GalleryDlPreferences.setCookieDomainEnabled(context, rootDomain, enabled)
             _disabledDomains.value = GalleryDlPreferences.getDisabledCookieDomains(context)
-        }
-    }
-
-    private fun persist(content: String) {
-        _content.value = content
-        viewModelScope.launch(Dispatchers.IO) {
-            CookieStore.write(context, content)
         }
     }
 }

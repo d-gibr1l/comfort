@@ -45,8 +45,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.comfort.app.data.VideoSiteRouter
-import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -626,14 +627,20 @@ fun CookieLoginDialog(
     onCookiesSaved: (String) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
     WebBrowser(
         startUrl = loginUrl,
         onDismiss = onDismiss,
         startDesktop = true,
         primaryAction = BrowserAction("Extract cookies", Icons.Outlined.Cookie) { url ->
-            CookieManager.getInstance().flush()
-            val merged = CookieStore.saveFromBrowser(context, url, CookieManager.getInstance().getCookie(url))
-            if (merged != null) onCookiesSaved(merged) else onDismiss()
+            scope.launch(Dispatchers.IO) {
+                runCatching { CookieManager.getInstance().flush() }
+                val cookieHeader = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull()
+                val merged = CookieStore.saveFromBrowser(context, url, cookieHeader)
+                withContext(Dispatchers.Main) {
+                    if (merged != null) onCookiesSaved(merged) else onDismiss()
+                }
+            }
         },
     )
 }
