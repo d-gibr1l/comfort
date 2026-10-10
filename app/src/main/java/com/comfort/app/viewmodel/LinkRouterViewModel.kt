@@ -29,6 +29,7 @@ sealed interface LinkRoute {
      * gallery-dl listing timed out) — the sheet shows it instead of fetching again. */
     data class Preview(override val url: String, val preloaded: PreviewInfo? = null) : LinkRoute
     data class Picker(override val url: String, val listing: ListingResult) : LinkRoute
+    data class Browse(override val url: String) : LinkRoute
 }
 
 /** Opening a link and starting its download — shared by Home's paste flow (one per activity) and
