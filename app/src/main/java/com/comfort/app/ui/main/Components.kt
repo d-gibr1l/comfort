@@ -280,9 +280,14 @@ fun formatFileSize(bytes: Long): String {
  * yt-dlp/gallery-dl's own terminal ETA, which also jumps around as speed fluctuates rather than
  * settling into a smooth countdown. Caller is expected to only call this with a positive value. */
 fun formatEta(seconds: Int): String {
-    val m = seconds / 60
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
     val s = seconds % 60
-    return if (m > 0) "${m}m ${s}s left" else "${s}s left"
+    return when {
+        h > 0 -> "${h}h ${m}m left"
+        m > 0 -> "${m}m ${s}s left"
+        else -> "${s}s left"
+    }
 }
 
 /** A small tinted pill for a queue card's site badge/format tags — a plain icon+text label read

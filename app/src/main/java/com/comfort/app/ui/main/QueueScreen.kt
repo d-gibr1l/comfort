@@ -1,8 +1,13 @@
 package com.comfort.app.ui.main
 
 import android.content.ClipData
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
@@ -458,7 +463,7 @@ fun QueueScreen(
                                 Badge(
                                     containerColor = if (selectedFilter == filter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                                 ) {
-                                    Text(count.toString())
+                                    Text(badgeCountText(count))
                                 }
                             }
                         }
@@ -696,6 +701,12 @@ private fun StoppedRow(
                     onClick = { if (selectionMode) onToggleSelect() },
                     onLongClick = onToggleSelect,
                 )
+                .semantics {
+                    if (selectionMode) {
+                        this.selected = selected
+                        this.role = Role.Checkbox
+                    }
+                }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -800,7 +811,9 @@ private fun StoppedRow(
                                 menuExpanded = false
                                 scope.launch {
                                     clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Download link", item.url)))
-                                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             },
                         )
@@ -861,6 +874,12 @@ fun QueueItemCard(
                     onClick = { if (selectionMode) onToggleSelect() },
                     onLongClick = onToggleSelect,
                 )
+                .semantics {
+                    if (selectionMode) {
+                        this.selected = selected
+                        this.role = Role.Checkbox
+                    }
+                }
                 .padding(16.dp)
         ) {
             Row(
@@ -1389,13 +1408,14 @@ private fun ErrorDetailsSheet(
                 OutlinedButton(
                     onClick = {
                         scope.launch {
-                            val text = parseEngineErrors(item.errorDetails)
-                                .takeIf { it.isNotEmpty() }
+                            val text = engineErrors.takeIf { it.isNotEmpty() }
                                 ?.joinToString("\n\n") { (engine, message) -> "$engine: $message" }
                                 ?: item.errorMessage.orEmpty()
                             val clipData = android.content.ClipData.newPlainText("Error message", text)
                             clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clipData))
-                            android.widget.Toast.makeText(context, "Error copied", android.widget.Toast.LENGTH_SHORT).show()
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                android.widget.Toast.makeText(context, "Error copied", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                         }
                     },
                     modifier = Modifier.weight(1f).height(50.dp),
@@ -1405,10 +1425,6 @@ private fun ErrorDetailsSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = MaterialTheme.shapes.medium,
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError,
-                    ),
                 ) { Text("Done") }
             }
         }
@@ -1480,7 +1496,9 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier) {
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager)
                         ?.setPrimaryClip(ClipData.newPlainText("Download link", url))
-                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                    }
                 },
             )
             .padding(vertical = 4.dp),
