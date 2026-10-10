@@ -30,6 +30,15 @@ class StagingCleanupWorker(context: Context, params: WorkerParameters) : Corouti
                 dir.deleteRecursively()
             }
         }
+        val cacheFiles = applicationContext.cacheDir.listFiles().orEmpty()
+        for (file in cacheFiles) {
+            if (file.isFile && file.name.startsWith("cookies-normalized-") && file.name.endsWith(".txt")) {
+                val fileDownloadId = file.name.removePrefix("cookies-normalized-").removeSuffix(".txt")
+                if (fileDownloadId in leftoverIds || System.currentTimeMillis() - file.lastModified() > 86_400_000L) {
+                    file.delete()
+                }
+            }
+        }
         return Result.success()
     }
 }
