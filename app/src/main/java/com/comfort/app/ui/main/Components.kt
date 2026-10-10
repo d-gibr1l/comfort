@@ -64,7 +64,9 @@ import com.comfort.app.data.DownloadStatus
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** [StatusBarScrim]'s opacity at its very top edge. Deliberately well below 1: content scrolling
  * under the status bar should still show through, just dimmed enough to keep the icons legible. */
@@ -427,12 +429,19 @@ fun rememberUndoableDelete(
         if (ids.isNotEmpty()) {
             viewModel.hideForDeletion(ids)
             scope.launch {
-                val result = snackbarHostState.showSnackbar(
-                    message = if (ids.size == 1) "Download removed" else "${ids.size} downloads removed",
-                    actionLabel = "Undo",
-                    duration = SnackbarDuration.Short,
-                )
-                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) viewModel.cancelDeletion(ids) else viewModel.confirmDelete(ids)
+                var undone = false
+                try {
+                    val result = snackbarHostState.showSnackbar(
+                        message = if (ids.size == 1) "Download removed" else "${ids.size} downloads removed",
+                        actionLabel = "Undo",
+                        duration = SnackbarDuration.Short,
+                    )
+                    undone = (result == androidx.compose.material3.SnackbarResult.ActionPerformed)
+                } finally {
+                    withContext(NonCancellable) {
+                        if (undone) viewModel.cancelDeletion(ids) else viewModel.confirmDelete(ids)
+                    }
+                }
             }
         }
     }
