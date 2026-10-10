@@ -481,10 +481,22 @@ fun DownloadPreviewSheet(
             previewStreamUrls = preview?.streamUrls ?: emptyList(),
             previewDurationMs = preview?.durationMs,
             // The selected chip's own size when the preview reported per-quality sizes (it used to
-            // always show the best format's — 718 MB with 720 selected); nothing rather than a
-            // wrong number when that one choice's size is unknown.
+            // always show the best format's — 718 MB with 720 selected); falls back to filesizeBytes
+            // when a specific quality or audio stream's exact size is not separately recorded.
             previewFilesize = preview?.let { p ->
-                if (p.sizesByQuality.isEmpty()) p.filesizeBytes else p.sizesByQuality["${(if (isSongSource) VideoQuality.AUDIO_ONLY else quality).name}|${outputFormat.extension}"]
+                if (p.sizesByQuality.isEmpty()) {
+                    p.filesizeBytes
+                } else {
+                    val effectiveQuality = if (isSongSource) VideoQuality.AUDIO_ONLY else quality
+                    if (effectiveQuality == VideoQuality.AUDIO_ONLY) {
+                        p.sizesByQuality["AUDIO_ONLY|mkv"]
+                            ?: p.sizesByQuality["AUDIO_ONLY|mp4"]
+                            ?: p.filesizeBytes
+                    } else {
+                        p.sizesByQuality["${effectiveQuality.name}|${outputFormat.extension}"]
+                            ?: p.filesizeBytes
+                    }
+                }
             },
             previewLoading = previewLoading,
             previewStatus = previewStatus,
@@ -678,33 +690,31 @@ private fun PreviewSheetOverlayHost(
             },
             onOpenTemplates = { onOpenOverlay(PreviewScreen.TEMPLATES) },
             onDownload = {
-                scope.launch {
-                    onDownload(
-                        DownloadOptions(
-                            // Spotify ignores quality entirely, but music.youtube.com/soundcloud.com
-                            // go through the normal yt-dlp/gallery-dl path and would otherwise
-                            // download video despite the sheet showing song styling — !showQualityRow
-                            // means the song-ness came from the URL itself, not just a manual "Audio"
-                            // pick, so this is the one case that needs forcing rather than trusting
-                            // whatever quality happens to be selected.
-                            quality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
-                            outputFormat = outputFormat,
-                            saveThumbnail = saveThumbnail,
-                            extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
-                            clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
-                            filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
-                            itemFilter = itemFilter,
-                            totalItems = if (itemFilter != null) selectedTrackCount else 0,
-                            // Only SONG_SINGLE has editable title/artist at all (SONG_LIST's own
-                            // per-track rows aren't individually editable, and VIDEO never shows
-                            // these fields) — null here means "use the source's own title/artist",
-                            // same as if this sheet had never had an editable field to begin with.
-                            overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE },
-                            overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE },
-                            engine = engineOverride,
-                        ),
-                    )
-                }
+                onDownload(
+                    DownloadOptions(
+                        // Spotify ignores quality entirely, but music.youtube.com/soundcloud.com
+                        // go through the normal yt-dlp/gallery-dl path and would otherwise
+                        // download video despite the sheet showing song styling — !showQualityRow
+                        // means the song-ness came from the URL itself, not just a manual "Audio"
+                        // pick, so this is the one case that needs forcing rather than trusting
+                        // whatever quality happens to be selected.
+                        quality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
+                        outputFormat = outputFormat,
+                        saveThumbnail = saveThumbnail,
+                        extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
+                        clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
+                        filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
+                        itemFilter = itemFilter,
+                        totalItems = if (itemFilter != null) selectedTrackCount else 0,
+                        // Only SONG_SINGLE has editable title/artist at all (SONG_LIST's own
+                        // per-track rows aren't individually editable, and VIDEO never shows
+                        // these fields) — null here means "use the source's own title/artist",
+                        // same as if this sheet had never had an editable field to begin with.
+                        overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
+                        overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
+                        engine = engineOverride,
+                    ),
+                )
             },
         )
 
@@ -2049,8 +2059,22 @@ private fun TrimVideoScreen(
             })
         }
     }
-    DisposableEffect(Unit) {
-        onDispose { exoPlayer.release() }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, exoPlayer) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE,
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    exoPlayer.pause()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            exoPlayer.release()
+        }
     }
 
     var streamLoadFailed by remember { mutableStateOf(false) }
@@ -2085,8 +2109,10 @@ private fun TrimVideoScreen(
     }
 
     LaunchedEffect(playheadMs) {
-        if (kotlin.math.abs(exoPlayer.currentPosition - playheadMs) > 500L) {
-            exoPlayer.seekTo(playheadMs)
+        if (streamUrls.isNotEmpty() && !streamLoadFailed) {
+            if (kotlin.math.abs(exoPlayer.currentPosition - playheadMs) > 500L) {
+                exoPlayer.seekTo(playheadMs)
+            }
         }
     }
 
@@ -2096,21 +2122,15 @@ private fun TrimVideoScreen(
     val sliderInteractionSource = remember { MutableInteractionSource() }
     val isDraggingSlider by sliderInteractionSource.collectIsDraggedAsState()
 
-    LaunchedEffect(exoPlayer) {
-        while (true) {
-            // Only gating on isPlaying here (rather than syncing unconditionally) meant this froze
-            // the instant playback paused — reproduced live: pausing, then seeking via the video's
-            // own built-in ExoPlayer controller (a tap-to-seek or drag on its scrubber, not our
-            // Slider below) moved the real player position but never touched playheadMs, so both
-            // the Slider and the visible timestamp stayed stuck wherever they were at the moment of
-            // pausing, completely disconnected from the frame actually on screen. Syncing whenever
-            // the user isn't actively dragging *our own* Slider (rather than whenever the player
-            // isn't playing) covers that case — and a paused native seek, and a playing native
-            // seek — while still not fighting the user's own drag on our Slider mid-gesture.
-            if (!isDraggingSlider) {
-                playheadMs = exoPlayer.currentPosition
+    LaunchedEffect(exoPlayer, streamUrls, streamLoadFailed) {
+        if (streamUrls.isNotEmpty() && !streamLoadFailed) {
+            while (true) {
+                // Only sync position when player actually has a media stream loaded and user is not dragging
+                if (!isDraggingSlider && exoPlayer.playbackState != androidx.media3.common.Player.STATE_IDLE) {
+                    playheadMs = exoPlayer.currentPosition
+                }
+                kotlinx.coroutines.delay(100)
             }
-            kotlinx.coroutines.delay(100)
         }
     }
 
@@ -2262,17 +2282,8 @@ private fun TrimVideoScreen(
             PreviewChip(
                 label = "Set Start",
                 onClick = {
-                    // playheadMs only mirrors the player's real position while it's actively
-                    // playing (see the polling LaunchedEffect above) — pausing and then scrubbing
-                    // via the video's own built-in ExoPlayer controller (rather than the Slider
-                    // below) never updates it, so it could read anywhere up to several minutes
-                    // stale relative to the frame actually on screen. Reading currentPosition
-                    // directly here (and syncing playheadMs to match, so the Slider/timestamp
-                    // catch up too) makes this always match whatever the video is showing at the
-                    // moment of the tap, not a cached mirror of it. Falls back to playheadMs itself
-                    // when there's no real stream (see NOMINAL_DURATION_MS) — nothing for the
-                    // player to be authoritative about in that case.
-                    val newStart = if (streamUrls.isNotEmpty()) exoPlayer.currentPosition else playheadMs
+                    val hasActivePlayer = streamUrls.isNotEmpty() && !streamLoadFailed && exoPlayer.playbackState != androidx.media3.common.Player.STATE_IDLE
+                    val newStart = if (hasActivePlayer) exoPlayer.currentPosition else playheadMs
                     playheadMs = newStart
                     // Mirrors the spec's safety constraint: a start at or past the current end
                     // would be an invalid (negative-length) clip, so the end is pushed out to keep
@@ -2286,8 +2297,8 @@ private fun TrimVideoScreen(
             PreviewChip(
                 label = "Set End",
                 onClick = {
-                    // Same staleness fix as Set Start above.
-                    val newEnd = if (streamUrls.isNotEmpty()) exoPlayer.currentPosition else playheadMs
+                    val hasActivePlayer = streamUrls.isNotEmpty() && !streamLoadFailed && exoPlayer.playbackState != androidx.media3.common.Player.STATE_IDLE
+                    val newEnd = if (hasActivePlayer) exoPlayer.currentPosition else playheadMs
                     playheadMs = newEnd
                     // The reverse constraint, clamped at zero so the start can't go negative.
                     updateActive { segment ->
@@ -2300,12 +2311,12 @@ private fun TrimVideoScreen(
         var startInput by remember { mutableStateOf(formatTimestamp(active?.startMs ?: 0L)) }
         var endInput by remember { mutableStateOf(formatTimestamp(active?.endMs ?: 0L)) }
         
-        LaunchedEffect(active?.startMs) {
+        LaunchedEffect(active?.id, active?.startMs) {
             if (parseTimestampToMs(startInput) != active?.startMs) {
                 startInput = formatTimestamp(active?.startMs ?: 0L)
             }
         }
-        LaunchedEffect(active?.endMs) {
+        LaunchedEffect(active?.id, active?.endMs) {
             if (parseTimestampToMs(endInput) != active?.endMs) {
                 endInput = formatTimestamp(active?.endMs ?: 0L)
             }
