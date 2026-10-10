@@ -595,8 +595,8 @@ class DownloadWorker(
                         // The song preview sheet's editable title/artist — applied
                         // last, unconditionally, so the user's edit always wins in the
                         // Library, matching what the wrappers embedded in the file's tags.
-                        if (!overrideTitle.isNullOrBlank()) dao.updateTitle(downloadId, overrideTitle)
-                        if (!overrideArtist.isNullOrBlank()) dao.setArtist(downloadId, overrideArtist)
+                        if (overrideTitle.isNotBlank()) dao.updateTitle(downloadId, overrideTitle)
+                        if (overrideArtist.isNotBlank()) dao.setArtist(downloadId, overrideArtist)
                         DownloadNotifications.updateProgress(
                             applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
                             speedMbs = speedMbs, currentBytes = totalBytes, expectedBytes = expectedBytesRef.get(),
