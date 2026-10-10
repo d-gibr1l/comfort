@@ -1,6 +1,7 @@
 package com.comfort.app.ui.main
 
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -220,6 +221,13 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    BackHandler(enabled = searchExpanded) {
+        searchExpanded = false
+        searchQuery = ""
+        keyboard?.hide()
+    }
     val scrollState = rememberScrollState()
     val density = androidx.compose.ui.platform.LocalDensity.current
     var maxHeaderHeightPx by remember { mutableStateOf(0) }
@@ -336,6 +344,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                             onClick = {
                                 searchExpanded = false
                                 searchQuery = ""
+                                keyboard?.hide()
                             },
                             modifier = Modifier.size(40.dp),
                         ) {
