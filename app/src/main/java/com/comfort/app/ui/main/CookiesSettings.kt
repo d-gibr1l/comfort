@@ -17,8 +17,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import android.widget.Toast
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -94,9 +96,23 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     // Non-null while a site's cookie viewer/editor sheet is open (tapping its row).
     var viewingSite by remember { mutableStateOf<SiteCookies?>(null) }
 
+    var showSitePicker by remember { mutableStateOf(false) }
+    var browserLoginUrl by remember { mutableStateOf("https://instagram.com/accounts/login/") }
+
+    if (showSitePicker) {
+        CookieLoginSiteDialog(
+            onDismiss = { showSitePicker = false },
+            onSelectSite = { url ->
+                browserLoginUrl = url
+                showSitePicker = false
+                showBrowser = true
+            },
+        )
+    }
+
     if (showBrowser) {
         CookieLoginDialog(
-            loginUrl = "https://instagram.com",
+            loginUrl = browserLoginUrl,
             onDismiss = { showBrowser = false },
             onCookiesSaved = { merged ->
                 extractedCookies = merged
@@ -137,7 +153,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Spacer(Modifier.height(16.dp))
 
             Button(
-                onClick = { showBrowser = true },
+                onClick = { showSitePicker = true },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
@@ -173,18 +189,30 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             OutlinedButton(
                 onClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    // Merges into whatever's already saved rather than replacing it wholesale (see
-                    // CookieStore.mergePasted). A paste where nothing parses is refused, and the
-                    // textbox kept so it can be fixed — it used to merge as a no-op and still say
-                    // "Cookies saved and applied" (reproduced live with Instagram cookies that
-                    // weren't real tab-separated rows).
-                    if (pastedCookies.isNotBlank() && !cookiesViewModel.savePasted(pastedCookies)) {
-                        pasteError = "Couldn't find any valid cookies in that text — it needs to be real tab-separated Netscape format (domain, includeSubdomains, path, secure, expiry, name, value per line), not just \"name=value\" pairs."
-                        savedConfirmation = false
-                    } else {
-                        pastedCookies = ""
-                        pasteError = null
-                        savedConfirmation = true
+                    val trimmed = pastedCookies.trim()
+                    when {
+                        trimmed.isBlank() -> {
+                            pasteError = "Please paste cookie text first."
+                            savedConfirmation = false
+                        }
+                        trimmed.startsWith("{") || trimmed.startsWith("[") -> {
+                            pasteError = "Detected JSON format. Comfort requires Netscape cookies.txt format (tab-separated columns). Please export in Netscape format from your browser extension."
+                            savedConfirmation = false
+                        }
+                        trimmed.contains("Cookie:") || (trimmed.contains("=") && !trimmed.contains("\t") && !trimmed.contains("   ")) -> {
+                            pasteError = "Detected HTTP header format (\"name=value\"). Comfort requires Netscape cookies.txt format with domain, path, expiry, and values separated by tabs."
+                            savedConfirmation = false
+                        }
+                        !cookiesViewModel.savePasted(pastedCookies) -> {
+                            pasteError = "Couldn't find any valid cookies in that text — it needs to be real tab-separated Netscape format (domain, includeSubdomains, path, secure, expiry, name, value per line)."
+                            savedConfirmation = false
+                        }
+                        else -> {
+                            pastedCookies = ""
+                            pasteError = null
+                            savedConfirmation = true
+                            Toast.makeText(context, "Cookies saved and applied", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -281,6 +309,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             scope.launch {
                                 runCatching {
                                     clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
+                                    Toast.makeText(context, "Copied ${site.label} cookies to clipboard", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }) {
@@ -323,6 +352,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             scope.launch {
                                 runCatching {
                                     clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("cookies.txt", savedCookiesContent)))
+                                    Toast.makeText(context, "Copied all cookies to clipboard", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -356,11 +386,15 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             site = site,
             onCopy = { label, text ->
                 scope.launch {
-                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(label, text)))
+                    runCatching {
+                        clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(label, text)))
+                        Toast.makeText(context, "Copied $label to clipboard", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
             onSave = { editedValues ->
                 cookiesViewModel.saveEdits(editedValues)
+                Toast.makeText(context, "Saved changes for ${site.label}", Toast.LENGTH_SHORT).show()
                 viewingSite = null
             },
             onDismiss = { viewingSite = null },
@@ -487,9 +521,97 @@ private fun SiteCookiesSheet(
 
 private fun formatCookieExpiry(epochSeconds: Long): String {
     if (epochSeconds <= 0L) return "Session"
-    val millis = epochSeconds * 1000
+    if (epochSeconds > 32503680000L) return "Persistent"
+    val millis = epochSeconds * 1000L
     if (millis < System.currentTimeMillis()) return "Expired"
     return java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
+}
+
+@Composable
+private fun CookieLoginSiteDialog(
+    onDismiss: () -> Unit,
+    onSelectSite: (String) -> Unit,
+) {
+    val sites = remember {
+        listOf(
+            "Instagram" to "https://instagram.com/accounts/login/",
+            "X / Twitter" to "https://x.com/i/flow/login",
+            "Reddit" to "https://www.reddit.com/login/",
+            "TikTok" to "https://www.tiktok.com/login",
+            "YouTube / Google" to "https://accounts.google.com/",
+            "Pinterest" to "https://www.pinterest.com/login/",
+        )
+    }
+    var customUrl by remember { mutableStateOf("") }
+    var showCustomField by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Log in via built-in browser") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text(
+                    "Choose a site to open in the login browser:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                sites.forEach { (name, url) ->
+                    OutlinedButton(
+                        onClick = { onSelectSite(url) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Text(name, modifier = Modifier.weight(1f))
+                        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                if (!showCustomField) {
+                    TextButton(
+                        onClick = { showCustomField = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Enter custom URL…")
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = customUrl,
+                        onValueChange = { customUrl = it },
+                        label = { Text("Custom URL") },
+                        placeholder = { Text("https://example.com/login") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = {
+                            val target = customUrl.trim().let { if (!it.startsWith("http://") && !it.startsWith("https://")) "https://$it" else it }
+                            if (target.isNotBlank()) onSelectSite(target)
+                        }),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            val target = customUrl.trim().let { if (!it.startsWith("http://") && !it.startsWith("https://")) "https://$it" else it }
+                            if (target.isNotBlank()) onSelectSite(target)
+                        },
+                        enabled = customUrl.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Text("Open custom URL")
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 /** Shared by the Cookies & Login settings screen, the Queue's per-download "Add cookies" error-card
