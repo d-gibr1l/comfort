@@ -149,13 +149,6 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // Owned here, not inside DownloadsHistoryScreen's own Scaffold — see that screen's own
     // snackbarHostState parameter doc comment for why (it drew behind FloatingNavBar otherwise).
     val librarySnackbarHostState = remember { SnackbarHostState() }
-    // A download-in-progress notification tap bumps this (MainActivity.openQueueSignal) — jump
-    // straight to Queue regardless of which tab was showing. Keyed on the signal itself (not
-    // Unit) so a second tap while already on Queue still re-triggers this instead of being a no-op
-    // LaunchedEffect restart.
-    LaunchedEffect(openQueueSignal) {
-        if (openQueueSignal > 0) showQueueScreen = true
-    }
     // Which sheet a link opened from Home is showing (listing it / preview / item picker), and the
     // download it starts — LinkRouterViewModel, shared with the share sheet's own flow.
     val router: LinkRouterViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
@@ -212,6 +205,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     }
     // Opening the Queue plays the push, the mirror of its back (see animateEnter).
     val openQueue = { if (!showQueueScreen) queueBack.animateEnter { showQueueScreen = true } }
+
+    // A download-in-progress notification tap bumps this (MainActivity.openQueueSignal) — jump
+    // straight to Queue regardless of which tab was showing. Keyed on the signal itself (not
+    // Unit) so a second tap while already on Queue still re-triggers this instead of being a no-op
+    // LaunchedEffect restart.
+    LaunchedEffect(openQueueSignal) {
+        if (openQueueSignal > 0) openQueue()
+    }
     // The tab being left during a switch between two tabs (Library <-> Settings): kept on
     // screen as the page behind, so it slides out like any page does. Without it the old tab
     // vanished at once and the screen was empty for ~80ms before the new one came in (Home,
@@ -263,11 +264,15 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     var librarySearchSignal by remember { mutableIntStateOf(0) }
     LaunchedEffect(shortcut) {
         val request = shortcut ?: return@LaunchedEffect
-        showQueueScreen = request.action == com.comfort.app.MainActivity.SHORTCUT_OPEN_QUEUE
-        when (request.action) {
-            com.comfort.app.MainActivity.SHORTCUT_PASTE_DOWNLOAD -> { selectedTab = 0; pasteDownloadSignal++ }
-            com.comfort.app.MainActivity.SHORTCUT_OPEN_LIBRARY -> selectedTab = 1
-            com.comfort.app.MainActivity.SHORTCUT_SEARCH_LIBRARY -> { selectedTab = 1; librarySearchSignal++ }
+        if (request.action == com.comfort.app.MainActivity.SHORTCUT_OPEN_QUEUE) {
+            openQueue()
+        } else {
+            showQueueScreen = false
+            when (request.action) {
+                com.comfort.app.MainActivity.SHORTCUT_PASTE_DOWNLOAD -> { selectedTab = 0; pasteDownloadSignal++ }
+                com.comfort.app.MainActivity.SHORTCUT_OPEN_LIBRARY -> selectedTab = 1
+                com.comfort.app.MainActivity.SHORTCUT_SEARCH_LIBRARY -> { selectedTab = 1; librarySearchSignal++ }
+            }
         }
     }
 
@@ -717,8 +722,10 @@ fun HomeScreen(
             // autoSize) rather than a guessed fixed fontSize — grows/shrinks to actually fill the
             // available width edge-to-edge like the reference image, on any screen width, instead
             // of only being right on one specific device.
-            var wordmarkFontSize by remember { mutableStateOf(88.sp) }
-            var wordmarkMeasured by remember { mutableStateOf(false) }
+            val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+            val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+            var wordmarkFontSize by remember(screenWidth, fontScale) { mutableStateOf(88.sp) }
+            var wordmarkMeasured by remember(screenWidth, fontScale) { mutableStateOf(false) }
             BasicText(
                 "COMFORT",
                 style = TextStyle(
@@ -741,7 +748,8 @@ fun HomeScreen(
                     .graphicsLayer(alpha = if (wordmarkMeasured) 1f else 0f),
                 onTextLayout = { result ->
                     if (result.didOverflowWidth && wordmarkFontSize > 12.sp) {
-                        wordmarkFontSize *= 0.94f
+                        val next = wordmarkFontSize * 0.94f
+                        wordmarkFontSize = if (next > 12.sp) next else 12.sp
                     } else {
                         wordmarkMeasured = true
                     }
@@ -1271,22 +1279,36 @@ private val HOME_TIPS = listOf(
 @Composable
 private fun HomeTipsCarousel() {
     var index by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
+    val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
+    LaunchedEffect(reducedMotion, windowInfo.isWindowFocused) {
+        if (reducedMotion || !windowInfo.isWindowFocused) return@LaunchedEffect
         while (true) {
             kotlinx.coroutines.delay(6000)
             index = (index + 1) % HOME_TIPS.size
         }
     }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = "Next tip",
+                role = androidx.compose.ui.semantics.Role.Button,
+            ) {
+                index = (index + 1) % HOME_TIPS.size
+            },
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         AnimatedContent(
             targetState = index,
             transitionSpec = {
-                (slideInVertically { it / 3 } + androidx.compose.animation.fadeIn(tween(300))) togetherWith
-                    (slideOutVertically { -it / 3 } + androidx.compose.animation.fadeOut(tween(300)))
+                if (reducedMotion) {
+                    androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                } else {
+                    (slideInVertically { it / 3 } + androidx.compose.animation.fadeIn(tween(300))) togetherWith
+                        (slideOutVertically { -it / 3 } + androidx.compose.animation.fadeOut(tween(300)))
+                }
             },
             label = "homeTip",
         ) { i ->
