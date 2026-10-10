@@ -406,15 +406,14 @@ class DownloadWorker(
                 // behavior instead of breaking every download regardless of whether that particular
                 // site even needs cookies.
                 val normalizedCookiesPath = if (cookiesPath.exists() && cookiesPath.length() > 0) {
-                    File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
-                        // The Cookies & Login screen's per-site toggle — a site can have real,
-                        // valid saved cookies that the user still doesn't want sent (e.g. a stale
-                        // or unwanted login), without deleting them outright. Filtered out of this
-                        // per-download copy only; the real, persistent cookies.txt this reads from
-                        // is never touched by a toggle, only by an actual delete.
-                        val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(applicationContext)
-                        val normalized = cookiesPath.readText().replace("\r\n", "\n")
-                        writeText(GalleryDlPreferences.filterCookiesByDisabledDomains(normalized, disabledDomains))
+                    val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(applicationContext)
+                    if (disabledDomains.isNotEmpty()) {
+                        File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
+                            val normalized = cookiesPath.readText().replace("\r\n", "\n")
+                            writeText(GalleryDlPreferences.filterCookiesByDisabledDomains(normalized, disabledDomains))
+                        }
+                    } else {
+                        cookiesPath
                     }
                 } else null
 
