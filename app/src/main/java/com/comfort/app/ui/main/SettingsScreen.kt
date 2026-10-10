@@ -216,8 +216,24 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
         ThemeMode.SYSTEM -> systemDark
     }
     val themeSummary = if (effectiveDark) themeState.darkTheme.darkLabel else themeState.lightTheme.lightLabel
-    val filenameFormat = remember { GalleryDlPreferences.getFilenameFormat(context) }
-    val hasCookies = remember { GalleryDlPreferences.getCookies(context).isNotBlank() }
+    var filenameFormat by remember { mutableStateOf(GalleryDlPreferences.getFilenameFormat(context)) }
+    var hasCookies by remember { mutableStateOf(GalleryDlPreferences.getCookies(context).isNotBlank()) }
+
+    DisposableEffect(context) {
+        val prefs = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == GalleryDlPreferences.KEY_FILENAME_FORMAT || key == null) {
+                filenameFormat = GalleryDlPreferences.getFilenameFormat(context)
+            }
+            if (key == GalleryDlPreferences.KEY_COOKIES || key == null) {
+                hasCookies = GalleryDlPreferences.getCookies(context).isNotBlank()
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -230,7 +246,8 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     }
     val scrollState = rememberScrollState()
     val density = androidx.compose.ui.platform.LocalDensity.current
-    var maxHeaderHeightPx by remember { mutableStateOf(0) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    var maxHeaderHeightPx by remember(configuration.screenWidthDp, configuration.screenHeightDp, configuration.fontScale) { mutableStateOf(0) }
     // 4dp under the header (not the sub-pages' 20dp) plus the list's own 8dp top padding below —
     // the combined ~32dp gap between the title and the first card read as too loose (reported live).
     val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp, expandedBottomPadding = 4.dp)
