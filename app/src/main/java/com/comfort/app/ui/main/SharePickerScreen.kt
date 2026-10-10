@@ -142,8 +142,8 @@ fun SharePickerScreen(
         } else {
             280.dp
         }
-        val maxHeight = configuration.screenHeightDp.dp * 0.92f
-        val minHeight = 280.dp
+        val maxHeight = (configuration.screenHeightDp.dp * 0.92f).coerceAtLeast(120.dp)
+        val minHeight = minOf(280.dp, maxHeight)
         onHeightChange(target.coerceIn(minHeight, maxHeight))
     }
 
@@ -499,9 +499,10 @@ fun SharePickerScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surfaceContainer),
                             ) {
-                                coil.compose.SubcomposeAsyncImage(
-                                    model = coil.request.ImageRequest.Builder(context)
+                                val imageRequest = remember(item.url, url, context) {
+                                    coil.request.ImageRequest.Builder(context)
                                         .data(item.url)
+                                        .crossfade(true)
                                         // Many sites (Instagram included) reject hotlinked image
                                         // requests without a browser-like UA and a same-site
                                         // Referer, so the preview would otherwise come back blank.
@@ -510,7 +511,10 @@ fun SharePickerScreen(
                                             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
                                         )
                                         .addHeader("Referer", url)
-                                        .build(),
+                                        .build()
+                                }
+                                coil.compose.SubcomposeAsyncImage(
+                                    model = imageRequest,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize(),
