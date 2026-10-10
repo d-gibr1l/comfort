@@ -32,13 +32,18 @@ object CookieStore {
     fun read(context: Context): String {
         val f = file(context)
         if (f.exists()) {
-            return runCatching { f.readText() }.getOrNull().orEmpty()
+            return runCatching {
+                val atomicFile = android.util.AtomicFile(f)
+                atomicFile.openRead().use { it.bufferedReader(Charsets.UTF_8).readText() }
+            }.getOrElse {
+                runCatching { f.readText() }.getOrNull().orEmpty()
+            }
         }
         val legacyPrefs = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE)
         val fromPrefs = legacyPrefs.getString(GalleryDlPreferences.KEY_COOKIES, null)
         if (!fromPrefs.isNullOrBlank()) {
             runCatching {
-                f.writeText(fromPrefs)
+                write(context, fromPrefs)
                 legacyPrefs.edit().remove(GalleryDlPreferences.KEY_COOKIES).apply()
             }
             return fromPrefs
@@ -49,7 +54,17 @@ object CookieStore {
     fun write(context: Context, content: String) {
         context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().remove(GalleryDlPreferences.KEY_COOKIES).apply()
-        file(context).writeText(content)
+        val target = file(context)
+        val atomicFile = android.util.AtomicFile(target)
+        var stream: java.io.FileOutputStream? = null
+        try {
+            stream = atomicFile.startWrite()
+            stream.write(content.toByteArray(Charsets.UTF_8))
+            atomicFile.finishWrite(stream)
+        } catch (e: Exception) {
+            if (stream != null) atomicFile.failWrite(stream)
+            runCatching { target.writeText(content) }
+        }
     }
 
     /** [cookies] as a whole file, header first. */
@@ -88,7 +103,8 @@ object CookieStore {
      * merged in over that host's previous lines. Returns the new file, or null when there was
      * nothing to save (no host, no cookies). */
     fun saveFromBrowser(context: Context, url: String, cookieHeader: String?): String? {
-        val host = runCatching { java.net.URI(url).host }.getOrNull()
+        val host = android.net.Uri.parse(url).host
+            ?: runCatching { java.net.URI(url).host }.getOrNull()
         if (host.isNullOrBlank() || cookieHeader.isNullOrBlank()) return null
         val existing = read(context)
         return mergeNetscapeCookies(existing, host, cookieHeader).also { write(context, it) }
@@ -210,7 +226,7 @@ fun groupCookiesBySite(cookies: List<ParsedCookie>): List<SiteCookies> {
  * into [existing], dropping any prior lines for [host] first so re-extracting replaces rather than
  * duplicates/conflicts with them. */
 fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): String {
-    val cleanHost = host.removePrefix(".").removePrefix("www.")
+    val cleanHost = host.removePrefix(".").removePrefix("www.").substringBefore(':')
     val domain = if (cleanHost.startsWith(".")) cleanHost else ".$cleanHost"
     val bareDomain = domain.removePrefix(".")
     // Five years out — CookieManager doesn't expose each cookie's real expiry, and a long-lived
@@ -220,8 +236,8 @@ fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): 
     val newLines = cookieHeader.split(";").mapNotNull { pair ->
         val idx = pair.indexOf('=')
         if (idx <= 0) return@mapNotNull null
-        val name = pair.substring(0, idx).trim()
-        val value = pair.substring(idx + 1).trim()
+        val name = pair.substring(0, idx).trim().replace(Regex("[\\t\\r\\n]"), "")
+        val value = pair.substring(idx + 1).trim().replace(Regex("[\\t\\r\\n]"), "")
         if (name.isEmpty()) return@mapNotNull null
         "$domain\tTRUE\t/\tTRUE\t$expiry\t$name\t$value"
     }
