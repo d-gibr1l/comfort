@@ -395,15 +395,8 @@ object DownloadDispatcher {
                 DownloadNotifications.cancel(context, id)
             }
         }
-        // Reproduced live: pausing a *running* download silently orphaned everything else queued
-        // behind it in the same round-robin lane. Each lane is a real WorkManager dependency chain
-        // (enqueueUniqueWork(..., APPEND_OR_REPLACE, ...) — the same shape as .then()), and
-        // cancelWorkById() on one link cascade-cancels every dependent chained after it, by
-        // WorkManager's own documented design. That cascade only touches WorkManager's internal
-        // state, not this app's DB — the DB rows behind the paused head stayed QUEUED/SCHEDULED, so
-        // the UI kept showing them as "waiting" even though their WorkRequest was already dead and
-        // would never start on its own.
-        repairOrphanedQueue(context)
+        // cancelWorkManagerJob() above already schedules debounced repair via requestQueueRepair(),
+        // so a burst of pauses/cancels consolidates into a single repair pass instead of thrashing.
     }
 
     /** Cancels the in-flight WorkManager job (if any) and marks the entry cancelled. Unlike
@@ -428,9 +421,7 @@ object DownloadDispatcher {
             // living with, never a real failure.
             deleteStagingDir(context, id)
         }
-        // Same WorkManager chain-cascade repair as pauseDownload() above — cancelling a running
-        // download's job can just as easily orphan whatever was queued behind it in its lane.
-        repairOrphanedQueue(context)
+        // cancelWorkManagerJob() above already schedules debounced repair via requestQueueRepair().
     }
 
     /** Re-submits only the QUEUED/SCHEDULED entries whose WorkManager job is actually dead —
