@@ -292,11 +292,10 @@ fun QueueScreen(
                         // Only ever appears once something's actually selected — the placeholder
                         // "Clear Queue" trash icon this replaces used to sit here unconditionally
                         // and did nothing (a dead TODO), so this is a real, scoped action instead.
+                        // Not cancelled here: the delete that runs once the Undo snackbar passes
+                        // (DownloadDispatcher.deleteDownload) stops each one's job itself.
+                        // Cancelling up front meant Undo brought running downloads back cancelled.
                         IconButton(onClick = {
-                            val activeItems = filteredItems.filter {
-                                it.id in selectedIds && (it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED || it.status == DownloadStatus.SCHEDULED)
-                            }
-                            activeItems.forEach { viewModel.cancelDownload(it.id) }
                             requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
