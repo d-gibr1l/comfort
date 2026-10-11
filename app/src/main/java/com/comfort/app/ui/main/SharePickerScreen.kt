@@ -64,6 +64,12 @@ fun SharePickerScreen(
     // like Twitter/Reddit that need a fresh guest-token/auth request per listing attempt. Null
     // (the default) means "fetch it myself," unchanged from every other caller of this screen.
     preloadedResult: ListingResult? = null,
+    // "Retry preview" after a failed listing. The callers pass the router's open(), which lists
+    // again and picks the sheet afresh: the router shows this picker for any failed listing (a
+    // timeout, typically), and a single video that answers on the retry belongs in the preview
+    // sheet (with Trim) — retrying in place left it as a "1 of 1 selected" picker. Null retries
+    // in place.
+    onRetry: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // The listing, the selection and the duplicate check live in SharePickerViewModel, scoped to
@@ -335,7 +341,7 @@ fun SharePickerScreen(
                             Spacer(Modifier.height(10.dp))
                         }
                         OutlinedButton(
-                            onClick = { picker.retry() },
+                            onClick = { onRetry?.invoke() ?: picker.retry() },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = MaterialTheme.shapes.medium,
                         ) {

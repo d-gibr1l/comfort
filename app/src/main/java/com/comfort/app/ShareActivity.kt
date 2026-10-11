@@ -598,6 +598,7 @@ private fun SharePickerSheet(
                     },
                     onHeightChange = { sheetHeight = it },
                     preloadedResult = preloadedResult,
+                    onRetry = { router.open(url) },
                 )
             }
         }

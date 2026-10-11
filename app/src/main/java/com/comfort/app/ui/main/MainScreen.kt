@@ -465,6 +465,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         },
                         onHeightChange = { sheetHeight = it },
                         preloadedResult = picker.listing,
+                        onRetry = { router.open(picker.url) },
                     )
                 }
             }
