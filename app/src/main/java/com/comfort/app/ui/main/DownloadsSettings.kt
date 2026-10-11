@@ -268,7 +268,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             )
             ToggleReveal(proxyEnabled) {
                 Spacer(Modifier.height(16.dp))
-                val isProxyError = proxyUrl.isNotBlank() && !isValidProxyUrl(proxyUrl)
+                val isProxyError = proxyUrl.isNotBlank() && !DownloadsSettingsViewModel.isValidProxyUrl(proxyUrl)
                 OutlinedTextField(
                     value = proxyUrl,
                     onValueChange = {
@@ -858,11 +858,4 @@ private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (co
             }
         }
     }
-}
-
-private val PROXY_URL_REGEX = Regex("^(https?|socks[45][ah]?)://.+", RegexOption.IGNORE_CASE)
-
-private fun isValidProxyUrl(url: String): Boolean {
-    val trimmed = url.trim()
-    return trimmed.isEmpty() || PROXY_URL_REGEX.matches(trimmed)
 }
