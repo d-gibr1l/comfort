@@ -30,6 +30,13 @@ class DownloadsSettingsViewModel(application: Application) : AndroidViewModel(ap
         rescheduleQueue()
     }
 
+    /** Updates the Wi-Fi only constraint and immediately reschedules queued downloads so WorkManager
+     * applies the updated network constraints (UNMETERED vs CONNECTED) to existing queue items. */
+    fun setWifiOnly(enabled: Boolean) {
+        GalleryDlPreferences.setWifiOnly(context, enabled)
+        rescheduleQueue()
+    }
+
     /** Without the reschedule, everything already queued stays chained in the lane(s) it was first
      * assigned to and keeps running at the old concurrency — the new count only applied to
      * downloads added after the change. */

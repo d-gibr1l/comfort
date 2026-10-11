@@ -103,6 +103,19 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
         ActivityResultContracts.StartActivityForResult()
     ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                batteryUnrestricted = isIgnoringBatteryOptimizations()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     SettingsSubScaffold(title = "Downloads", topicIcon = Icons.Outlined.Download, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Sharing", icon = Icons.Outlined.Share) {
             ShareModeRow(
@@ -150,7 +163,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 checked = wifiOnly,
                 onCheckedChange = {
                     wifiOnly = it
-                    sharedPreferences.edit().putBoolean(GalleryDlPreferences.KEY_WIFI_ONLY, it).apply()
+                    downloadsSettings.setWifiOnly(it)
                 },
             )
 
@@ -255,6 +268,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             )
             ToggleReveal(proxyEnabled) {
                 Spacer(Modifier.height(16.dp))
+                val isProxyError = proxyUrl.isNotBlank() && !isValidProxyUrl(proxyUrl)
                 OutlinedTextField(
                     value = proxyUrl,
                     onValueChange = {
@@ -265,6 +279,14 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     label = { Text("Proxy") },
                     placeholder = { Text("None") },
                     singleLine = true,
+                    isError = isProxyError,
+                    supportingText = {
+                        if (isProxyError) {
+                            Text("Must start with http://, https://, or socks5://", color = MaterialTheme.colorScheme.error)
+                        } else if (proxyUrl.isBlank()) {
+                            Text("e.g. http://10.0.0.1:8080 or socks5://127.0.0.1:1080")
+                        }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                     shape = MaterialTheme.shapes.medium,
                 )
@@ -405,7 +427,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 OutlinedTextField(
                     value = if (bufferSizeKb > 0) bufferSizeKb.toString() else "",
                     onValueChange = { input ->
-                        val kb = input.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        val digits = input.filter { it.isDigit() }.take(7)
+                        val kb = digits.toIntOrNull()?.coerceIn(0, 1048576) ?: 0
                         bufferSizeKb = kb
                         GalleryDlPreferences.setBufferSizeKb(context, kb)
                     },
@@ -514,6 +537,14 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         },
                     )
                 }
+                if (scheduleStartMin == scheduleEndMin) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Start and end times are identical; downloads will run continuously without time restrictions.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -576,7 +607,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 OutlinedTextField(
                     value = if (downloadDelaySeconds > 0) downloadDelaySeconds.toString() else "",
                     onValueChange = { input ->
-                        val seconds = input.filter { it.isDigit() }.toIntOrNull() ?: 0
+                        val digits = input.filter { it.isDigit() }.take(6)
+                        val seconds = digits.toIntOrNull()?.coerceIn(0, 86400) ?: 0
                         downloadDelaySeconds = seconds
                         GalleryDlPreferences.setDownloadDelaySeconds(context, seconds)
                     },
@@ -826,4 +858,11 @@ private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (co
             }
         }
     }
+}
+
+private val PROXY_URL_REGEX = Regex("^(https?|socks[45][ah]?)://.+", RegexOption.IGNORE_CASE)
+
+private fun isValidProxyUrl(url: String): Boolean {
+    val trimmed = url.trim()
+    return trimmed.isEmpty() || PROXY_URL_REGEX.matches(trimmed)
 }
