@@ -129,8 +129,10 @@ private fun EngineChoiceSection() {
                         haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                         when {
                             turnOn -> setOn(engine, true)
-                            choice.enabled.size <= 1 ->
+                            choice.enabled.size <= 1 -> {
+                                haptics.performHapticFeedback(HapticFeedbackType.Reject)
                                 android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                             else -> confirmOff = engine
                         }
                     },
@@ -162,6 +164,7 @@ private fun EngineChoiceSection() {
                 onCheckedChange = { turnOn ->
                     haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                     if (!turnOn && choice.enabled.size <= 1) {
+                        haptics.performHapticFeedback(HapticFeedbackType.Reject)
                         android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
                     } else {
                         setOn(instaloader, turnOn)
@@ -198,6 +201,7 @@ private fun EngineChoiceSection() {
 @Composable
 private fun SitesSection() {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var open by remember { mutableStateOf(false) }
     var engineSites by remember { mutableStateOf<com.comfort.app.util.EngineSites?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -388,12 +392,25 @@ private fun SitesSection() {
                                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        loadFailed -> Text(
-                            "Couldn't read the engines' site lists.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        )
+                        loadFailed -> Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text(
+                                "Couldn't read the engines' site lists.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            TextButton(onClick = {
+                                coroutineScope.launch {
+                                    loadFailed = false
+                                    engineSites = com.comfort.app.util.EngineSitesRepository.load(context)
+                                    loadFailed = engineSites == null
+                                }
+                            }) {
+                                Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Retry")
+                            }
+                        }
                         else -> Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(10.dp))
@@ -470,6 +487,7 @@ private fun SiteListSheet(
         // Edge to edge: the content runs under the navigation bar instead of stopping above it.
         contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0) },
     ) {
+        val haptics = LocalHapticFeedback.current
         // Full height whatever the search leaves, so the sheet doesn't jump as results shrink.
         Column(modifier = Modifier.fillMaxHeight(0.92f).padding(horizontal = 20.dp).imePadding()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -478,7 +496,7 @@ private fun SiteListSheet(
                 Column {
                     Text(siteRouteTitle(route), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "%,d sites · ".format(sites.size) + siteRouteMeaning(route),
+                        (if (query.isNotBlank()) "%,d of %,d sites · ".format(shown.size, sites.size) else "%,d sites · ".format(sites.size)) + siteRouteMeaning(route),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -535,14 +553,22 @@ private fun SiteListSheet(
                                     androidx.compose.material3.DropdownMenuItem(
                                         text = { Text("Move to ${siteRouteTitle(to)}") },
                                         leadingIcon = { Icon(siteRouteIcon(to), contentDescription = null) },
-                                        onClick = { menu = false; onMove(site, to) },
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            menu = false
+                                            onMove(site, to)
+                                        },
                                     )
                                 }
                                 if (changed) {
                                     androidx.compose.material3.DropdownMenuItem(
                                         text = { Text("Reset to default") },
                                         leadingIcon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
-                                        onClick = { menu = false; onMove(site, null) },
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            menu = false
+                                            onMove(site, null)
+                                        },
                                     )
                                 }
                             }
@@ -1057,6 +1083,7 @@ private fun EngineChannelPicker(
     channel: EngineUpdateChannel,
     onChannelChange: (EngineUpdateChannel) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     val bleedingEdgeLabel = if (engine == EngineUpdater.YT_DLP) "Nightly" else "Master"
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1073,7 +1100,12 @@ private fun EngineChannelPicker(
                     .selectable(
                         selected = selected,
                         role = Role.RadioButton,
-                        onClick = { onChannelChange(value) },
+                        onClick = {
+                            if (!selected) {
+                                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                            }
+                            onChannelChange(value)
+                        },
                     ),
                 shape = MaterialTheme.shapes.medium,
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
