@@ -25,9 +25,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DownloadsViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).downloadDao()
+    private val shapeCache = ConcurrentHashMap<String, MediaShape>()
+    private val isScanning = AtomicBoolean(false)
 
     private val rawHistoryFlow: StateFlow<List<DownloadEntity>> = dao.getHistoryFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -53,14 +57,21 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Each Library item's shape and length (MediaShapes), by download id — what the grid sizes
      * its tiles and duration badges from. Read from MediaStore off the main thread; an audio
-     * download's cover art gives the shape and its real file (mediaUri) the length. */
+     * download's cover art gives the shape and its real file (mediaUri) the length. Cached to
+     * avoid re-parsing MediaStore for existing items across emissions. */
     val mediaShapes: StateFlow<Map<String, MediaShape>> = combine(rawHistoryFlow, rawDeletedFlow) { history, deleted -> history + deleted }
         .map { items ->
             withContext(Dispatchers.IO) {
+                val currentIds = items.map { it.id }.toSet()
+                shapeCache.keys.retainAll(currentIds)
                 items.mapNotNull { item ->
+                    val cached = shapeCache[item.id]
+                    if (cached != null) return@mapNotNull item.id to cached
                     val shape = item.thumbnailPath?.let { MediaShapes.of(getApplication(), it) } ?: return@mapNotNull null
                     val duration = item.mediaUri?.let { MediaShapes.of(getApplication(), it)?.durationMs } ?: shape.durationMs
-                    item.id to shape.copy(durationMs = duration)
+                    val resolved = shape.copy(durationMs = duration)
+                    shapeCache[item.id] = resolved
+                    item.id to resolved
                 }.toMap()
             }
         }
@@ -307,23 +318,28 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * outlives the song (and can be cleared while the song is still there). A Deleted download
      * whose file is back (restored from the gallery's trash) returns to the Library. */
     fun scanForDeletedMedia() {
+        if (!isScanning.compareAndSet(false, true)) return
         viewModelScope.launch {
-            val context = getApplication<Application>()
-            val candidates = dao.getHistoryWithThumbnailOnce()
-            val deleted = dao.getDeletedOnce()
-            withContext(Dispatchers.IO) {
-                candidates.forEach { entity ->
-                    val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
-                    if (!MediaStoreHelper.exists(context, uri)) {
-                        dao.updateStatus(entity.id, DownloadStatus.DELETED)
+            try {
+                val context = getApplication<Application>()
+                val candidates = dao.getHistoryWithThumbnailOnce()
+                val deleted = dao.getDeletedOnce()
+                withContext(Dispatchers.IO) {
+                    candidates.forEach { entity ->
+                        val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
+                        if (!MediaStoreHelper.exists(context, uri)) {
+                            dao.updateStatus(entity.id, DownloadStatus.DELETED)
+                        }
+                    }
+                    deleted.forEach { entity ->
+                        val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
+                        if (uri.startsWith("content://media/") && MediaStoreHelper.exists(context, uri, failOpen = false)) {
+                            dao.updateStatus(entity.id, DownloadStatus.FINISHED)
+                        }
                     }
                 }
-                deleted.forEach { entity ->
-                    val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
-                    if (uri.startsWith("content://media/") && MediaStoreHelper.exists(context, uri, failOpen = false)) {
-                        dao.updateStatus(entity.id, DownloadStatus.FINISHED)
-                    }
-                }
+            } finally {
+                isScanning.set(false)
             }
         }
     }

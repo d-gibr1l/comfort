@@ -1006,7 +1006,7 @@ private val CLUTTER_TAG_RE = Regex(
     RegexOption.IGNORE_CASE,
 )
 private val EXTRA_SPACES_RE = Regex("""\s{2,}""")
-private val TOPIC_SUFFIX_RE = Regex(""" - Topic$""")
+private val TOPIC_SUFFIX_RE = Regex("""\s*-\s*Topic\s*$""", RegexOption.IGNORE_CASE)
 
 /** Starting value for the preview sheet's own editable title field — strips common YouTube-upload
  * clutter tags so the field opens already tidy rather than a raw scrape; the user can still edit
