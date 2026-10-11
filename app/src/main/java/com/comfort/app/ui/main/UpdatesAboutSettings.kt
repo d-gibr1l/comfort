@@ -13,8 +13,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Instagram
@@ -115,6 +124,7 @@ private fun EngineChoiceSection() {
                 }
                 Switch(
                     checked = on,
+                    modifier = Modifier.semantics { contentDescription = "${engineLabel(engine)} engine" },
                     onCheckedChange = { turnOn ->
                         haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                         when {
@@ -148,6 +158,7 @@ private fun EngineChoiceSection() {
             }
             Switch(
                 checked = instaloaderOn,
+                modifier = Modifier.semantics { contentDescription = "Instaloader engine" },
                 onCheckedChange = { turnOn ->
                     haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                     if (!turnOn && choice.enabled.size <= 1) {
@@ -211,7 +222,7 @@ private fun SitesSection() {
 
     SettingsSection(title = "Sites", icon = Icons.Outlined.Public, onClick = { open = true }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.AltRoute, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            Icon(Icons.AutoMirrored.Outlined.AltRoute, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("Which engine each site uses", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
@@ -221,7 +232,7 @@ private fun SitesSection() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
@@ -294,6 +305,15 @@ private fun SitesSection() {
                         singleLine = true,
                         shape = RoundedCornerShape(50),
                         isError = input.isNotBlank() && site == null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (site != null) {
+                                route(site, addTo)
+                                justAdded = site
+                                input = ""
+                                focusManager.clearFocus()
+                            }
+                        }),
                         modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     )
                     Text(
@@ -365,7 +385,7 @@ private fun SitesSection() {
                                     Text(siteRouteMeaning(which), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Text("%,d".format(lists[which].orEmpty().size), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         loadFailed -> Text(
@@ -465,13 +485,23 @@ private fun SiteListSheet(
                 }
             }
             Spacer(Modifier.height(12.dp))
+            val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 placeholder = { Text("Search sites") },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 singleLine = true,
                 shape = RoundedCornerShape(50),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
             )
             Spacer(Modifier.height(8.dp))
@@ -617,10 +647,16 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
             icon = Icons.Outlined.Info,
             onClick = {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/d-gibr1l/comfort"))
-                context.startActivity(intent)
+                runCatching { context.startActivity(intent) }
             }
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.semantics {
+                    role = Role.Button
+                    contentDescription = "Comfort version $versionName, open project page"
+                }
+            ) {
                 AppIconTile(size = 48.dp)
                 Spacer(Modifier.width(12.dp))
                 Column {
@@ -1032,10 +1068,15 @@ private fun EngineChannelPicker(
         ).forEach { (value, label) ->
             val selected = channel == value
             Surface(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .selectable(
+                        selected = selected,
+                        role = Role.RadioButton,
+                        onClick = { onChannelChange(value) },
+                    ),
                 shape = MaterialTheme.shapes.medium,
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                onClick = { onChannelChange(value) },
             ) {
                 Box(modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
@@ -1069,6 +1110,10 @@ private fun CreditChip(entry: CreditEntry, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     Surface(
         modifier = modifier
+            .semantics {
+                role = Role.Button
+                contentDescription = "Open ${entry.title} website"
+            }
             .clickable {
                 haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(entry.url))) }
