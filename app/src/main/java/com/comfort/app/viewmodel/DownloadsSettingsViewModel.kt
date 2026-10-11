@@ -25,16 +25,19 @@ class DownloadsSettingsViewModel(application: Application) : AndroidViewModel(ap
     private val context get() = getApplication<Application>()
     private val prefs get() = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE)
 
+    private var queueRescheduleJob: Job? = null
+    private var restartRunningJob: Job? = null
+
     fun setConcurrentDownloadsEnabled(enabled: Boolean) {
         GalleryDlPreferences.setConcurrentDownloadsEnabled(context, enabled)
-        rescheduleQueue()
+        rescheduleQueue(delayMs = 250L)
     }
 
     /** Updates the Wi-Fi only constraint and immediately reschedules queued downloads so WorkManager
      * applies the updated network constraints (UNMETERED vs CONNECTED) to existing queue items. */
     fun setWifiOnly(enabled: Boolean) {
         GalleryDlPreferences.setWifiOnly(context, enabled)
-        rescheduleQueue()
+        rescheduleQueue(delayMs = 250L)
     }
 
     /** Without the reschedule, everything already queued stays chained in the lane(s) it was first
@@ -42,45 +45,50 @@ class DownloadsSettingsViewModel(application: Application) : AndroidViewModel(ap
      * downloads added after the change. */
     fun setConcurrentDownloads(count: Int) {
         prefs.edit().putInt(GalleryDlPreferences.KEY_CONCURRENT_DOWNLOADS, count).apply()
-        rescheduleQueue()
+        rescheduleQueue(delayMs = 250L)
     }
 
     fun setSpeedLimitEnabled(enabled: Boolean) {
         GalleryDlPreferences.setSpeedLimitEnabled(context, enabled)
-        restartRunning()
+        restartRunning(delayMs = 250L)
     }
 
     fun setSpeedLimit(limit: String) {
         GalleryDlPreferences.setSpeedLimit(context, limit)
-        restartRunning()
+        restartRunning(delayMs = 300L)
     }
 
     fun setProxyEnabled(enabled: Boolean) {
         GalleryDlPreferences.setProxyEnabled(context, enabled)
-        restartRunning()
+        val currentUrl = GalleryDlPreferences.getProxyUrl(context)
+        if (!enabled || isValidProxyUrl(currentUrl)) {
+            restartRunning(delayMs = 250L)
+        }
     }
 
-    private var proxyRestart: Job? = null
-
     /** Saved on every keystroke; running downloads restart once typing settles for 800 ms, not on
-     * every character. */
+     * every character, and only if the proxy is enabled and the URL is valid. */
     fun setProxyUrl(url: String) {
         GalleryDlPreferences.setProxyUrl(context, url)
-        proxyRestart?.cancel()
-        proxyRestart = viewModelScope.launch {
-            delay(800)
-            DownloadDispatcher.restartRunningDownloads(context)
+        if (!GalleryDlPreferences.isProxyEnabled(context)) {
+            // Proxy is not active; editing the URL doesn't affect currently running downloads.
+            return
         }
+        if (!isValidProxyUrl(url)) {
+            // Incomplete or invalid URL while typing — do not abort active downloads.
+            return
+        }
+        restartRunning(delayMs = 800L)
     }
 
     fun setMaxFilesizeEnabled(enabled: Boolean) {
         GalleryDlPreferences.setMaxFilesizeEnabled(context, enabled)
-        restartRunning()
+        restartRunning(delayMs = 250L)
     }
 
     fun setMaxFilesize(size: String) {
         GalleryDlPreferences.setMaxFilesize(context, size)
-        restartRunning()
+        restartRunning(delayMs = 300L)
     }
 
     /** A download queued under the old window would otherwise sit until its stale delay elapses —
@@ -116,15 +124,32 @@ class DownloadsSettingsViewModel(application: Application) : AndroidViewModel(ap
     }
 
     private fun scheduleChanged() {
-        rescheduleQueue()
+        rescheduleQueue(delayMs = 250L)
         DownloadDispatcher.scheduleWindowAlarm(context)
     }
 
-    private fun rescheduleQueue() {
-        viewModelScope.launch { DownloadDispatcher.rescheduleQueuedDownloads(context) }
+    private fun rescheduleQueue(delayMs: Long = 250L) {
+        queueRescheduleJob?.cancel()
+        queueRescheduleJob = viewModelScope.launch {
+            if (delayMs > 0) delay(delayMs)
+            DownloadDispatcher.rescheduleQueuedDownloads(context)
+        }
     }
 
-    private fun restartRunning() {
-        viewModelScope.launch { DownloadDispatcher.restartRunningDownloads(context) }
+    private fun restartRunning(delayMs: Long = 300L) {
+        restartRunningJob?.cancel()
+        restartRunningJob = viewModelScope.launch {
+            if (delayMs > 0) delay(delayMs)
+            DownloadDispatcher.restartRunningDownloads(context)
+        }
+    }
+
+    companion object {
+        val PROXY_URL_REGEX = Regex("^(https?|socks[45][ah]?)://.+", RegexOption.IGNORE_CASE)
+
+        fun isValidProxyUrl(url: String): Boolean {
+            val trimmed = url.trim()
+            return trimmed.isEmpty() || PROXY_URL_REGEX.matches(trimmed)
+        }
     }
 }
