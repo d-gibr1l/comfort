@@ -48,6 +48,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
     var lyricsLrc by remember { mutableStateOf(GalleryDlPreferences.isLyricsLrcFile(context)) }
     var audioFormat by remember { mutableStateOf(GalleryDlPreferences.getAudioFormat(context)) }
     var normalizeAudio by remember { mutableStateOf(GalleryDlPreferences.isNormalizeAudio(context)) }
+    var webpToJpg by remember { mutableStateOf(GalleryDlPreferences.isWebpToJpg(context)) }
 
     SettingsSubScaffold(title = "Processing", topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
@@ -367,6 +368,19 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
+            )
+        }
+
+        SettingsSection(title = "Picture downloads", icon = Icons.Outlined.Image) {
+            IconToggleRow(
+                icon = Icons.Outlined.Image,
+                title = "Save WebP pictures as JPG",
+                subtitle = "Many sites send pictures as WebP, which some apps can't open or share. Converts them to JPG as they're saved; animated ones stay WebP.",
+                checked = webpToJpg,
+                onCheckedChange = {
+                    webpToJpg = it
+                    GalleryDlPreferences.setWebpToJpg(context, it)
+                },
             )
         }
 

@@ -119,6 +119,7 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry("Embed metadata", "Tag the file with its title, uploader, and other details.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed chapters", "Saves chapter markers inside the video file.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Audio format", "Save songs and audio as MP3, M4A, Opus, FLAC, or the site's original.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Save WebP pictures as JPG", "Converts WebP pictures to JPG as they're saved.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Even out volume", "Makes every song play at the same loudness.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Lyrics", "Adds synced or plain lyrics to downloaded songs.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Save .lrc file", "Also saves synced lyrics as a .lrc file next to the song.", SettingsRoute.PROCESSING),

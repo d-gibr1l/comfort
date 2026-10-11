@@ -1967,6 +1967,16 @@ private fun DownloadActionsMenu(
     val fileGone = item.status == DownloadStatus.DELETED
     // The real file: a song's thumbnailPath is its cover art, and mediaUri the song.
     val fileUri = (item.mediaUri ?: item.thumbnailPath)?.takeIf { it.isNotBlank() && !fileGone }
+    // Compress is offered for a saved video only (not a song, a picture or a multi-file post's
+    // first file being an image).
+    val isVideo = remember(fileUri, item.isAudio) {
+        !item.isAudio && fileUri != null &&
+            runCatching { context.contentResolver.getType(Uri.parse(fileUri)) }.getOrNull()?.startsWith("video/") == true
+    }
+    var compressOpen by remember { mutableStateOf(false) }
+    if (compressOpen && fileUri != null) {
+        CompressDialog(item = item, fileUri = Uri.parse(fileUri), onDismiss = { compressOpen = false })
+    }
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (fileGone) {
             DropdownMenuItem(
@@ -2000,6 +2010,13 @@ private fun DownloadActionsMenu(
                     runCatching { context.startActivity(Intent.createChooser(intent, "Share")) }
                 },
             )
+            if (isVideo) {
+                DropdownMenuItem(
+                    text = { Text("Compress video") },
+                    leadingIcon = { Icon(Icons.Outlined.Compress, contentDescription = null) },
+                    onClick = { onDismiss(); compressOpen = true },
+                )
+            }
         }
         DropdownMenuItem(
             text = { Text("View Original Source") },

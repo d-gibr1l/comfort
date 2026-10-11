@@ -505,16 +505,17 @@ _H264_KBPS = ((240, 600), (360, 1200), (480, 2500), (720, 5000), (1080, 8000), (
 
 def _h264_args(video, spec="v:0"):
     """Output args encoding `spec` to H.264 on the phone's own hardware encoder (h264_mediacodec —
-    there's no software H.264 encoder in the build). Its input has to be NV12 with a width that's a
-    multiple of 16: 1080-wide video (Instagram Reels) fails with "Invalid argument" otherwise
-    (tested on a Galaxy S24), so up to 15 columns are cropped off the sides. A bit more bitrate than
+    there's no software H.264 encoder in the build). Its input has to be NV12 with both sides a
+    multiple of 16: 1080-wide video (Instagram Reels) or a 480x854 frame fails with "Invalid
+    argument" otherwise (tested on a Galaxy S24), so up to 15 pixels are cropped off each dimension
+    (centred, so a few per edge). A bit more bitrate than
     the source had, since re-encoding already-compressed video loses some."""
     width, height = (video or {}).get("width"), (video or {}).get("height")
     short = min(width, height) if width and height else 1080
     table = next((kbps for side, kbps in _H264_KBPS if short <= side), 35000)
     src = (video or {}).get("kbps")
     kbps = int(min(max(src * 1.15, 400), table * 2)) if src else table
-    return [f"-filter:{spec}", "crop=trunc(iw/16)*16:ih", f"-c:{spec}", "h264_mediacodec",
+    return [f"-filter:{spec}", "crop=trunc(iw/16)*16:trunc(ih/16)*16", f"-c:{spec}", "h264_mediacodec",
             f"-b:{spec}", f"{kbps}k", f"-pix_fmt:{spec}", "nv12"]
 
 

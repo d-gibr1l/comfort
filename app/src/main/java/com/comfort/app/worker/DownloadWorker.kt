@@ -17,6 +17,7 @@ import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
 import com.comfort.app.util.EngineProbe
 import com.comfort.app.util.GalleryDlListing
+import com.comfort.app.util.ImageConverter
 import com.comfort.app.util.MediaStoreHelper
 import com.comfort.app.util.PythonRuntime
 import kotlinx.coroutines.CancellationException
@@ -553,7 +554,8 @@ class DownloadWorker(
                 val heldFiles = java.util.Collections.synchronizedList(mutableListOf<Pair<File, Boolean>>())
 
                 // [firstOfDownload]: the download's first file, whose thumbnail is the Library's.
-                suspend fun saveFile(candidate: File, isAudioFile: Boolean, firstOfDownload: Boolean = false) {
+                suspend fun saveFile(original: File, isAudioFile: Boolean, firstOfDownload: Boolean = false) {
+                    val candidate = if (GalleryDlPreferences.isWebpToJpg(applicationContext)) ImageConverter.webpToJpg(original) else original
                     val fileSize = candidate.length()
                     // Lyrics go into the staging file's tags before it's saved;
                     // a synced .lrc lands beside it and is saved after the song.

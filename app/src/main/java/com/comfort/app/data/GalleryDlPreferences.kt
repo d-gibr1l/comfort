@@ -121,6 +121,7 @@ object GalleryDlPreferences {
     const val KEY_OUTPUT_FORMAT = "output_format"
     const val KEY_AUDIO_FORMAT = "audio_format"
     const val KEY_NORMALIZE_AUDIO = "normalize_audio"
+    const val KEY_WEBP_TO_JPG = "webp_to_jpg"
     const val KEY_NETWORK_RETRIES = "network_retries"
     const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
     const val KEY_YTDLP_UPDATE_CHANNEL = "ytdlp_update_channel"
@@ -764,6 +765,13 @@ object GalleryDlPreferences {
 
     fun setNormalizeAudio(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_NORMALIZE_AUDIO, enabled).apply()
+    }
+
+    /** Still WebP pictures are saved as JPG (ImageConverter) — off by default, WebP is smaller. */
+    fun isWebpToJpg(context: Context): Boolean = prefs(context).getBoolean(KEY_WEBP_TO_JPG, false)
+
+    fun setWebpToJpg(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WEBP_TO_JPG, enabled).apply()
     }
 
     fun getYtDlpUpdateChannel(context: Context): EngineUpdateChannel {
