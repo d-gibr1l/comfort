@@ -382,12 +382,14 @@ object MediaStoreHelper {
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = runCatching { resolver.insert(collection, values) }.getOrNull() ?: return null
-        val copied = resolver.openOutputStream(uri)?.use { out ->
-            sourceFile.inputStream().use { it.copyTo(out) }
-            true
-        } ?: false
+        val copied = runCatching {
+            resolver.openOutputStream(uri)?.use { out ->
+                sourceFile.inputStream().use { it.copyTo(out) }
+                true
+            } ?: false
+        }.getOrDefault(false)
         if (!copied) {
-            resolver.delete(uri, null, null)
+            runCatching { resolver.delete(uri, null, null) }
             return null
         }
         values.clear()
