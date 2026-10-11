@@ -101,7 +101,8 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             if (isExtractorArgsDirty) {
                 Button(
                     onClick = {
-                        GalleryDlPreferences.setExtractorArgs(context, extractorArgs.trim())
+                        val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
+                        GalleryDlPreferences.setExtractorArgs(context, cleaned)
                         extractorArgsSaved = true
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -114,7 +115,8 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             } else {
                 OutlinedButton(
                     onClick = {
-                        GalleryDlPreferences.setExtractorArgs(context, extractorArgs.trim())
+                        val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
+                        GalleryDlPreferences.setExtractorArgs(context, cleaned)
                         extractorArgsSaved = true
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -332,6 +334,12 @@ private fun ExtraArgsSheetField() {
         var draftBoth by remember { mutableStateOf(bothArgs) }
         var draftYtDlp by remember { mutableStateOf(ytDlpArgs) }
         var draftGalleryDl by remember { mutableStateOf(galleryDlArgs) }
+
+        val bothHasUnclosedQuotes = hasUnmatchedQuotes(draftBoth)
+        val ytDlpHasUnclosedQuotes = hasUnmatchedQuotes(draftYtDlp)
+        val galleryDlHasUnclosedQuotes = hasUnmatchedQuotes(draftGalleryDl)
+        val hasAnyQuoteError = bothHasUnclosedQuotes || ytDlpHasUnclosedQuotes || galleryDlHasUnclosedQuotes
+
         ModalBottomSheet(onDismissRequest = { showSheet = false }) {
             Column(
                 modifier = Modifier
@@ -352,6 +360,8 @@ private fun ExtraArgsSheetField() {
                     value = draftBoth,
                     onValueChange = { draftBoth = it },
                     placeholder = "e.g. --no-mtime",
+                    isError = bothHasUnclosedQuotes,
+                    errorMessage = "Unclosed quotation marks — arguments may be ignored",
                 )
                 ExtraArgsSection(
                     title = "yt-dlp",
@@ -359,6 +369,8 @@ private fun ExtraArgsSheetField() {
                     value = draftYtDlp,
                     onValueChange = { draftYtDlp = it },
                     placeholder = "e.g. --extractor-args \"youtube:player_client=web\"",
+                    isError = ytDlpHasUnclosedQuotes,
+                    errorMessage = "Unclosed quotation marks — arguments may be ignored",
                 )
                 ExtraArgsSection(
                     title = "gallery-dl",
@@ -366,6 +378,8 @@ private fun ExtraArgsSheetField() {
                     value = draftGalleryDl,
                     onValueChange = { draftGalleryDl = it },
                     placeholder = "e.g. --write-metadata",
+                    isError = galleryDlHasUnclosedQuotes,
+                    errorMessage = "Unclosed quotation marks — arguments may be ignored",
                 )
                 Text(
                     "Instaloader has none: it runs as a library here, not a command line.",
@@ -378,6 +392,7 @@ private fun ExtraArgsSheetField() {
                     ConfirmCancelSplitButton(
                         label = "Save",
                         icon = Icons.Filled.FilledCheckCircle,
+                        confirmEnabled = !hasAnyQuoteError,
                         onConfirm = {
                             bothArgs = draftBoth.trim()
                             ytDlpArgs = draftYtDlp.trim()
@@ -402,6 +417,8 @@ private fun ExtraArgsSection(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
+    isError: Boolean = false,
+    errorMessage: String? = null,
 ) {
     Spacer(Modifier.height(20.dp))
     Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
@@ -412,6 +429,12 @@ private fun ExtraArgsSection(
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).clearFocusOnKeyboardDismiss(),
         placeholder = { Text(placeholder) },
+        isError = isError,
+        supportingText = {
+            if (isError && errorMessage != null) {
+                Text(errorMessage, color = MaterialTheme.colorScheme.error)
+            }
+        },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         shape = MaterialTheme.shapes.medium,
     )
@@ -438,4 +461,23 @@ internal fun validateCustomHeaders(headersText: String): String? {
 internal fun isValidFormatSort(formatSort: String): Boolean {
     return !formatSort.any { it in "\"'$`;|&" || it == '\n' || it == '\r' }
 }
+
+internal fun hasUnmatchedQuotes(args: String): Boolean {
+    var inSingle = false
+    var inDouble = false
+    var escape = false
+    for (char in args) {
+        if (escape) {
+            escape = false
+            continue
+        }
+        when (char) {
+            '\\' -> escape = true
+            '\'' -> if (!inDouble) inSingle = !inSingle
+            '"' -> if (!inSingle) inDouble = !inDouble
+        }
+    }
+    return inSingle || inDouble
+}
+
 
