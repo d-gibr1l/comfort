@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -104,11 +105,11 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
         if (status.artifactUrl == null) return
         val key = status.engine.packageDirName
         if (key in _updatingEngines.value) return
-        _updatingEngines.value = _updatingEngines.value + key
+        _updatingEngines.update { it + key }
         _engineError.value = null
         viewModelScope.launch {
             val result = EngineUpdater.update(context, status)
-            _updatingEngines.value = _updatingEngines.value - key
+            _updatingEngines.update { it - key }
             result.onSuccess { newVersion ->
                 val updated = _engineStatuses.value.orEmpty().map {
                     if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it

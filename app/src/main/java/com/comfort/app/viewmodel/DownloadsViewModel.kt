@@ -256,6 +256,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * whether to actually go through with [confirmDelete] or reverse this with [cancelDeletion];
      * nothing here is irreversible on its own. */
     fun hideForDeletion(ids: Set<String>) {
+        if (ids.isEmpty()) return
         _deletingIds.update { it + ids }
     }
 
@@ -267,6 +268,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * genuinely passed; [hideForDeletion] must have already hidden these ids or they never
      * visually leave their list in the first place. */
     fun confirmDelete(ids: Set<String>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             val context = getApplication<Application>()
             ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
@@ -277,6 +279,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Reverses [hideForDeletion] — the user tapped Undo before [confirmDelete] ever ran, so
      * nothing was actually deleted and this just un-hides the ids. */
     fun cancelDeletion(ids: Set<String>) {
+        if (ids.isEmpty()) return
         _deletingIds.update { it - ids }
     }
 
@@ -287,8 +290,10 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun renameDownload(id: String, newTitle: String) {
+        val trimmed = newTitle.trim()
+        if (trimmed.isEmpty()) return
         viewModelScope.launch {
-            dao.updateTitle(id, newTitle)
+            dao.updateTitle(id, trimmed)
         }
     }
 

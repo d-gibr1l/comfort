@@ -53,22 +53,24 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
     /** Lists [url] to decide between the preview sheet and the item picker — so a pasted or shared
      * multi-image gallery gets a picker instead of a single-video card with nothing to pick. */
     fun open(url: String) {
+        val trimmed = url.trim()
+        if (trimmed.isEmpty()) return
         listing?.cancel()
-        _route.value = LinkRoute.Listing(url)
+        _route.value = LinkRoute.Listing(trimmed)
         _isDuplicate.value = false
         listing = viewModelScope.launch {
-            launch { _isDuplicate.value = DownloadDispatcher.isDuplicate(context, url) }
-            val result = GalleryDlListing.listItemsForSheet(context, url)
-            if (result.timedOut && !com.comfort.app.data.VideoSiteRouter.isGalleryDlOnly(url)) {
+            launch { _isDuplicate.value = DownloadDispatcher.isDuplicate(context, trimmed) }
+            val result = GalleryDlListing.listItemsForSheet(context, trimmed)
+            if (result.timedOut && !com.comfort.app.data.VideoSiteRouter.isGalleryDlOnly(trimmed)) {
                 // gallery-dl is stuck (a rate limit, typically), but yt-dlp reaches the site its own
                 // way — a video link still gets its normal preview. Only if yt-dlp can't show
                 // anything either (an image post, or the site really is down) does the picker's
                 // "taking too long" screen come up.
-                val preview = withTimeoutOrNull(YT_DLP_PREVIEW_CAP_MS) { GalleryDlListing.fetchPreviewInfo(context, url, ytDlpOnly = true) }
-                _route.value = if (preview?.hasContent() == true) LinkRoute.Preview(url, preview) else LinkRoute.Picker(url, result)
+                val preview = withTimeoutOrNull(YT_DLP_PREVIEW_CAP_MS) { GalleryDlListing.fetchPreviewInfo(context, trimmed, ytDlpOnly = true) }
+                _route.value = if (preview?.hasContent() == true) LinkRoute.Preview(trimmed, preview) else LinkRoute.Picker(trimmed, result)
                 return@launch
             }
-            _route.value = if (result.shouldUsePreviewSheet(url)) LinkRoute.Preview(url) else LinkRoute.Picker(url, result)
+            _route.value = if (result.shouldUsePreviewSheet(trimmed)) LinkRoute.Preview(trimmed) else LinkRoute.Picker(trimmed, result)
         }
     }
 

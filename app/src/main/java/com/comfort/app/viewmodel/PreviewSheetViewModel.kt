@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** The download preview sheet's data for one link: the listing pass's [preview], its live
@@ -72,8 +73,8 @@ class PreviewSheetViewModel(
             val result = preloaded ?: GalleryDlListing.fetchPreviewInfo(context, url, onStatus = { _status.value = it })
             _preview.value = result
             result?.tracks?.takeIf { it.isNotEmpty() }?.let { tracks -> _selectedNums.value = tracks.map { it.num }.toSet() }
-            if (_editedTitle.value == null) result?.title?.let { _editedTitle.value = cleanTrackTitle(it) }
-            if (_editedArtist.value == null) result?.artist?.let { _editedArtist.value = cleanArtistName(it) }
+            if (_editedTitle.value == null) result?.title?.let { _editedTitle.value = cleanTrackTitle(it).trim() }
+            if (_editedArtist.value == null) result?.artist?.let { _editedArtist.value = cleanArtistName(it).trim() }
             _loading.value = false
         }
         viewModelScope.launch {
@@ -82,12 +83,13 @@ class PreviewSheetViewModel(
     }
 
     fun toggleItem(num: Int) {
-        _selectedNums.value = _selectedNums.value.let { if (num in it) it - num else it + num }
+        if (num <= 0) return
+        _selectedNums.update { current -> if (num in current) current - num else current + num }
     }
 
     fun toggleAll() {
         val tracks = _preview.value?.tracks.orEmpty()
-        _selectedNums.value = if (_selectedNums.value.size == tracks.size) emptySet() else tracks.map { it.num }.toSet()
+        _selectedNums.update { current -> if (current.size == tracks.size) emptySet() else tracks.map { it.num }.toSet() }
     }
 
     fun setEditedTitle(title: String) { _editedTitle.value = title }
