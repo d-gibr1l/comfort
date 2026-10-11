@@ -128,7 +128,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 }
             }
 
-            if (extractorArgsSaved) {
+            ToggleReveal(extractorArgsSaved) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extractor arguments saved", tint = MaterialTheme.colorScheme.primary)
             }
@@ -192,7 +192,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 }
             }
 
-            if (formatSortSaved) {
+            ToggleReveal(formatSortSaved) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Format sort saved", tint = MaterialTheme.colorScheme.primary)
             }
@@ -253,7 +253,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 }
             }
 
-            if (customHeadersSaved) {
+            ToggleReveal(customHeadersSaved) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Headers saved", tint = MaterialTheme.colorScheme.primary)
             }

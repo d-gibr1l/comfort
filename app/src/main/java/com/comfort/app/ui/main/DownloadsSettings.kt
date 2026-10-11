@@ -537,7 +537,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         },
                     )
                 }
-                if (scheduleStartMin == scheduleEndMin) {
+                ToggleReveal(scheduleStartMin == scheduleEndMin) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Start and end times are identical; downloads will run continuously without time restrictions.",
@@ -684,7 +684,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     downloadsSettings.setDeleteLeftoverOnFailure(it)
                 },
             )
-            if (deleteLeftoverOnFailure) {
+            ToggleReveal(deleteLeftoverOnFailure) {
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "\"On failure\" only runs from inside the download itself, so it can't catch the app being killed outright — the periodic options add that as a backstop, on top of the same on-failure cleanup.",
