@@ -65,12 +65,17 @@ object Aria2Runtime {
 
         root.deleteRecursively()
         root.mkdirs()
-        runCatching {
+        val extractOk = runCatching {
             zipSo.inputStream().use { PythonRuntime.unzipStreamTo(it, root) }
-        }.onFailure { return null }
-        PythonRuntime.fixBrokenSymlinks(libDir)
-
-        marker.writeText(PROVISION_VERSION)
+            PythonRuntime.fixBrokenSymlinks(libDir)
+            val tempMarker = File(root, "$PROVISION_MARKER.tmp")
+            tempMarker.writeText(PROVISION_VERSION)
+            tempMarker.renameTo(marker)
+        }.isSuccess
+        if (!extractOk || !marker.exists()) {
+            root.deleteRecursively()
+            return null
+        }
         return libDir
     }
 }

@@ -522,7 +522,10 @@ object PythonRuntime {
                     try {
                         awaitCancellation()
                     } finally {
-                        if (process.isAlive) process.destroyForcibly()
+                        if (process.isAlive) {
+                            process.destroyForcibly()
+                            runCatching { process.waitFor() }
+                        }
                     }
                 }
                 process.outputStream.close()
@@ -538,7 +541,10 @@ object PythonRuntime {
             }
             exitCode
         } finally {
-            if (process.isAlive) process.destroyForcibly()
+            if (process.isAlive) {
+                process.destroyForcibly()
+                runCatching { process.waitFor() }
+            }
         }
     }
 }
