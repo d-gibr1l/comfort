@@ -342,6 +342,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
+            val isFormatOverrideError = formatIdOverride.isNotBlank() && !isValidFormatSelector(formatIdOverride)
             OutlinedTextField(
                 value = formatIdOverride,
                 onValueChange = { input ->
@@ -353,8 +354,11 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 label = { Text("Format selector") },
                 placeholder = { Text("bv+ba/b") },
                 singleLine = true,
+                isError = isFormatOverrideError,
                 supportingText = {
-                    if (formatIdOverride.isNotBlank()) {
+                    if (isFormatOverrideError) {
+                        Text("Check expression syntax (unbalanced brackets or trailing operator)", color = MaterialTheme.colorScheme.error)
+                    } else if (formatIdOverride.isNotBlank()) {
                         Text("Overrides quality and output format for all yt-dlp downloads.", color = MaterialTheme.colorScheme.tertiary)
                     }
                 },
@@ -435,3 +439,28 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 }
 
 private val SUBTITLE_LANG_REGEX = Regex("^[a-zA-Z0-9_-]+$")
+
+internal fun isValidFormatSelector(selector: String): Boolean {
+    val trimmed = selector.trim()
+    if (trimmed.isEmpty()) return true
+    var squareBrackets = 0
+    var roundBrackets = 0
+    for (char in trimmed) {
+        when (char) {
+            '[' -> squareBrackets++
+            ']' -> {
+                squareBrackets--
+                if (squareBrackets < 0) return false
+            }
+            '(' -> roundBrackets++
+            ')' -> {
+                roundBrackets--
+                if (roundBrackets < 0) return false
+            }
+        }
+    }
+    if (squareBrackets != 0 || roundBrackets != 0) return false
+    val last = trimmed.last()
+    if (last == '/' || last == '+' || last == ',' || last == '|' || last == '&') return false
+    return true
+}
