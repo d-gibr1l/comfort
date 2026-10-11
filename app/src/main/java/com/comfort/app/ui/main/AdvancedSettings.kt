@@ -2,12 +2,16 @@ package com.comfort.app.ui.main
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.material.icons.filled.CheckCircle as FilledCheckCircle
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.comfort.app.data.GalleryDlPreferences
@@ -20,7 +24,6 @@ import androidx.compose.material.icons.outlined.*
 @Composable
 internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     var extractorArgs by remember { mutableStateOf(GalleryDlPreferences.getExtractorArgs(context)) }
     var extractorArgsSaved by remember { mutableStateOf(false) }
     var formatSort by remember { mutableStateOf(GalleryDlPreferences.getFormatSort(context)) }
@@ -55,7 +58,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
         }
 
-        SettingsSection(title = "Bot detection", icon = Icons.Outlined.GppBad) {
+        SettingsSection(title = "Bot detection", icon = Icons.Outlined.Lock) {
             IconToggleRow(
                 icon = Icons.Outlined.GppBad,
                 title = "Impersonate a browser",
@@ -68,7 +71,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
         }
 
-        SettingsSection(title = "yt-dlp extractor arguments", icon = Icons.Outlined.Terminal) {
+        SettingsSection(title = "yt-dlp extractor arguments", icon = Icons.Outlined.Tune) {
             Text(
                 "Site-specific yt-dlp tuning (throttling workarounds, player client selection, etc). " +
                     "CLI syntax, e.g. \"youtube:player_client=android,web\". Separate multiple " +
@@ -83,6 +86,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 onValueChange = { extractorArgs = it; extractorArgsSaved = false },
                 modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. youtube:player_client=android") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 shape = MaterialTheme.shapes.medium,
             )
             Spacer(Modifier.height(12.dp))
@@ -123,6 +127,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. codec:vp9,fps") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
             )
             Spacer(Modifier.height(12.dp))
@@ -160,6 +165,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 onValueChange = { customHeaders = it; customHeadersSaved = false },
                 modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. Referer: https://example.com") },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 shape = MaterialTheme.shapes.medium,
             )
             Spacer(Modifier.height(12.dp))
@@ -183,7 +189,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             }
         }
 
-        SettingsSection(title = "Debugging", icon = Icons.Outlined.Terminal) {
+        SettingsSection(title = "Debugging", icon = Icons.Outlined.Code) {
             IconToggleRow(
                 icon = Icons.Outlined.Terminal,
                 title = "Verbose logging",
@@ -233,7 +239,9 @@ private fun ExtraArgsSheetField() {
         ).joinToString(", ", prefix = "Set for ")
     }
     OutlinedButton(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Extra arguments: $summary" },
         shape = MaterialTheme.shapes.medium,
         enabled = enabled,
         onClick = { showSheet = true },
@@ -336,6 +344,7 @@ private fun ExtraArgsSection(
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).clearFocusOnKeyboardDismiss(),
         placeholder = { Text(placeholder) },
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         shape = MaterialTheme.shapes.medium,
     )
 }
