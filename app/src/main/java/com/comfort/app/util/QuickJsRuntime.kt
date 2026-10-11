@@ -24,6 +24,6 @@ object QuickJsRuntime {
      * should degrade to yt-dlp's own reduced-functionality fallback, not crash). */
     fun getExecutablePath(context: Context): String? {
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY_NAME)
-        return binary.takeIf { it.exists() }?.absolutePath
+        return binary.takeIf { it.isFile && it.exists() }?.absolutePath
     }
 }
