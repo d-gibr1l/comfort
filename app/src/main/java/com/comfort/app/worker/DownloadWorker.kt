@@ -259,6 +259,7 @@ class DownloadWorker(
         // how many downloads are actually still using it, and explicitly cancel it once that count
         // hits zero — not tied to (or trusting) WorkManager's own foreground-service bookkeeping.
         DownloadNotifications.markForegroundStarted()
+        val gateAcquired = AtomicBoolean(false)
         try {
             // Blocks here (not a hard failure) until a concurrency slot is actually free. Every
             // queued download's worker waits here in line (one job per download, see
@@ -271,6 +272,7 @@ class DownloadWorker(
                 queueOrder = entity?.queueOrder ?: 0,
                 dateAdded = entity?.dateAdded ?: System.currentTimeMillis(),
             )
+            gateAcquired.set(true)
             // The real, per-download notification the user actually reads - posted as a plain
             // notify() to its own id, entirely separate from the foreground-service one above, so
             // it's always freely updatable/cancellable regardless of that service's lifecycle.
@@ -637,6 +639,7 @@ class DownloadWorker(
                         try {
                             if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0) else savedCount.decrementAndGet()
                         } catch (e: Exception) {
+                            if (e is CancellationException) throw e
                             savedCount.decrementAndGet()
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
                         }
@@ -1078,7 +1081,9 @@ class DownloadWorker(
             }
         }
         } finally {
-            DownloadConcurrencyGate.release()
+            if (gateAcquired.compareAndSet(true, false)) {
+                DownloadConcurrencyGate.release()
+            }
         }
         } finally {
             DownloadNotifications.markForegroundStopped(applicationContext)
@@ -1097,17 +1102,17 @@ class DownloadWorker(
  * text. Returns null for a name that doesn't look like that shape (e.g. the user configured a
  * custom filename format), leaving the placeholder title in place rather than showing something
  * worse. */
-private fun derivePosterCaptionTitle(filename: String): String? {
+internal fun derivePosterCaptionTitle(filename: String): String? {
     val withoutExtension = filename.substringBeforeLast('.', "").ifBlank { return null }
-    val stripped = withoutExtension.replace(Regex("\\s*\\[[^\\[\\]]*]$"), "").trim()
-    return stripped.ifBlank { null }
+    val stripped = withoutExtension.replace(Regex("\\s*\\[[^\\[\\]]*]\\s*$"), "").trim()
+    return stripped.take(255).trim().ifBlank { null }
 }
 
 /** An engine saying only that the link isn't its kind — yt-dlp's "No video could be found in
  * this tweet" on a picture post — rather than why it failed. With yt-dlp set to run first, that
  * used to become a failed download's summary even when gallery-dl, after it, had the real reason
  * (a private account, a login needed). */
-private fun isNotItsKind(message: String): Boolean {
+internal fun isNotItsKind(message: String): Boolean {
     val m = message.lowercase()
     return "no video could be found" in m || "there's no video in this" in m || "no video formats found" in m ||
         "unsupported url" in m
