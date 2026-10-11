@@ -70,15 +70,28 @@ class PreviewSheetViewModel(
 
     init {
         viewModelScope.launch {
-            val result = preloaded ?: GalleryDlListing.fetchPreviewInfo(context, url, onStatus = { _status.value = it })
-            _preview.value = result
-            result?.tracks?.takeIf { it.isNotEmpty() }?.let { tracks -> _selectedNums.value = tracks.map { it.num }.toSet() }
-            if (_editedTitle.value == null) result?.title?.let { _editedTitle.value = cleanTrackTitle(it).trim() }
-            if (_editedArtist.value == null) result?.artist?.let { _editedArtist.value = cleanArtistName(it).trim() }
-            _loading.value = false
+            try {
+                val result = preloaded ?: GalleryDlListing.fetchPreviewInfo(context, url, onStatus = { _status.value = it })
+                _preview.value = result
+                result?.tracks?.takeIf { it.isNotEmpty() }?.let { tracks -> _selectedNums.value = tracks.map { it.num }.toSet() }
+                if (_editedTitle.value == null) result?.title?.let { _editedTitle.value = cleanTrackTitle(it).trim() }
+                if (_editedArtist.value == null) result?.artist?.let { _editedArtist.value = cleanArtistName(it).trim() }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _status.value = "Failed to load preview"
+            } finally {
+                _loading.value = false
+            }
         }
         viewModelScope.launch {
-            itemFilter.collectLatest { filter -> _isDuplicate.value = DownloadDispatcher.isDuplicate(context, url, filter) }
+            itemFilter.collectLatest { filter ->
+                try {
+                    _isDuplicate.value = DownloadDispatcher.isDuplicate(context, url, filter)
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    _isDuplicate.value = false
+                }
+            }
         }
     }
 

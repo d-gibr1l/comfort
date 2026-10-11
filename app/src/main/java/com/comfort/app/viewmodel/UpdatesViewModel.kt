@@ -108,17 +108,23 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
         _updatingEngines.update { it + key }
         _engineError.value = null
         viewModelScope.launch {
-            val result = EngineUpdater.update(context, status)
-            _updatingEngines.update { it - key }
-            result.onSuccess { newVersion ->
-                val updated = _engineStatuses.value.orEmpty().map {
-                    if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
+            try {
+                val result = EngineUpdater.update(context, status)
+                result.onSuccess { newVersion ->
+                    val updated = _engineStatuses.value.orEmpty().map {
+                        if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
+                    }
+                    GalleryDlPreferences.setEngineUpdateAvailable(context, updated.any { it.updateAvailable && EngineUpdater.isOn(context, it.engine) })
+                    publishEngines(updated)
                 }
-                GalleryDlPreferences.setEngineUpdateAvailable(context, updated.any { it.updateAvailable && EngineUpdater.isOn(context, it.engine) })
-                publishEngines(updated)
-            }
-            result.onFailure { e ->
+                result.onFailure { e ->
+                    _engineError.value = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _engineError.value = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
+            } finally {
+                _updatingEngines.update { it - key }
             }
         }
     }

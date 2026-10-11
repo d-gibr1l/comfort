@@ -271,8 +271,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         if (ids.isEmpty()) return
         viewModelScope.launch {
             val context = getApplication<Application>()
-            ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
-            _deletingIds.update { it - ids }
+            try {
+                ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
+            } finally {
+                _deletingIds.update { it - ids }
+            }
         }
     }
 
