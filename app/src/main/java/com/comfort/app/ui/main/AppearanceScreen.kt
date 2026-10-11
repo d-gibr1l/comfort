@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +41,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -116,6 +121,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 // extra the bleed measures into, making the bleed pointless.
                 modifier = Modifier
                     .fillMaxWidth()
+                    .semantics { contentDescription = "Light theme options" }
                     .layout { measurable, constraints ->
                         val bleed = 20.dp.roundToPx()
                         val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
@@ -148,6 +154,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 // Same bleed + contentPadding technique as the Light theme row above.
                 modifier = Modifier
                     .fillMaxWidth()
+                    .semantics { contentDescription = "Dark theme options" }
                     .layout { measurable, constraints ->
                         val bleed = 20.dp.roundToPx()
                         val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
@@ -245,7 +252,18 @@ private fun ThemeToggleRow(
     // this same gap was found and fixed identically.
     val haptics = LocalHapticFeedback.current
     Row(
-        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)).padding(vertical = 14.dp, horizontal = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(highlightRowModifier(title))
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = {
+                    haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+                    onCheckedChange(it)
+                },
+            )
+            .padding(vertical = 14.dp, horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -259,10 +277,7 @@ private fun ThemeToggleRow(
         Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked,
-            onCheckedChange = {
-                haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
-                onCheckedChange(it)
-            },
+            onCheckedChange = null,
             // Same fix as SettingsComponents.kt's IconToggleRow: the default unchecked thumb color is
             // nearly invisible against the unchecked track in this theme, so an off toggle read
             // as a dead gray blob rather than a working control resting in its off position.
@@ -287,6 +302,7 @@ private fun ThemePreviewCard(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val scheme: ColorScheme = remember(theme, isDark) {
         if (theme.isDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -295,6 +311,7 @@ private fun ThemePreviewCard(
         }
     }
     val label = if (isDark) theme.darkLabel else theme.lightLabel
+    val accessibilityLabel = "${if (isDark) "Dark" else "Light"} theme: $label"
 
     Column(
         modifier = Modifier.width(100.dp),
@@ -310,7 +327,17 @@ private fun ThemePreviewCard(
                     color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
                     shape = RoundedCornerShape(20.dp),
                 )
-                .clickable(onClick = onClick),
+                .selectable(
+                    selected = selected,
+                    role = Role.RadioButton,
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onClick()
+                    },
+                )
+                .semantics {
+                    contentDescription = accessibilityLabel
+                },
         ) {
             Column(
                 modifier = Modifier
@@ -405,7 +432,7 @@ private fun ThemePreviewCard(
                         .background(scheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = scheme.onPrimary, modifier = Modifier.size(11.dp))
+                    Icon(Icons.Outlined.Check, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(11.dp))
                 }
             }
         }
