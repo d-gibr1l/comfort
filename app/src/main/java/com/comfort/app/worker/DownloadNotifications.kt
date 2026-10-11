@@ -195,6 +195,7 @@ object DownloadNotifications {
         currentBytes: Long = 0L,
         expectedBytes: Long = 0L,
     ): Notification {
+        val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         ensureChannel(context)
         val sizeText = if (expectedBytes > 0) "${formatFileSize(currentBytes)} of ${formatFileSize(expectedBytes)}" else null
         val speedText = if (speedMbs > 0.01f) "%.1f MB/s".format(speedMbs) else null
@@ -208,8 +209,8 @@ object DownloadNotifications {
                     // Real byte-level detail (size + speed) already implies progress more
                     // usefully than a bare percent would, so it takes priority when available.
                     byteDetail.isNotBlank() -> byteDetail
-                    progressPercent != null -> "$progressPercent% · ${if (downloadedItems > 0) "$downloadedItems downloaded" else "Downloading…"}"
-                    downloadedItems > 0 -> "$downloadedItems downloaded"
+                    progressPercent != null -> "$progressPercent% · ${if (safeDownloadedItems > 0) "$safeDownloadedItems downloaded" else "Downloading…"}"
+                    safeDownloadedItems > 0 -> "$safeDownloadedItems downloaded"
                     else -> "Starting…"
                 }
             )
@@ -246,9 +247,10 @@ object DownloadNotifications {
     }
 
     fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?) {
+        val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         // "picture(s)" used to be hardcoded here regardless of what actually got saved — a
         // downloaded video or audio file still read "1 picture saved," which looked like a bug.
-        val text = if (downloadedItems > 0) "$downloadedItems item${if (downloadedItems == 1) "" else "s"} saved" else "Nothing new to download"
+        val text = if (safeDownloadedItems > 0) "$safeDownloadedItems item${if (safeDownloadedItems == 1) "" else "s"} saved" else "Nothing new to download"
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
             // still uses — so "this one finished" is visible at a glance in the shade/status bar
@@ -343,7 +345,9 @@ object DownloadNotifications {
     }
 
     fun cancel(context: Context, downloadId: String) {
-        NotificationManagerCompat.from(context).cancel(notificationId(downloadId))
+        runCatching {
+            NotificationManagerCompat.from(context).cancel(notificationId(downloadId))
+        }
     }
 
     private fun notifySafe(context: Context, downloadId: String, notification: Notification) {
@@ -351,7 +355,11 @@ object DownloadNotifications {
         val hasPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         if (hasPermission) {
-            NotificationManagerCompat.from(context).notify(notificationId(downloadId), notification)
+            runCatching {
+                NotificationManagerCompat.from(context).notify(notificationId(downloadId), notification)
+            }.onFailure { e ->
+                android.util.Log.w("DownloadNotifications", "Failed to post notification for $downloadId", e)
+            }
         }
     }
 }

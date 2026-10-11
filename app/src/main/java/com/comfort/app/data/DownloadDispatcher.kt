@@ -103,8 +103,13 @@ object DownloadDispatcher {
         val appContext = context.applicationContext
         pendingRepair?.cancel()
         pendingRepair = repairScope.launch {
-            kotlinx.coroutines.delay(QUEUE_REPAIR_DEBOUNCE_MS)
-            repairOrphanedQueue(appContext)
+            try {
+                kotlinx.coroutines.delay(QUEUE_REPAIR_DEBOUNCE_MS)
+                repairOrphanedQueue(appContext)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("DownloadDispatcher", "Queue repair failed", e)
+            }
         }
     }
 
@@ -136,8 +141,10 @@ object DownloadDispatcher {
      * "Redownload," tapping it is the confirmation; callers pass forceDuplicate = true straight
      * through rather than needing a second confirmation step here. */
     suspend fun isDuplicate(context: Context, url: String, itemFilter: String? = null): Boolean {
+        val trimmedUrl = url.trim()
+        if (trimmedUrl.isBlank()) return false
         if (!GalleryDlPreferences.isPreventDuplicateDownloads(context)) return false
-        return AppDatabase.getDatabase(context).downloadDao().findActiveOrFinishedByUrl(url, itemFilter) != null
+        return AppDatabase.getDatabase(context).downloadDao().findActiveOrFinishedByUrl(trimmedUrl, itemFilter) != null
     }
 
     suspend fun enqueueDownload(
@@ -163,18 +170,21 @@ object DownloadDispatcher {
         // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
         forceDuplicate: Boolean = false,
     ): EnqueueResult {
+        val trimmedUrl = url.trim()
+        val sanitizedTitle = title.trim().ifBlank { trimmedUrl }
+        val safeTotalItems = totalItems.coerceAtLeast(0)
         val dao = AppDatabase.getDatabase(context).downloadDao()
         // Imported from YTDLnis's own "Prevent duplicate downloads" setting — off by default, so
         // this only ever short-circuits when the user has actually turned it on. Records the skip
         // in duplicate_attempts (see DuplicateAttempt's own doc comment) rather than creating a
         // redundant second downloads row for the same URL.
         if (!forceDuplicate && GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
-            dao.findActiveOrFinishedByUrl(url, itemFilter)?.let { existing ->
+            dao.findActiveOrFinishedByUrl(trimmedUrl, itemFilter)?.let { existing ->
                 dao.insertDuplicateAttempt(
                     DuplicateAttempt(
                         id = UUID.randomUUID().toString(),
-                        url = url,
-                        title = title,
+                        url = trimmedUrl,
+                        title = sanitizedTitle,
                         thumbnailPath = existing.thumbnailPath,
                         originalDownloadId = existing.id,
                         dateAdded = System.currentTimeMillis(),
@@ -188,8 +198,8 @@ object DownloadDispatcher {
         dao.insert(
             DownloadEntity(
                 id = id,
-                url = url,
-                title = title,
+                url = trimmedUrl,
+                title = sanitizedTitle,
                 thumbnailPath = null,
                 // A new download added while globally paused used to always insert as QUEUED
                 // regardless — it never actually dispatched to WorkManager (see the check below,
@@ -205,20 +215,20 @@ object DownloadDispatcher {
                 // Known for free when this came from the share-sheet item picker (it already
                 // enumerated the gallery to render itself); left at 0 — "unknown" — otherwise, in
                 // which case DownloadWorker enumerates it itself before starting the real download.
-                totalItems = totalItems,
+                totalItems = safeTotalItems,
                 speedMbs = 0f,
                 etaSeconds = 0L,
                 errorMessage = null,
                 dateAdded = System.currentTimeMillis(),
                 itemFilter = itemFilter,
-                videoQuality = videoQuality?.name ?: if (VideoSiteRouter.isSongSource(url)) VideoQuality.AUDIO_ONLY.name else null,
+                videoQuality = videoQuality?.name ?: if (VideoSiteRouter.isSongSource(trimmedUrl)) VideoQuality.AUDIO_ONLY.name else null,
                 clipRange = clipRange,
                 extraCommands = extraCommands,
                 outputFormat = outputFormat?.name,
                 filenameTemplate = filenameTemplate,
                 saveThumbnail = saveThumbnail,
-                overrideTitle = overrideTitle,
-                overrideArtist = overrideArtist,
+                overrideTitle = overrideTitle?.trim()?.ifBlank { null },
+                overrideArtist = overrideArtist?.trim()?.ifBlank { null },
                 engineOverride = engineOverride?.name,
                 // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
                 // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
@@ -229,7 +239,7 @@ object DownloadDispatcher {
         // While globally paused, new downloads sit undispatched — resumeAll() picks up anything
         // still PAUSED (see above) alongside whatever it un-pauses.
         if (!globallyPaused) {
-            enqueueWork(context, id, url)
+            enqueueWork(context, id, trimmedUrl)
         }
         return EnqueueResult.Started(id)
     }
@@ -403,6 +413,7 @@ object DownloadDispatcher {
      * [pauseDownload], a cancelled entry is never swept back up by resumeAll() — the user has to
      * explicitly resume it from the Cancelled section. */
     suspend fun cancelDownload(context: Context, id: String) {
+        if (id.isBlank()) return
         withDownloadLock(id) {
             val dao = AppDatabase.getDatabase(context).downloadDao()
             val entity = dao.getById(id) ?: return@withDownloadLock
@@ -503,18 +514,21 @@ object DownloadDispatcher {
     }
 
     /** Cancels any in-flight job, drops the row, and cleans up its download-archive file. */
-    suspend fun deleteDownload(context: Context, id: String) = withDownloadLock(id) {
-        val dao = AppDatabase.getDatabase(context).downloadDao()
-        val entity = dao.getById(id)
-        cancelWorkManagerJob(context, entity?.workRequestId)
-        DownloadNotifications.cancel(context, id)
-        File(context.filesDir, "archives/$id.sqlite3").delete()
-        File(context.filesDir, "archives/$id.ytdlp.txt").delete()
-        File(context.filesDir, "archives/$id.instaloader.txt").delete()
-        deleteStagingDir(context, id)
-        dao.clearDownloadedFileRecords(id)
-        dao.delete(id)
-        forgetLock(id)
+    suspend fun deleteDownload(context: Context, id: String) {
+        if (id.isBlank()) return
+        withDownloadLock(id) {
+            val dao = AppDatabase.getDatabase(context).downloadDao()
+            val entity = dao.getById(id)
+            cancelWorkManagerJob(context, entity?.workRequestId)
+            DownloadNotifications.cancel(context, id)
+            File(context.filesDir, "archives/$id.sqlite3").delete()
+            File(context.filesDir, "archives/$id.ytdlp.txt").delete()
+            File(context.filesDir, "archives/$id.instaloader.txt").delete()
+            deleteStagingDir(context, id)
+            dao.clearDownloadedFileRecords(id)
+            dao.delete(id)
+            forgetLock(id)
+        }
     }
 
     /** Re-submits every not-yet-started download's WorkManager job so it recomputes its delay
@@ -631,8 +645,8 @@ object DownloadDispatcher {
     fun scheduleDelayMillis(context: Context): Long {
         if (!GalleryDlPreferences.isScheduleEnabled(context)) return 0L
 
-        val startMin = GalleryDlPreferences.getScheduleStartMinutes(context)
-        val endMin = GalleryDlPreferences.getScheduleEndMinutes(context)
+        val startMin = GalleryDlPreferences.getScheduleStartMinutes(context).coerceIn(0, 1439)
+        val endMin = GalleryDlPreferences.getScheduleEndMinutes(context).coerceIn(0, 1439)
         // Identical Start/End would otherwise fall into the non-wrapping branch below and read as
         // "open" only during that exact one minute of the day, closed the other 1439 — surprising
         // for a value nobody would deliberately pick to mean "almost never download." Treating it
@@ -671,22 +685,26 @@ object DownloadDispatcher {
      * it fires, since scheduleDelayMillis() is ~0 right when the window opens and there's nothing
      * to re-arm for until the next SCHEDULED item comes along naturally. */
     fun scheduleWindowAlarm(context: Context) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val pendingIntent = PendingIntent.getBroadcast(
             context, SCHEDULE_ALARM_REQUEST_CODE,
             Intent(context, ScheduleAlarmReceiver::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         if (!GalleryDlPreferences.isScheduleEnabled(context) || !GalleryDlPreferences.isAlarmSchedulingEnabled(context)) {
-            alarmManager.cancel(pendingIntent)
+            runCatching { alarmManager.cancel(pendingIntent) }
             return
         }
         val delayMillis = scheduleDelayMillis(context)
         if (delayMillis <= 0L) {
             // Already inside the window (or nothing configured) — nothing to wake up for.
-            alarmManager.cancel(pendingIntent)
+            runCatching { alarmManager.cancel(pendingIntent) }
             return
         }
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+        runCatching {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + delayMillis, pendingIntent)
+        }.onFailure { e ->
+            android.util.Log.w("DownloadDispatcher", "Failed to schedule window alarm", e)
+        }
     }
 }

@@ -22,17 +22,19 @@ class StagingCleanupWorker(context: Context, params: WorkerParameters) : Corouti
         val leftoverIds = dao.getCancelledOrErroredIdsOnce().toSet()
         val stagingRoot = File(applicationContext.cacheDir, "gallery-dl-staging")
         val dirs = stagingRoot.listFiles() ?: return Result.success()
+        val canonicalStagingRoot = stagingRoot.canonicalFile
         for (dir in dirs) {
             // Only ever touch a subdirectory whose name is a known cancelled/errored download's
             // id — never a bare age-based sweep, so an id that's still QUEUED/RUNNING/PAUSED (or
             // simply not in the DB, e.g. staging's own transient state) is never at risk.
-            if (dir.isDirectory && dir.name in leftoverIds) {
+            if (dir.isDirectory && dir.name in leftoverIds && dir.canonicalFile.parentFile == canonicalStagingRoot) {
                 dir.deleteRecursively()
             }
         }
         val cacheFiles = applicationContext.cacheDir.listFiles().orEmpty()
+        val canonicalCacheDir = applicationContext.cacheDir.canonicalFile
         for (file in cacheFiles) {
-            if (file.isFile && file.name.startsWith("cookies-normalized-") && file.name.endsWith(".txt")) {
+            if (file.isFile && file.canonicalFile.parentFile == canonicalCacheDir && file.name.startsWith("cookies-normalized-") && file.name.endsWith(".txt")) {
                 val fileDownloadId = file.name.removePrefix("cookies-normalized-").removeSuffix(".txt")
                 if (fileDownloadId in leftoverIds || System.currentTimeMillis() - file.lastModified() > 86_400_000L) {
                     file.delete()
