@@ -8,11 +8,11 @@ import java.io.File
  * (the one place in an app's sandbox that's still exec-permitted since Android 10 made the rest of
  * private storage noexec).
  *
- * The same build for every ABI (ffmpeg 7.1, built from ~/ffmpeg-build/build2.sh in WSL): it links
+ * The same build for every ABI (ffmpeg 7.1, built by tools/build-ffmpeg.sh): it links
  * only against system libraries (libc, libz, libmediandk), so there's nothing to unpack. Besides
  * muxing yt-dlp's separate video and audio streams, it decodes audio/video/images and encodes AAC,
  * MP3 (LAME), Opus, FLAC, JPEG, PNG and GIF, plus H.264/HEVC through the phone's own hardware
- * encoder (h264_mediacodec — needs the frame width to be a multiple of 16, see
+ * encoder (h264_mediacodec — needs both frame sides to be multiples of 16, see
  * yt_dlp_wrapper.py's _h264_args).
  *
  * armeabi-v7a used to ship a dynamically linked ytdlnis-packages build with a separate
