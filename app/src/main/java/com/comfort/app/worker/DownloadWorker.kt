@@ -21,6 +21,7 @@ import com.comfort.app.util.MediaStoreHelper
 import com.comfort.app.util.PythonRuntime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -180,6 +181,23 @@ class DownloadWorker(
             }
         }
         return File(song.parentFile, song.nameWithoutExtension + ".lrc").takeIf { writeLrc && it.isFile }
+    }
+
+    /** A worker the system stopped (battery saver, a constraint going away, a job timeout) gets
+     * cancelled like a user Pause, but nothing has written a new status for it: the row stays
+     * RUNNING while WorkManager re-runs it later, so the Queue showed a "downloading" card with
+     * nothing moving while the real attempt waited for a slot. Only RUNNING rows still owned by this
+     * job are reset — a user pause/cancel (PAUSED/CANCELLED) or a re-enqueue under a new job id
+     * (whose own worker may already be RUNNING) are left alone. NonCancellable: this runs from the
+     * cancellation path itself. */
+    private suspend fun requeueIfStillRunning(dao: com.comfort.app.data.DownloadDao, downloadId: String) {
+        withContext(NonCancellable) {
+            runCatching {
+                if (dao.getById(downloadId)?.workRequestId == id.toString()) {
+                    dao.updateStatusIfIn(downloadId, DownloadStatus.QUEUED, listOf(DownloadStatus.RUNNING))
+                }
+            }
+        }
     }
 
     override suspend fun doWork(): Result {
@@ -384,6 +402,7 @@ class DownloadWorker(
                     // start" with no error surfaced (reproduced live). Our own DB status column is
                     // the real source of truth for this download's outcome; WorkManager's Result
                     // only needs to say "done, move on to the next queued item".
+                    requeueIfStillRunning(dao, downloadId)
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
                 }
@@ -970,6 +989,7 @@ class DownloadWorker(
                     // Leave whatever status pauseDownload()/cancelDownload()/suspendForSchedule()
                     // already set instead of overwriting it either way.
                     // Result.success() — see the isStopped branch above for why.
+                    requeueIfStillRunning(dao, downloadId)
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
                 }
@@ -1012,7 +1032,9 @@ class DownloadWorker(
                 Result.success()
             } catch (e: CancellationException) {
                 // A paused/cancelled download: leave whatever status pauseDownload()/cancelDownload()
-                // already set instead of overwriting it with an error.
+                // already set instead of overwriting it with an error. Stopped by the system instead
+                // (battery saver, a constraint change), it's still RUNNING — put it back to waiting.
+                requeueIfStillRunning(dao, downloadId)
                 DownloadNotifications.cancel(applicationContext, downloadId)
                 throw e
             } catch (e: Exception) {
@@ -1022,6 +1044,7 @@ class DownloadWorker(
                 // failure() would cascade to kill every other download sharing this WorkManager
                 // concurrency slot without ever running them.
                 if (isStopped) {
+                    requeueIfStillRunning(dao, downloadId)
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     Result.success()
                 } else {
