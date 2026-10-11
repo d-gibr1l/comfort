@@ -34,6 +34,13 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
     var youtubeClientRotation by remember { mutableStateOf(GalleryDlPreferences.isYoutubeClientRotationEnabled(context)) }
     var impersonateEnabled by remember { mutableStateOf(GalleryDlPreferences.isImpersonateEnabled(context)) }
 
+    val isExtractorArgsDirty = extractorArgs.trim() != GalleryDlPreferences.getExtractorArgs(context).trim()
+    val isFormatSortDirty = formatSort.trim() != GalleryDlPreferences.getFormatSort(context).trim()
+    val isFormatSortError = formatSort.isNotBlank() && !isValidFormatSort(formatSort)
+
+    val isCustomHeadersDirty = customHeaders.trim() != GalleryDlPreferences.getCustomHeaders(context).trim()
+    val customHeadersError = validateCustomHeaders(customHeaders)
+
     SettingsSubScaffold(title = "Advanced", topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
             Text(
@@ -91,17 +98,32 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
             Spacer(Modifier.height(12.dp))
 
-            OutlinedButton(
-                onClick = {
-                    GalleryDlPreferences.setExtractorArgs(context, extractorArgs)
-                    extractorArgsSaved = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Save extractor arguments")
+            if (isExtractorArgsDirty) {
+                Button(
+                    onClick = {
+                        GalleryDlPreferences.setExtractorArgs(context, extractorArgs.trim())
+                        extractorArgsSaved = true
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save extractor arguments")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        GalleryDlPreferences.setExtractorArgs(context, extractorArgs.trim())
+                        extractorArgsSaved = true
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save extractor arguments")
+                }
             }
 
             if (extractorArgsSaved) {
@@ -127,22 +149,45 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. codec:vp9,fps") },
                 singleLine = true,
+                isError = isFormatSortError,
+                supportingText = {
+                    if (isFormatSortError) {
+                        Text("Cannot contain quotes, newlines, or shell characters", color = MaterialTheme.colorScheme.error)
+                    }
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
             )
             Spacer(Modifier.height(12.dp))
 
-            OutlinedButton(
-                onClick = {
-                    GalleryDlPreferences.setFormatSort(context, formatSort)
-                    formatSortSaved = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Save format sort")
+            if (isFormatSortDirty) {
+                Button(
+                    onClick = {
+                        GalleryDlPreferences.setFormatSort(context, formatSort.trim())
+                        formatSortSaved = true
+                    },
+                    enabled = !isFormatSortError,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save format sort")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        GalleryDlPreferences.setFormatSort(context, formatSort.trim())
+                        formatSortSaved = true
+                    },
+                    enabled = !isFormatSortError,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save format sort")
+                }
             }
 
             if (formatSortSaved) {
@@ -165,22 +210,45 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 onValueChange = { customHeaders = it; customHeadersSaved = false },
                 modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
                 label = { Text("e.g. Referer: https://example.com") },
+                isError = customHeadersError != null,
+                supportingText = {
+                    if (customHeadersError != null) {
+                        Text(customHeadersError, color = MaterialTheme.colorScheme.error)
+                    }
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 shape = MaterialTheme.shapes.medium,
             )
             Spacer(Modifier.height(12.dp))
 
-            OutlinedButton(
-                onClick = {
-                    GalleryDlPreferences.setCustomHeaders(context, customHeaders)
-                    customHeadersSaved = true
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Save headers")
+            if (isCustomHeadersDirty) {
+                Button(
+                    onClick = {
+                        GalleryDlPreferences.setCustomHeaders(context, customHeaders.trim())
+                        customHeadersSaved = true
+                    },
+                    enabled = customHeadersError == null,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save headers")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        GalleryDlPreferences.setCustomHeaders(context, customHeaders.trim())
+                        customHeadersSaved = true
+                    },
+                    enabled = customHeadersError == null,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save headers")
+                }
             }
 
             if (customHeadersSaved) {
@@ -348,3 +416,26 @@ private fun ExtraArgsSection(
         shape = MaterialTheme.shapes.medium,
     )
 }
+
+internal fun validateCustomHeaders(headersText: String): String? {
+    for ((index, line) in headersText.lineSequence().withIndex()) {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) continue
+        if (!trimmed.contains(':')) {
+            return "Line ${index + 1}: Missing colon ':' between header name and value"
+        }
+        val name = trimmed.substringBefore(':').trim()
+        if (name.isEmpty()) {
+            return "Line ${index + 1}: Header name cannot be empty"
+        }
+        if (name.any { it.isWhitespace() }) {
+            return "Line ${index + 1}: Header name cannot contain spaces"
+        }
+    }
+    return null
+}
+
+internal fun isValidFormatSort(formatSort: String): Boolean {
+    return !formatSort.any { it in "\"'$`;|&" || it == '\n' || it == '\r' }
+}
+
