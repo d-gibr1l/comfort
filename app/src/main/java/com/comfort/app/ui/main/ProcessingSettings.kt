@@ -4,14 +4,18 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import compose.icons.feathericons.Instagram
-import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
@@ -70,7 +74,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                         }
                     }
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 20.dp)
+                    .selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 val qualities = VideoQuality.entries
@@ -83,7 +88,9 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                             videoQuality = quality
                             GalleryDlPreferences.setVideoQuality(context, quality)
                         },
-                        modifier = Modifier.height(40.dp),
+                        modifier = Modifier
+                            .height(40.dp)
+                            .semantics { role = Role.RadioButton },
                         interactionSource = interactionSource,
                         shape = rememberMorphingChipShape(index, qualities.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
                         label = { Text(quality.label, style = MaterialTheme.typography.labelLarge) },
@@ -111,7 +118,9 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             )
             Spacer(Modifier.height(12.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 val formats = OutputFormat.entries
@@ -124,7 +133,10 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                             outputFormat = format
                             GalleryDlPreferences.setOutputFormat(context, format)
                         },
-                        modifier = Modifier.weight(1f).height(40.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .semantics { role = Role.RadioButton },
                         interactionSource = interactionSource,
                         shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
                         label = {
@@ -148,7 +160,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.List,
+                icon = Icons.Outlined.VideoFile,
                 title = "Single video only",
                 subtitle = "Only downloads the specific video from a link, even if it belongs to a larger playlist or channel.",
                 checked = noPlaylist,
@@ -208,7 +220,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.List,
+                icon = Icons.AutoMirrored.Outlined.List,
                 title = "Embed chapters",
                 subtitle = "Saves chapter markers inside the video file.",
                 checked = embedChapters,
@@ -259,6 +271,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                     label = { Text("Subtitle languages") },
                     placeholder = { Text("en") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     shape = MaterialTheme.shapes.medium,
                 )
                 Spacer(Modifier.height(4.dp))
@@ -306,6 +319,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 label = { Text("Format selector") },
                 placeholder = { Text("bv+ba/b") },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
             )
         }
@@ -320,7 +334,9 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             )
             Spacer(Modifier.height(12.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 val modes = listOf(
@@ -337,7 +353,10 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                             lyricsMode = mode
                             GalleryDlPreferences.setLyricsMode(context, mode)
                         },
-                        modifier = Modifier.weight(1f).height(40.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .semantics { role = Role.RadioButton },
                         interactionSource = interactionSource,
                         shape = rememberMorphingChipShape(index, modes.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
                         label = {
