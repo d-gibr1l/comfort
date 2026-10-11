@@ -7,9 +7,11 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import java.util.Locale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,7 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -258,6 +265,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     label = { Text("Proxy") },
                     placeholder = { Text("None") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
                     shape = MaterialTheme.shapes.medium,
                 )
             }
@@ -297,7 +305,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
-                icon = Icons.Outlined.CallSplit,
+                icon = Icons.AutoMirrored.Outlined.CallSplit,
                 title = "Concurrent fragments",
                 subtitle = "How many fragments of a single video to download in parallel.",
                 checked = concurrentFragmentsEnabled,
@@ -405,7 +413,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     label = { Text("KB") },
                     placeholder = { Text("1024") },
                     singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     shape = MaterialTheme.shapes.medium,
                 )
             }
@@ -576,7 +584,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     label = { Text("Seconds") },
                     placeholder = { Text("0") },
                     singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     shape = MaterialTheme.shapes.medium,
                 )
             }
@@ -656,7 +664,9 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 // same reasoning, as the Sharing mode row above: the chip API's own accessibility
                 // semantics, minimum touch target, and selected-state contract, for free.
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     // "Never" isn't one of the options here — the toggle above already covers
@@ -673,7 +683,10 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                                 cleanupLeftoverInterval = value
                                 downloadsSettings.setCleanupLeftoverInterval(value)
                             },
-                            modifier = Modifier.weight(1f).height(40.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .semantics { role = Role.RadioButton },
                             interactionSource = interactionSource,
                             shape = rememberMorphingChipShape(index, cleanupOptions.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
                             label = {
@@ -712,15 +725,18 @@ private fun TimePickerButton(
         else -> hour
     }
     var showPicker by remember { mutableStateOf(false) }
+    val formattedTime = String.format(Locale.getDefault(), "%d:%02d %s", displayHour, minute, amPm)
 
     OutlinedButton(
-        modifier = modifier,
+        modifier = modifier.semantics {
+            contentDescription = "$label schedule time: $formattedTime"
+        },
         shape = MaterialTheme.shapes.medium,
         onClick = { showPicker = true },
     ) {
         Column {
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("%d:%02d %s".format(displayHour, minute, amPm), style = MaterialTheme.typography.titleSmall)
+            Text(formattedTime, style = MaterialTheme.typography.titleSmall)
         }
     }
 
@@ -777,13 +793,21 @@ private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (co
         // Same connected-group treatment as the Library toolbar row's chips (Sort/Deleted/
         // Duplicates/Audio) — near-touching (2dp) with rounded outer ends/square inner corners,
         // not the wider 8dp-gap/uniform-shape look tried first.
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             options.forEachIndexed { index, option ->
                 val interactionSource = remember { MutableInteractionSource() }
                 FilterChip(
                     selected = mode == option,
                     onClick = { onModeChange(option) },
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .semantics { role = Role.RadioButton },
                     interactionSource = interactionSource,
                     shape = rememberMorphingChipShape(index, options.size, selected = mode == option, interactionSource = interactionSource, height = 40.dp),
                     label = {
