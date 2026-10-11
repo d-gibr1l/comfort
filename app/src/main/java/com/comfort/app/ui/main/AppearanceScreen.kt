@@ -13,6 +13,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
@@ -30,10 +32,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +84,29 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> systemDark
     }
+
+    // Guard against unsupported dynamic theme on API < 31 (e.g. from restored preferences)
+    LaunchedEffect(dynamicAvailable) {
+        if (!dynamicAvailable) {
+            if (themeState.lightTheme.isDynamic) {
+                themeState.setLightTheme(AppTheme.DEFAULT)
+            }
+            if (themeState.darkTheme.isDynamic) {
+                themeState.setDarkTheme(AppTheme.DEFAULT)
+            }
+        }
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+    val lightSelectedIndex = remember(availableThemes, themeState.lightTheme) {
+        availableThemes.indexOf(themeState.lightTheme).coerceAtLeast(0)
+    }
+    val darkSelectedIndex = remember(availableThemes, themeState.darkTheme) {
+        availableThemes.indexOf(themeState.darkTheme).coerceAtLeast(0)
+    }
+    val lightRowState = rememberLazyListState(initialFirstVisibleItemIndex = (lightSelectedIndex - 1).coerceAtLeast(0))
+    val darkRowState = rememberLazyListState(initialFirstVisibleItemIndex = (darkSelectedIndex - 1).coerceAtLeast(0))
+
     // Own scroll state + HighlightController, mirroring SettingsSubScaffold's own copy of this —
     // this screen keeps its own Box/Column (see its own doc comment below) rather than that shared
     // one, so it can't just receive one from there.
@@ -113,6 +141,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             ThemeHeading(Icons.Outlined.LightMode, "Light theme", isActive = !effectiveDark)
             Spacer(Modifier.height(10.dp))
             LazyRow(
+                state = lightRowState,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 // Bleed past the page's own 20dp side padding (from the parent Column, above) so
                 // this row can actually scroll edge-to-edge instead of stopping short at the same
@@ -136,7 +165,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     },
                 contentPadding = PaddingValues(horizontal = 20.dp),
             ) {
-                items(availableThemes, key = { "${it.name}_light" }) { theme ->
+                itemsIndexed(availableThemes, key = { _, theme -> "${theme.name}_light" }) { index, theme ->
                     ThemePreviewCard(
                         theme = theme,
                         isDark = false,
@@ -145,6 +174,9 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                             themeState.setLightTheme(theme)
                             if (themeState.mode != ThemeMode.SYSTEM) {
                                 themeState.setMode(ThemeMode.LIGHT)
+                            }
+                            coroutineScope.launch {
+                                lightRowState.animateScrollToItem((index - 1).coerceAtLeast(0))
                             }
                         },
                     )
@@ -155,6 +187,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             ThemeHeading(Icons.Outlined.DarkMode, "Dark theme", isActive = effectiveDark)
             Spacer(Modifier.height(10.dp))
             LazyRow(
+                state = darkRowState,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 // Same bleed + contentPadding technique as the Light theme row above.
                 modifier = Modifier
@@ -169,7 +202,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     },
                 contentPadding = PaddingValues(horizontal = 20.dp),
             ) {
-                items(availableThemes, key = { "${it.name}_dark" }) { theme ->
+                itemsIndexed(availableThemes, key = { _, theme -> "${theme.name}_dark" }) { index, theme ->
                     ThemePreviewCard(
                         theme = theme,
                         isDark = true,
@@ -179,6 +212,9 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                             themeState.setDarkTheme(theme)
                             if (themeState.mode != ThemeMode.SYSTEM) {
                                 themeState.setMode(ThemeMode.DARK)
+                            }
+                            coroutineScope.launch {
+                                darkRowState.animateScrollToItem((index - 1).coerceAtLeast(0))
                             }
                         },
                     )
