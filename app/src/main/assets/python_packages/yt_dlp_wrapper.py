@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
@@ -262,48 +263,23 @@ def _patch_embed_thumbnail_fallback():
 
     EmbedThumbnailPP.run = _run_with_fallback
 
-_FFMPEG_AUDIO_COPY_PATCHED = False
+_MOVFLAGS_PATCHED = False
 
-def _patch_ffmpeg_audio_copy_for_stripped_build():
-    """Two separate incompatibilities between FFmpegExtractAudioPP's "best"-codec/copy-only path
-    (see that fix's own doc comment just above) and this app's own stripped ffmpeg build
-    (--disable-encoders/--disable-decoders, and a narrow --enable-muxer list of just
-    'mp4,ipod,matroska,webm,adts,wav,mp3' — confirmed directly from this build's own `-version`
-    configure string), both reproduced live extracting audio from a source whose native codec is
-    opus (a common YouTube bestaudio format, not just aac/m4a):
+def _patch_movflags_for_non_mp4():
+    """FFmpegPostProcessor.real_run_ffmpeg (postprocessor/ffmpeg.py) appends "-movflags
+    +faststart" to every output file's args — an option only the MP4 muxer has. ffmpeg rejects it
+    for any other output ("Invalid argument") instead of ignoring it, so an .opus, .mp3, .flac or
+    .mkv output (an audio extraction, a trim) failed outright. Popen.run is the one point every
+    ffmpeg run goes through; the pair is dropped there whenever the output isn't mp4-family.
 
-    1. yt_dlp's own ACODECS table (postprocessor/ffmpeg.py) maps a copy-only opus/vorbis
-       extraction to a bare ".opus"/".ogg" extension — but that build's --enable-muxer list has
-       no ogg/opus muxer at all, so writing to that extension can never work here, copy-only or
-       not. WebM *is* in the muxer list and is itself a fully valid, standard container for
-       Opus/Vorbis audio, so remapping just the extension keeps this a pure remux (still
-       "-acodec copy", no real encode) into a container this build can actually write.
-
-    2. FFmpegPostProcessor.real_run_ffmpeg (same file) separately, unconditionally appends
-       "-movflags", "+faststart" to every output file's own args (see its own make_args() nested
-       helper) — a flag only the MP4 muxer understands. A full desktop ffmpeg build just warns
-       and ignores an option a muxer doesn't recognize; this stripped build turns that into a
-       hard "Invalid argument" failure instead — so even after the extension fix above, a webm
-       output still needs this flag stripped to actually succeed.
-
-    Fixed with two small, narrowly-targeted patches: remapping ACODECS's own opus/vorbis
-    extensions to "webm" (keeping their real encoder/opts entries untouched — irrelevant anyway
-    once the "best"/copy-only branch overrides acodec to "copy" regardless), and wrapping
-    Popen.run (yt_dlp.utils.Popen, the one point every ffmpeg invocation funnels through) to
-    strip a literal "-movflags"/"+faststart" pair whenever the command's own output path isn't an
-    mp4-family extension the flag actually applies to. Neither touches a real mp4/m4a output,
-    where both the original extension and the flag are correct and unaffected."""
-    global _FFMPEG_AUDIO_COPY_PATCHED
-    if _FFMPEG_AUDIO_COPY_PATCHED:
+    Used to come with an ACODECS remap of opus/vorbis to .webm, for the old build that had no ogg
+    muxer; this build writes .opus/.ogg itself, so audio keeps its real extension."""
+    global _MOVFLAGS_PATCHED
+    if _MOVFLAGS_PATCHED:
         return
-    _FFMPEG_AUDIO_COPY_PATCHED = True
+    _MOVFLAGS_PATCHED = True
 
-    from yt_dlp.postprocessor.ffmpeg import ACODECS
     from yt_dlp.utils import Popen
-
-    for _codec in ("opus", "vorbis"):
-        _ext, _encoder, _opts = ACODECS[_codec]
-        ACODECS[_codec] = ("webm", _encoder, _opts)
 
     _orig_run = Popen.run.__func__
 
@@ -319,6 +295,42 @@ def _patch_ffmpeg_audio_copy_for_stripped_build():
         return _orig_run(cls, *args, **kwargs)
 
     Popen.run = classmethod(_run_without_bad_movflags)
+
+
+def _ffmpeg_env():
+    """This process's environment minus LD_LIBRARY_PATH, for running ffmpeg. That variable points
+    at the bundled Python's own libraries (libz, libcrypto, ...) so Python can start, and ffmpeg
+    links system libraries (libz, libandroid, libmediandk) whose own dependencies then resolve to
+    those copies instead — reproduced on the phone: "CANNOT LINK EXECUTABLE ... cannot locate
+    symbol OpenSSL_add_all_algorithms referenced by /system/lib64/libsqlite.so", so yt-dlp saw no
+    ffmpeg at all ("ffprobe and ffmpeg not found"). ffmpeg needs nothing from that path."""
+    env = dict(os.environ)
+    env.pop("LD_LIBRARY_PATH", None)
+    return env
+
+
+_FFMPEG_ENV_PATCHED = False
+
+def _patch_ffmpeg_env(ffmpeg_path):
+    """Every ffmpeg yt-dlp starts — merging, post-processing, its version check, the ffmpeg
+    downloader — goes through yt_dlp.utils.Popen's constructor; those get _ffmpeg_env()."""
+    global _FFMPEG_ENV_PATCHED
+    if _FFMPEG_ENV_PATCHED:
+        return
+    _FFMPEG_ENV_PATCHED = True
+
+    from yt_dlp.utils import Popen
+
+    name = os.path.basename(ffmpeg_path)
+    _orig_init = Popen.__init__
+
+    def _init(self, args, *rest, **kwargs):
+        exe = args[0] if isinstance(args, (list, tuple)) and args else args
+        if isinstance(exe, (str, bytes)) and os.path.basename(os.fsdecode(exe)) == name:
+            kwargs["env"] = {k: v for k, v in (kwargs.get("env") or os.environ).items() if k != "LD_LIBRARY_PATH"}
+        _orig_init(self, args, *rest, **kwargs)
+
+    Popen.__init__ = _init
 
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
@@ -456,113 +468,267 @@ class _SafeEmbedSubtitlePP(FFmpegEmbedSubtitlePP):
             return [], info
 
 
+_STREAM_RE = re.compile(r"Stream #\d+:\d+[^:]*: (Video|Audio): ([^\n]+)")
+
+
+def _probe_media(executable, path):
+    """The first real video stream and first audio stream of `path`, read from `ffmpeg -i`'s own
+    stream listing (there's no ffprobe in the app): {"video": {"codec", "width", "height", "kbps"},
+    "audio": {"codec", "kbps", "rate"}}, either None when absent. A cover image ("attached pic")
+    isn't the video. Empty dict if ffmpeg couldn't be run at all."""
+    try:
+        out = subprocess.run([executable, "-hide_banner", "-i", path], capture_output=True,
+                             text=True, errors="replace", timeout=60, env=_ffmpeg_env()).stderr
+    except Exception:
+        return {}
+    result = {"video": None, "audio": None}
+    for kind, rest in _STREAM_RE.findall(out):
+        codec = rest.split()[0].rstrip(",")
+        kbps = re.search(r"(\d+) kb/s", rest)
+        kbps = int(kbps.group(1)) if kbps else None
+        if kind == "Video" and result["video"] is None and "attached pic" not in rest:
+            size = re.search(r"(\d{2,5})x(\d{2,5})", rest)
+            result["video"] = {
+                "codec": codec, "kbps": kbps,
+                "width": int(size.group(1)) if size else None,
+                "height": int(size.group(2)) if size else None,
+            }
+        elif kind == "Audio" and result["audio"] is None:
+            rate = re.search(r"(\d+) Hz", rest)
+            result["audio"] = {"codec": codec, "kbps": kbps, "rate": int(rate.group(1)) if rate else None}
+    return result
+
+
+# Bitrate for re-encoded H.264 when the source's own isn't known, by the short side of the frame.
+_H264_KBPS = ((240, 600), (360, 1200), (480, 2500), (720, 5000), (1080, 8000), (1440, 16000))
+
+
+def _h264_args(video, spec="v:0"):
+    """Output args encoding `spec` to H.264 on the phone's own hardware encoder (h264_mediacodec —
+    there's no software H.264 encoder in the build). Its input has to be NV12 with a width that's a
+    multiple of 16: 1080-wide video (Instagram Reels) fails with "Invalid argument" otherwise
+    (tested on a Galaxy S24), so up to 15 columns are cropped off the sides. A bit more bitrate than
+    the source had, since re-encoding already-compressed video loses some."""
+    width, height = (video or {}).get("width"), (video or {}).get("height")
+    short = min(width, height) if width and height else 1080
+    table = next((kbps for side, kbps in _H264_KBPS if short <= side), 35000)
+    src = (video or {}).get("kbps")
+    kbps = int(min(max(src * 1.15, 400), table * 2)) if src else table
+    return [f"-filter:{spec}", "crop=trunc(iw/16)*16:ih", f"-c:{spec}", "h264_mediacodec",
+            f"-b:{spec}", f"{kbps}k", f"-pix_fmt:{spec}", "nv12"]
+
+
+def _audio_args(ext, audio, spec="a:0"):
+    """Output args re-encoding `spec` into the codec that belongs in a `.ext` file: AAC for
+    mp4/m4a, LAME VBR V0 for mp3, Opus for opus/ogg/webm, FLAC for flac, and in mkv the source's
+    own kind (Opus stays Opus, anything else AAC). Lossy bitrates follow the source's, within limits."""
+    codec = (audio or {}).get("codec")
+    src = (audio or {}).get("kbps") or 0
+    aac = [f"-c:{spec}", "aac", f"-b:{spec}", f"{min(max(src, 128), 320) if src else 192}k"]
+    opus = [f"-c:{spec}", "libopus", f"-b:{spec}", f"{min(max(src, 96), 256) if src else 160}k"]
+    if ext == "mp3":
+        return [f"-c:{spec}", "libmp3lame", f"-q:{spec}", "0"]
+    if ext in ("opus", "ogg", "oga", "webm"):
+        return opus
+    if ext == "flac":
+        return [f"-c:{spec}", "flac"]
+    if ext == "wav":
+        return [f"-c:{spec}", "pcm_s16le"]
+    if ext in ("mkv", "mka"):
+        return opus if codec == "opus" else ([f"-c:{spec}", "flac"] if codec == "flac" else aac)
+    return aac
+
+
+def _loudnorm_filter(audio):
+    """EBU R128 levelling to -16 LUFS (what streaming services aim for). loudnorm always outputs
+    192 kHz, so it's resampled back to the source's own rate."""
+    rate = (audio or {}).get("rate") or 48000
+    return f"loudnorm=I=-16:TP=-1.5:LRA=11,aresample={rate}"
+
+
 class _LocalTrimPP(FFmpegPostProcessor):
     """Trims the just-produced file to `ranges` (a list of (start, end) second tuples — see
-    _parse_clip_range) via a plain local, file-to-file ffmpeg subprocess, replacing it in place at
-    the same path once done. Registered as the *last* postprocessor (see download()'s own
-    ydl.add_post_processor call) so it runs after merging and any thumbnail/metadata/subtitle
-    embedding already have — trimming last keeps this one operation, on whatever the real final
-    file already is, rather than needing its own opinion about which of those other steps to run
-    before/after.
+    _parse_clip_range) and/or evens out its volume (`normalize`), replacing it in place at the same
+    path. Multiple ranges are each cut to their own temp file, then joined with ffmpeg's concat
+    demuxer (every segment has the same codecs, so the join itself is a plain copy).
 
-    Stream-copy only ("-c copy", `stream_copy_opts()`) — this bundled ffmpeg build has no encoders
-    at all (see _parse_clip_range's own doc comment), so a cut lands on the nearest existing
-    keyframe rather than the exact requested timestamp. Multiple ranges are each cut to their own
-    temp file, then concatenated via ffmpeg's own concat demuxer — also stream-copy-safe, since
-    every segment shares the same source codecs."""
+    Cuts are re-encoded so they land exactly where asked: video to H.264 (_h264_args), audio to the
+    file's own kind of codec (_audio_args), everything else (a cover image, subtitles) copied. An
+    input-side -ss with re-encoding is frame-exact — ffmpeg decodes from the keyframe before and
+    drops what comes before the start. If encoding fails (a .webm video: H.264 can't go in WebM),
+    it falls back to a stream copy, which can only cut at keyframes — up to a few seconds off.
 
-    def __init__(self, downloader, ranges):
+    Video downloads run this last, after metadata, thumbnail and subtitle embedding, so those are
+    trimmed along with it. Audio downloads run it right after ExtractAudio, before tags and cover
+    art are embedded: an Ogg/Opus cover is a tag ffmpeg can't write back, so a later re-encode
+    would drop it."""
+
+    def __init__(self, downloader, ranges, precise=True, normalize=False):
         super().__init__(downloader)
         self._ranges = ranges
+        self._precise = precise
+        self._normalize = normalize
 
     @classmethod
     def pp_key(cls):
-        # PostProcessor.__init__ sets self.PP_NAME = self.pp_key() *after* any class-level
-        # PP_NAME is defined, silently overwriting it — and the base implementation derives the
-        # key from cls.__name__[:-2] (built for the "FfmpegXxxPP" naming convention), which for
-        # this class's actual name ("_LocalTrimPP") yields "_LocalTrim" (leading underscore
-        # intact), not "LocalTrim". postprocessor_hook (below) reports d["postprocessor"] from
-        # this same pp_key(), and custom_pp_keys' "LocalTrim" entry (see download()) never
-        # matched that leading-underscore variant — is_final was always False, so the finished
-        # file's path never reached `callback`, DownloadWorker never saw a real output file, and
-        # the download was reported as errored ("No downloadable content found") even though the
-        # trim had actually succeeded on disk. Reproduced live against the Instagram Reel trim
-        # case that originally motivated this whole postprocessor. Overriding pp_key() explicitly
-        # sidesteps the naming convention entirely instead of relying on this class's Python name.
+        # The base implementation derives the key from cls.__name__[:-2], which for this class's
+        # name yields "_LocalTrim" (leading underscore intact) — postprocessor_hook reports
+        # d["postprocessor"] from this, and a mismatched key once left a successful trim reported as
+        # "No downloadable content found". Explicit, so it doesn't depend on the Python name.
         return "LocalTrim"
 
-    def run(self, info):
-        filepath = info.get("filepath")
-        if not filepath or not self._ranges or not os.path.exists(filepath):
-            return [], info
+    def _encode_opts(self, filepath, ext):
+        media = _probe_media(self.executable, filepath)
+        video, audio = media.get("video"), media.get("audio")
+        if video and ext == "webm":
+            return None
+        if video:
+            opts = ["-map", "0", "-c", "copy", *_h264_args(video)]
+            if audio:
+                opts += _audio_args(ext, audio)
+            return opts
+        if audio:
+            opts = ["-map", "0:a:0", *_audio_args(ext, audio)]
+            if self._normalize:
+                opts += ["-filter:a:0", _loudnorm_filter(audio)]
+            return opts
+        return None
 
+    def _cut(self, filepath, ranges, out_opts):
         base, ext = os.path.splitext(filepath)
         ext = ext.lstrip(".")
         segment_paths = []
         try:
-            for i, (start, end) in enumerate(self._ranges):
+            for i, (start, end) in enumerate(ranges):
                 seg_path = f"{base}.trimseg{i}.{ext}"
-                seek_opts = ["-ss", str(start)]
+                seek_opts = []
+                if start:
+                    seek_opts += ["-ss", str(start)]
                 if end != float("inf"):
                     seek_opts += ["-to", str(end)]
-                # -ss/-to given here (as part of the *input*'s own opts, ahead of "-i" — see
-                # real_run_ffmpeg) rather than after -i: an input-side seek is a fast, plain
-                # demuxer-level skip: exactly what a stream-copy-only build can still do. An
-                # output-side seek needs to decode every discarded frame first, which this build
-                # can't do at all.
-                self.real_run_ffmpeg(
-                    [(filepath, seek_opts)],
-                    [(seg_path, list(self.stream_copy_opts(ext=ext)))],
-                )
+                # Input-side (ahead of -i, see real_run_ffmpeg): a fast seek, frame-exact when
+                # re-encoding, keyframe-aligned when copying.
+                self.real_run_ffmpeg([(filepath, seek_opts)], [(seg_path, list(out_opts))])
                 segment_paths.append(seg_path)
 
             if len(segment_paths) == 1:
-                trimmed_path = segment_paths[0]
+                result = segment_paths[0]
             else:
                 concat_list_path = f"{base}.trimconcat.txt"
                 with open(concat_list_path, "w", encoding="utf-8") as f:
                     for seg_path in segment_paths:
                         f.write("file '{}'\n".format(seg_path.replace("'", "'\\''")))
-                trimmed_path = f"{base}.trimmed.{ext}"
+                result = f"{base}.trimmed.{ext}"
                 self.real_run_ffmpeg(
                     [(concat_list_path, ["-f", "concat", "-safe", "0"])],
-                    [(trimmed_path, list(self.stream_copy_opts(ext=ext)))],
+                    [(result, ["-map", "0", *self.stream_copy_opts(ext=ext)])],
                 )
                 os.remove(concat_list_path)
                 for seg_path in segment_paths:
                     os.remove(seg_path)
-
-            # A start past the real end of the file (the Kotlin side clamps against the known
-            # duration now, but an older/cached UI, a manually-typed range, or a duration that
-            # simply wasn't known yet when the range was set could still send one here) makes an
-            # input-side "-ss" land at EOF immediately — ffmpeg's stream-copy-only build then
-            # writes a valid but empty container and still exits 0, not an error. Without this
-            # check, os.replace() below would silently swap the already-fully-downloaded original
-            # out for that empty file, with the run reported as a plain success. Raising here
-            # instead routes it through the same except block below, which discards the segments
-            # and lets the real error surface — leaving `filepath` (os.replace never runs) as the
-            # untrimmed, still-complete original.
-            if os.path.getsize(trimmed_path) == 0:
+            # A start past the real end makes ffmpeg write a valid but empty file and exit 0 —
+            # replacing the complete original with it would look like a plain success.
+            if os.path.getsize(result) == 0:
+                os.remove(result)
                 raise PostProcessingError(
                     "Trim produced an empty file — the requested range is likely past the end of "
                     "the actual video"
                 )
-
-            # Same path the file already had — nothing downstream (this module's own
-            # postprocessor_hook, DownloadWorker's file-move logic on the Kotlin side) needs to
-            # know a trim happened at all.
-            os.replace(trimmed_path, filepath)
+            return result
         except Exception:
-            # The untrimmed original at `filepath` is still intact at this point (os.replace above
-            # never ran) — best-effort cleanup of whatever temp segments did get created, then
-            # let the real error propagate through yt-dlp's own postprocessor error handling (the
-            # same path "ERROR: ffmpeg exited with code 8" itself was already surfacing through).
             for seg_path in segment_paths:
                 if os.path.exists(seg_path):
                     os.remove(seg_path)
             raise
 
+    def run(self, info):
+        filepath = info.get("filepath")
+        if not filepath or not os.path.exists(filepath) or not (self._ranges or self._normalize):
+            return [], info
+        ext = os.path.splitext(filepath)[1].lstrip(".").lower()
+        ranges = self._ranges or [(0, float("inf"))]
+
+        out_opts = self._encode_opts(filepath, ext) if (self._precise or self._normalize) else None
+        result = None
+        if out_opts:
+            try:
+                result = self._cut(filepath, ranges, out_opts)
+            except Exception as e:
+                if not self._ranges:
+                    self.report_warning(f"Couldn't even out the volume, keeping it as it was: {e}")
+                    return [], info
+                self.report_warning(f"Exact cut failed, cutting at the nearest keyframes instead: {e}")
+        if result is None:
+            if not self._ranges:
+                return [], info
+            result = self._cut(filepath, ranges, ["-map", "0", *self.stream_copy_opts(ext=ext)])
+        # Same path the file already had, so nothing downstream needs to know a trim happened.
+        os.replace(result, filepath)
         return [], info
+
+
+# Video codecs and audio codecs an .mp4 plays everywhere with.
+_MP4_VIDEO = ("h264", "hevc")
+_MP4_AUDIO = ("aac", "mp3")
+_VIDEO_EXTS = ("mp4", "mkv", "webm", "mov", "m4v", "flv", "ts", "3gp", "avi")
+
+
+class _Mp4ConvertPP(FFmpegPostProcessor):
+    """Makes "MP4" mean an MP4 every player opens. yt-dlp's merge (merge_output_format "mp4/mkv")
+    falls back to .mkv whenever the streams can't go in an MP4 as they are — VP9/AV1 video, Opus
+    audio, often the only streams YouTube's higher resolutions and Instagram Reels have — and an AV1
+    .mp4 still won't play on older phones. Here the video is re-encoded to H.264 (the phone's own
+    hardware encoder, ~7x real time for 720p on a Galaxy S24) and the audio to AAC, each only when
+    it isn't already one of those; whatever already fits is copied untouched.
+
+    Runs first among the post-processors, before metadata/thumbnail/subtitle embedding, so those
+    are written into the final .mp4 rather than the file that gets replaced."""
+
+    @classmethod
+    def pp_key(cls):
+        return "Mp4Convert"
+
+    def run(self, info):
+        path = info.get("filepath")
+        if not path or not os.path.exists(path):
+            return [], info
+        ext = os.path.splitext(path)[1].lstrip(".").lower()
+        if ext not in _VIDEO_EXTS:
+            return [], info
+        media = _probe_media(self.executable, path)
+        video, audio = media.get("video"), media.get("audio")
+        if not video:
+            return [], info
+        video_ok = video["codec"] in _MP4_VIDEO
+        audio_ok = audio is None or audio["codec"] in _MP4_AUDIO
+        if ext == "mp4" and video_ok and audio_ok:
+            return [], info
+
+        opts = ["-map", "0:v:0", "-map", "0:a:0?"]
+        if video_ok:
+            opts += ["-c:v:0", "copy"] + (["-tag:v:0", "hvc1"] if video["codec"] == "hevc" else [])
+        else:
+            opts += _h264_args(video)
+        if audio is not None:
+            opts += ["-c:a:0", "copy"] if audio_ok else _audio_args("mp4", audio)
+
+        base = os.path.splitext(path)[0]
+        out_path = f"{base}.mp4" if ext != "mp4" else f"{base}.converted.mp4"
+        self.to_screen(f"Converting to MP4: {path}")
+        try:
+            self.real_run_ffmpeg([(path, [])], [(out_path, opts)])
+        except Exception as e:
+            if os.path.exists(out_path):
+                os.remove(out_path)
+            self.report_warning(f"Couldn't convert to MP4, keeping the {ext.upper()} file: {e}")
+            return [], info
+        if ext == "mp4":
+            os.replace(out_path, path)
+            return [], info
+        info["filepath"] = out_path
+        info["ext"] = "mp4"
+        return [path], info
+
 
 _URL_RE = re.compile(r"https?://\S+")
 
@@ -874,7 +1040,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              restrict_filenames=True, trim_filenames=True, fragment_retries=None,
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
-             override_title=None, override_artist=None, info_json_path=None):
+             override_title=None, override_artist=None, info_json_path=None,
+             audio_format=None, normalize_audio=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1118,17 +1285,18 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     default_format = "bestvideo+bestaudio/best" if ffmpeg_path else "best/18"
     # audio_only overrides any quality-cap format_selector the caller passed — a video-shaped
     # selector here would just waste bandwidth downloading video that gets discarded.
-    # "bestaudio[ext=m4a]" first, "bestaudio" as fallback: nearly every YouTube video's own
-    # bestaudio format is Opus-in-WebM these days (itag 251) — a real, valid audio format, but
-    # one this app's own stripped ffmpeg build can't remux without the ACODECS/webm-extension
-    # patch just above (see its own doc comment), and mutagen can't tag/embed cover art into a
-    # WebM container at all afterward regardless. m4a (itag 140, AAC), when YouTube also offers
-    # it for a given video, sidesteps both problems entirely — a real .m4a file, correctly filed
-    # under Music by MediaStore, with working mutagen tagging/cover art — at the cost of usually
-    # being YouTube's lower-bitrate alternative to its own opus stream when both exist. Falls
-    # back to plain "bestaudio" (Opus include) when a video has no m4a-native audio format at
-    # all, same as before this preference existed.
-    chosen_format = "bestaudio[ext=m4a]/bestaudio/best" if audio_only else (format_selector or default_format)
+    # Which audio stream depends on the format it's saved as (audio_format, Settings > Processing):
+    # - original/M4A: m4a (YouTube's AAC, itag 140) when there is one — saved as is, no re-encode,
+    #   and it plays and tags everywhere — else the best stream (Opus on YouTube, itag 251).
+    # - Opus: YouTube's own Opus stream, saved as is.
+    # - MP3/FLAC: always a re-encode, so the best stream of any kind is the best starting point.
+    if audio_format in ("mp3", "flac"):
+        audio_selector = "bestaudio/best"
+    elif audio_format == "opus":
+        audio_selector = "bestaudio[acodec=opus]/bestaudio/best"
+    else:
+        audio_selector = "bestaudio[ext=m4a]/bestaudio/best"
+    chosen_format = audio_selector if audio_only else (format_selector or default_format)
     # Poster name, then caption; DownloadWorker derives the entity's own display title from this
     # same "name - caption [id]" shape (see its own comment on that), so the two need to keep
     # matching. Only this *default* template; a caller-supplied filename_format (a saved template,
@@ -1353,18 +1521,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         #
         # That bias can only ever reorder *existing* candidates, not conjure a compatible one —
         # reproduced live against a real Instagram Reel offering VP9 video with no H264 variant at
-        # all (common for Reels specifically): the bias had nothing to pick, yt-dlp still forced a
-        # stream-copy remux into .mp4 (this bundled ffmpeg has every encoder disabled — see
-        # FfmpegRuntime's own build config — so *transcoding* VP9 into real H264 to rescue this
-        # isn't an option at all), and produced the exact "Empty VP Codec Configuration box"
-        # failure this whole feature exists to avoid — just now reachable via an explicit user
-        # choice instead of yt-dlp's own old default. "mp4/mkv" (a preference *list*, not a single
-        # value) is yt-dlp's own documented mechanism for exactly this: get_compatible_ext() (see
-        # YoutubeDL.py) walks the list in order and returns the first extension the actual codecs
-        # can losslessly satisfy, with "mkv" always accepted as a universal container regardless of
-        # codec — so this still produces a real .mp4 whenever the source genuinely supports one,
-        # and only quietly drops to .mkv for the specific sources that can't, rather than a file
-        # that "downloaded successfully" while being unplayable either way.
+        # all (common for Reels specifically): yt-dlp still forced a stream-copy remux into .mp4
+        # and produced the "Empty VP Codec Configuration box" failure. "mp4/mkv" (a preference
+        # *list*) is yt-dlp's own mechanism for this: get_compatible_ext() (see YoutubeDL.py)
+        # returns the first extension the actual codecs can losslessly satisfy, with "mkv" always
+        # accepted — a real .mp4 whenever the streams fit one, otherwise an .mkv, which
+        # _Mp4ConvertPP (added in _attempt below) then re-encodes into an MP4 that plays anywhere.
         ydl_opts["merge_output_format"] = f"{output_format}/mkv" if output_format == "mp4" else (output_format or "mkv")
         # Built in the same order as custom_pp_keys above — get_postprocessor() resolves each
         # "key" to a "<key>PP" class (e.g. "FFmpegExtractAudio" -> FFmpegExtractAudioPP), while
@@ -1387,19 +1549,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 r"(?P<uploader>.*?)(?: - Topic)?$",
             )],
         })
+        _patch_movflags_for_non_mp4()
+        _patch_ffmpeg_env(ffmpeg_path)
         if audio_only:
-            # "mp3" (yt-dlp's own CLI default) forces FFmpegExtractAudioPP into a real transcode
-            # for any source not already literally mp3 — this bundled ffmpeg build is compiled
-            # with --disable-encoders (see _LocalTrimPP's own doc comment: stream-copy only, same
-            # reason), so that transcode always failed with "Encoder not found", on every source,
-            # regardless of quality/codec. "best" (yt-dlp's own --audio-format best) tells
-            # FFmpegExtractAudioPP to keep the source's native audio codec and only remux the
-            # container via "-acodec copy" (see its run() in postprocessor/ffmpeg.py) — exactly
-            # what this ffmpeg build can still do. Output keeps whatever extension the source
-            # audio codec maps to (Reddit/Instagram's aac/opus -> .m4a/.opus, not always .mp3),
-            # which is the expected, documented behavior of --audio-format best itself.
-            postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": "best"})
-            _patch_ffmpeg_audio_copy_for_stripped_build()
+            # "best" keeps the source's own codec and only changes the container ("-acodec copy",
+            # see FFmpegExtractAudioPP.run): AAC -> .m4a, Opus -> .opus. A named format converts
+            # unless the source already is that codec, which is then copied too. Quality: LAME VBR
+            # V0 for MP3 ("0" maps to -q:a 0), 256k AAC, 160k Opus (values over 10 are kbps).
+            codec = audio_format if audio_format in ("mp3", "m4a", "opus", "flac") else "best"
+            quality = {"mp3": "0", "m4a": "256", "opus": "160"}.get(codec)
+            postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": codec, "preferredquality": quality})
         if embed_metadata or embed_chapters or audio_only:
             # A single FFmpegMetadata entry handles both — add_chapters is that postprocessor's
             # own independent kwarg (this is literally how the real CLI's --embed-chapters is
@@ -1526,15 +1685,22 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # _FinalFilePP. already_have_subtitle keeps the subtitle file on disk when "Save
                 # subtitle files" is on too — the stock step deleted it after embedding.
                 ydl.add_post_processor(_SafeEmbedSubtitlePP(ydl, already_have_subtitle=save_subtitle_files), when="post_process")
-            if clip_ranges and ffmpeg_path:
-                # Added directly rather than through ydl_opts["postprocessors"] (a list of plain
-                # {"key": ...} dicts yt-dlp itself resolves to stock Ffmpeg*PP classes) since
-                # _LocalTrimPP isn't one of those — this is yt-dlp's own supported way to add a
-                # custom postprocessor instance. "post_process" is the same stage every stock
-                # postprocessor above runs at, and instances added here run *after* ones already
-                # registered via ydl_opts at that same stage — see _LocalTrimPP's own doc comment
-                # for why running last is what we want here anyway.
-                ydl.add_post_processor(_LocalTrimPP(ydl, clip_ranges), when="post_process")
+            if ffmpeg_path:
+                # Custom instances, so not through ydl_opts["postprocessors"] (plain {"key": ...}
+                # dicts yt-dlp resolves to its stock classes). Everything at the "post_process"
+                # stage runs in list order; ydl_opts' own (ExtractAudio, Metadata, EmbedThumbnail)
+                # are already in it, and add_post_processor appends after them.
+                post = ydl._pps["post_process"]
+                if audio_only and (clip_ranges or normalize_audio):
+                    # Straight after ExtractAudio, before tags and cover art (see _LocalTrimPP).
+                    after_extract = next((i + 1 for i, pp in enumerate(post) if pp.pp_key() == "ExtractAudio"), 0)
+                    post.insert(after_extract, _LocalTrimPP(ydl, clip_ranges, normalize=normalize_audio))
+                elif clip_ranges:
+                    # Last, so embedded metadata, thumbnail and subtitles are trimmed with it.
+                    ydl.add_post_processor(_LocalTrimPP(ydl, clip_ranges), when="post_process")
+                if output_format == "mp4" and not audio_only:
+                    # First, so everything after it writes into the final .mp4.
+                    post.insert(0, _Mp4ConvertPP(ydl))
             if ffmpeg_path and callback:
                 # See _FinalFilePP's own doc comment for why this (not postprocessor_hooks) is
                 # what reports the real final file whenever any postprocessing could happen —
@@ -1866,5 +2032,7 @@ if __name__ == "__main__":
         override_title=(_s(a[46]) if len(a) > 46 else None),
         override_artist=(_s(a[47]) if len(a) > 47 else None),
         info_json_path=(_s(a[48]) if len(a) > 48 else None),
+        audio_format=(_s(a[49]) if len(a) > 49 else None),
+        normalize_audio=_b(a[50]) if len(a) > 50 else False,
     )
     print(event("exit", status=status), flush=True)

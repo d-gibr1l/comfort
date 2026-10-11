@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.comfort.app.data.AudioFormat
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
@@ -45,10 +46,12 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
     var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
     var lyricsMode by remember { mutableStateOf(GalleryDlPreferences.getLyricsMode(context)) }
     var lyricsLrc by remember { mutableStateOf(GalleryDlPreferences.isLyricsLrcFile(context)) }
+    var audioFormat by remember { mutableStateOf(GalleryDlPreferences.getAudioFormat(context)) }
+    var normalizeAudio by remember { mutableStateOf(GalleryDlPreferences.isNormalizeAudio(context)) }
 
     SettingsSubScaffold(title = "Processing", topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
-            if (formatIdOverride.isNotBlank()) {
+            ToggleReveal(formatIdOverride.isNotBlank()) {
                 Surface(
                     shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
@@ -138,7 +141,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             Text("Output format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Only applies when video and audio need merging (most yt-dlp sources). A single already-muxed file, or anything gallery-dl fetches directly, keeps its own format regardless. If MP4 is picked but a source's video can't actually go in an MP4 (Instagram Reels are usually like this), that one download saves as MKV instead rather than an unplayable MP4.",
+                "For videos from yt-dlp sources; anything gallery-dl fetches directly keeps its own format. MKV saves the streams exactly as the site sends them. MP4 plays everywhere: video that can't go in an MP4 as it is (VP9 or AV1, like most Instagram Reels and YouTube above 1080p) is converted to H.264 on your phone's video encoder after downloading, which takes a little longer.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -285,7 +288,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                     GalleryDlPreferences.setDownloadSubtitles(context, it)
                 },
             )
-            if (downloadSubtitles) {
+            ToggleReveal(downloadSubtitles) {
                 Spacer(Modifier.height(12.dp))
                 val isSubtitlesError = subtitleLanguages.isNotBlank() && subtitleLanguages.split(',').any { segment ->
                     val trimmed = segment.trim()
@@ -368,6 +371,72 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
         }
 
         SettingsSection(title = "Music downloads", icon = Icons.Outlined.MusicNote) {
+            Text("Audio format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "For songs and audio-only downloads. Original saves the site's own audio untouched (usually M4A, or Opus). The others convert it unless it's already in that format: MP3 plays on anything, FLAC is lossless but can't add back quality the source didn't have.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                val formats = AudioFormat.entries
+                formats.forEachIndexed { index, format ->
+                    val selected = audioFormat == format
+                    val interactionSource = remember { MutableInteractionSource() }
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            audioFormat = format
+                            GalleryDlPreferences.setAudioFormat(context, format)
+                        },
+                        // "Original" gets a wider share: five equal chips cut it short.
+                        modifier = Modifier
+                            .weight(if (format == AudioFormat.ORIGINAL) 1.7f else 1f)
+                            .height(40.dp)
+                            .semantics { role = Role.RadioButton },
+                        interactionSource = interactionSource,
+                        shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                        label = {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(format.label, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                            }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                        border = null,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = Icons.Outlined.GraphicEq,
+                title = "Even out volume",
+                subtitle = "Makes every song play at the same loudness, so a quiet track isn't followed by a blaring one. Re-encodes the audio.",
+                checked = normalizeAudio,
+                onCheckedChange = {
+                    normalizeAudio = it
+                    GalleryDlPreferences.setNormalizeAudio(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
             Text("Lyrics", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -418,7 +487,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 }
             }
 
-            if (lyricsMode != GalleryDlPreferences.LYRICS_OFF) {
+            ToggleReveal(lyricsMode != GalleryDlPreferences.LYRICS_OFF) {
                 Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(Modifier.height(16.dp))

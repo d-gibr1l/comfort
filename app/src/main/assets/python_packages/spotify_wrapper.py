@@ -322,6 +322,23 @@ def _embed_cover_art(filepath, cover_data):
             audio = ID3(filepath)
             audio.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=cover_data))
             audio.save()
+        elif ext in (".flac", ".opus", ".ogg"):
+            # FLAC keeps the picture in its own metadata block; Ogg (Opus) in a base64
+            # METADATA_BLOCK_PICTURE comment holding that same block.
+            import base64
+            from mutagen.flac import FLAC, Picture
+            picture = Picture()
+            picture.type, picture.mime, picture.desc, picture.data = 3, "image/jpeg", "Cover", cover_data
+            if ext == ".flac":
+                audio = FLAC(filepath)
+                audio.clear_pictures()
+                audio.add_picture(picture)
+            else:
+                from mutagen.oggopus import OggOpus
+                from mutagen.oggvorbis import OggVorbis
+                audio = OggOpus(filepath) if ext == ".opus" else OggVorbis(filepath)
+                audio["metadata_block_picture"] = [base64.b64encode(picture.write()).decode("ascii")]
+            audio.save()
     except Exception:
         pass
 
@@ -334,6 +351,8 @@ def _retag_with_spotify_metadata(filepath, title, artist, album, thumbnail_url):
         import mutagen
         audio = mutagen.File(filepath, easy=True)
         if audio is not None:
+            if audio.tags is None:
+                audio.add_tags()
             if title:
                 audio["title"] = title
             if artist:
@@ -374,7 +393,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              verbose=False, save_thumbnail=False, playlist_items=None,
              override_title=None, override_artist=None, impersonate=False,
              youtube_client_rotation=False, extractor_args=None, proxy_url=None,
-             socket_timeout_seconds=None, retries=None):
+             socket_timeout_seconds=None, retries=None, audio_format=None, normalize_audio=False):
     """One call per Spotify link (track, or every track in an album/playlist in turn). Each
     track's own final-file callback line comes straight from the inner yt_dlp_wrapper.download()
     call unchanged, so DownloadWorker.kt's existing bare-filepath/[progress]/[size] handling needs
@@ -494,6 +513,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 impersonate=impersonate, youtube_client_rotation=youtube_client_rotation,
                 extractor_args=extractor_args, proxy_url=proxy_url,
                 socket_timeout_seconds=socket_timeout_seconds, retries=retries,
+                audio_format=audio_format, normalize_audio=normalize_audio,
             )
             if status != "Done":
                 continue
@@ -553,5 +573,7 @@ if __name__ == "__main__":
         proxy_url=_s(a[20]) if len(a) > 20 else None,
         socket_timeout_seconds=_s(a[21]) if len(a) > 21 else None,
         retries=_s(a[22]) if len(a) > 22 else None,
+        audio_format=_s(a[23]) if len(a) > 23 else None,
+        normalize_audio=_b(a[24]) if len(a) > 24 else False,
     )
     print(event("exit", status=status), flush=True)
