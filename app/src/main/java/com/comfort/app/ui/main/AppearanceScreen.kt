@@ -1,6 +1,11 @@
 package com.comfort.app.ui.main
 
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -105,7 +110,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
             Spacer(Modifier.height(16.dp))
 
-            ThemeHeading(Icons.Outlined.LightMode, "Light theme")
+            ThemeHeading(Icons.Outlined.LightMode, "Light theme", isActive = !effectiveDark)
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -147,7 +152,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
             Spacer(Modifier.height(24.dp))
 
-            ThemeHeading(Icons.Outlined.DarkMode, "Dark theme")
+            ThemeHeading(Icons.Outlined.DarkMode, "Dark theme", isActive = effectiveDark)
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -169,6 +174,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                         theme = theme,
                         isDark = true,
                         selected = themeState.darkTheme == theme,
+                        pureBlack = themeState.pureBlack,
                         onClick = { 
                             themeState.setDarkTheme(theme)
                             if (themeState.mode != ThemeMode.SYSTEM) {
@@ -195,7 +201,11 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                             themeState.setMode(if (follow) ThemeMode.SYSTEM else if (effectiveDark) ThemeMode.DARK else ThemeMode.LIGHT)
                         },
                     )
-                    if (themeState.mode != ThemeMode.LIGHT) {
+                    AnimatedVisibility(
+                        visible = themeState.mode != ThemeMode.LIGHT,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
                         ThemeToggleRow(
                             icon = Icons.Outlined.Contrast,
                             title = "Pure black dark mode",
@@ -231,11 +241,34 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
 
 /** "Light theme" / "Dark theme" above their rows of theme cards. */
 @Composable
-private fun ThemeHeading(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String) {
+private fun ThemeHeading(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    isActive: Boolean = false,
+) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = highlightRowModifier(title)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
         Spacer(Modifier.width(8.dp))
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        if (isActive) {
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+            ) {
+                Text(
+                    "Active",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+        }
     }
 }
 
@@ -299,15 +332,29 @@ private fun ThemePreviewCard(
     theme: AppTheme,
     isDark: Boolean,
     selected: Boolean,
+    pureBlack: Boolean = false,
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
-    val scheme: ColorScheme = remember(theme, isDark) {
+    val baseScheme: ColorScheme = remember(theme, isDark) {
         if (theme.isDynamic && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            runCatching {
+                if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }.getOrElse { if (isDark) DarkColorScheme else LightColorScheme }
         } else {
             (if (isDark) theme.dark else theme.light) ?: (if (isDark) DarkColorScheme else LightColorScheme)
+        }
+    }
+    val scheme = remember(baseScheme, isDark, pureBlack) {
+        if (isDark && pureBlack) {
+            baseScheme.copy(
+                background = Color.Black,
+                surface = Color.Black,
+                surfaceContainer = Color(0xFF0D0D0D),
+            )
+        } else {
+            baseScheme
         }
     }
     val label = if (isDark) theme.darkLabel else theme.lightLabel
