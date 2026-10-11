@@ -80,8 +80,8 @@ object MediaStoreHelper {
      * belong to — subtitles with the videos, .lrc lyrics with the songs, so players find them —
      * and info files (.json, .description) in Other. */
     internal fun subfolderFor(name: String, mimeType: String?): String {
-        val ext = name.substringAfterLast('.', "").lowercase()
-        val mime = mimeType.orEmpty()
+        val ext = name.trim().substringAfterLast('.', "").trim().lowercase()
+        val mime = mimeType?.trim().orEmpty()
         return when {
             ext == "lrc" -> "Music"
             ext == "srt" || ext == "vtt" -> "Videos"
@@ -166,10 +166,20 @@ object MediaStoreHelper {
             ?: URLConnection.guessContentTypeFromName(sourceFile.name)
             ?: when (ext) {
                 "mp4", "m4v" -> "video/mp4"
+                "mov" -> "video/quicktime"
                 "mkv" -> "video/x-matroska"
                 "webm" -> "video/webm"
                 "mp3" -> "audio/mpeg"
                 "m4a" -> "audio/mp4"
+                "flac" -> "audio/flac"
+                "wav" -> "audio/wav"
+                "ogg", "oga", "opus" -> "audio/ogg"
+                "aac" -> "audio/aac"
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "gif" -> "image/gif"
+                "webp" -> "image/webp"
+                "avif" -> "image/avif"
                 // yt-dlp's own subtitle sidecar files ("Download Subtitles" in Settings) —
                 // MimeTypeMap doesn't reliably recognize either on every Android version, and
                 // falling all the way through this chain used to default to "image/jpeg" for

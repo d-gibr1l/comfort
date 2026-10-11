@@ -206,10 +206,13 @@ class MediaSniffer {
 
         fun pixelsOf(item: Caught): Long = sizeOf(item)?.let { (w, h) -> w.toLong() * h } ?: 0
 
-        private fun hostOf(url: String) = runCatching { java.net.URI(url).host }.getOrNull().orEmpty().lowercase()
+        private fun hostOf(url: String) = runCatching { java.net.URI(url).host }.getOrNull().orEmpty().trim().lowercase()
 
         /** "videos.pexels.com" → "pexels.com" (good enough for "same site"; no public-suffix list). */
-        private fun siteOf(host: String) = host.split('.').takeLast(2).joinToString(".")
+        private fun siteOf(host: String): String {
+            val parts = host.split('.').filter { it.isNotBlank() }
+            return if (parts.size < 2) host else parts.takeLast(2).joinToString(".")
+        }
 
         /**
          * What's worth listing for the page at [pageUrl], best first. Left out: a stream's pieces,
