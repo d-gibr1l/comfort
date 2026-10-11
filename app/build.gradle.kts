@@ -43,12 +43,8 @@ android {
             // native-backed feature silently had nothing to load, surfacing as PythonRuntime's
             // graceful "Failed to provision the Python runtime" rather than a crash. All four
             // native components (python/qjs/aria2c/ffmpeg) now exist for this ABI —
-            // jniLibs/armeabi-v7a/lib{python,qjs,aria2c,ffmpeg}*, all from the same
-            // ytdlnis-packages source. ffmpeg's own build for this ABI is dynamically linked
-            // (unlike the fully-static single-binary bundled for arm64-v8a/x86_64), so it also
-            // ships libffmpeg.zip.so — its actual shared-library dependencies, provisioned the
-            // same zip.so-unpacking way PythonRuntime/Aria2Runtime already provision their own
-            // (see FfmpegRuntime.ensureProvisioned).
+            // jniLibs/armeabi-v7a/lib{python,qjs,aria2c,ffmpeg}* — python/qjs/aria2c from
+            // ytdlnis-packages, ffmpeg the same own build every ABI uses (see FfmpegRuntime).
             include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true
         }

@@ -129,8 +129,8 @@ interpreter — a genuine OS process per download, not an embedded JNI interpret
 makes `curl_cffi` browser impersonation possible on Android at all. A small fork server keeps the
 engines pre-loaded so each download starts without paying Python's import cost again. Kotlin talks
 to it over a stdout line protocol (`[title]`/`[thumbnail]`/`[progress]`/`[error]`/bare file paths),
-the same shape either tool prints when run from a terminal. A bundled `ffmpeg` build handles muxing
-and does the post-download stream-copy trim used by the Clip/section feature.
+the same shape either tool prints when run from a terminal. A bundled `ffmpeg` build handles muxing,
+exact trims, audio conversion (MP3/M4A/Opus/FLAC), volume levelling and MP4 conversion.
 
 Room + WorkManager persist the download queue across process death; the UI is 100% Jetpack Compose
 with Material 3 Expressive components.
@@ -157,7 +157,10 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
 - [YTDLnis](https://github.com/deniscerri/ytdlnis) / its
   [ytdlnis-packages](https://github.com/deniscerri/ytdlnis-packages) repo (GPLv3) — the
   subprocess-Python-on-Android architecture this app's own Python runtime is built on, and the
-  actual prebuilt Python/ffmpeg/QuickJS binaries bundled directly into this app
+  actual prebuilt Python/QuickJS binaries bundled directly into this app
+- [FFmpeg](https://ffmpeg.org) (LGPLv2.1+) 7.1, built for this app with
+  [LAME](https://lame.sourceforge.io) (LGPLv2) for MP3 and [Opus](https://opus-codec.org) (BSD) —
+  merging, converting, trimming and re-encoding (H.264 on the phone's own hardware encoder)
 - [aria2](https://github.com/aria2/aria2) (GPLv2+) — multi-connection downloads
 - [QuickJS](https://github.com/bellard/quickjs) (MIT) — JS-challenge solving for sites that require it
 - [TachiyomiJ2K](https://github.com/Jays2Kings/tachiyomiJ2K) (Apache-2.0) — the Appearance
@@ -166,7 +169,7 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
 ## License
 
 GPLv3 — see [`LICENSE`](LICENSE). Required by the GPL-licensed components this app bundles
-directly (gallery-dl, aria2, and the ytdlnis-packages Python/ffmpeg/QuickJS binaries) — bundling
+directly (gallery-dl, aria2, and the ytdlnis-packages Python/QuickJS binaries) — bundling
 GPL code into a distributed app means the combined work has to be GPL-compatible too, with source
 available to anyone who gets the APK (this repo). The permissively-licensed pieces (yt-dlp,
 Instaloader, QuickJS, the ported TachiyomiJ2K UI) are all GPL-compatible on their own terms; see

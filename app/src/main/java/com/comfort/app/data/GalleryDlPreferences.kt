@@ -38,6 +38,17 @@ enum class OutputFormat(val label: String, val extension: String) {
     MP4("MP4", "mp4"),
 }
 
+/** The format audio downloads (and Spotify songs) are saved in. ORIGINAL keeps the site's own
+ * stream without re-encoding (YouTube: AAC .m4a when there is one, else Opus); the others convert
+ * unless the stream already is that codec — see yt_dlp_wrapper.py's ExtractAudio setup. */
+enum class AudioFormat(val label: String, val codec: String) {
+    ORIGINAL("Original", ""),
+    MP3("MP3", "mp3"),
+    M4A("M4A", "m4a"),
+    OPUS("Opus", "opus"),
+    FLAC("FLAC", "flac"),
+}
+
 /** What a link shared to Comfort does: open the picker/preview sheet, download right away, or ask
  * which in a small sheet (ShareActivity's AskShareModeHandler). */
 enum class ShareMode(val label: String) {
@@ -108,6 +119,8 @@ object GalleryDlPreferences {
     const val KEY_APP_UPDATE_LAST_CHECK_MS = "app_update_last_check_ms"
     const val KEY_APP_UPDATE_AVAILABLE = "app_update_available"
     const val KEY_OUTPUT_FORMAT = "output_format"
+    const val KEY_AUDIO_FORMAT = "audio_format"
+    const val KEY_NORMALIZE_AUDIO = "normalize_audio"
     const val KEY_NETWORK_RETRIES = "network_retries"
     const val KEY_AUTO_UPDATE_ENGINES = "auto_update_engines"
     const val KEY_YTDLP_UPDATE_CHANNEL = "ytdlp_update_channel"
@@ -724,11 +737,10 @@ object GalleryDlPreferences {
         prefs(context).edit().putBoolean(KEY_APP_UPDATE_AVAILABLE, available).apply()
     }
 
-    /** Only affects a merged video (audio+video muxed via ffmpeg) — a single already-muxed format
-     * downloads straight through regardless of this setting, and gallery-dl-sourced items keep
-     * whatever extension the site actually served. MKV stays the default: see
-     * yt_dlp_wrapper.py's own merge_output_format comment for why MP4 needed real work (a
-     * format_sort codec bias) to avoid producing unplayable output on some sources. */
+    /** The container for yt-dlp video downloads; gallery-dl-sourced items keep whatever extension
+     * the site actually served. MP4 biases format choice toward H.264/AAC and re-encodes anything
+     * else (VP9/AV1/Opus) into an MP4 that plays everywhere — yt_dlp_wrapper.py's _Mp4ConvertPP.
+     * MKV takes every stream as it is. */
     fun getOutputFormat(context: Context): OutputFormat {
         val stored = prefs(context).getString(KEY_OUTPUT_FORMAT, OutputFormat.MKV.name)
         return runCatching { OutputFormat.valueOf(stored ?: OutputFormat.MKV.name) }.getOrDefault(OutputFormat.MKV)
@@ -736,6 +748,22 @@ object GalleryDlPreferences {
 
     fun setOutputFormat(context: Context, format: OutputFormat) {
         prefs(context).edit().putString(KEY_OUTPUT_FORMAT, format.name).apply()
+    }
+
+    fun getAudioFormat(context: Context): AudioFormat {
+        val stored = prefs(context).getString(KEY_AUDIO_FORMAT, AudioFormat.ORIGINAL.name)
+        return runCatching { AudioFormat.valueOf(stored ?: AudioFormat.ORIGINAL.name) }.getOrDefault(AudioFormat.ORIGINAL)
+    }
+
+    fun setAudioFormat(context: Context, format: AudioFormat) {
+        prefs(context).edit().putString(KEY_AUDIO_FORMAT, format.name).apply()
+    }
+
+    /** Levels audio downloads to the same loudness (EBU R128, -16 LUFS) — a re-encode, so off by default. */
+    fun isNormalizeAudio(context: Context): Boolean = prefs(context).getBoolean(KEY_NORMALIZE_AUDIO, false)
+
+    fun setNormalizeAudio(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_NORMALIZE_AUDIO, enabled).apply()
     }
 
     fun getYtDlpUpdateChannel(context: Context): EngineUpdateChannel {

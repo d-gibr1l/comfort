@@ -68,9 +68,11 @@ internal class EngineCommands(
     // the latter merges the separate video/audio streams into one playable file.
     private val jsRuntimePath = QuickJsRuntime.getExecutablePath(context).orEmpty()
     private val ffmpegPath = FfmpegRuntime.getExecutablePath(context).orEmpty()
-    // Non-empty only on armeabi-v7a, whose ffmpeg needs its unpacked shared libraries
-    // (LD_LIBRARY_PATH); the other ABIs' ffmpeg is fully static.
+    // Always empty now (no ABI's ffmpeg has libraries of its own); the call also clears the old
+    // armeabi-v7a bundle's leftover folder. Still passed: the wrappers' argument positions.
     private val ffmpegLibDir = FfmpegRuntime.ensureProvisioned(context)?.absolutePath.orEmpty()
+    private val audioFormat = GalleryDlPreferences.getAudioFormat(context)
+    private val normalizeAudio = GalleryDlPreferences.isNormalizeAudio(context)
 
     // A per-download quality the sheet set wins over the Settings default.
     private val videoQuality = entity?.videoQuality?.let { stored -> runCatching { VideoQuality.valueOf(stored) }.getOrNull() }
@@ -180,6 +182,8 @@ internal class EngineCommands(
             // The preview sheet's saved extraction of this same URL, if any — reused instead of
             // extracting again (see yt_dlp_wrapper.download).
             GalleryDlListing.ytDlpInfoCacheFile(context, url).absolutePath,
+            audioFormat.codec,
+            flag(normalizeAudio),
         ),
     )
 
@@ -208,6 +212,8 @@ internal class EngineCommands(
             proxyUrl,
             socketTimeoutSeconds,
             networkRetries,
+            audioFormat.codec,
+            flag(normalizeAudio),
         ),
     )
 
