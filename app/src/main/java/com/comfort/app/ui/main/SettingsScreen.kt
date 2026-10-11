@@ -220,16 +220,14 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     }
     val themeSummary = if (effectiveDark) themeState.darkTheme.darkLabel else themeState.lightTheme.lightLabel
     var filenameFormat by remember { mutableStateOf(GalleryDlPreferences.getFilenameFormat(context)) }
-    var hasCookies by remember { mutableStateOf(GalleryDlPreferences.getCookies(context).isNotBlank()) }
+    val cookieVersion by com.comfort.app.data.CookieStore.version.collectAsState()
+    val hasCookies = remember(cookieVersion) { GalleryDlPreferences.getCookies(context).isNotBlank() }
 
     DisposableEffect(context) {
         val prefs = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == GalleryDlPreferences.KEY_FILENAME_FORMAT || key == null) {
                 filenameFormat = GalleryDlPreferences.getFilenameFormat(context)
-            }
-            if (key == GalleryDlPreferences.KEY_COOKIES || key == null) {
-                hasCookies = GalleryDlPreferences.getCookies(context).isNotBlank()
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)

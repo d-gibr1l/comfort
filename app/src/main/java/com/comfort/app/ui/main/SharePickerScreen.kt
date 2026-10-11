@@ -64,11 +64,11 @@ fun SharePickerScreen(
     // like Twitter/Reddit that need a fresh guest-token/auth request per listing attempt. Null
     // (the default) means "fetch it myself," unchanged from every other caller of this screen.
     preloadedResult: ListingResult? = null,
-    // "Retry preview" after a failed listing. The callers pass the router's open(), which lists
-    // again and picks the sheet afresh: the router shows this picker for any failed listing (a
-    // timeout, typically), and a single video that answers on the retry belongs in the preview
-    // sheet (with Trim) — retrying in place left it as a "1 of 1 selected" picker. Null retries
-    // in place.
+    // Listing again: "Retry preview", the network coming back, a login. The callers pass the
+    // router's open(), which lists again and picks the sheet afresh — the router shows this picker
+    // for any failed listing (a timeout, typically), and a single video that answers on the retry
+    // belongs in the preview sheet (with Trim); retrying in place left it as a "1 of 1 selected"
+    // picker. Null retries in place.
     onRetry: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -98,7 +98,7 @@ fun SharePickerScreen(
             wasNetworkUnavailable = true
         } else if (wasNetworkUnavailable && state == ListingState.ERROR) {
             wasNetworkUnavailable = false
-            picker.retry()
+            onRetry?.invoke() ?: picker.retry()
         }
     }
 
@@ -381,7 +381,7 @@ fun SharePickerScreen(
                                 showLoginDialog = false
                                 // Cookies just changed — the same URL is worth re-listing rather
                                 // than leaving the user stuck on the same error they just fixed.
-                                picker.retry()
+                                onRetry?.invoke() ?: picker.retry()
                             },
                         )
                     }

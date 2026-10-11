@@ -196,16 +196,19 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             pasteError = "Please paste cookie text first."
                             savedConfirmation = false
                         }
-                        trimmed.startsWith("{") || trimmed.startsWith("[") -> {
-                            pasteError = "Detected JSON format. Comfort requires Netscape cookies.txt format (tab-separated columns). Please export in Netscape format from your browser extension."
-                            savedConfirmation = false
-                        }
-                        trimmed.contains("Cookie:") || (trimmed.contains("=") && !trimmed.contains("\t") && !trimmed.contains("   ")) -> {
-                            pasteError = "Detected HTTP header format (\"name=value\"). Comfort requires Netscape cookies.txt format with domain, path, expiry, and values separated by tabs."
-                            savedConfirmation = false
-                        }
+                        // The parser decides first: it also takes cookies.txt lines whose tabs became
+                        // spaces (some apps convert them when copying), and their values often hold
+                        // "=" — a format guess made beforehand turned those away as "name=value"
+                        // headers. The guesses only pick the message once nothing parsed.
                         !cookiesViewModel.savePasted(pastedCookies) -> {
-                            pasteError = "Couldn't find any valid cookies in that text — it needs to be real tab-separated Netscape format (domain, includeSubdomains, path, secure, expiry, name, value per line)."
+                            pasteError = when {
+                                trimmed.startsWith("{") || trimmed.startsWith("[") ->
+                                    "Detected JSON format. Comfort requires Netscape cookies.txt format (tab-separated columns). Please export in Netscape format from your browser extension."
+                                trimmed.contains("Cookie:") || (trimmed.contains("=") && !trimmed.contains("\t")) ->
+                                    "Detected HTTP header format (\"name=value\"). Comfort requires Netscape cookies.txt format with domain, path, expiry, and values separated by tabs."
+                                else ->
+                                    "Couldn't find any valid cookies in that text — it needs to be real tab-separated Netscape format (domain, includeSubdomains, path, secure, expiry, name, value per line)."
+                            }
                             savedConfirmation = false
                         }
                         else -> {
