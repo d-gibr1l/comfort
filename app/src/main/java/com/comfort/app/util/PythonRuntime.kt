@@ -73,7 +73,7 @@ object PythonRuntime {
     /** Null if the app's own nativeLibraryDir can't be resolved. */
     private fun helperNativeLibDir(context: Context): File? {
         val dir = context.applicationInfo.nativeLibraryDir ?: return null
-        return File(dir).takeIf { it.exists() }
+        return File(dir).takeIf { it.exists() && it.isDirectory }
     }
 
     // Guards the unpack-everything critical section below. Without this, two downloads starting
@@ -399,10 +399,16 @@ object PythonRuntime {
     // internal, not private — EngineUpdater.kt reuses this to unpack a freshly downloaded engine
     // wheel the same way a bundled one gets unpacked here.
     internal fun unzipStreamTo(input: InputStream, destDir: File) {
+        destDir.mkdirs()
+        val canonicalDest = destDir.canonicalFile
         ZipInputStream(input).use { zis ->
             var entry: ZipEntry? = zis.nextEntry
             while (entry != null) {
                 val outFile = File(destDir, entry.name)
+                val canonicalOut = outFile.canonicalFile
+                if (!canonicalOut.path.startsWith(canonicalDest.path + File.separator) && canonicalOut != canonicalDest) {
+                    throw SecurityException("Zip entry is outside destination directory: ${entry.name}")
+                }
                 if (entry.isDirectory) {
                     outFile.mkdirs()
                 } else {

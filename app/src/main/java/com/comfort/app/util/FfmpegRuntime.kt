@@ -36,7 +36,7 @@ object FfmpegRuntime {
     /** Path to the ffmpeg executable, or null if it wasn't bundled for this device's ABI. */
     fun getExecutablePath(context: Context): String? {
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY_NAME)
-        return binary.takeIf { it.exists() }?.absolutePath
+        return binary.takeIf { it.isFile && it.exists() }?.absolutePath
     }
 
     /** Directory holding this ABI's ffmpeg's own bundled shared-library dependencies — null on
@@ -46,6 +46,7 @@ object FfmpegRuntime {
      * this via the ffmpeg_lib_dir kwarg, identical to Aria2Runtime.ensureProvisioned's own
      * equivalent for aria2c. Cheap to call repeatedly — only actually unzips the first time (or
      * after [PROVISION_VERSION] changes). */
+    @Synchronized
     fun ensureProvisioned(context: Context): File? {
         val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
         val zipSo = File(nativeLibDir, ZIP_SO_NAME)

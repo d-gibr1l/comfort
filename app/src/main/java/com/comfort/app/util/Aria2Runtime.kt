@@ -41,7 +41,7 @@ object Aria2Runtime {
     /** Path to the aria2c executable, or null if it wasn't bundled for this device's ABI. */
     fun getExecutablePath(context: Context): String? {
         val binary = File(context.applicationInfo.nativeLibraryDir, BINARY_NAME)
-        return binary.takeIf { it.exists() }?.absolutePath
+        return binary.takeIf { it.isFile && it.exists() }?.absolutePath
     }
 
     /** Directory holding aria2c's own bundled shared-library dependencies. Callers must point the
@@ -50,6 +50,7 @@ object Aria2Runtime {
      * bundled for this device's ABI, or if provisioning it failed. Cheap to call repeatedly, like
      * PythonRuntime.ensureProvisioned — only actually unzips the first time (or after
      * [PROVISION_VERSION] changes). */
+    @Synchronized
     fun ensureProvisioned(context: Context): File? {
         val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
         val zipSo = File(nativeLibDir, ZIP_SO_NAME)
