@@ -81,7 +81,7 @@ private fun EngineChoiceSection() {
     fun move(index: Int, by: Int) {
         val order = choice.order.filter { it in com.comfort.app.worker.EngineChoice.REORDERABLE }.toMutableList()
         val target = index + by
-        if (target !in order.indices) return
+        if (index !in order.indices || target !in order.indices) return
         order[index] = order[target].also { order[target] = order[index] }
         haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
         GalleryDlPreferences.setEngineOrder(context, order.map { it.name })
@@ -393,11 +393,7 @@ private fun SitesSection() {
                             }
                         }
                         loadFailed -> Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Text(
-                                "Couldn't read the engines' site lists.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                            )
+                            SettingsErrorBanner("Couldn't read the engines' site lists.")
                             Spacer(Modifier.height(4.dp))
                             TextButton(onClick = {
                                 coroutineScope.launch {
@@ -524,8 +520,8 @@ private fun SiteListSheet(
             )
             Spacer(Modifier.height(8.dp))
             androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                items(shown.size, key = { shown[it] }) { i ->
-                    val site = shown[i]
+                items(shown.size, key = { shown.getOrNull(it) ?: it }) { i ->
+                    val site = shown.getOrNull(i) ?: return@items
                     val changed = com.comfort.app.data.VideoSiteRouter.siteOverride(site) != null
                     var menu by remember { mutableStateOf(false) }
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -535,7 +531,7 @@ private fun SiteListSheet(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                site.first().uppercase(),
+                                site.firstOrNull()?.uppercase() ?: "",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = if (changed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
@@ -599,6 +595,33 @@ private fun engineLabel(engine: com.comfort.app.data.DownloadEngine) = when (eng
     com.comfort.app.data.DownloadEngine.GALLERY_DL -> "gallery-dl"
     com.comfort.app.data.DownloadEngine.INSTALOADER -> "Instaloader"
     com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify"
+}
+
+@Composable
+private fun SettingsErrorBanner(message: String, modifier: Modifier = Modifier) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
 }
 
 /** The app's icon as the launcher shows it, drawn from the launcher's own vector — used wherever
@@ -753,7 +776,7 @@ internal fun QuickAppUpdateSection() {
         )
         if (downloadError != null) {
             Spacer(Modifier.height(10.dp))
-            Text(downloadError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            SettingsErrorBanner(downloadError.orEmpty())
         }
     }
 }
@@ -789,7 +812,7 @@ private fun AppUpdateSection() {
         }
         if (downloadError != null) {
             Spacer(Modifier.height(10.dp))
-            Text(downloadError.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            SettingsErrorBanner(downloadError.orEmpty())
         }
         Spacer(Modifier.height(14.dp))
         OutlinedButton(onClick = { updates.checkApp() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
@@ -873,7 +896,7 @@ internal fun QuickEngineUpdateSection() {
         }
         if (errorText != null) {
             Spacer(Modifier.height(10.dp))
-            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            SettingsErrorBanner(errorText.orEmpty())
         }
     }
 }
@@ -954,7 +977,7 @@ private fun EnginesSection() {
         }
         if (errorText != null) {
             Spacer(Modifier.height(10.dp))
-            Text(errorText.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            SettingsErrorBanner(errorText.orEmpty())
         }
         Spacer(Modifier.height(14.dp))
         OutlinedButton(onClick = { updates.checkEngines() }, enabled = !checking, modifier = Modifier.fillMaxWidth()) {
