@@ -48,6 +48,32 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
     SettingsSubScaffold(title = "Processing", topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
+            if (formatIdOverride.isNotBlank()) {
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Format ID override is active (\"$formatIdOverride\"). Quality choices below will be bypassed.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                    }
+                }
+            }
+
             Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
@@ -261,24 +287,31 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             )
             if (downloadSubtitles) {
                 Spacer(Modifier.height(12.dp))
+                val isSubtitlesError = subtitleLanguages.isNotBlank() && subtitleLanguages.split(',').any { segment ->
+                    val trimmed = segment.trim()
+                    trimmed.isNotEmpty() && !SUBTITLE_LANG_REGEX.matches(trimmed)
+                }
                 OutlinedTextField(
                     value = subtitleLanguages,
-                    onValueChange = {
-                        subtitleLanguages = it
-                        GalleryDlPreferences.setSubtitleLanguages(context, it)
+                    onValueChange = { input ->
+                        val sanitized = input.filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == ',' || it == ' ' }
+                        subtitleLanguages = sanitized
+                        GalleryDlPreferences.setSubtitleLanguages(context, sanitized.trim())
                     },
                     modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     label = { Text("Subtitle languages") },
                     placeholder = { Text("en") },
                     singleLine = true,
+                    isError = isSubtitlesError,
+                    supportingText = {
+                        if (isSubtitlesError) {
+                            Text("Use comma-separated language codes, e.g. \"en, es, en-US\"", color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text("Comma-separated language codes, e.g. \"en,es\".")
+                        }
+                    },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     shape = MaterialTheme.shapes.medium,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Comma-separated language codes, e.g. \"en,es\".",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -311,14 +344,20 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = formatIdOverride,
-                onValueChange = {
-                    formatIdOverride = it
-                    GalleryDlPreferences.setFormatIdOverride(context, it)
+                onValueChange = { input ->
+                    val sanitized = input.filterNot { it in "\"'$`" || it == '\n' || it == '\r' }
+                    formatIdOverride = sanitized
+                    GalleryDlPreferences.setFormatIdOverride(context, sanitized.trim())
                 },
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                 label = { Text("Format selector") },
                 placeholder = { Text("bv+ba/b") },
                 singleLine = true,
+                supportingText = {
+                    if (formatIdOverride.isNotBlank()) {
+                        Text("Overrides quality and output format for all yt-dlp downloads.", color = MaterialTheme.colorScheme.tertiary)
+                    }
+                },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
             )
@@ -394,3 +433,5 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
         }
     }
 }
+
+private val SUBTITLE_LANG_REGEX = Regex("^[a-zA-Z0-9_-]+$")
