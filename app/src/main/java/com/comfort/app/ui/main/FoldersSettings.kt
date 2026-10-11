@@ -161,7 +161,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 Text("Save format")
             }
 
-            if (filenameFormatSaved) {
+            ToggleReveal(filenameFormatSaved) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Filename format saved", tint = MaterialTheme.colorScheme.primary)
             }
@@ -406,7 +406,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     Text("Clear cache")
                 }
             }
-            if (cacheCleared) {
+            ToggleReveal(cacheCleared) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cache cleared", tint = MaterialTheme.colorScheme.primary)
             }

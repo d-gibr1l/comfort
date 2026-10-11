@@ -163,7 +163,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 Text("Log in via built-in browser")
             }
 
-            if (extractedCookies.isNotEmpty()) {
+            ToggleReveal(extractedCookies.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies extracted successfully", tint = MaterialTheme.colorScheme.primary)
             }
@@ -224,7 +224,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 Text("Save cookies")
             }
 
-            if (savedConfirmation) {
+            ToggleReveal(savedConfirmation) {
                 Spacer(Modifier.height(8.dp))
                 StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies saved and applied", tint = MaterialTheme.colorScheme.primary)
             }
