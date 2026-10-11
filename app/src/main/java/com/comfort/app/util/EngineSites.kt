@@ -23,10 +23,11 @@ object EngineSitesRepository {
             .joinToString("|") { EngineUpdater.installedVersion(context, it).orEmpty() }
         memory?.takeIf { it.first == key }?.let { return@withContext it.second }
         val cache = File(context.filesDir, CACHE_FILE)
-        val cached = runCatching { JSONObject(cache.readText()) }.getOrNull()?.takeIf { it.optString("key") == key }
-        val json = cached ?: generate(context)?.also { fresh ->
+        val cached = runCatching { JSONObject(cache.readText()) }.getOrNull()
+        val exactMatch = cached?.takeIf { it.optString("key") == key }
+        val json = exactMatch ?: generate(context)?.also { fresh ->
             runCatching { cache.writeText(fresh.put("key", key).toString()) }
-        } ?: return@withContext null
+        } ?: cached ?: return@withContext null
         val galleryDl = json.optJSONArray("gallery_dl").strings().toSet()
         val ytDlp = json.optJSONArray("yt_dlp").strings().toSet()
         EngineSites(
