@@ -59,18 +59,30 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         _route.value = LinkRoute.Listing(trimmed)
         _isDuplicate.value = false
         listing = viewModelScope.launch {
-            launch { _isDuplicate.value = DownloadDispatcher.isDuplicate(context, trimmed) }
-            val result = GalleryDlListing.listItemsForSheet(context, trimmed)
-            if (result.timedOut && !com.comfort.app.data.VideoSiteRouter.isGalleryDlOnly(trimmed)) {
-                // gallery-dl is stuck (a rate limit, typically), but yt-dlp reaches the site its own
-                // way — a video link still gets its normal preview. Only if yt-dlp can't show
-                // anything either (an image post, or the site really is down) does the picker's
-                // "taking too long" screen come up.
-                val preview = withTimeoutOrNull(YT_DLP_PREVIEW_CAP_MS) { GalleryDlListing.fetchPreviewInfo(context, trimmed, ytDlpOnly = true) }
-                _route.value = if (preview?.hasContent() == true) LinkRoute.Preview(trimmed, preview) else LinkRoute.Picker(trimmed, result)
-                return@launch
+            try {
+                launch {
+                    try {
+                        _isDuplicate.value = DownloadDispatcher.isDuplicate(context, trimmed)
+                    } catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        _isDuplicate.value = false
+                    }
+                }
+                val result = GalleryDlListing.listItemsForSheet(context, trimmed)
+                if (result.timedOut && !com.comfort.app.data.VideoSiteRouter.isGalleryDlOnly(trimmed)) {
+                    // gallery-dl is stuck (a rate limit, typically), but yt-dlp reaches the site its own
+                    // way — a video link still gets its normal preview. Only if yt-dlp can't show
+                    // anything either (an image post, or the site really is down) does the picker's
+                    // "taking too long" screen come up.
+                    val preview = withTimeoutOrNull(YT_DLP_PREVIEW_CAP_MS) { GalleryDlListing.fetchPreviewInfo(context, trimmed, ytDlpOnly = true) }
+                    _route.value = if (preview?.hasContent() == true) LinkRoute.Preview(trimmed, preview) else LinkRoute.Picker(trimmed, result)
+                    return@launch
+                }
+                _route.value = if (result.shouldUsePreviewSheet(trimmed)) LinkRoute.Preview(trimmed) else LinkRoute.Picker(trimmed, result)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _route.value = LinkRoute.Picker(trimmed, ListingResult(items = emptyList(), errorMessage = e.message ?: "Failed to load link", timedOut = false))
             }
-            _route.value = if (result.shouldUsePreviewSheet(trimmed)) LinkRoute.Preview(trimmed) else LinkRoute.Picker(trimmed, result)
         }
     }
 
