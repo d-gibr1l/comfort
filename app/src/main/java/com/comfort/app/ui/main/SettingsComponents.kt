@@ -23,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -516,8 +518,20 @@ internal fun IconToggleRow(
     // material3 1.5.0-alpha18 SwitchKt.class, no HapticFeedback reference anywhere in it. Every
     // toggle in Settings felt inert on tap without this.
     val haptics = LocalHapticFeedback.current
+    val toggle: (Boolean) -> Unit = {
+        haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+        onCheckedChange(it)
+    }
+    // The whole row flips the switch, not just the switch itself — tapping the title did nothing
+    // before. One toggleable node also reads to TalkBack as a single "switch, on/off" control with
+    // the title as its label.
     Row(
-        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)).padding(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(highlightRowModifier(title))
+            .clip(MaterialTheme.shapes.medium)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = toggle)
+            .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -545,10 +559,8 @@ internal fun IconToggleRow(
         Spacer(Modifier.width(12.dp))
         Switch(
             checked = checked,
-            onCheckedChange = {
-                haptics.performHapticFeedback(if (it) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
-                onCheckedChange(it)
-            },
+            // Null: the row above handles the tap, so the switch is just its indicator.
+            onCheckedChange = null,
             // Default unchecked thumb color reads as near-invisible against the unchecked track
             // in this theme — an off toggle looked like a flat, dead pill rather than a working
             // control resting in its off position. onSurfaceVariant/surfaceVariant is M3's own
