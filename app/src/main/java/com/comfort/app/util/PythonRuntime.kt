@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Runs gallery_dl_wrapper.py / yt_dlp_wrapper.py as a real OS subprocess against a standalone
@@ -227,21 +228,26 @@ object PythonRuntime {
         try {
             if (!ensureProvisioned(context)) return
             val root = runtimeRoot(context)
+            val socketFile = File(root, SERVER_SOCKET)
+            runCatching { socketFile.delete() }
             val process = pythonProcess(
                 context,
-                listOf(File(root, SERVER_SCRIPT).absolutePath, File(root, SERVER_SOCKET).absolutePath),
+                listOf(File(root, SERVER_SCRIPT).absolutePath, socketFile.absolutePath),
             ).start()
             // stdin is deliberately left open: the server exits when it closes, i.e. when this app
             // process dies, so it can never outlive the app (or serve a newer version of it).
             val started = System.currentTimeMillis()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val ready = withContext(Dispatchers.IO) {
-                var line = reader.readLine()
-                while (line != null && line != "${CONTROL}ready") line = reader.readLine()
-                line != null
-            }
+            val ready = withTimeoutOrNull(15_000) {
+                withContext(Dispatchers.IO) {
+                    var line = reader.readLine()
+                    while (line != null && line != "${CONTROL}ready") line = reader.readLine()
+                    line != null
+                }
+            } ?: false
             if (!ready) {
-                android.util.Log.w("PythonRuntime", "fork server exited before becoming ready")
+                android.util.Log.w("PythonRuntime", "fork server exited or timed out before becoming ready")
+                if (process.isAlive) process.destroyForcibly()
                 return
             }
             server = process
@@ -264,7 +270,7 @@ object PythonRuntime {
      * replacing an engine, whose old version the server still has in memory. Running jobs are
      * separate processes and are unaffected. */
     fun restartServer() {
-        server?.destroy()
+        server?.destroyForcibly()
         server = null
         serverFailedAt = 0L
     }
@@ -373,14 +379,22 @@ object PythonRuntime {
         val root = runtimeRoot(context)
         val interpreter = File(nativeLibDir, "libpython.so").absolutePath
         val started = System.currentTimeMillis()
-        val result = runCatching {
-            val process = ProcessBuilder(
+        val hasNice = File("/system/bin/nice").canExecute()
+        val cmd = if (hasNice) {
+            listOf(
                 "/system/bin/nice", "-n", "10",
                 // Single process: compileall's -j uses multiprocessing, whose SemLock needs
                 // /dev/shm, which Android doesn't have (FileNotFoundError, found live). ~8s for the
                 // whole tree on-device at nice 10, in the background.
                 interpreter, "-m", "compileall", "-q", dir.absolutePath,
             )
+        } else {
+            listOf(
+                interpreter, "-m", "compileall", "-q", dir.absolutePath,
+            )
+        }
+        val result = runCatching {
+            val process = ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .apply {
                     environment()["PYTHONHOME"] = File(root, "usr").absolutePath
