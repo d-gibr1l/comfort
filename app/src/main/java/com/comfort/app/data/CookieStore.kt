@@ -51,6 +51,10 @@ object CookieStore {
         return ""
     }
 
+    /** Goes up on every [write], so screens showing "cookies set or not" can follow along — the
+     * cookies live in a file now, not the SharedPreferences key Settings used to listen to. */
+    val version = kotlinx.coroutines.flow.MutableStateFlow(0)
+
     fun write(context: Context, content: String) {
         context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().remove(GalleryDlPreferences.KEY_COOKIES).apply()
@@ -65,6 +69,7 @@ object CookieStore {
             if (stream != null) atomicFile.failWrite(stream)
             runCatching { target.writeText(content) }
         }
+        version.value++
     }
 
     /** [cookies] as a whole file, header first. */

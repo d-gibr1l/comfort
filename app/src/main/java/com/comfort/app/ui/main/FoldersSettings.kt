@@ -43,19 +43,13 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     var audioLocationUri by remember { mutableStateOf(GalleryDlPreferences.getAudioLocationUri(context)) }
     var videoLocationUri by remember { mutableStateOf(GalleryDlPreferences.getVideoLocationUri(context)) }
 
+    // Choosing another folder or going back to the default never releases the old folder's
+    // permission: everything already saved there is still in the Library, and opening,
+    // sharing, renaming or checking those files goes through it.
     val downloadLocationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            val oldUri = downloadLocationUri
-            if (oldUri != null && oldUri != uri && oldUri != audioLocationUri && oldUri != videoLocationUri) {
-                runCatching {
-                    context.contentResolver.releasePersistableUriPermission(
-                        oldUri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                }
-            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -74,15 +68,6 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            val oldUri = audioLocationUri
-            if (oldUri != null && oldUri != uri && oldUri != downloadLocationUri && oldUri != videoLocationUri) {
-                runCatching {
-                    context.contentResolver.releasePersistableUriPermission(
-                        oldUri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                }
-            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -97,15 +82,6 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
-            val oldUri = videoLocationUri
-            if (oldUri != null && oldUri != uri && oldUri != downloadLocationUri && oldUri != audioLocationUri) {
-                runCatching {
-                    context.contentResolver.releasePersistableUriPermission(
-                        oldUri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                }
-            }
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
@@ -242,16 +218,6 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 if (downloadLocationUri != null) {
                     OutlinedButton(
                         onClick = {
-                            downloadLocationUri?.let { uri ->
-                                if (uri != audioLocationUri && uri != videoLocationUri) {
-                                    runCatching {
-                                        context.contentResolver.releasePersistableUriPermission(
-                                            uri,
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                                        )
-                                    }
-                                }
-                            }
                             downloadLocationUri = null
                             GalleryDlPreferences.setDownloadLocationUri(context, null)
                         },
@@ -273,16 +239,6 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 uri = audioLocationUri,
                 onChoose = { audioLocationLauncher.launch(null) },
                 onUseDefault = {
-                    audioLocationUri?.let { uri ->
-                        if (uri != downloadLocationUri && uri != videoLocationUri) {
-                            runCatching {
-                                context.contentResolver.releasePersistableUriPermission(
-                                    uri,
-                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                                )
-                            }
-                        }
-                    }
                     audioLocationUri = null
                     GalleryDlPreferences.setAudioLocationUri(context, null)
                 },
@@ -298,16 +254,6 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 uri = videoLocationUri,
                 onChoose = { videoLocationLauncher.launch(null) },
                 onUseDefault = {
-                    videoLocationUri?.let { uri ->
-                        if (uri != downloadLocationUri && uri != audioLocationUri) {
-                            runCatching {
-                                context.contentResolver.releasePersistableUriPermission(
-                                    uri,
-                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                                )
-                            }
-                        }
-                    }
                     videoLocationUri = null
                     GalleryDlPreferences.setVideoLocationUri(context, null)
                 },

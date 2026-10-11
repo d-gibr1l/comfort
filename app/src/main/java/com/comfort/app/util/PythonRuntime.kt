@@ -16,7 +16,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Runs gallery_dl_wrapper.py / yt_dlp_wrapper.py as a real OS subprocess against a standalone
@@ -238,13 +237,25 @@ object PythonRuntime {
             // process dies, so it can never outlive the app (or serve a newer version of it).
             val started = System.currentTimeMillis()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val ready = withTimeoutOrNull(15_000) {
+            // A coroutine timeout can't interrupt the blocking readLine() below, so a server that hangs
+            // before "ready" is killed instead, which ends the read (null). It's normally ready in
+            // under a second (714 ms on a Galaxy S24).
+            val watchdog = Thread {
+                try {
+                    Thread.sleep(15_000)
+                    if (process.isAlive) process.destroyForcibly()
+                } catch (_: InterruptedException) {
+                }
+            }.apply { isDaemon = true; start() }
+            val ready = try {
                 withContext(Dispatchers.IO) {
                     var line = reader.readLine()
                     while (line != null && line != "${CONTROL}ready") line = reader.readLine()
                     line != null
                 }
-            } ?: false
+            } finally {
+                watchdog.interrupt()
+            }
             if (!ready) {
                 android.util.Log.w("PythonRuntime", "fork server exited or timed out before becoming ready")
                 if (process.isAlive) process.destroyForcibly()
