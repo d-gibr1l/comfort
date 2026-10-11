@@ -291,13 +291,11 @@ object MediaStoreHelper {
         val dot = name.lastIndexOf('.')
         val base = if (dot > 0) name.substring(0, dot) else name
         val ext = if (dot > 0) name.substring(dot) else ""
-        var index = 1
-        var candidate: String
-        do {
-            candidate = "$base ($index)$ext"
-            index++
-        } while (dir.findFile(candidate) != null)
-        return candidate
+        for (index in 1..1000) {
+            val candidate = "$base ($index)$ext"
+            if (dir.findFile(candidate) == null) return candidate
+        }
+        return "$base (${System.currentTimeMillis()})$ext"
     }
 
     /** Same dedup as [uniqueName] above, against a plain public directory instead of a
@@ -313,13 +311,11 @@ object MediaStoreHelper {
         val dot = name.lastIndexOf('.')
         val base = if (dot > 0) name.substring(0, dot) else name
         val ext = if (dot > 0) name.substring(dot) else ""
-        var index = 1
-        var candidate: File
-        do {
-            candidate = File(dir, "$base ($index)$ext")
-            index++
-        } while (candidate.exists())
-        return candidate
+        for (index in 1..1000) {
+            val candidate = File(dir, "$base ($index)$ext")
+            if (!candidate.exists()) return candidate
+        }
+        return File(dir, "$base (${System.currentTimeMillis()})$ext")
     }
 
     private fun saveToMediaStore(context: Context, sourceFile: File, mimeType: String): Uri? {
@@ -443,20 +439,30 @@ object MediaStoreHelper {
                         var size = f.readInt().toLong() and 0xFFFFFFFFL
                         val type = ByteArray(4).also { f.readFully(it) }.toString(Charsets.ISO_8859_1)
                         var header = 8L
-                        if (size == 1L) { size = f.readLong(); header = 16L }
+                        if (size == 1L) {
+                            if (pos + 16 > end) return
+                            size = f.readLong()
+                            header = 16L
+                        }
                         if (size == 0L) size = end - pos
-                        if (size < header || pos + size > end) return
+                        if (size < header || size > (end - pos)) return
                         when (type) {
                             "moov", "trak", "mdia" -> patch(pos + header, pos + size)
                             "mvhd", "tkhd", "mdhd" -> {
                                 val body = pos + header
-                                f.seek(body)
-                                val version = f.readUnsignedByte()
-                                val fieldStart = body + 4
-                                if (version == 1) {
-                                    f.seek(fieldStart); f.writeLong(secs); f.writeLong(secs)
-                                } else {
-                                    f.seek(fieldStart); f.writeInt(secs.toInt()); f.writeInt(secs.toInt())
+                                if (body + 12 <= pos + size) {
+                                    f.seek(body)
+                                    val version = f.readUnsignedByte()
+                                    val fieldStart = body + 4
+                                    if (version == 1) {
+                                        if (fieldStart + 16 <= pos + size) {
+                                            f.seek(fieldStart); f.writeLong(secs); f.writeLong(secs)
+                                        }
+                                    } else {
+                                        if (fieldStart + 8 <= pos + size) {
+                                            f.seek(fieldStart); f.writeInt(secs.toInt()); f.writeInt(secs.toInt())
+                                        }
+                                    }
                                 }
                             }
                         }
