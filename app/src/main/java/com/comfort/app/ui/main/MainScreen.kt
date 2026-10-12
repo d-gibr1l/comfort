@@ -308,7 +308,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     }
 
     val useNavRail = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= NAV_RAIL_MIN_WIDTH_DP
-    CompositionLocalProvider(LocalUseNavRail provides useNavRail) {
+    // The media viewer (Photon Gallery's, ui/viewer), opened from a Library item over everything.
+    var mediaViewer by remember { mutableStateOf<com.comfort.app.ui.viewer.MediaViewerRequest?>(null) }
+    CompositionLocalProvider(
+        LocalUseNavRail provides useNavRail,
+        com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { mediaViewer = it },
+    ) {
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     if (useNavRail) {
         SideNavRail(
@@ -450,6 +455,10 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 )
                 }
             }
+        }
+
+        mediaViewer?.let { request ->
+            com.comfort.app.ui.viewer.MediaViewerHost(request, viewModel, onClose = { mediaViewer = null })
         }
 
         // Neither engine knows the site: the in-app browser, to find the media on the page.

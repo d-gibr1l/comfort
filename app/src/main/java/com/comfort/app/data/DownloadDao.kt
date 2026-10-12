@@ -256,6 +256,23 @@ interface DownloadDao {
     @Query("DELETE FROM downloaded_files WHERE downloadId = :downloadId")
     suspend fun clearDownloadedFileRecords(downloadId: String)
 
+    /** The source names of a download's files, in the order they arrived (rows are inserted as
+     * each one does) — the media viewer's fallback for a download saved before [SavedFile]. */
+    @Query("SELECT filename FROM downloaded_files WHERE downloadId = :downloadId ORDER BY rowid")
+    suspend fun downloadedFileNames(downloadId: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun recordSavedFile(file: SavedFile)
+
+    @Query("SELECT * FROM saved_files WHERE downloadId = :downloadId ORDER BY position")
+    suspend fun savedFiles(downloadId: String): List<SavedFile>
+
+    @Query("SELECT * FROM saved_files WHERE downloadId IN (:downloadIds) ORDER BY downloadId, position")
+    suspend fun savedFiles(downloadIds: List<String>): List<SavedFile>
+
+    @Query("DELETE FROM saved_files WHERE downloadId = :downloadId")
+    suspend fun clearSavedFiles(downloadId: String)
+
     @Query("SELECT * FROM downloads")
     suspend fun getAllOnce(): List<DownloadEntity>
 

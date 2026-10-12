@@ -371,6 +371,7 @@ fun DownloadsHistoryScreen(
     // DownloadsViewModel.mediaShapes.
     val shapes by viewModel.mediaShapes.collectAsStateWithLifecycle()
 
+    val openViewer = com.comfort.app.ui.viewer.LocalOpenMediaViewer.current
     val visibleItems = remember(
         showDeletedOnly,
         deletedItems,
@@ -598,6 +599,7 @@ fun DownloadsHistoryScreen(
                                 }
                             },
                             onLongPress = { selectedIds = selectedIds + item.id },
+                            onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
                             onDelete = { requestDelete(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
@@ -625,6 +627,7 @@ fun DownloadsHistoryScreen(
                                 }
                             },
                             onLongPress = { selectedIds = selectedIds + item.id },
+                            onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
                             durationMs = shapes[item.id]?.durationMs,
                             onDelete = { requestDelete(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
@@ -1507,6 +1510,7 @@ private fun HistoryGridItem(
     selected: Boolean,
     selectionMode: Boolean,
     onTap: () -> Unit,
+    onOpen: () -> Unit,
     onLongPress: () -> Unit,
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -1548,26 +1552,8 @@ private fun HistoryGridItem(
                     if (selectionMode) {
                         onTap()
                     } else if (hasThumbnail) {
-                        // mediaUri is only ever set when thumbnailPath got pointed at a separate
-                        // extracted image instead of the real file (audio downloads — see
-                        // DownloadEntity.mediaUri's own doc comment); everything else still opens
-                        // thumbnailPath itself, same as before mediaUri existed.
-                        val uri = Uri.parse(item.mediaUri ?: item.thumbnailPath)
-                        // thumbnailPath is the real saved file's own MediaStore URI (see
-                        // DownloadWorker.kt's setThumbnail call) — for a video download that's a
-                        // video/* file, not an image, so a hardcoded "image/*" here sent every
-                        // video open request under the wrong type. Android's "Always" default-app
-                        // preference is stored per resolved type, so a video's "Always open with
-                        // Google Photos" choice (recorded against video/*) never matched this
-                        // screen's requests and the chooser reappeared on every tap (reproduced
-                        // live on a Samsung A03 Core). Querying the real type from the content
-                        // resolver fixes it for images and videos alike.
-                        val realType = context.contentResolver.getType(uri) ?: "*/*"
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, realType)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        runCatching { context.startActivity(intent) }
+                        // The media viewer (Photon Gallery's, ui/viewer); it has "Open with" for another app.
+                        onOpen()
                     }
                 },
                 onLongClick = onLongPress,
@@ -1766,6 +1752,7 @@ private fun HistoryRow(
     selected: Boolean,
     selectionMode: Boolean,
     onTap: () -> Unit,
+    onOpen: () -> Unit,
     onLongPress: () -> Unit,
     durationMs: Long?,
     onDelete: () -> Unit,
@@ -1813,26 +1800,8 @@ private fun HistoryRow(
                     if (selectionMode) {
                         onTap()
                     } else if (hasThumbnail) {
-                        // mediaUri is only ever set when thumbnailPath got pointed at a separate
-                        // extracted image instead of the real file (audio downloads — see
-                        // DownloadEntity.mediaUri's own doc comment); everything else still opens
-                        // thumbnailPath itself, same as before mediaUri existed.
-                        val uri = Uri.parse(item.mediaUri ?: item.thumbnailPath)
-                        // thumbnailPath is the real saved file's own MediaStore URI (see
-                        // DownloadWorker.kt's setThumbnail call) — for a video download that's a
-                        // video/* file, not an image, so a hardcoded "image/*" here sent every
-                        // video open request under the wrong type. Android's "Always" default-app
-                        // preference is stored per resolved type, so a video's "Always open with
-                        // Google Photos" choice (recorded against video/*) never matched this
-                        // screen's requests and the chooser reappeared on every tap (reproduced
-                        // live on a Samsung A03 Core). Querying the real type from the content
-                        // resolver fixes it for images and videos alike.
-                        val realType = context.contentResolver.getType(uri) ?: "*/*"
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, realType)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        runCatching { context.startActivity(intent) }
+                        // The media viewer (Photon Gallery's, ui/viewer); it has "Open with" for another app.
+                        onOpen()
                     }
                 },
                 onLongClick = onLongPress,
