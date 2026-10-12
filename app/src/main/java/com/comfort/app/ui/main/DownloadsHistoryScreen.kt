@@ -116,6 +116,10 @@ fun DownloadsHistoryScreen(
     // bar's rounded ends instead of sitting above it. MainScreen now owns this SnackbarHost and
     // renders it after FloatingNavBar, so this screen only needs the state to trigger it with.
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    // False while MainScreen keeps this screen built but hidden (so opening it has nothing to
+    // build). Hidden, it's put back the way a fresh visit starts — no filter, selection or search,
+    // newest first, at the top — and its Back handlers stay off, so Back on Home is Home's.
+    isVisible: Boolean = true,
 ) {
     // Library's own topic icon in its header — same role Icons.Outlined.SettingsApplications
     // plays in the Settings root header (see SettingsScreen.kt's SettingsRootScreen).
@@ -334,15 +338,28 @@ fun DownloadsHistoryScreen(
     // Back turns an active filter chip off before it leaves the Library. Registered before the
     // selection handler, so with both active Back clears the selection first.
     val chipActive = favoritesOnly || showDeletedOnly || showDuplicatesOnly || audioOnly
-    BackHandler(enabled = chipActive && !isQueueOpen) {
+    BackHandler(enabled = isVisible && chipActive && !isQueueOpen) {
         favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false
     }
-    BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
+    BackHandler(enabled = isVisible && selectionMode) { selectedIds = emptySet() }
 
     // Checks each finished download's thumbnail against the real MediaStore once per Library
     // visit — cheap enough for typical history sizes, and it's the only way to notice a file the
     // user deleted from their gallery outside the app.
-    LaunchedEffect(Unit) { viewModel.scanForDeletedMedia() }
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            viewModel.scanForDeletedMedia()
+        } else {
+            selectedIds = emptySet()
+            favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false
+            searchQuery = ""
+            searchExpanded = false
+            sortOption = LibrarySort.DATE_NEWEST
+            sortMenuExpanded = false
+            listState.scrollToItem(0)
+            gridState.scrollToItem(0)
+        }
+    }
 
     // Each item's shape (grid tile widths) and length (the list's duration badge) — see
     // DownloadsViewModel.mediaShapes.

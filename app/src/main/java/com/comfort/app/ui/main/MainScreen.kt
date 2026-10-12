@@ -223,11 +223,33 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // composing the page, ~38ms layout+draw) — rebuilt from scratch each time, which also
     // re-ran its "Updates available" engine check. It's nearly static, so keeping it costs
     // little. Built ~2s after launch while idle, so even the first open only has to draw it.
-    // (Library isn't kept: it recomposes on every download progress tick, and costs ~35-50ms.)
+    // Library is kept the same way, but only while nothing is downloading: it recomposes on
+    // every progress tick, which a hidden copy would pay for too. Kept, it opens with nothing
+    // to build; otherwise enterTab builds it the frame before its slide (measured on the
+    // benchmark build: a ~75ms frame inside the slide without either).
     var keepSettings by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(2_000)
         keepSettings = true
+    }
+    // A tab that isn't kept composed (Library) is built first, hidden, and only then slides in:
+    // built inside the push it cost the animation its first frames (the page's ~35-50ms
+    // composition landed in them — the lag opening Library). Now that cost is one frame before
+    // the slide starts, and the slide itself only has to draw a page that's already there.
+    var preparingTab by remember { mutableStateOf<Int?>(null) }
+    val keepLibrary = keepSettings && activeDownloadsCount == 0
+    val tabScope = rememberCoroutineScope()
+    fun enterTab(index: Int, enter: () -> Unit) {
+        if (preparingTab != null) return
+        if ((index == 2 && keepSettings) || (index == 1 && keepLibrary)) { enter(); return }
+        preparingTab = index
+        tabScope.launch {
+            // The next frame composes and measures it (hidden); the one after starts the slide.
+            withFrameNanos { }
+            withFrameNanos { }
+            enter()
+            preparingTab = null
+        }
     }
     val onTabSelect: (Int) -> Unit = { index ->
         when {
@@ -247,12 +269,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             index == 0 -> tabBack.animateBack()
             // Another tab opens with the push, the page it covers sliding away behind it:
             // Home, or when switching between two tabs, the tab being left (outgoingTab).
-            selectedTab == 0 -> tabBack.animateEnter { selectedTab = index }
+            selectedTab == 0 -> enterTab(index) { tabBack.animateEnter { selectedTab = index } }
             else -> {
                 val leaving = selectedTab
-                tabBack.animateEnter(onFinished = { outgoingTab = null }) {
-                    outgoingTab = leaving
-                    selectedTab = index
+                enterTab(index) {
+                    tabBack.animateEnter(onFinished = { outgoingTab = null }) {
+                        outgoingTab = leaving
+                        selectedTab = index
+                    }
                 }
             }
         }
@@ -316,7 +340,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // tab-to-tab switch, the tab being left, underneath the new one. Keyed per tab so the
         // outgoing tab keeps its composed instance (rebuilding it would stall the frame).
         val shownTabs = listOfNotNull(outgoingTab, selectedTab.takeIf { it != 0 }).distinct()
-        val keptTabs = (shownTabs + listOfNotNull(2.takeIf { keepSettings })).distinct()
+        val keptTabs = (shownTabs + listOfNotNull(2.takeIf { keepSettings }, 1.takeIf { keepLibrary }, preparingTab)).distinct()
         for (tab in keptTabs) key(tab) {
             Box(
                 // Opaque so a centered, width-capped page (Home/Settings on a wide window) doesn't
@@ -341,6 +365,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         isQueueOpen = showQueueScreen,
                         snackbarHostState = librarySnackbarHostState,
                         openSearchSignal = librarySearchSignal,
+                        isVisible = tab == selectedTab || tab == outgoingTab,
                     )
                     2 -> ConstrainedWidth {
                     MoreScreen(
