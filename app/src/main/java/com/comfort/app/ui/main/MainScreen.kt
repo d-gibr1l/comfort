@@ -251,6 +251,13 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             preparingTab = null
         }
     }
+    // Swiping sideways between the pages (PageSwipe.kt). Not while the Queue covers them or a
+    // tap's own transition is still running.
+    val pageSwipe = rememberPageSwipeState(
+        current = selectedTab,
+        allowed = !showQueueScreen && outgoingTab == null && preparingTab == null,
+        onSettled = { selectedTab = it },
+    )
     val onTabSelect: (Int) -> Unit = { index ->
         when {
             // Tapping the already-selected Library tab again jumps to the Queue, matching
@@ -317,12 +324,17 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     Box(modifier = Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
         // Everything under the Queue (Home + the current tab) — it's what closing the Queue
         // reveals, so it trails/fades in as one layer (see predictiveBackBehind).
-        Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen)) {
+        Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(queueBack, active = showQueueScreen).pageSwipeArea(pageSwipe)) {
+        CompositionLocalProvider(LocalPageSwipe provides pageSwipe) {
         Box(
             modifier = Modifier.fillMaxSize().then(
-                // Between two tabs Home stays hidden; the outgoing tab is the page behind instead.
-                if (outgoingTab != null) Modifier.graphicsLayer { alpha = 0f }
-                else Modifier.predictiveBackBehind(tabBack, active = selectedTab != 0)
+                when {
+                    // A swipe to or from Home: beside the other page, following the finger.
+                    pageSwipe.involves(0) -> Modifier.pageSwipeLayer(pageSwipe, 0, selectedTab)
+                    // Between two tabs Home stays hidden; the outgoing tab is the page behind instead.
+                    outgoingTab != null -> Modifier.graphicsLayer { alpha = 0f }
+                    else -> Modifier.predictiveBackBehind(tabBack, active = selectedTab != 0)
+                }
             )
         ) {
             ConstrainedWidth {
@@ -340,15 +352,22 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // tab-to-tab switch, the tab being left, underneath the new one. Keyed per tab so the
         // outgoing tab keeps its composed instance (rebuilding it would stall the frame).
         val shownTabs = listOfNotNull(outgoingTab, selectedTab.takeIf { it != 0 }).distinct()
-        val keptTabs = (shownTabs + listOfNotNull(2.takeIf { keepSettings }, 1.takeIf { keepLibrary }, preparingTab)).distinct()
+        // The page a swipe is bringing in is built as the swipe starts, if it wasn't already.
+        val keptTabs = (
+            shownTabs + listOfNotNull(2.takeIf { keepSettings }, 1.takeIf { keepLibrary }, preparingTab, pageSwipe.neighbor?.takeIf { it != 0 })
+        ).distinct()
         for (tab in keptTabs) key(tab) {
             Box(
                 // Opaque so a centered, width-capped page (Home/Settings on a wide window) doesn't
                 // show whatever's underneath in the gutters either side of it.
-                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).then(
-                    when (tab) {
-                        selectedTab -> Modifier.predictiveBackReveal(tabBack)
-                        outgoingTab -> Modifier.predictiveBackBehind(tabBack, active = true)
+                modifier = if (pageSwipe.involves(tab)) {
+                    // Moved by a swipe: its background moves with it (inside the layer), or it
+                    // would stay put and cover the page coming in beside it.
+                    Modifier.fillMaxSize().pageSwipeLayer(pageSwipe, tab, selectedTab).background(MaterialTheme.colorScheme.background)
+                } else Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).then(
+                    when {
+                        tab == selectedTab -> Modifier.predictiveBackReveal(tabBack)
+                        tab == outgoingTab -> Modifier.predictiveBackBehind(tabBack, active = true)
                         // Kept but not shown: measured (so showing it only has to draw) but not
                         // placed — so not drawn and not hit-testable.
                         else -> Modifier.layout { measurable, constraints ->
@@ -377,6 +396,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     }
                 }
             }
+        }
         }
         }
 
