@@ -91,6 +91,7 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
                 renameText = { item -> live[downloadIdOf(item)]?.title.orEmpty() },
                 onRename = { item, name -> viewModel.renameDownload(downloadIdOf(item), name) },
                 groupKey = ::downloadIdOf,
+                startMuted = remember { !com.comfort.app.data.GalleryDlPreferences.isViewerSound(context) },
                 extraMenuItems = { item, close ->
                     val download = live[downloadIdOf(item)] ?: return@MediaViewerScreen
                     DropdownMenuItem(

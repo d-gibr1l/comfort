@@ -5,6 +5,11 @@
  */
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.FilledTonalIconButton
 import android.content.Context
 
@@ -160,6 +165,8 @@ fun MediaViewerScreen(
     /** Extra entries for the ⋮ menu (the post's link, ...); call close() when one is picked. */
     extraMenuItems: @Composable (item: GalleryItem, close: () -> Unit) -> Unit = { _, _ -> },
     useFullScreenGlobal: Boolean = false,
+    /** Videos start muted (Comfort's "Play videos with sound" off). */
+    startMuted: Boolean = true,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -256,13 +263,27 @@ fun MediaViewerScreen(
 
     var showUi by remember { mutableStateOf(true) }
 
-    // Auto hide UI after 4 seconds of inactivity (e.g., no swiping/page change)
-    LaunchedEffect(showUi, pagerState.isScrollInProgress, pagerState.currentPage) {
-        if (showUi) {
-            kotlinx.coroutines.delay(4000)
+    // Comfort: videos' sound is one setting for the whole viewer (muted to start unless Settings'
+    // "Play videos with sound" is on — Photon's "Autoplay with sound"),
+    // so it carries over from video to video; volume up unmutes (see the key handler below).
+    var videosMuted by remember { mutableStateOf(startMuted) }
+    // Whether the video on screen is playing (reported by its VideoPlayerItem).
+    var currentVideoPlaying by remember { mutableStateOf(true) }
+
+    // Auto hide UI after 6 seconds of inactivity (e.g., no swiping/page change). Comfort: 6 s, not
+    // Photon's 4, and never while the video on screen is paused, so its controls stay at hand.
+    val pausedVideo = currentItem?.isVideo == true && !currentVideoPlaying
+    LaunchedEffect(showUi, pagerState.isScrollInProgress, pagerState.currentPage, pausedVideo) {
+        if (showUi && !pausedVideo) {
+            kotlinx.coroutines.delay(6000)
             showUi = false
         }
     }
+
+    // Comfort: volume up unmutes, as in most galleries; the key isn't consumed, so it still turns
+    // the volume up. The viewer takes focus so the key reaches it.
+    val keyFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { keyFocus.requestFocus() } }
 
     var currentScale by remember { mutableStateOf(1f) }
 
@@ -357,6 +378,16 @@ fun MediaViewerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .focusRequester(keyFocus)
+            .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.key == androidx.compose.ui.input.key.Key.VolumeUp &&
+                    event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown
+                ) {
+                    videosMuted = false
+                }
+                false
+            }
             .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = bgAlpha)),
         contentAlignment = Alignment.Center
     ) {
@@ -497,8 +528,11 @@ fun MediaViewerScreen(
                             uri = resolvedUri,
                             isCurrentPage = page == pagerState.currentPage,
                             showControls = showUi,
+                            muted = videosMuted,
+                            onMutedChange = { videosMuted = it },
+                            onPlayingChange = { playing -> if (page == pagerState.currentPage) currentVideoPlaying = playing },
                             // Comfort: above a carousel's filmstrip.
-                            controlsBottomPadding = if (galleryItems.count { groupKey(it) == groupKey(item) } > 1) 76.dp + FILMSTRIP_SPACE else 76.dp,
+                            controlsBottomPadding = if (galleryItems.count { groupKey(it) == groupKey(item) } > 1) 64.dp + FILMSTRIP_SPACE else 64.dp,
                             modifier = Modifier.fillMaxSize(),
                             onTap = {
                                 if (showInfoCard || showUi) {
