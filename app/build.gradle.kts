@@ -130,6 +130,8 @@ dependencies {
   // every other androidx.compose.* artifact here.
   implementation("androidx.compose.material:material-icons-extended")
   implementation("androidx.documentfile:documentfile:1.0.1")
+  // The media viewer's info sheet (ported from Photon Gallery) reads a picture's EXIF.
+  implementation("androidx.exifinterface:exifinterface:1.3.7")
   // The in-app browser's media catcher runs its page script in every frame from the start of
   // each page (WebViewCompat.addDocumentStartJavaScript).
   implementation("androidx.webkit:webkit:1.12.1")

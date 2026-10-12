@@ -529,6 +529,7 @@ object DownloadDispatcher {
             File(context.filesDir, "archives/$id.instaloader.txt").delete()
             deleteStagingDir(context, id)
             dao.clearDownloadedFileRecords(id)
+            dao.clearSavedFiles(id)
             dao.delete(id)
             forgetLock(id)
         }

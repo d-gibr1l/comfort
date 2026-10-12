@@ -187,9 +187,20 @@ private val MIGRATION_23_24 = object : Migration(23, 24) {
     }
 }
 
+// Adds saved_files (SavedFile): where each file of a download was saved, for the media viewer.
+private val MIGRATION_24_25 = object : Migration(24, 25) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS saved_files (" +
+                "downloadId TEXT NOT NULL, uri TEXT NOT NULL, position INTEGER NOT NULL, " +
+                "PRIMARY KEY(downloadId, uri))"
+        )
+    }
+}
+
 @Database(
-    entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 24,
+    entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class, SavedFile::class],
+    version = 25,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -207,7 +218,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
-                        MIGRATION_22_23, MIGRATION_23_24,
+                        MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

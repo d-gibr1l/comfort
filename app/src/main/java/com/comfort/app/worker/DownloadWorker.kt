@@ -553,10 +553,11 @@ class DownloadWorker(
                 // Files are saved to the gallery here, not as each one arrives: the File event holds
                 // them (heldFiles), and saveHeldFiles() saves them together when the download ends —
                 // also on pause or cancel, so nothing finished is lost — or in batches for a big one.
-                val heldFiles = java.util.Collections.synchronizedList(mutableListOf<Pair<File, Boolean>>())
+                // (file, is audio, its 1-based place in the download — SavedFile.position)
+                val heldFiles = java.util.Collections.synchronizedList(mutableListOf<Triple<File, Boolean, Int>>())
 
                 // [firstOfDownload]: the download's first file, whose thumbnail is the Library's.
-                suspend fun saveFile(original: File, isAudioFile: Boolean, firstOfDownload: Boolean = false) {
+                suspend fun saveFile(original: File, isAudioFile: Boolean, firstOfDownload: Boolean = false, position: Int = 0) {
                     val candidate = if (GalleryDlPreferences.isWebpToJpg(applicationContext)) ImageConverter.webpToJpg(original) else original
                     val fileSize = candidate.length()
                     // Lyrics go into the staging file's tags before it's saved;
@@ -569,6 +570,8 @@ class DownloadWorker(
                         runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrcFile) }
                     }
                     lrcFile?.delete()
+                    // Where it went, in the post's order: what the media viewer pages through.
+                    if (savedUri != null) dao.recordSavedFile(com.comfort.app.data.SavedFile(downloadId, savedUri.toString(), position))
                     if (savedUri == null) {
                         // Counted when it arrived; it didn't make it to the gallery.
                         savedCount.decrementAndGet()
@@ -635,9 +638,9 @@ class DownloadWorker(
                     if (batch.isEmpty()) return
                     val firstBatch = !firstBatchSaved.getAndSet(true)
                     for ((index, held) in batch.withIndex().reversed()) {
-                        val (file, isAudio) = held
+                        val (file, isAudio, position) = held
                         try {
-                            if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0) else savedCount.decrementAndGet()
+                            if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0, position = position) else savedCount.decrementAndGet()
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
                             savedCount.decrementAndGet()
@@ -784,8 +787,8 @@ class DownloadWorker(
                                     // saveHeldFiles), so a carousel lands in the gallery all at once.
                                     // Counted now, so progress still moves file by file.
                                     lastDataAt.set(System.currentTimeMillis())
-                                    heldFiles += candidate to isAudioFile
                                     val count = savedCount.incrementAndGet()
+                                    heldFiles += Triple(candidate, isAudioFile, count)
                                     dao.updateLiveProgress(downloadId, count, measuredSpeedMbs.get())
                                     DownloadNotifications.updateProgress(
                                         applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
