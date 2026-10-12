@@ -154,6 +154,14 @@ fun QueueScreen(
     // entirely) — same pattern already proven in DownloadsHistoryScreen's own multi-select.
     // Reproduced live before this: back while selecting jumped straight out to Library instead.
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
+    // Swiping sideways moves between the filters, in their chips' order (PageSwipe.kt). Not while
+    // selecting: a selection belongs to one filter.
+    val filterSwipe = rememberPageSwipeState(
+        current = filters.indexOf(selectedFilter),
+        allowed = !selectionMode,
+        pageCount = filters.size,
+        onSettled = { selectedFilter = filters[it] },
+    )
 
     // The "Add cookies" error-card action opens this for the failing item's own site, then
     // retries that same download once cookies are extracted.
@@ -195,9 +203,9 @@ fun QueueScreen(
     // Hoisted above the Scaffold so the FAB can react to both the current filter tab (Errored/
     // Cancelled get "Retry All" instead of Pause/Resume) and what's actually in it. No more
     // catch-all "All" tab — every status has its own explicit chip now, so this is exhaustive.
-    val filteredItems = remember(queueItems, selectedFilter) {
+    fun itemsFor(filter: String) =
         queueItems.filter { item ->
-            when (selectedFilter) {
+            when (filter) {
                 "Running" -> item.status == DownloadStatus.RUNNING
                 "In Queue" -> item.status == DownloadStatus.QUEUED
                 "Scheduled" -> item.status == DownloadStatus.SCHEDULED
@@ -207,7 +215,7 @@ fun QueueScreen(
                 else -> false
             }
         }
-    }
+    val filteredItems = remember(queueItems, selectedFilter) { itemsFor(selectedFilter) }
     val retryAllStatus = when (selectedFilter) {
         "Errored" -> DownloadStatus.ERRORED
         "Cancelled" -> DownloadStatus.CANCELLED
@@ -318,7 +326,11 @@ fun QueueScreen(
         // up, with the content reserving exactly its fully-expanded height. The filter chips ride
         // inside that overlay, right under the title, so they stay reachable in the compact bar
         // too — hence the small bottom padding (the chip row brings its own spacing).
-        val listState = rememberLazyListState()
+        // One list state per filter: the list a swipe brings in carries on as the current one,
+        // where it already is, with the header following it.
+        val listStates = remember { HashMap<String, androidx.compose.foundation.lazy.LazyListState>() }
+        fun listStateFor(filter: String) = listStates.getOrPut(filter) { androidx.compose.foundation.lazy.LazyListState() }
+        val listState = listStateFor(selectedFilter)
         val headerState = rememberLazyCollapsingHeaderState(
             listState,
             expandedTopPadding = 76.dp,
@@ -344,7 +356,7 @@ fun QueueScreen(
             if (selectionMode) object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {}
             else headerState.nestedScrollConnection!!
         }
-        Box(modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection)) {
+        Box(modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection).pageSwipeArea(filterSwipe)) {
             // better-interface review: this filter row (6 chips: Running/In Queue/Scheduled/
             // Paused/Errored/Cancelled) has the same undiscoverable-overflow problem the Library
             // toolbar row had — nothing on screen hints that "Cancelled" sits off past the visible
@@ -373,42 +385,14 @@ fun QueueScreen(
                     filterListState.animateScrollBy(-filterNudgePx, animationSpec = tween(450))
                 }
             }
-            if (filteredItems.isEmpty()) {
-                // Outside the list, centered in the space actually left below the header (and
-                // above the bottom nav), so it moves down along with the taller header.
-                // Tab-specific copy — "Paste a link on Home to start one" only actually helps on
-                // the tabs that describe genuinely-no-work-at-all (Running/In Queue/Scheduled);
-                // Paused/Errored/Cancelled describe downloads that already went through some other
-                // state, so the same generic line there read as a non sequitur (reported live:
-                // the Paused tab said "No downloads in queue" while Errored/Cancelled next to it
-                // had real counts, which read as those two other tabs error being wrong).
-                val (emptyTitle, emptySubtitle) = when (selectedFilter) {
-                    "Paused" -> "No paused downloads" to "Downloads you pause will show up here."
-                    "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
-                    "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
-                    "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
-                    // Nothing running only because there's no usable connection: say so, rather than
-                    // "No downloads in queue" with the In Queue chip showing a count beside it.
-                    else -> if (selectedFilter == "Running" && waitingForNetwork > 0) {
-                        "Waiting for a network connection" to networkWaitSubtitle(queueContext, waitingForNetwork)
-                    } else {
-                        "No downloads in queue" to "Paste a link on Home to start one."
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = topReserve, bottom = navBarClearance()),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    EmptyState(
-                        icon = if (selectedFilter == "Running" && waitingForNetwork > 0) Icons.Outlined.WifiOff else Icons.Outlined.Inbox,
-                        title = emptyTitle,
-                        subtitle = emptySubtitle,
-                    )
+            LaunchedEffect(selectedFilter) {
+                val index = filters.indexOf(selectedFilter)
+                val info = filterListState.layoutInfo
+                val chip = info.visibleItemsInfo.firstOrNull { it.index == index }
+                if (chip == null || chip.offset < info.viewportStartOffset || chip.offset + chip.size > info.viewportEndOffset) {
+                    filterListState.animateScrollToItem(index)
                 }
             }
-
             // The pinned overlay: the Settings-style header plus the filter chips under it, one
             // unit that collapses and hides/reappears together. In selection mode the header part
             // gives way to Scaffold's selection TopAppBar, but the chips stay. zIndex keeps it (and
@@ -494,107 +478,162 @@ fun QueueScreen(
             }
             }
 
-            LazyColumn(
-                state = listState,
-                // Extra bottom inset beyond the normal 16dp: the Pause/Resume/Retry All FAB floats
-                // over the content rather than reserving space for itself, so without this the
-                // last card(s) end up scrolled underneath it, partly unreadable and with their own
-                // action buttons unreachable. navBarClearance() (not a flat 100dp guess) so this
-                // also clears the real system nav bar inset on devices where it's taller than this
-                // app's own FAB assumed — see its doc comment (MainScreen.kt) for the full story.
-                // Cards get their 16dp horizontal inset individually (see animateItem below).
-                contentPadding = PaddingValues(bottom = navBarClearance()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                // The header's reserved space as a real item 0, not top contentPadding: the
-                // header's collapse is driven by item 0's own scroll offset (see
-                // rememberLazyCollapsingHeaderState), which is only exact while item 0 is still on
-                // screen. With the first *card* as item 0, a card shorter than the 120dp collapse
-                // range scrolled off part-way through, the index ticked to 1, and collapseFraction
-                // jumped straight to 1 — reported live as the header snapping into its compact form.
-                // This spacer is always taller than that range. Minus the 12dp item spacing that
-                // follows it, so the first card still starts exactly topReserve + 8dp down.
-                item(key = "queue-header-space") {
-                    // Clamped: topReserve is 0 until the header's first measure.
-                    Spacer(Modifier.height((topReserve + 8.dp - 12.dp).coerceAtLeast(0.dp)))
-                }
-                    items(filteredItems, key = { it.id }) { item ->
-                        // Slide-up + fade-in on first appearance (a newly queued download, or one
-                        // scrolling into view for the first time) — targetState flips true right
-                        // after this item enters composition, MutableTransitionState's own initial
-                        // "false" giving Compose something to animate *from*. Never flips back to
-                        // false again from here — a finished/removed item just leaves
-                        // filteredItems and this composable is disposed outright, so the "crossfade
-                        // out and slide the rest up to fill the gap" half of this is entirely
-                        // animateItem()'s own built-in fade-out + placement animation below, not
-                        // this AnimatedVisibility's exit (deliberately ExitTransition.None).
-                        val visibleState = remember(item.id) {
-                            MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
-                        }
-                        SideEffect { alreadyAnimatedIds.add(item.id) }
-                        val isSelected = item.id in selectedIds
-                        val row = @Composable {
-                            if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED) {
-                                StoppedRow(
-                                    item = item,
-                                    onResume = { viewModel.retryDownload(item.id) },
-                                    onDelete = { requestDelete(setOf(item.id)) },
-                                    selectionMode = selectionMode,
-                                    selected = isSelected,
-                                    onToggleSelect = { toggleSelected(item.id) },
-                                )
-                            } else {
-                                QueueItemCard(
-                                    item = item,
-                                    isNetworkAvailable = isNetworkAvailable,
-                                    onCancel = { viewModel.cancelDownload(item.id) },
-                                    onDelete = { requestDelete(setOf(item.id)) },
-                                    onPauseResume = { viewModel.pauseDownload(item.id) },
-                                    onRetry = { viewModel.retryDownload(item.id) },
-                                    onStartNow = { viewModel.startNow(item.id) },
-                                    onAddCookies = {
-                                        val host = runCatching { android.net.Uri.parse(item.url).host }.getOrNull()
-                                        val targetUrl = if (!host.isNullOrBlank()) "https://$host" else item.url
-                                        cookieLoginTarget = targetUrl to item.id
-                                    },
-                                    onShowError = { errorSheetItemId = item.id },
-                                    selectionMode = selectionMode,
-                                    selected = isSelected,
-                                    onToggleSelect = { toggleSelected(item.id) },
-                                )
-                            }
-                        }
-
-                        AnimatedVisibility(
-                            visibleState = visibleState,
-                            // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
-                            // but keeps the fade — brief functional feedback that a new item just
-                            // appeared, same as better-accessibility's own guidance distinguishes.
-                            enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
-                            exit = ExitTransition.None,
-                            modifier = Modifier.animateItem().padding(horizontal = 16.dp),
-                        ) {
-                        // Swipe-to-delete is only offered for downloads that are already stopped
-                        // for good (errored or cancelled) — everything still active or resumable
-                        // (running, queued, scheduled, paused) should require a deliberate tap
-                        // instead of a stray swipe wiping it out. Also suppressed for the whole
-                        // list while multi-select is active — a swipe gesture competing with
-                        // tap-to-toggle-selection on the same cards would be janky either way.
-                        if (!selectionMode && (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.ERRORED)) {
-                            // Library's shared swipe card (same reveal background, plus its swipe
-                            // haptics), with this card's own rounded shape.
-                            SwipeToDeleteCard(
-                                onDelete = { requestDelete(setOf(item.id)) },
-                                shape = RoundedCornerShape(20.dp),
-                            ) {
-                                row()
-                            }
+            // The filter's list (or its empty state) — and while a sideways swipe moves between
+            // filters, the neighbouring filter's beside it (PageSwipe.kt). Keyed per filter, so the
+            // list a swipe brings in stays the same instance once it's the current one.
+            val currentIndex = filters.indexOf(selectedFilter)
+            val shownFilters = listOfNotNull(selectedFilter, filterSwipe.neighbor?.let { filters[it] })
+            CompositionLocalProvider(LocalPageSwipe provides filterSwipe) {
+            for (filter in shownFilters) key(filter) {
+                val pageIndex = filters.indexOf(filter)
+                val pageItems = remember(queueItems, filter) { itemsFor(filter) }
+                val pageListState = listStateFor(filter)
+                // Brought in by a swipe: from its top, as a tap on its chip shows it.
+                LaunchedEffect(Unit) { if (filter != selectedFilter) pageListState.scrollToItem(0) }
+                Box(
+                    modifier = Modifier.fillMaxSize().then(
+                        if (filterSwipe.involves(pageIndex)) Modifier.pageSwipeLayer(filterSwipe, pageIndex, currentIndex) else Modifier
+                    )
+                ) {
+                if (pageItems.isEmpty()) {
+                    // Outside the list, centered in the space actually left below the header (and
+                    // above the bottom nav), so it moves down along with the taller header.
+                    // Tab-specific copy — "Paste a link on Home to start one" only actually helps on
+                    // the tabs that describe genuinely-no-work-at-all (Running/In Queue/Scheduled);
+                    // Paused/Errored/Cancelled describe downloads that already went through some other
+                    // state, so the same generic line there read as a non sequitur (reported live:
+                    // the Paused tab said "No downloads in queue" while Errored/Cancelled next to it
+                    // had real counts, which read as those two other tabs error being wrong).
+                    val (emptyTitle, emptySubtitle) = when (filter) {
+                        "Paused" -> "No paused downloads" to "Downloads you pause will show up here."
+                        "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
+                        "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
+                        "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
+                        // Nothing running only because there's no usable connection: say so, rather than
+                        // "No downloads in queue" with the In Queue chip showing a count beside it.
+                        else -> if (filter == "Running" && waitingForNetwork > 0) {
+                            "Waiting for a network connection" to networkWaitSubtitle(queueContext, waitingForNetwork)
                         } else {
-                            row()
-                        }
+                            "No downloads in queue" to "Paste a link on Home to start one."
                         }
                     }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = topReserve, bottom = navBarClearance()),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EmptyState(
+                            icon = if (filter == "Running" && waitingForNetwork > 0) Icons.Outlined.WifiOff else Icons.Outlined.Inbox,
+                            title = emptyTitle,
+                            subtitle = emptySubtitle,
+                        )
+                    }
+                }
+                LazyColumn(
+                    state = pageListState,
+                    // Extra bottom inset beyond the normal 16dp: the Pause/Resume/Retry All FAB floats
+                    // over the content rather than reserving space for itself, so without this the
+                    // last card(s) end up scrolled underneath it, partly unreadable and with their own
+                    // action buttons unreachable. navBarClearance() (not a flat 100dp guess) so this
+                    // also clears the real system nav bar inset on devices where it's taller than this
+                    // app's own FAB assumed — see its doc comment (MainScreen.kt) for the full story.
+                    // Cards get their 16dp horizontal inset individually (see animateItem below).
+                    contentPadding = PaddingValues(bottom = navBarClearance()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    // The header's reserved space as a real item 0, not top contentPadding: the
+                    // header's collapse is driven by item 0's own scroll offset (see
+                    // rememberLazyCollapsingHeaderState), which is only exact while item 0 is still on
+                    // screen. With the first *card* as item 0, a card shorter than the 120dp collapse
+                    // range scrolled off part-way through, the index ticked to 1, and collapseFraction
+                    // jumped straight to 1 — reported live as the header snapping into its compact form.
+                    // This spacer is always taller than that range. Minus the 12dp item spacing that
+                    // follows it, so the first card still starts exactly topReserve + 8dp down.
+                    item(key = "queue-header-space") {
+                        // Clamped: topReserve is 0 until the header's first measure.
+                        Spacer(Modifier.height((topReserve + 8.dp - 12.dp).coerceAtLeast(0.dp)))
+                    }
+                        items(pageItems, key = { it.id }) { item ->
+                            // Slide-up + fade-in on first appearance (a newly queued download, or one
+                            // scrolling into view for the first time) — targetState flips true right
+                            // after this item enters composition, MutableTransitionState's own initial
+                            // "false" giving Compose something to animate *from*. Never flips back to
+                            // false again from here — a finished/removed item just leaves
+                            // pageItems and this composable is disposed outright, so the "crossfade
+                            // out and slide the rest up to fill the gap" half of this is entirely
+                            // animateItem()'s own built-in fade-out + placement animation below, not
+                            // this AnimatedVisibility's exit (deliberately ExitTransition.None).
+                            val visibleState = remember(item.id) {
+                                MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
+                            }
+                            SideEffect { alreadyAnimatedIds.add(item.id) }
+                            val isSelected = item.id in selectedIds
+                            val row = @Composable {
+                                if (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED) {
+                                    StoppedRow(
+                                        item = item,
+                                        onResume = { viewModel.retryDownload(item.id) },
+                                        onDelete = { requestDelete(setOf(item.id)) },
+                                        selectionMode = selectionMode,
+                                        selected = isSelected,
+                                        onToggleSelect = { toggleSelected(item.id) },
+                                    )
+                                } else {
+                                    QueueItemCard(
+                                        item = item,
+                                        isNetworkAvailable = isNetworkAvailable,
+                                        onCancel = { viewModel.cancelDownload(item.id) },
+                                        onDelete = { requestDelete(setOf(item.id)) },
+                                        onPauseResume = { viewModel.pauseDownload(item.id) },
+                                        onRetry = { viewModel.retryDownload(item.id) },
+                                        onStartNow = { viewModel.startNow(item.id) },
+                                        onAddCookies = {
+                                            val host = runCatching { android.net.Uri.parse(item.url).host }.getOrNull()
+                                            val targetUrl = if (!host.isNullOrBlank()) "https://$host" else item.url
+                                            cookieLoginTarget = targetUrl to item.id
+                                        },
+                                        onShowError = { errorSheetItemId = item.id },
+                                        selectionMode = selectionMode,
+                                        selected = isSelected,
+                                        onToggleSelect = { toggleSelected(item.id) },
+                                    )
+                                }
+                            }
+
+                            AnimatedVisibility(
+                                visibleState = visibleState,
+                                // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
+                                // but keeps the fade — brief functional feedback that a new item just
+                                // appeared, same as better-accessibility's own guidance distinguishes.
+                                enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
+                                exit = ExitTransition.None,
+                                modifier = Modifier.animateItem().padding(horizontal = 16.dp),
+                            ) {
+                            // Swipe-to-delete is only offered for downloads that are already stopped
+                            // for good (errored or cancelled) — everything still active or resumable
+                            // (running, queued, scheduled, paused) should require a deliberate tap
+                            // instead of a stray swipe wiping it out. Also suppressed for the whole
+                            // list while multi-select is active — a swipe gesture competing with
+                            // tap-to-toggle-selection on the same cards would be janky either way.
+                            if (!selectionMode && (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.ERRORED)) {
+                                // Library's shared swipe card (same reveal background, plus its swipe
+                                // haptics), with this card's own rounded shape.
+                                SwipeToDeleteCard(
+                                    onDelete = { requestDelete(setOf(item.id)) },
+                                    shape = RoundedCornerShape(20.dp),
+                                ) {
+                                    row()
+                                }
+                            } else {
+                                row()
+                            }
+                            }
+                        }
+                }
+                }
+            }
             }
         }
     }

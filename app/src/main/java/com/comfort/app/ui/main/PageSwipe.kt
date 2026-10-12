@@ -31,7 +31,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /**
- * Swiping sideways between the main pages (Home, Library, Settings, in that order): the page
+ * Swiping sideways between pages — the main ones (Home, Library, Settings, in that order), and the
+ * Queue's status filters (Running, In Queue, ...): the page
  * follows the finger with its neighbour coming in beside it, and on release settles on whichever
  * one the swipe carried far or fast enough.
  *
@@ -46,6 +47,7 @@ import kotlin.math.abs
 class PageSwipeState internal constructor(
     private val scope: CoroutineScope,
     private val current: State<Int>,
+    private val pageCount: State<Int>,
     private val allowed: State<Boolean>,
     private val onSettled: State<(Int) -> Unit>,
 ) {
@@ -73,7 +75,7 @@ class PageSwipeState internal constructor(
 
     internal fun neighborFor(dx: Float): Int? {
         val page = if (dx < 0) current.value + 1 else current.value - 1
-        return page.takeIf { it in 0 until PAGE_COUNT }
+        return page.takeIf { it in 0 until pageCount.value }
     }
 
     internal fun begin(target: Int) {
@@ -86,19 +88,20 @@ class PageSwipeState internal constructor(
         offset = if (target > current.value) (offset + fraction).coerceIn(-1f, 0f) else (offset + fraction).coerceIn(0f, 1f)
     }
 
-    /** The finger lifted: on to the neighbour past half way or on a fling toward it, else back. */
-    internal fun release(velocity: Float) {
+    /** The finger lifted: on to the neighbour past half way or on a flick toward it, else back.
+     * A gesture the system cancelled (a notification sliding in, say) always goes back. */
+    internal fun release(velocity: Float, cancelled: Boolean = false) {
         val target = neighbor ?: return
         val toward = if (target > current.value) -1f else 1f
         val progress = offset * toward
         val flung = velocity * toward > FLING_WIDTHS_PER_SECOND
         val flungBack = velocity * toward < -FLING_WIDTHS_PER_SECOND
-        val commit = !flungBack && (progress > 0.5f || (flung && progress > 0.04f))
+        val commit = !cancelled && !flungBack && (progress > 0.5f || (flung && progress > FLING_MIN_PROGRESS))
         scope.launch {
             animate(
                 initialValue = offset,
                 targetValue = if (commit) toward else 0f,
-                initialVelocity = velocity,
+                initialVelocity = if (cancelled) 0f else velocity,
                 animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
             ) { value, _ -> offset = value }
             // One snapshot, so no frame shows the new page selected but still shifted aside.
@@ -111,22 +114,25 @@ class PageSwipeState internal constructor(
     }
 
     private companion object {
-        const val PAGE_COUNT = 3
-        // A flick this fast (page widths per second) turns the page however short it was.
+        // A flick this fast (page widths per second) turns the page however short it was (a quick
+        // flick barely moves it before the finger's off); slower, it has to pass half way.
         const val FLING_WIDTHS_PER_SECOND = 0.6f
+        const val FLING_MIN_PROGRESS = 0.02f
     }
 }
 
 @Composable
-fun rememberPageSwipeState(current: Int, allowed: Boolean, onSettled: (Int) -> Unit): PageSwipeState {
+fun rememberPageSwipeState(current: Int, allowed: Boolean, pageCount: Int = 3, onSettled: (Int) -> Unit): PageSwipeState {
     val scope = rememberCoroutineScope()
     val currentState = rememberUpdatedState(current)
+    val pageCountState = rememberUpdatedState(pageCount)
     val allowedState = rememberUpdatedState(allowed)
     val onSettledState = rememberUpdatedState(onSettled)
-    return remember { PageSwipeState(scope, currentState, allowedState, onSettledState) }
+    return remember { PageSwipeState(scope, currentState, pageCountState, allowedState, onSettledState) }
 }
 
-/** The page swipe, for the content under every page — null where there's none (the Queue). */
+/** The page swipe the content belongs to (the main pages', or the Queue's filters'), for the
+ * swipe-to-remove cards' page-turning strips; null where there's none. */
 val LocalPageSwipe = staticCompositionLocalOf<PageSwipeState?> { null }
 
 /** Where [page] sits while a swipe moves it: its place beside the selected page, plus the drag. */
@@ -179,17 +185,25 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
         }
         state.begin(target)
         val width = size.width.toFloat().coerceAtLeast(1f)
+        var cancelled = true
         try {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) {
+                    // Compose turns a cancelled gesture into a release of its own: already
+                    // consumed, at the same time as the event before. A real lift is neither.
+                    cancelled = change.isConsumed || change.uptimeMillis == change.previousUptimeMillis
+                    if (!cancelled) tracker.addPosition(change.uptimeMillis, change.position)
+                    break
+                }
                 tracker.addPosition(change.uptimeMillis, change.position)
-                if (!change.pressed) break
                 state.dragBy(change.positionChangeIgnoreConsumed().x / width)
                 change.consume()
             }
         } finally {
-            state.release(tracker.calculateVelocity().x / width)
+            // Also here when the gesture ended any other way (this handler cancelled): back.
+            state.release(tracker.calculateVelocity().x / width, cancelled)
         }
     }
 }
@@ -201,7 +215,7 @@ private const val TAKE_AFTER_SLOPS = 1.5f
 /** On a swipe-to-remove card: a touch landing within [zone] of either side (the thumbnail and ⋮
  * columns) turns the page instead of removing the card. Only marks the touch; [pageSwipeArea]
  * decides once it's clearly sideways, and takes it before the card can. */
-fun Modifier.pageSwipeEdges(state: PageSwipeState, zone: Dp = 60.dp): Modifier = pointerInput(state) {
+fun Modifier.pageSwipeEdges(state: PageSwipeState, zone: Dp = 80.dp): Modifier = pointerInput(state) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val z = zone.toPx()
