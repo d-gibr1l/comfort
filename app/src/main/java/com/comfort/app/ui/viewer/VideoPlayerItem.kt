@@ -5,6 +5,7 @@
  */
 package com.comfort.app.ui.viewer
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.FilledTonalIconButton
@@ -62,11 +63,26 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 
 @Composable
-fun VideoPlayerItem(uri: Uri, isCurrentPage: Boolean, showControls: Boolean, modifier: Modifier = Modifier, controlsBottomPadding: androidx.compose.ui.unit.Dp = 76.dp, onTap: (() -> Unit)? = null) {
+fun VideoPlayerItem(
+    uri: Uri,
+    isCurrentPage: Boolean,
+    showControls: Boolean,
+    modifier: Modifier = Modifier,
+    controlsBottomPadding: androidx.compose.ui.unit.Dp = 64.dp,
+    // Comfort: the sound setting lives with the viewer (shared by every video in it), and the
+    // viewer hears whether this video plays (it keeps the controls up while paused).
+    muted: Boolean = true,
+    onMutedChange: (Boolean) -> Unit = {},
+    onPlayingChange: (Boolean) -> Unit = {},
+    onTap: (() -> Unit)? = null,
+) {
     VideoPlayerItemWithResolvedUri(
         uri = uri,
         isCurrentPage = isCurrentPage,
         showControls = showControls,
+        muted = muted,
+        onMutedChange = onMutedChange,
+        onPlayingChange = onPlayingChange,
         controlsBottomPadding = controlsBottomPadding,
         modifier = modifier,
         onTap = onTap
@@ -75,7 +91,17 @@ fun VideoPlayerItem(uri: Uri, isCurrentPage: Boolean, showControls: Boolean, mod
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun VideoPlayerItemWithResolvedUri(uri: Uri, isCurrentPage: Boolean, showControls: Boolean, modifier: Modifier = Modifier, controlsBottomPadding: androidx.compose.ui.unit.Dp = 76.dp, onTap: (() -> Unit)? = null) {
+fun VideoPlayerItemWithResolvedUri(
+    uri: Uri,
+    isCurrentPage: Boolean,
+    showControls: Boolean,
+    modifier: Modifier = Modifier,
+    controlsBottomPadding: androidx.compose.ui.unit.Dp = 64.dp,
+    muted: Boolean = true,
+    onMutedChange: (Boolean) -> Unit = {},
+    onPlayingChange: (Boolean) -> Unit = {},
+    onTap: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val exoPlayer = remember(uri) {
         val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context)
@@ -131,9 +157,8 @@ fun VideoPlayerItemWithResolvedUri(uri: Uri, isCurrentPage: Boolean, showControl
         }
     }
 
-    // Comfort: Photon's "Autoplay with sound" setting at its default (off): videos start muted.
-    val autoplayWithSound = false
-    var isMuted by remember(autoplayWithSound) { mutableStateOf(!autoplayWithSound) }
+    // Comfort: from the viewer (muted to start, Photon's "Autoplay with sound" default).
+    val isMuted = muted
 
     // Comfort: the video's thumbnail until its first frame is up (~0.5 s to start a player), not
     // an empty page.
@@ -186,6 +211,10 @@ fun VideoPlayerItemWithResolvedUri(uri: Uri, isCurrentPage: Boolean, showControl
             currentPosition = exoPlayer.currentPosition
             delay(100)
         }
+    }
+
+    LaunchedEffect(isPlaying, isCurrentPage) {
+        if (isCurrentPage) onPlayingChange(isPlaying)
     }
 
     LaunchedEffect(isMuted) {
@@ -307,6 +336,10 @@ fun VideoPlayerItemWithResolvedUri(uri: Uri, isCurrentPage: Boolean, showControl
             ) + fadeOut(MotionTokens.gentleSpring()),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                // Comfort: measured from the top of the navigation bar, like the toolbar under it
+                // (navigationBarsPadding there too). Photon's fixed 76dp from the screen's edge
+                // only cleared a gesture bar: over a taller 3-button bar the card sat on the toolbar.
+                .navigationBarsPadding()
                 .padding(bottom = controlsBottomPadding, start = 16.dp, end = 16.dp)
         ) {
             Surface(
@@ -360,7 +393,7 @@ fun VideoPlayerItemWithResolvedUri(uri: Uri, isCurrentPage: Boolean, showControl
                     
                     // Audio mute/unmute
                     IconButton(
-                        onClick = { isMuted = !isMuted },
+                        onClick = { onMutedChange(!isMuted) },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
