@@ -12,7 +12,7 @@ from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcess
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 import net_resilience
-from comfort_events import event
+from comfort_events import event, parse
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 # curl_cffi is the only impersonate backend this bundled yt-dlp ships with (see
@@ -1056,6 +1056,29 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # original once-a-second cadence the ease finished with ~550ms left before the next update,
     # visible as a brief pause-then-jump. Twice a second keeps a new target arriving before the
     # current ease finishes, so the animation reads as continuous motion instead.
+    # A file the in-app browser caught (WebBrowser.queueCaught) carries this marker: if yt-dlp
+    # can't save it, it's downloaded directly instead (_direct_download). Not a yt-dlp flag, so
+    # it's taken out before the rest reaches yt-dlp's own option parser.
+    direct_fallback = bool(extra_args) and _DIRECT_FALLBACK_FLAG in extra_args
+    if direct_fallback:
+        extra_args = extra_args.replace(_DIRECT_FALLBACK_FLAG, " ")
+    # A video file the browser's player paired with a separate audio file (Instagram's are one
+    # each): the saved video gets that audio merged in (_merge_audio) before it's reported.
+    merge_audio, extra_args = _take_merge_audio(extra_args)
+    saved_any = [False]
+    held_files = []
+    _report = callback
+    if callback is not None:
+
+        def callback(line, _report=_report):
+            parsed = parse(line) or {}
+            if parsed.get("type") == "file":
+                saved_any[0] = True
+                if merge_audio and parsed.get("path"):
+                    held_files.append(parsed["path"])
+                    return None
+            return _report(line)
+
     last_progress_emit = [0.0]
     last_emitted_bytes = [0]
     last_reported_total = [None]
@@ -1740,12 +1763,192 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             opts = dict(ydl_opts)
             opts.pop("cookiefile", None)
             _attempt(opts, reuse_info=False)
-        return "Done"
+        if direct_fallback and not saved_any[0]:
+            status = _direct_download(url, download_dir, ydl_opts, callback, extra_args)
+        else:
+            status = "Done"
     except _Cancelled:
         return "Cancelled"
     except Exception as e:
+        if direct_fallback and not saved_any[0]:
+            if callback:
+                callback(event("warning", message=f"yt-dlp couldn't download it ({e}); downloading the file directly"))
+            status = _direct_download(url, download_dir, ydl_opts, callback, extra_args)
+        else:
+            if callback:
+                callback(event("error", message=str(e)))
+            return f"Error: {e}"
+    for path in held_files:
+        if should_cancel and should_cancel():
+            return "Cancelled"
+        merged = _merge_audio(path, merge_audio, ydl_opts, ffmpeg_path, _report)
+        _report(event("file", path=merged))
+    return status
+
+
+_DIRECT_FALLBACK_FLAG = "--comfort-direct-fallback"
+_MERGE_AUDIO_FLAG = "--comfort-merge-audio"
+
+
+def _take_merge_audio(extra_args):
+    """(audio URL, extra_args without it) for WebBrowser.queueCaught's "--comfort-merge-audio
+    <url>" — not a yt-dlp option, so it's taken out before yt-dlp parses the rest."""
+    if not extra_args or _MERGE_AUDIO_FLAG not in extra_args:
+        return None, extra_args
+    import shlex
+    try:
+        tokens = shlex.split(extra_args)
+    except ValueError:
+        return None, extra_args
+    if _MERGE_AUDIO_FLAG not in tokens[:-1]:
+        return None, extra_args
+    i = tokens.index(_MERGE_AUDIO_FLAG)
+    return tokens[i + 1], shlex.join(tokens[:i] + tokens[i + 2:])
+
+
+def _merge_audio(video_path, audio_url, ydl_opts, ffmpeg_path, report):
+    """Fetches [audio_url] the way the page did (_page_opener) and copies it into the video at
+    [video_path] as its sound — both streams as they are, nothing re-encoded. Returns the path
+    to report: the video with sound, or the video as saved if that couldn't be done (said so)."""
+    import subprocess
+    import urllib.request
+    audio_path = video_path + ".audio.part"
+    base, ext = os.path.splitext(video_path)
+    merged_path = base + ".merged" + ext
+    try:
+        if not ffmpeg_path:
+            raise ValueError("ffmpeg isn't available")
+        opener, headers = _page_opener(ydl_opts)
+        with opener.open(urllib.request.Request(audio_url, headers=headers), timeout=30) as response:
+            with open(audio_path, "wb") as f:
+                while True:
+                    block = response.read(256 * 1024)
+                    if not block:
+                        break
+                    f.write(block)
+        result = subprocess.run(
+            [ffmpeg_path, "-y", "-v", "error", "-i", video_path, "-i", audio_path,
+             "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", merged_path],
+            capture_output=True, text=True, env=_ffmpeg_env(), timeout=600,
+        )
+        if result.returncode != 0 or not os.path.isfile(merged_path):
+            raise ValueError(((result.stderr or "").strip().splitlines() or ["ffmpeg failed"])[-1][:300])
+        os.replace(merged_path, video_path)
+    except Exception as e:
+        if report:
+            report(event("warning", message=f"Saved without its separate sound track: {e}"))
+    finally:
+        for leftover in (audio_path, merged_path):
+            try:
+                os.remove(leftover)
+            except OSError:
+                pass
+    return os.path.abspath(video_path)
+
+
+def _page_opener(ydl_opts):
+    """A urllib opener and headers for a request made like the page's own: the headers the page
+    sent (Referer, Origin, User-Agent and any auth header, all in ydl_opts' http_headers by now),
+    the cookies saved from the browser, through the same proxy."""
+    import http.cookiejar
+    import ssl
+    import urllib.request
+    # yt-dlp merged its own defaults into http_headers (YoutubeDL.__init__ edits the dict it
+    # was given): a page's Accept and "Sec-Fetch-Mode: navigate", which a host that refused
+    # yt-dlp may refuse here too. Only the headers the page itself sent are kept.
+    from yt_dlp.utils.networking import std_headers
+    headers = {"User-Agent": "Mozilla/5.0"}
+    headers.update({
+        k: v for k, v in (ydl_opts.get("http_headers") or {}).items()
+        if v and std_headers.get(k) != v
+    })
+    jar = http.cookiejar.MozillaCookieJar()
+    if ydl_opts.get("cookiefile"):
+        try:
+            jar.load(ydl_opts["cookiefile"], ignore_discard=True, ignore_expires=True)
+        except Exception:
+            pass
+    handlers = [urllib.request.HTTPCookieProcessor(jar)]
+    if os.path.exists(_CACERT_PATH):
+        handlers.append(urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=_CACERT_PATH)))
+    if ydl_opts.get("proxy"):
+        handlers.append(urllib.request.ProxyHandler({"http": ydl_opts["proxy"], "https": ydl_opts["proxy"]}))
+    return urllib.request.build_opener(*handlers), headers
+
+
+def _literal_metadata(extra_args):
+    """The fixed values WebBrowser.queueCaught sets with --parse-metadata ("#<value>:#(?P<field>.+)"),
+    as {field: value} — the page's site and title, for naming a directly downloaded file."""
+    import shlex
+    try:
+        tokens = shlex.split(extra_args or "")
+    except ValueError:
+        return {}
+    found = {}
+    for i, token in enumerate(tokens[:-1]):
+        if token != "--parse-metadata":
+            continue
+        m = re.match(r"^#(.*?)(?<!\\):#\(\?P<(\w+)>", tokens[i + 1])
+        if m:
+            found[m.group(2)] = m.group(1).replace("\\:", ":").replace("%%", "%")
+    return found
+
+
+def _direct_download(url, download_dir, ydl_opts, callback, extra_args):
+    """Downloads [url] as a plain file — for media the in-app browser caught that yt-dlp couldn't
+    take (an unknown kind of link, a host refusing its default headers). The same request the page
+    made (_page_opener). Named like yt-dlp's default, "<site> - <page title> [<id>]", with the
+    extension from the Content-Disposition name, the URL or the Content-Type. A web page coming
+    back instead of a file is a failure."""
+    import mimetypes
+    import urllib.request
+
+    def emit(line):
         if callback:
-            callback(event("error", message=str(e)))
+            callback(line)
+
+    try:
+        opener, headers = _page_opener(ydl_opts)
+        with opener.open(urllib.request.Request(url, headers=headers), timeout=30) as response:
+            content_type = (response.headers.get_content_type() or "").lower()
+            if content_type in ("text/html", "application/xhtml+xml"):
+                raise ValueError("the link gave a web page, not a file")
+            name_from_header = None
+            disposition = response.headers.get("Content-Disposition") or ""
+            m = re.search(r"filename\*?=(?:UTF-8'')?\"?([^\";]+)", disposition, re.I)
+            if m:
+                name_from_header = urllib.parse.unquote(m.group(1)).strip()
+            source_name = name_from_header or urllib.parse.unquote(urllib.parse.urlparse(response.url).path.rsplit("/", 1)[-1])
+            ext = os.path.splitext(source_name)[1].lstrip(".").lower()
+            if not ext or len(ext) > 5:
+                ext = (mimetypes.guess_extension(content_type) or ".bin").lstrip(".")
+                ext = {"jpe": "jpg", "mpga": "mp3", "qt": "mov"}.get(ext, ext)
+            meta = _literal_metadata(extra_args)
+            title = " - ".join(v for v in (meta.get("uploader"), meta.get("title")) if v) or os.path.splitext(source_name)[0] or "download"
+            name = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "_", f"{title} [{short_id(url)}]")[:180]
+            path = os.path.join(download_dir, f"{name}.{ext}")
+            total = int(response.headers.get("Content-Length") or 0)
+            if total:
+                emit(event("size", bytes=total))
+            done, last = 0, 0.0
+            with open(path + ".part", "wb") as f:
+                while True:
+                    block = response.read(256 * 1024)
+                    if not block:
+                        break
+                    f.write(block)
+                    done += len(block)
+                    now = time.monotonic()
+                    if now - last >= 0.5:
+                        last = now
+                        emit(event("progress", downloaded=done, speed=0))
+        if total and done < total:
+            raise ValueError(f"the download stopped at {done} of {total} bytes")
+        os.replace(path + ".part", path)
+        emit(event("file", path=os.path.abspath(path)))
+        return "Done"
+    except Exception as e:
+        emit(event("error", message=f"Downloading the file directly failed too: {e}"))
         return f"Error: {e}"
 
 # Settings' / the preview sheet's quality chips (GalleryDlPreferences.VideoQuality names) and the
