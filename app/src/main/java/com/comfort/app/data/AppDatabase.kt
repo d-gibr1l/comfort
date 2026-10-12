@@ -180,9 +180,16 @@ private val MIGRATION_22_23 = object : Migration(22, 23) {
     }
 }
 
+// Adds audioFormat (DownloadEntity.audioFormat) — the Configure sheet's per-download audio format.
+private val MIGRATION_23_24 = object : Migration(23, 24) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN audioFormat TEXT")
+    }
+}
+
 @Database(
     entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class],
-    version = 23,
+    version = 24,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -200,7 +207,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
-                        MIGRATION_22_23,
+                        MIGRATION_22_23, MIGRATION_23_24,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

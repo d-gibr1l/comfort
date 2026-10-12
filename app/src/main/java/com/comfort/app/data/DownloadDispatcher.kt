@@ -165,6 +165,8 @@ object DownloadDispatcher {
         overrideArtist: String? = null,
         // The Configure sheet's engine pick — see DownloadEntity.engineOverride.
         engineOverride: DownloadEngine? = null,
+        // The Configure sheet's audio format — see DownloadEntity.audioFormat.
+        audioFormat: AudioFormat? = null,
         // Set true for the explicit "Redownload anyway" action on a duplicate's own Snackbar/
         // Library entry — skips the check below for just this one deliberate retry, same shape as
         // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
@@ -230,6 +232,7 @@ object DownloadDispatcher {
                 overrideTitle = overrideTitle?.trim()?.ifBlank { null },
                 overrideArtist = overrideArtist?.trim()?.ifBlank { null },
                 engineOverride = engineOverride?.name,
+                audioFormat = audioFormat?.name,
                 // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
                 // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
                 // this as (a plain Settings switch, not a per-download picker).
