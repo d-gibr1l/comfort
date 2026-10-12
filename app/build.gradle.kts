@@ -130,6 +130,9 @@ dependencies {
   // every other androidx.compose.* artifact here.
   implementation("androidx.compose.material:material-icons-extended")
   implementation("androidx.documentfile:documentfile:1.0.1")
+  // The in-app browser's media catcher runs its page script in every frame from the start of
+  // each page (WebViewCompat.addDocumentStartJavaScript).
+  implementation("androidx.webkit:webkit:1.12.1")
   // Media3 ExoPlayer for Trim UI Video Streaming. media3-exoplayer-hls specifically: yt-dlp/
   // YouTube resolve some formats (confirmed live on a YouTube Shorts link) to an HLS (.m3u8)
   // manifest URL rather than a plain progressive file — without this on the classpath,

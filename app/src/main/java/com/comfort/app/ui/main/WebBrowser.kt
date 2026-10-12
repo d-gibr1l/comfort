@@ -39,6 +39,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -119,8 +120,16 @@ fun WebBrowser(
     var fullScreenView by remember { mutableStateOf<View?>(null) }
     var fullScreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     // The media this page loads (MediaSniffer), listed from the ⋮ menu.
-    val sniffer = remember { com.comfort.app.util.MediaSniffer() }
+    val sniffer = remember {
+        com.comfort.app.util.MediaSniffer(com.comfort.app.util.MseRecorder(java.io.File(context.cacheDir, "browser-recording")))
+    }
     val caughtMedia by sniffer.items.collectAsState()
+    val pieceBuilt by sniffer.pieceBuilt.collectAsState()
+    val drmProtected by sniffer.protected.collectAsState()
+    val playerPoster by sniffer.playerPoster.collectAsState()
+    val pagePicture by sniffer.pagePicture.collectAsState()
+    val recording by sniffer.recorder.state.collectAsState()
+    var savingRecording by remember { mutableStateOf(false) }
     val rankedMedia = remember(caughtMedia, currentUrl) { com.comfort.app.util.MediaSniffer.ranked(caughtMedia, currentUrl) }
     var mediaSheetOpen by remember { mutableStateOf(false) }
     // What's been queued from this browser, so a row keeps its check after the sheet closes.
@@ -156,7 +165,19 @@ fun WebBrowser(
     }
 
     DisposableEffect(Unit) {
+        // Requests from the page's service workers don't reach the WebView's own client.
+        val serviceWorkers = runCatching { android.webkit.ServiceWorkerController.getInstance() }.getOrNull()
+        runCatching {
+            serviceWorkers?.setServiceWorkerClient(object : android.webkit.ServiceWorkerClient() {
+                override fun shouldInterceptRequest(request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                    sniffer.onRequest(request.url.toString(), request.requestHeaders.orEmpty())
+                    return null
+                }
+            })
+        }
         onDispose {
+            runCatching { serviceWorkers?.setServiceWorkerClient(null) }
+            sniffer.recorder.cancel()
             sniffer.close()
             exitFullScreen()
             webView?.apply {
@@ -260,6 +281,16 @@ fun WebBrowser(
                                 applyDesktopMode(this, desktopMode)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 addJavascriptInterface(sniffer, com.comfort.app.util.MediaSniffer.JS_NAME)
+                                // In every frame (embedded players are iframes) and before the page's
+                                // own code, so its fetch/XHR and MediaSource are wrapped first.
+                                // Otherwise it's run after each load (onPageFinished), main frame only.
+                                if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                                    runCatching {
+                                        androidx.webkit.WebViewCompat.addDocumentStartJavaScript(
+                                            this, com.comfort.app.util.MediaSniffer.PAGE_SCRIPT, setOf("*"),
+                                        )
+                                    }
+                                }
                                 setFindListener { activeMatchOrdinal, numberOfMatches, _ ->
                                     findTotal = numberOfMatches
                                     findActive = if (numberOfMatches == 0) 0 else activeMatchOrdinal + 1
@@ -357,6 +388,17 @@ fun WebBrowser(
                     CaughtMediaSheet(
                         shown = rankedMedia,
                         queued = queuedMedia,
+                        pieceBuilt = pieceBuilt,
+                        drmProtected = drmProtected,
+                        streamPicture = playerPoster ?: pagePicture,
+                        frameOf = sniffer::frameOf,
+                        onRecord = {
+                            mediaSheetOpen = false
+                            sniffer.recorder.start()
+                            // Again from the start, so the first pieces (the initialization) are caught.
+                            webView?.reload()
+                            Toast.makeText(context, "Recording. Play the video to the end, then tap Stop and save.", Toast.LENGTH_LONG).show()
+                        },
                         onQueue = { item ->
                             queuedMedia = queuedMedia + item.url
                             val userAgent = webView?.settings?.userAgentString.orEmpty()
@@ -368,6 +410,29 @@ fun WebBrowser(
                             }
                         },
                         onDismiss = { mediaSheetOpen = false },
+                    )
+                }
+
+                if (recording.recording || savingRecording) {
+                    RecordingBar(
+                        bytes = recording.bytes,
+                        ended = recording.ended,
+                        saving = savingRecording,
+                        onStop = {
+                            savingRecording = true
+                            val title = pageTitle
+                            val page = currentUrl
+                            scope.launch {
+                                val saved = sniffer.recorder.finish(context, title, page)
+                                savingRecording = false
+                                Toast.makeText(
+                                    context,
+                                    if (saved != null) "Recording saved to your Library" else "Couldn't save the recording",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        },
+                        onCancel = { sniffer.recorder.cancel() },
                     )
                 }
 
@@ -509,6 +574,11 @@ fun WebBrowser(
 private fun CaughtMediaSheet(
     shown: List<com.comfort.app.util.MediaSniffer.Caught>,
     queued: Set<String>,
+    pieceBuilt: Boolean,
+    drmProtected: Boolean,
+    streamPicture: String?,
+    frameOf: suspend (com.comfort.app.util.MediaSniffer.Caught) -> android.graphics.Bitmap?,
+    onRecord: () -> Unit,
     onQueue: (com.comfort.app.util.MediaSniffer.Caught) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -547,7 +617,14 @@ private fun CaughtMediaSheet(
                 )
             }
         } else {
-            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            // The order changes live (a video starts playing, a size comes in). A lazy list keeps
+            // its first row in view when one is inserted above it, which scrolled a new best match
+            // out of sight above the top; at the top, it stays at the top.
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            LaunchedEffect(shown.firstOrNull()?.url) {
+                if (listState.firstVisibleItemIndex <= 1) listState.scrollToItem(0)
+            }
+            androidx.compose.foundation.lazy.LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
                 items(shown.size, key = { shown[it].url }) { i ->
                     val item = shown[i]
                     val isQueued = item.url in queued
@@ -578,7 +655,7 @@ private fun CaughtMediaSheet(
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             )
                         },
-                        leadingContent = { MediaThumb(item) },
+                        leadingContent = { MediaThumb(item, streamPicture, frameOf) },
                         // The sheet's own color behind every row, not ListItem's surface white.
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         trailingContent = {
@@ -616,7 +693,77 @@ private fun CaughtMediaSheet(
                 }
             }
         }
+        // A player that builds its video from pieces (a blob: source) can have nothing above to
+        // download; recording it while it plays is the way left.
+        if (pieceBuilt) {
+            Surface(
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        if (drmProtected) "This video is protected" else "Not the video you want?",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (drmProtected) {
+                            "The site uses copy protection (DRM), so a recording of it wouldn't play."
+                        } else {
+                            "This player builds its video from pieces. Comfort can record them while it plays: the page reloads, you play the video to the end, then tap Stop and save."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (!drmProtected) {
+                        Spacer(Modifier.height(12.dp))
+                        FilledTonalButton(onClick = onRecord) {
+                            Icon(Icons.Outlined.FiberManualRecord, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Record while it plays")
+                        }
+                    }
+                }
+            }
+        }
         Spacer(Modifier.height(16.dp))
+    }
+}
+
+/** Shown while a recording runs: how much has been caught, and Stop and save / Cancel. Once the
+ * page's player says its stream is complete, the bar says so. */
+@Composable
+private fun RecordingBar(bytes: Long, ended: Boolean, saving: Boolean, onStop: () -> Unit, onCancel: () -> Unit) {
+    val context = LocalContext.current
+    Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Outlined.FiberManualRecord,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                when {
+                    saving -> "Saving the recording…"
+                    ended -> "Recorded to the end · " + android.text.format.Formatter.formatShortFileSize(context, bytes)
+                    bytes > 0 -> "Recording · " + android.text.format.Formatter.formatShortFileSize(context, bytes)
+                    else -> "Recording · play the video"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            if (!saving) {
+                TextButton(onClick = onCancel) { Text("Cancel") }
+                Button(onClick = onStop, enabled = bytes > 0) { Text("Stop and save") }
+            }
+        }
     }
 }
 
@@ -632,10 +779,28 @@ private fun qualityLabel(kind: com.comfort.app.util.MediaSniffer.Kind, w: Int, h
     }
 }
 
-/** 56 dp rounded: the picture itself for an image, else the kind's icon on a tonal tile. */
+/** 56 dp rounded: the kind's icon on a tonal tile, covered by a preview once there is one — the
+ * picture itself for an image, a frame of the file for a video (MediaSniffer.frameOf, else its
+ * player's poster), the player's poster or the page's own picture for a stream. */
 @Composable
-private fun MediaThumb(item: com.comfort.app.util.MediaSniffer.Caught) {
+private fun MediaThumb(
+    item: com.comfort.app.util.MediaSniffer.Caught,
+    streamPicture: String?,
+    frameOf: suspend (com.comfort.app.util.MediaSniffer.Caught) -> android.graphics.Bitmap?,
+) {
     val shape = RoundedCornerShape(12.dp)
+    // (tried, frame): the poster stands in only once the frame has failed, so it can't flash in
+    // before the real frame.
+    val frameState by produceState<Pair<Boolean, android.graphics.Bitmap?>>(false to null, item.url) {
+        value = true to if (item.kind == com.comfort.app.util.MediaSniffer.Kind.VIDEO) frameOf(item) else null
+    }
+    val (frameTried, frame) = frameState
+    val picture = when (item.kind) {
+        com.comfort.app.util.MediaSniffer.Kind.IMAGE -> item.url
+        com.comfort.app.util.MediaSniffer.Kind.VIDEO -> item.poster.takeIf { frameTried && frame == null }
+        com.comfort.app.util.MediaSniffer.Kind.STREAM -> item.poster ?: streamPicture
+        else -> null
+    }
     Box(
         modifier = Modifier
             .size(56.dp)
@@ -643,24 +808,31 @@ private fun MediaThumb(item: com.comfort.app.util.MediaSniffer.Caught) {
             .background(MaterialTheme.colorScheme.secondaryContainer),
         contentAlignment = Alignment.Center,
     ) {
-        if (item.kind == com.comfort.app.util.MediaSniffer.Kind.IMAGE) {
-            // Under the picture, so the tile isn't blank while it loads or if it can't be shown.
-            Icon(Icons.Outlined.Image, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-            coil.compose.AsyncImage(
-                model = item.url,
+        // Under the preview, so the tile isn't blank while it loads or if it can't be shown.
+        Icon(
+            when (item.kind) {
+                com.comfort.app.util.MediaSniffer.Kind.AUDIO -> Icons.Outlined.MusicNote
+                com.comfort.app.util.MediaSniffer.Kind.STREAM -> Icons.Outlined.Stream
+                com.comfort.app.util.MediaSniffer.Kind.IMAGE -> Icons.Outlined.Image
+                else -> Icons.Outlined.Movie
+            },
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        val bitmap = frame
+        if (bitmap != null) {
+            androidx.compose.foundation.Image(
+                bitmap = bitmap.asImageBitmap(),
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else {
-            Icon(
-                when (item.kind) {
-                    com.comfort.app.util.MediaSniffer.Kind.AUDIO -> Icons.Outlined.MusicNote
-                    com.comfort.app.util.MediaSniffer.Kind.STREAM -> Icons.Outlined.Stream
-                    else -> Icons.Outlined.Movie
-                },
+        } else if (picture != null) {
+            coil.compose.AsyncImage(
+                model = picture,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
@@ -710,6 +882,11 @@ private suspend fun queueCaught(
                 append(" --add-header ").append(shellQuote("$key:$value"))
             }
         }
+        // A plain file (not a stream) yt-dlp can't take is downloaded directly instead, with these
+        // same headers and the saved cookies (yt_dlp_wrapper.py's _direct_download).
+        if (item.kind != com.comfort.app.util.MediaSniffer.Kind.STREAM) append(" --comfort-direct-fallback")
+        // A video whose sound the player took from a separate file: merged in once it's saved.
+        item.pairedAudio?.let { append(" --comfort-merge-audio ").append(shellQuote(it)) }
         if (site.isNotBlank()) append(" --parse-metadata ").append(shellQuote(literal(site) + ":#(?P<uploader>.+)"))
         if (pageTitle.isNotBlank()) append(" --parse-metadata ").append(shellQuote(literal(pageTitle.trim()) + ":#(?P<title>.+)"))
     }
