@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.comfort.app.data.AudioFormat
 import com.comfort.app.data.DownloadDispatcher
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
@@ -171,6 +173,8 @@ data class DownloadOptions(
     val overrideArtist: String? = null,
     /** The engine picked for this download in the sheet's Engine chips; null = Auto (Settings). */
     val engine: com.comfort.app.data.DownloadEngine? = null,
+    /** The format an audio download is saved in — see DownloadEntity.audioFormat. */
+    val audioFormat: AudioFormat? = null,
 )
 
 /** The engines the Configure sheet offers for [url]: only links more than one engine can download
@@ -278,6 +282,7 @@ fun DownloadPreviewSheet(
     // per-download override, never a write back to the global Settings value.
     var quality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
     var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
+    var audioFormat by remember { mutableStateOf(GalleryDlPreferences.getAudioFormat(context)) }
     var saveThumbnail by remember { mutableStateOf(false) }
     // Per-download engine (null = Auto) and the engines the link can use.
     var engineOverride by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
@@ -533,6 +538,8 @@ fun DownloadPreviewSheet(
             onToggleFormat = {
                 outputFormat = if (outputFormat == OutputFormat.MP4) OutputFormat.MKV else OutputFormat.MP4
             },
+            audioFormat = audioFormat,
+            onAudioFormatChange = { audioFormat = it },
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
             engineOptions = engineOptions,
@@ -580,6 +587,8 @@ private fun PreviewSheetOverlayHost(
     onQualityChange: (VideoQuality) -> Unit,
     outputFormat: OutputFormat,
     onToggleFormat: () -> Unit,
+    audioFormat: AudioFormat,
+    onAudioFormatChange: (AudioFormat) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
@@ -661,6 +670,8 @@ private fun PreviewSheetOverlayHost(
             onQualityChange = onQualityChange,
             outputFormat = outputFormat,
             onToggleFormat = onToggleFormat,
+            audioFormat = audioFormat,
+            onAudioFormatChange = onAudioFormatChange,
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = onToggleSaveThumbnail,
             engineOptions = engineOptions,
@@ -713,6 +724,7 @@ private fun PreviewSheetOverlayHost(
                         overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
                         overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
                         engine = engineOverride,
+                        audioFormat = audioFormat,
                     ),
                 )
             },
@@ -920,6 +932,84 @@ private fun ChipRow(
     )
 }
 
+/** The audio format for this one download (Settings > Processing > Audio format is the default):
+ * a chip showing the current pick that opens a small panel of all of them, each with what it's for. */
+@Composable
+private fun AudioFormatChip(
+    format: AudioFormat,
+    shape: androidx.compose.ui.graphics.Shape,
+    onChange: (AudioFormat) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        PreviewChip(label = format.label, icon = Icons.Outlined.MusicNote, shape = shape, onClick = { open = true })
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            shadowElevation = 3.dp,
+            modifier = Modifier.width(264.dp),
+        ) {
+            Text(
+                "Save audio as",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 6.dp),
+            )
+            AudioFormat.entries.forEach { option ->
+                val selected = option == format
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        .selectable(selected = selected, role = Role.RadioButton) {
+                            onChange(option)
+                            open = false
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            option.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            audioFormatHint(option),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (selected) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+private fun audioFormatHint(format: AudioFormat): String = when (format) {
+    AudioFormat.ORIGINAL -> "As the site sends it, not re-encoded"
+    AudioFormat.MP3 -> "Plays on anything"
+    AudioFormat.M4A -> "AAC, small and good quality"
+    AudioFormat.OPUS -> "Smallest at the same quality"
+    AudioFormat.FLAC -> "Lossless, biggest file"
+}
+
 /** [icon] is the chip's own resting icon (what it *is*); the selected state replaces it with a
  * check, per the M3 chip spec, so a selected chip still reads as selected at a glance. */
 @Composable
@@ -1052,6 +1142,8 @@ private fun MainPreviewScreen(
     onQualityChange: (VideoQuality) -> Unit,
     outputFormat: OutputFormat,
     onToggleFormat: () -> Unit,
+    audioFormat: AudioFormat,
+    onAudioFormatChange: (AudioFormat) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
@@ -1282,12 +1374,22 @@ private fun MainPreviewScreen(
                                 onClick = onOpenTrim,
                             )
                         }
-                        PreviewChip(
-                            label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
-                            icon = Icons.Outlined.Movie,
-                            shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
-                            onClick = onToggleFormat,
-                        )
+                        // Audio only saves no video, so the video container means nothing there —
+                        // the audio format does.
+                        if (quality == VideoQuality.AUDIO_ONLY) {
+                            AudioFormatChip(
+                                format = audioFormat,
+                                shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
+                                onChange = onAudioFormatChange,
+                            )
+                        } else {
+                            PreviewChip(
+                                label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
+                                icon = Icons.Outlined.Movie,
+                                shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
+                                onClick = onToggleFormat,
+                            )
+                        }
                         PreviewChip(
                             label = "Filename Templates",
                             selected = filenameTemplate != null,
@@ -1298,20 +1400,24 @@ private fun MainPreviewScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                 } else {
-                    // Song modes: no Trim (not a video), no Mp4/Mkv format toggle (yt-dlp's own
-                    // audio-only output format isn't a container choice the way video is) — just
-                    // the cover-art save toggle, Commands, and Filename Templates.
+                    // Song modes: no Trim (not a video) and no Mp4/Mkv toggle — the audio format
+                    // instead, then the cover-art save toggle, Commands and Filename Templates.
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Spacer(modifier = Modifier.width(12.dp))
+                        AudioFormatChip(
+                            format = audioFormat,
+                            shape = FIRST_CHIP_SHAPE,
+                            onChange = onAudioFormatChange,
+                        )
                         PreviewChip(
                             label = "Save cover art",
                             selected = saveThumbnail,
                             icon = Icons.Outlined.Image,
-                            shape = FIRST_CHIP_SHAPE,
+                            shape = MIDDLE_CHIP_SHAPE,
                             onClick = onToggleSaveThumbnail,
                         )
                         PreviewChip(

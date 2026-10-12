@@ -4,6 +4,7 @@ import android.content.Context
 import com.comfort.app.data.DownloadEngine
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.GalleryDlPreferences
+import com.comfort.app.data.AudioFormat
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.util.Aria2Runtime
@@ -71,7 +72,9 @@ internal class EngineCommands(
     // Always empty now (no ABI's ffmpeg has libraries of its own); the call also clears the old
     // armeabi-v7a bundle's leftover folder. Still passed: the wrappers' argument positions.
     private val ffmpegLibDir = FfmpegRuntime.ensureProvisioned(context)?.absolutePath.orEmpty()
-    private val audioFormat = GalleryDlPreferences.getAudioFormat(context)
+    // A per-download pick (the Configure sheet) wins over the Settings default.
+    private val audioFormat = entity?.audioFormat?.let { stored -> runCatching { AudioFormat.valueOf(stored) }.getOrNull() }
+        ?: GalleryDlPreferences.getAudioFormat(context)
     private val normalizeAudio = GalleryDlPreferences.isNormalizeAudio(context)
 
     // A per-download quality the sheet set wins over the Settings default.

@@ -110,6 +110,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
             overrideTitle = options.overrideTitle,
             overrideArtist = options.overrideArtist,
             engineOverride = options.engine,
+            audioFormat = options.audioFormat,
             forceDuplicate = true,
         )
     }
