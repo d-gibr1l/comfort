@@ -342,6 +342,12 @@ fun DownloadsHistoryScreen(
         favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false
     }
     BackHandler(enabled = isVisible && selectionMode) { selectedIds = emptySet() }
+    // While selecting, sideways swipes stay on the cards instead of turning the page.
+    val pageSwipe = LocalPageSwipe.current
+    DisposableEffect(pageSwipe, selectionMode, isVisible) {
+        pageSwipe?.blocked = selectionMode && isVisible
+        onDispose { pageSwipe?.blocked = false }
+    }
 
     // Checks each finished download's thumbnail against the real MediaStore once per Library
     // visit — cheap enough for typical history sizes, and it's the only way to notice a file the
@@ -1287,9 +1293,12 @@ internal fun SwipeToDeleteCard(
                 )
             }
     }
+    // Under the main pages, the card's outer strips (thumbnail, ⋮) turn the page instead
+    // (PageSwipe.kt); the Queue's cards have no pages to turn.
+    val pageSwipe = LocalPageSwipe.current
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier,
+        modifier = if (pageSwipe != null) modifier.pageSwipeEdges(pageSwipe) else modifier,
         backgroundContent = {
             Box(
                 modifier = Modifier
