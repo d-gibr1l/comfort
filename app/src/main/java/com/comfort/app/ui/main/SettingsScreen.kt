@@ -82,7 +82,6 @@ internal data class SubpageSearchEntry(val title: String, val subtitle: String, 
 // changes. Order doesn't matter — this is only ever filtered, never displayed as-is.
 internal val SUBPAGE_SEARCH_INDEX = listOf(
     // Downloads
-    SubpageSearchEntry("Play videos with sound", "Videos in the viewer start with their sound on.", SettingsRoute.APPEARANCE),
     SubpageSearchEntry("Sharing mode", "Configure, Instant, or Always ask — what Comfort does with a link shared to it.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Multiple concurrent downloads", "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.", SettingsRoute.DOWNLOADS),
     SubpageSearchEntry("Wi-Fi only", "Queued downloads wait for a Wi-Fi connection instead of using mobile data.", SettingsRoute.DOWNLOADS),

@@ -224,7 +224,8 @@ fun VideoPlayerItemWithResolvedUri(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLowest)
+            // Comfort: transparent, so the viewer's backdrop shows (black with the controls hidden).
+            .background(Color.Transparent)
             .clickable(
                 onClick = {
                     onTap?.invoke()
