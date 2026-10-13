@@ -165,8 +165,10 @@ fun MediaViewerScreen(
     /** Extra entries for the ⋮ menu (the post's link, ...); call close() when one is picked. */
     extraMenuItems: @Composable (item: GalleryItem, close: () -> Unit) -> Unit = { _, _ -> },
     useFullScreenGlobal: Boolean = false,
-    /** Videos start muted (Comfort's "Play videos with sound" off). */
+    /** Videos start muted (the ⋮ menu's "Play videos with sound" off). */
     startMuted: Boolean = true,
+    /** The ⋮ menu's "Play videos with sound": remembered for next time by the caller. */
+    onSoundSettingChange: (Boolean) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -371,7 +373,27 @@ fun MediaViewerScreen(
     // Vertical drag offset (px). When the user drags the image downward at
     // 1× zoom, this translates the pager and fades the black scrim.
     val dismissOffsetY = remember { Animatable(0f) }
-    val dismissProgress = (kotlin.math.abs(dismissOffsetY.value) / 600f).coerceIn(0f, 1f)
+    // Comfort: only a drag down closes the viewer (a drag up opens the info sheet), so only that
+    // one fades and shrinks the page.
+    val dismissProgress = (dismissOffsetY.value.coerceAtLeast(0f) / 600f).coerceIn(0f, 1f)
+
+    // Comfort: with the controls hidden, the bands above and below the picture go black and the
+    // system bars hide, as in other galleries; they come back with the controls.
+    val backdrop by androidx.compose.animation.animateColorAsState(
+        if (showUi) MaterialTheme.colorScheme.surfaceContainerLowest else Color.Black,
+        animationSpec = androidx.compose.animation.core.tween(250),
+        label = "viewerBackdrop",
+    )
+    LaunchedEffect(showUi) {
+        if (window != null && insetsController != null) {
+            if (showUi) {
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            } else {
+                insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
     val bgAlpha = 1f - dismissProgress          // scrim fades out
     val dismissScale = 1f - dismissProgress * 0.15f // subtle shrink
 
@@ -388,7 +410,7 @@ fun MediaViewerScreen(
                 }
                 false
             }
-            .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = bgAlpha)),
+            .background(backdrop.copy(alpha = bgAlpha)),
         contentAlignment = Alignment.Center
     ) {
         if (viewerBlurEffect && currentItem != null) {
@@ -444,12 +466,14 @@ fun MediaViewerScreen(
                             val velocity = velocityTracker.calculateVelocity().y
                             coroutineScope.launch {
                                 val current = dismissOffsetY.value
-                                if (kotlin.math.abs(current) > dismissThreshold ||
-                                    kotlin.math.abs(velocity) > velocityThreshold
-                                ) {
+                                // Comfort: down closes, up opens the info sheet (Photon closed on both).
+                                if (current > 0f && (current > dismissThreshold || velocity > velocityThreshold)) {
                                     // Commit dismiss — trigger existing back transition
                                     onBack()
                                 } else {
+                                    if (current < 0f && (current < -INFO_SWIPE_PX || velocity < -velocityThreshold)) {
+                                        showInfoCard = true
+                                    }
                                     // Snap back with spring
                                     dismissOffsetY.animateTo(
                                         0f,
@@ -472,7 +496,9 @@ fun MediaViewerScreen(
                     ) { change, dragAmount ->
                         velocityTracker.addPointerInputChange(change)
                         coroutineScope.launch {
-                            dismissOffsetY.snapTo(dismissOffsetY.value + dragAmount)
+                            // Comfort: upward, the page only follows a little (it opens the sheet).
+                            val step = if (dismissOffsetY.value + dragAmount < 0f) dragAmount * 0.35f else dragAmount
+                            dismissOffsetY.snapTo(dismissOffsetY.value + step)
                         }
                     }
                 },
@@ -1171,6 +1197,20 @@ fun MediaViewerScreen(
                                             }
                                         )
                                         extraMenuItems(currentItem) { showMoreMenu = false }
+                                        // Comfort: whether videos start with sound, here where they play.
+                                        var soundOn by remember { mutableStateOf(!startMuted) }
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { Text("Play videos with sound") },
+                                            leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_volume_up), contentDescription = null) },
+                                            trailingIcon = {
+                                                androidx.compose.material3.Checkbox(checked = soundOn, onCheckedChange = null)
+                                            },
+                                            onClick = {
+                                                soundOn = !soundOn
+                                                videosMuted = !soundOn
+                                                onSoundSettingChange(soundOn)
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -1311,3 +1351,6 @@ private fun InfoBlock(label: String, value: String, modifier: Modifier = Modifie
         )
     }
 }
+
+// How far up (px) a page is dragged to open the info sheet (after the 0.35 resistance).
+private const val INFO_SWIPE_PX = 60f

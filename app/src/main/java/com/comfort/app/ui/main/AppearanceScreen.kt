@@ -252,40 +252,6 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     }
                 }
             }
-            Spacer(Modifier.height(28.dp))
-
-            // The media viewer (opened from a Library item).
-            val viewerContext = androidx.compose.ui.platform.LocalContext.current
-            var viewerSound by remember { mutableStateOf(com.comfort.app.data.GalleryDlPreferences.isViewerSound(viewerContext)) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "VIEWER",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(Modifier.height(16.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    ThemeToggleRow(
-                        icon = Icons.AutoMirrored.Outlined.VolumeUp,
-                        title = "Play videos with sound",
-                        subtitle = "Videos in the viewer start with their sound on. Off, they start muted; volume up or the speaker button turns it on.",
-                        checked = viewerSound,
-                        onCheckedChange = {
-                            viewerSound = it
-                            com.comfort.app.data.GalleryDlPreferences.setViewerSound(viewerContext, it)
-                        },
-                    )
-                }
-            }
 
             Spacer(Modifier.height(navBarClearance()))
         }
