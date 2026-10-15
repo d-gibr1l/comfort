@@ -122,6 +122,8 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                    // The scrolled content's own origin (scroll 0), header padding included.
+                    .onGloballyPositioned { highlight.container = it }
                 .padding(top = with(density) { maxHeaderHeightPx.toDp() })
                 .padding(horizontal = 20.dp)
                 .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },

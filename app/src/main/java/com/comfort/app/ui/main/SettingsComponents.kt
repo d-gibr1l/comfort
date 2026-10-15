@@ -22,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -61,6 +62,10 @@ class HighlightController(val targetKey: String?, val scrollState: ScrollState) 
     // stays correct regardless of how deep the row is nested (inside a SettingsSection's own Card,
     // itself inside the scrolling Column).
     var containerWindowY = 0f
+    // The scrolling content itself (set alongside containerWindowY): a row's place within it
+    // doesn't depend on when it's measured — the two window positions, taken at different moments
+    // (the row once, mid enter-transition; the container on every move), could disagree.
+    var container: androidx.compose.ui.layout.LayoutCoordinates? = null
 }
 
 val LocalHighlightState = compositionLocalOf<HighlightController?> { null }
@@ -79,7 +84,13 @@ fun highlightRowModifier(title: String): Modifier {
     if (highlight == null || targetKey == null || !title.startsWith(targetKey, ignoreCase = true)) return Modifier
 
     var rowWindowY by remember(highlight) { mutableStateOf<Float?>(null) }
+    var rowCoords by remember(highlight) { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     val flash = remember(highlight) { Animatable(0f) }
+    val highlightColor = MaterialTheme.colorScheme.primaryContainer
+    // Room above the row once scrolled to: the page's header (it collapses to a pinned bar) and a
+    // little breathing space, so the row lands near the top, not under the header — or at the
+    // bottom, under the keyboard.
+    val topRoomPx = with(androidx.compose.ui.platform.LocalDensity.current) { 140.dp.toPx() }
 
     LaunchedEffect(rowWindowY) {
         val y = rowWindowY ?: return@LaunchedEffect
@@ -87,16 +98,36 @@ fun highlightRowModifier(title: String): Modifier {
         // before scrolling — animating scroll position mid-transition read as a jarring double
         // motion when tested without this.
         delay(300)
-        val target = (highlight.scrollState.value + (y - highlight.containerWindowY)).roundToInt().coerceAtLeast(0)
+        val container = highlight.container
+        val row = rowCoords
+        val target = if (container != null && row != null && container.isAttached && row.isAttached) {
+            (container.localPositionOf(row, androidx.compose.ui.geometry.Offset.Zero).y - topRoomPx).roundToInt().coerceAtLeast(0)
+        } else {
+            (highlight.scrollState.value + (y - highlight.containerWindowY)).roundToInt().coerceAtLeast(0)
+        }
         highlight.scrollState.animateScrollTo(target)
-        flash.animateTo(1f, tween(150))
-        delay(450)
-        flash.animateTo(0f, tween(600))
+        // Comfort: held long enough to find (it was a 0.45 s faint tint, easy to miss).
+        flash.animateTo(1f, tween(200))
+        delay(1200)
+        flash.animateTo(0f, tween(800))
     }
 
     return Modifier
-        .onGloballyPositioned { if (rowWindowY == null) rowWindowY = it.positionInWindow().y }
-        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = flash.value * 0.6f), RoundedCornerShape(14.dp))
+        .onGloballyPositioned { rowCoords = it; if (rowWindowY == null) rowWindowY = it.positionInWindow().y }
+        .drawBehind {
+            // A little past the row's edges, so a bare heading ("Audio format") gets a visible
+            // block, not just a tint behind its text.
+            val bleedX = 8.dp.toPx()
+            val bleedY = 6.dp.toPx()
+            if (flash.value > 0f) {
+                drawRoundRect(
+                    color = highlightColor.copy(alpha = flash.value * 0.85f),
+                    topLeft = androidx.compose.ui.geometry.Offset(-bleedX, -bleedY),
+                    size = androidx.compose.ui.geometry.Size(size.width + 2 * bleedX, size.height + 2 * bleedY),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(14.dp.toPx()),
+                )
+            }
+        }
 }
 
 // Shared by SettingsSubScaffold's pinned topBar, its own inline/collapsing variant, and the pinned
@@ -390,6 +421,8 @@ internal fun SettingsSubScaffold(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
+                    // The scrolled content's own origin (scroll 0), header padding included.
+                    .onGloballyPositioned { highlight.container = it }
                     // Reserves exactly the header's own resting (fully expanded) height so the
                     // first section starts right where it visually ends at scroll = 0 — the header
                     // itself is a pinned overlay below, entirely outside this Column, not one of
