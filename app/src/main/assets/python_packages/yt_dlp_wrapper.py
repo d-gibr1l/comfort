@@ -173,6 +173,8 @@ def _patch_external_downloader_progress():
     ExternalFD.real_download = _real_download_with_polling
 
 _EMBED_THUMBNAIL_PATCHED = False
+# Audio containers yt-dlp embeds a cover into (_square_audio_cover crops only for these).
+_AUDIO_EXTS = {"m4a", "mp3", "opus", "ogg", "oga", "flac", "mka", "aac", "alac", "wav"}
 
 def _patch_embed_thumbnail_fallback():
     """EmbedThumbnailPP only accepts jpg/png (or any format at all, for mkv/mka) straight from
@@ -251,10 +253,49 @@ def _patch_embed_thumbnail_fallback():
         entry["filepath"] = jpg_path
         entry["url"] = jpg_url
 
+    def _square_audio_cover(pp, info):
+        """A song's cover, cropped to its centre square. YouTube's thumbnails are 16:9 video
+        frames — for YouTube Music, the square album art centred between black bars — so a song
+        embedded one as is, borders and all. Audio only: a video's thumbnail is its picture.
+        A cover in another format (webp, when the jpg fetch above failed) becomes a JPEG on
+        the way, which mutagen can embed. A square cover comes out unchanged. Any failure keeps
+        the original cover."""
+        if (info.get("ext") or "").lower() not in _AUDIO_EXTS:
+            return
+        thumbnails = info.get("thumbnails") or []
+        entry = next((t for t in reversed(thumbnails) if t.get("filepath")), None)
+        if entry is None:
+            return
+        src = entry["filepath"]
+        if not os.path.exists(src):
+            return
+        is_png = os.path.splitext(src)[1].lower() == ".png"
+        dst = os.path.splitext(src)[0] + (".square.png" if is_png else ".square.jpg")
+        try:
+            pp.real_run_ffmpeg(
+                [(src, [])],
+                [(dst, ["-vf", "crop='min(iw,ih)':'min(iw,ih)'", "-frames:v", "1"]
+                  + ([] if is_png else ["-q:v", "2"]))],
+            )
+        except Exception as e:
+            pp.to_screen(f"Cover kept as is; {e}")
+            return
+        if not os.path.exists(dst) or os.path.getsize(dst) == 0:
+            return
+        final = os.path.splitext(src)[0] + (".png" if is_png else ".jpg")
+        os.replace(dst, final)
+        if final != src:
+            try:
+                os.remove(src)
+            except OSError:
+                pass
+        entry["filepath"] = final
+
     _orig_run = EmbedThumbnailPP.run
 
     def _run_with_fallback(self, info):
         _prefer_jpg_thumbnail(info)
+        _square_audio_cover(self, info)
         try:
             return _orig_run(self, info)
         except Exception as e:
@@ -828,18 +869,6 @@ class _FinalFilePP(PostProcessor):
             # happen before that line fires, not after.
             if self._override_title or self._override_artist:
                 _apply_title_artist_override(filepath, self._override_title, self._override_artist)
-            # music.youtube.com only (not plain youtube.com/youtu.be) — a real song is a
-            # near-guarantee there, unlike a random YouTube video, where an iTunes title+artist
-            # search would just as often return a wrong or nonexistent match. See
-            # _apply_cover_art_override's own doc comment for why this is worth doing at all:
-            # YouTube's own thumbnail is always a 16:9 video frame, never a square cover.
-            if self._source_url and "music.youtube.com" in self._source_url:
-                title = self._override_title or info.get("track") or info.get("title")
-                artist = self._override_artist or info.get("artist") or info.get("uploader") or info.get("channel")
-                if title and artist:
-                    cover_url = _itunes_cover_art_url(title, artist)
-                    if cover_url:
-                        _apply_cover_art_override(filepath, cover_url)
             self._callback(event("file", path=os.path.abspath(filepath)))
         return [], info
 
@@ -860,69 +889,6 @@ def _apply_title_artist_override(filepath, title, artist):
             if artist:
                 audio["artist"] = artist
             audio.save()
-    except Exception:
-        pass
-
-
-def _itunes_cover_art_url(title, artist):
-    """Best-effort square album-art URL for a title+artist pair with no known track id — used
-    for plain YouTube Music downloads (see _FinalFilePP's own call site below), which only ever
-    carry YouTube's own non-square 16:9 video-frame thumbnail. iTunes' public search API needs
-    no signup/API key at all — tried instead of Spotify's own search, which needs either a
-    registered developer app's Client Credentials token or an anonymous session token scraped
-    from open.spotify.com/search (confirmed live that the latter no longer works: Spotify has
-    evidently moved token issuance to a client-side JS call a plain HTTP fetch can't observe).
-    "artworkUrl100"'s "100x100" segment is a well-documented, swappable size hint — requesting
-    600x600 back gets a real high-res image instead of the tiny default thumbnail. Returns None
-    on no match or any failure, never raises — a missing cover-art upgrade should never fail an
-    otherwise-successful download."""
-    try:
-        import urllib.parse
-        import urllib.request
-        import ssl
-        ssl_context = ssl.create_default_context(cafile=_CACERT_PATH) if os.path.exists(_CACERT_PATH) else None
-        query = urllib.parse.quote(f"{artist} {title}")
-        req = urllib.request.Request(
-            f"https://itunes.apple.com/search?term={query}&media=music&entity=song&limit=1",
-            headers={"User-Agent": "Mozilla/5.0"},
-        )
-        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as resp:
-            data = json.loads(resp.read().decode("utf-8", "replace"))
-        results = data.get("results") or []
-        if not results:
-            return None
-        artwork = results[0].get("artworkUrl100")
-        return artwork.replace("100x100", "600x600") if artwork else None
-    except Exception:
-        return None
-
-
-def _apply_cover_art_override(filepath, image_url):
-    """Square cover art from _itunes_cover_art_url's own lookup (see _FinalFilePP's own call
-    site above), overriding whatever EmbedThumbnailPP already embedded from YouTube's own 16:9
-    video-frame thumbnail — this app's stripped ffmpeg build has no
-    image encoder/muxer at all (see _patch_embed_thumbnail_fallback's own doc comment on that
-    same limitation) and the bundled Python has no image library, so cropping that thumbnail
-    locally isn't possible; fetching an already-square image instead sidesteps the problem
-    entirely. mutagen-only, mp4/m4a only (the container every audio-only YouTube Music download
-    actually uses) — mirrors yt-dlp's own EmbedThumbnailPP mutagen branch for that container.
-    Silently no-ops on any failure (bad URL, wrong container, ...): a missing cover-art upgrade
-    should never turn an otherwise-successful download into a failure."""
-    try:
-        import ssl
-        import urllib.request
-        ssl_context = None
-        if os.path.exists(_CACERT_PATH):
-            ssl_context = ssl.create_default_context(cafile=_CACERT_PATH)
-        req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=10, context=ssl_context) as resp:
-            image_data = resp.read()
-        if not image_data:
-            return
-        from mutagen.mp4 import MP4, MP4Cover
-        audio = MP4(filepath)
-        audio.tags["covr"] = [MP4Cover(data=image_data, imageformat=MP4Cover.FORMAT_JPEG)]
-        audio.save()
     except Exception:
         pass
 
