@@ -536,7 +536,8 @@ fun MediaViewerScreen(
                     .size(coil.size.Size.ORIGINAL)
                     .memoryCachePolicy(CachePolicy.ENABLED)
                     .diskCachePolicy(CachePolicy.ENABLED)
-                    .placeholderMemoryCacheKey("photo_${item.resolvedUri}_384")
+                    // Comfort: the Library's thumbnail of it (Photon's grid key isn't Comfort's).
+                    .placeholderMemoryCacheKey(com.comfort.app.util.thumbnailCacheKey(item.id))
                     .crossfade(true)
                     .build()
             }
@@ -574,6 +575,7 @@ fun MediaViewerScreen(
                         title = item.songTitle ?: item.name,
                         subtitle = item.songSubtitle,
                         cover = item.cover,
+                        placeholderKey = com.comfort.app.util.thumbnailCacheKey(item.id),
                         isCurrentPage = page == pagerState.currentPage,
                         bottomPadding = if (galleryItems.count { groupKey(it) == groupKey(item) } > 1) 64.dp + FILMSTRIP_SPACE else 64.dp,
                         onPlayingChange = { playing -> if (page == pagerState.currentPage) currentVideoPlaying = playing },
@@ -591,6 +593,7 @@ fun MediaViewerScreen(
                     Box(modifier = Modifier.fillMaxSize()) {
                         VideoPlayerItem(
                             uri = resolvedUri,
+                            placeholderKey = com.comfort.app.util.thumbnailCacheKey(item.id),
                             isCurrentPage = page == pagerState.currentPage,
                             showControls = showUi,
                             muted = videosMuted,

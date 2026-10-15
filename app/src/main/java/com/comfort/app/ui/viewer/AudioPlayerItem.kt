@@ -82,6 +82,8 @@ fun AudioPlayerItem(
     title: String,
     subtitle: String?,
     cover: Any?,
+    /** The memory-cache key of its Library thumbnail (the cover), shown at once while it loads. */
+    placeholderKey: String? = null,
     isCurrentPage: Boolean,
     modifier: Modifier = Modifier,
     /** Room left at the bottom for the viewer's toolbar (and a carousel's filmstrip). */
@@ -102,6 +104,9 @@ fun AudioPlayerItem(
     var duration by remember { mutableStateOf(0L) }
     var dragPosition by remember { mutableStateOf<Float?>(null) }
     var coverFailed by remember(cover) { mutableStateOf(false) }
+    val coverRequest = remember(cover, placeholderKey) {
+        coil.request.ImageRequest.Builder(context).data(cover).placeholderMemoryCacheKey(placeholderKey).build()
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -165,7 +170,7 @@ fun AudioPlayerItem(
         // which can't blur).
         if (cover != null && !coverFailed) {
             AsyncImage(
-                model = cover,
+                model = coverRequest,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().blur(60.dp).scale(1.2f),
@@ -211,7 +216,7 @@ fun AudioPlayerItem(
                 ) {
                     if (cover != null && !coverFailed) {
                         AsyncImage(
-                            model = cover,
+                            model = coverRequest,
                             contentDescription = title,
                             contentScale = ContentScale.Crop,
                             onError = { coverFailed = true },
