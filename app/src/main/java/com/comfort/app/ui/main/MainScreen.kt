@@ -314,6 +314,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         LocalUseNavRail provides useNavRail,
         com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { mediaViewer = it },
     ) {
+    Box(modifier = Modifier.fillMaxSize()) {
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     if (useNavRail) {
         SideNavRail(
@@ -457,10 +458,6 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             }
         }
 
-        mediaViewer?.let { request ->
-            com.comfort.app.ui.viewer.MediaViewerHost(request, viewModel, onClose = { mediaViewer = null })
-        }
-
         // Neither engine knows the site: the in-app browser, to find the media on the page.
         (route as? LinkRoute.Browse)?.let { browse ->
             WebBrowser(startUrl = browse.url, onDismiss = { router.close() })
@@ -524,6 +521,11 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 }
             }
         }
+    }
+    }
+    // The media viewer over everything, the nav rail included (on a tablet it opened beside it).
+    mediaViewer?.let { request ->
+        com.comfort.app.ui.viewer.MediaViewerHost(request, viewModel, onClose = { mediaViewer = null })
     }
     }
     }
