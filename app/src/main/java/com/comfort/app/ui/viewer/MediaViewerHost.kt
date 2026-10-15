@@ -177,6 +177,13 @@ private suspend fun galleryItemsFor(
                 // A song plays in the video player too (its controls, no picture).
                 isVideo = mime?.startsWith("video/") == true || mime?.startsWith("audio/") == true || download.isAudio,
                 durationMs = info?.duration?.takeIf { it > 0 },
+                isAudio = download.isAudio,
+                songTitle = if (download.isAudio) download.title.ifBlank { info?.name ?: "" } else null,
+                songSubtitle = if (download.isAudio) {
+                    listOfNotNull(download.artist?.takeIf { it.isNotBlank() }, download.album?.takeIf { it.isNotBlank() })
+                        .joinToString(" · ").ifBlank { null }
+                } else null,
+                cover = if (download.isAudio) com.comfort.app.util.AudioCover(uri.toString(), download.thumbnailPath.takeIf { download.mediaUri != null }) else null,
             )
         }
     }

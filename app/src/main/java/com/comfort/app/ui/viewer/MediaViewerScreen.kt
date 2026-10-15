@@ -238,6 +238,25 @@ fun MediaViewerScreen(
     }
 
     val currentItem = galleryItems.getOrNull(pagerState.currentPage)
+
+    // Comfort: a song's page is dark whatever the theme, so the system bars' icons go light on it
+    // (dark ones were near invisible), and back to the theme's when it's left.
+    val onSongPage = currentItem?.isAudio == true
+    androidx.compose.runtime.DisposableEffect(onSongPage, insetsController) {
+        val controller = insetsController
+        val wasLightStatus = controller?.isAppearanceLightStatusBars
+        val wasLightNav = controller?.isAppearanceLightNavigationBars
+        if (onSongPage && controller != null) {
+            controller.isAppearanceLightStatusBars = false
+            controller.isAppearanceLightNavigationBars = false
+        }
+        onDispose {
+            if (onSongPage && controller != null) {
+                wasLightStatus?.let { controller.isAppearanceLightStatusBars = it }
+                wasLightNav?.let { controller.isAppearanceLightNavigationBars = it }
+            }
+        }
+    }
     var isLocalFileMissing by remember(currentItem) { mutableStateOf(false) }
     LaunchedEffect(currentItem) {
         if (currentItem != null) {
@@ -548,7 +567,27 @@ fun MediaViewerScreen(
             androidx.compose.foundation.layout.BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val parentWidth = constraints.maxWidth.toFloat()
                 val parentHeight = constraints.maxHeight.toFloat()
-                if (item.isVideo) {
+                if (item.isAudio) {
+                    // Comfort: a song gets its own Now Playing page.
+                    AudioPlayerItem(
+                        uri = resolvedUri,
+                        title = item.songTitle ?: item.name,
+                        subtitle = item.songSubtitle,
+                        cover = item.cover,
+                        isCurrentPage = page == pagerState.currentPage,
+                        bottomPadding = if (galleryItems.count { groupKey(it) == groupKey(item) } > 1) 64.dp + FILMSTRIP_SPACE else 64.dp,
+                        onPlayingChange = { playing -> if (page == pagerState.currentPage) currentVideoPlaying = playing },
+                        onTap = {
+                            if (showInfoCard || showUi) {
+                                showInfoCard = false
+                                showUi = false
+                            } else {
+                                showUi = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (item.isVideo) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         VideoPlayerItem(
                             uri = resolvedUri,
