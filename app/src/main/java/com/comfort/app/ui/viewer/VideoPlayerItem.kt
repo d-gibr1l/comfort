@@ -242,10 +242,11 @@ fun VideoPlayerItemWithResolvedUri(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            // Comfort: the largest box of the video's shape that fits (the Box above centres it).
+            // fillMaxSize() first made it width-first only: on a wide screen (landscape, a
+            // tablet) a 4:3 or 16:9 video ran off the top and bottom, looking zoomed in.
             val playerModifier = if (videoAspectRatio != null && videoAspectRatio!! > 0f) {
-                Modifier
-                    .fillMaxSize()
-                    .aspectRatio(videoAspectRatio!!, matchHeightConstraintsFirst = false)
+                Modifier.aspectRatio(videoAspectRatio!!)
             } else {
                 Modifier.fillMaxSize()
             }

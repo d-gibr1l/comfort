@@ -517,16 +517,22 @@ fun DownloadsHistoryScreen(
                 )
             }
         } else if (gridView) {
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
             // Gallery-style: edge to edge, hairline gaps, and rows where every tile is as wide as
             // its media's shape needs (justifiedCells) rather than identical squares. A file whose
             // shape isn't known (yet) counts as square.
-            val gridWidth = LocalConfiguration.current.screenWidthDp.toFloat()
+            // The grid's own width (not the screen's: a tablet's nav rail takes some). Tile sizes
+            // come from a phone's width at most, so a wide screen fits more tiles to a row instead
+            // of making them huge (one wide picture used to fill a whole tablet screen).
+            val gridWidth = maxWidth.value
+            val sizeRef = minOf(gridWidth, GRID_SIZE_REF_DP)
             val (targetFraction, minTileFraction, maxHeightFraction) = LIBRARY_GRID_SIZES[gridSize.coerceIn(0, LIBRARY_GRID_SIZES.lastIndex)]
             val cells = remember(visibleItems, shapes, gridWidth, gridSize) {
                 justifiedCells(
                     aspects = visibleItems.map { shapes[it.id]?.aspect ?: 1f },
                     width = gridWidth,
-                    targetHeight = gridWidth * targetFraction,
+                    maxPerRow = maxOf(4, (4 * gridWidth / GRID_SIZE_REF_DP).toInt()),
+                    targetHeight = sizeRef * targetFraction,
                     gap = GRID_GAP_DP,
                     // Portraits cropped only down to 0.6 wide-to-tall: a row of three is taller (bigger
                     // tiles) and shows more of each video.
@@ -535,8 +541,8 @@ fun DownloadsHistoryScreen(
                     // sharing its row to a fifth of the screen. Rows that end early for that are
                     // capped at 0.6x the width (tiles crop top and bottom), like Samsung Gallery.
                     maxAspect = 1.78f,
-                    minTileWidth = gridWidth * minTileFraction,
-                    maxHeight = gridWidth * maxHeightFraction,
+                    minTileWidth = sizeRef * minTileFraction,
+                    maxHeight = sizeRef * maxHeightFraction,
                 )
             }
             LazyVerticalGrid(
@@ -609,6 +615,7 @@ fun DownloadsHistoryScreen(
                     }
                 }
             }
+            }
         } else {
             LazyColumn(
                 state = listState,
@@ -651,7 +658,13 @@ fun DownloadsHistoryScreen(
                         exit = ExitTransition.None,
                         // Inset rounded cards (same 16dp side margin and 20dp corners as the
                         // Queue's cards) rather than edge-to-edge rows on one continuous band.
-                        modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 4.dp),
+                        // At most the other pages' reading width, centred (a tablet's rows ran edge
+                        // to edge, the ⋮ a screen away from the title).
+                        modifier = Modifier.animateItem()
+                            .fillMaxWidth()
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .widthIn(max = CONTENT_MAX_WIDTH)
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
                         if (selectionMode) {
                             row()
@@ -2132,3 +2145,6 @@ internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifie
         }
     }
 }
+
+/** The width (dp) the grid's tile sizes are measured against at most — about a big phone's. */
+private const val GRID_SIZE_REF_DP = 480f
