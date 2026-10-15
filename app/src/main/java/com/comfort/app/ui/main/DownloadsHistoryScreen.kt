@@ -76,6 +76,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.comfort.app.util.thumbnailModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
@@ -1560,12 +1561,7 @@ private fun HistoryGridItem(
             ),
     ) {
         if (hasThumbnail) {
-            AsyncImage(
-                model = item.thumbnailPath,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+            LibraryThumbnail(item, Modifier.fillMaxSize())
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 val icon = when (item.status) {
@@ -1820,12 +1816,7 @@ private fun HistoryRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 if (hasThumbnail) {
-                    AsyncImage(
-                        model = item.thumbnailPath,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    LibraryThumbnail(item, Modifier.fillMaxSize())
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         val icon = when (item.status) {
@@ -2107,4 +2098,29 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.glideToTop() 
         )
     }
     scrollToItem(0)
+}
+
+/** A Library item's thumbnail: for a song, its cover (AppImageLoader's AudioCover), and a music
+ * note when it has none — a song with no cover used to leave an empty tile. */
+@Composable
+internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) {
+    var failed by remember(item.id, item.thumbnailPath, item.mediaUri) { mutableStateOf(false) }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = item.thumbnailModel(),
+            contentDescription = item.title,
+            contentScale = ContentScale.Crop,
+            onError = { failed = true },
+            onSuccess = { failed = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (failed) {
+            Icon(
+                if (item.isAudio) Icons.Outlined.MusicNote else Icons.Outlined.Image,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(26.dp),
+            )
+        }
+    }
 }
