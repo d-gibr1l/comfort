@@ -1068,6 +1068,8 @@ fun HomeScreen(
                         kotlinx.coroutines.delay(16)
                     }
                 }
+                // Comfort: a tap opens the item in the media viewer, paging through the strip.
+                val openViewer = com.comfort.app.ui.viewer.LocalOpenMediaViewer.current
                 LazyRow(
                     state = recentListState,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1093,7 +1095,17 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 24.dp),
                 ) {
                     items(recentDownloads, key = { it.id }) { item ->
-                        RecentDownloadThumbnail(item = item, onClick = onOpenLibrary)
+                        RecentDownloadThumbnail(
+                            item = item,
+                            onClick = {
+                                val viewable = recentDownloads.filter { it.status != com.comfort.app.data.DownloadStatus.DELETED }
+                                if (item in viewable) {
+                                    openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(viewable, item.id))
+                                } else {
+                                    onOpenLibrary()
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -1271,11 +1283,12 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(
                 role = Role.Button,
-                onClickLabel = "Open in library",
+                onClickLabel = "Open",
                 onClick = onClick,
             ),
     ) {
-        HomeCardThumbnail(item.thumbnailPath, item.url, item.title, Modifier.fillMaxSize())
+        // A finished download's file (a song's cover): the Library's own thumbnail.
+        LibraryThumbnail(item, Modifier.fillMaxSize())
     }
 }
 

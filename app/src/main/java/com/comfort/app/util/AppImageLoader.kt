@@ -15,6 +15,8 @@ import coil.fetch.Fetcher
 import coil.request.Options
 import coil.size.pxOrElse
 import okhttp3.Dispatcher
+import okio.buffer
+import okio.source
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
@@ -38,6 +40,9 @@ object AppImageLoader {
                 .components {
                     // First in line for gallery (MediaStore) items — see MediaStoreThumbnailFetcher.
                     add(MediaStoreThumbnailFetcher.Factory())
+                    // A song's cover (AudioCover) — see AudioCoverFetcher.
+                    add(AudioCoverFetcher.Factory())
+                    add(AudioCoverFetcher.Keyer())
                     // Registers frame extraction for video thumbnails (gallery-dl downloads are
                     // all images, but yt-dlp ones are video — without this decoder, a video's
                     // MediaStore thumbnail Uri just renders blank instead of a preview frame).
@@ -110,5 +115,78 @@ private class MediaStoreThumbnailFetcher(
     private companion object {
         // A thumbnail, not a full-screen image — anything larger goes through the normal path.
         const val MAX_PX = 1024
+    }
+}
+
+/**
+ * A song's cover, for a Library or Home thumbnail. [storedArt] is the cover the download pulled out
+ * of the file (MediaStoreHelper.extractAudioArtworkUri) — kept in the app's cache, so Android can
+ * clear it (Settings > Storage > Clear cache, or when space runs low) — and [audioUri] the song.
+ */
+data class AudioCover(val audioUri: String?, val storedArt: String?)
+
+/** What a download's thumbnail loads: its cover for a song (an AudioCover), else thumbnailPath. */
+fun com.comfort.app.data.DownloadEntity.thumbnailModel(): Any? =
+    if (isAudio) {
+        // mediaUri is set only when a cover was pulled out; without one, thumbnailPath is the song.
+        AudioCover(audioUri = mediaUri ?: thumbnailPath, storedArt = thumbnailPath.takeIf { mediaUri != null })
+    } else {
+        thumbnailPath
+    }
+
+/** The cover pulled out when the song was saved; failing that (cleared, or never there), the
+ * system's thumbnail for the song (its embedded cover), then the embedded cover read directly.
+ * No cover at all is an error, so the tile shows its music-note placeholder. */
+private class AudioCoverFetcher(
+    private val data: AudioCover,
+    private val options: Options,
+) : Fetcher {
+    override suspend fun fetch(): FetchResult {
+        val context = options.context
+        val resolver = context.contentResolver
+        data.storedArt?.let { art ->
+            val stream = runCatching { resolver.openInputStream(Uri.parse(art)) }.getOrNull()
+            if (stream != null) {
+                return coil.fetch.SourceResult(
+                    source = coil.decode.ImageSource(stream.source().buffer(), context),
+                    mimeType = null,
+                    dataSource = DataSource.DISK,
+                )
+            }
+        }
+        val audio = data.audioUri?.let(Uri::parse) ?: throw java.io.IOException("no song")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && audio.authority == MediaStore.AUTHORITY) {
+            val width = options.size.width.pxOrElse { 512 }.coerceIn(1, 1024)
+            val height = options.size.height.pxOrElse { 512 }.coerceIn(1, 1024)
+            val bitmap = runCatching { resolver.loadThumbnail(audio, android.util.Size(width, height), null) }.getOrNull()
+            if (bitmap != null) {
+                return DrawableResult(bitmap.toDrawable(context.resources), isSampled = true, dataSource = DataSource.DISK)
+            }
+        }
+        val embedded = android.media.MediaMetadataRetriever().let { retriever ->
+            try {
+                retriever.setDataSource(context, audio)
+                retriever.embeddedPicture
+            } catch (e: Exception) {
+                null
+            } finally {
+                retriever.release()
+            }
+        } ?: throw java.io.IOException("no cover")
+        return coil.fetch.SourceResult(
+            source = coil.decode.ImageSource(okio.Buffer().write(embedded), context),
+            mimeType = null,
+            dataSource = DataSource.DISK,
+        )
+    }
+
+    class Factory : Fetcher.Factory<AudioCover> {
+        override fun create(data: AudioCover, options: Options, imageLoader: ImageLoader): Fetcher =
+            AudioCoverFetcher(data, options)
+    }
+
+    /** Lets the memory cache keep covers (a custom type has no cache key otherwise). */
+    class Keyer : coil.key.Keyer<AudioCover> {
+        override fun key(data: AudioCover, options: Options): String = "audio-cover:${data.audioUri}|${data.storedArt}"
     }
 }
