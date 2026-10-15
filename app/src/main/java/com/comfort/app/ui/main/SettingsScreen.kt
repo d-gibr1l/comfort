@@ -239,6 +239,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     BackHandler(enabled = searchExpanded) {
         searchExpanded = false
@@ -306,6 +307,9 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                 ExpressiveSettingsList(
                     items = filteredSubpageResults.map { entry ->
                         SettingsItemSpec(entry.route.icon(), entry.title, "In ${entry.route.displayName()}", SettingsItemColor.SURFACE_HIGH) {
+                            // The search field's keyboard would otherwise stay up over the page.
+                            focusManager.clearFocus()
+                            keyboard?.hide()
                             onNavigate(entry.route, entry.title)
                         }
                     },

@@ -812,7 +812,7 @@ private fun TimePickerButton(
  * genuine third option (Always ask) existed that a boolean couldn't represent. */
 @Composable
 private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (com.comfort.app.data.ShareMode) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().then(highlightRowModifier("Sharing mode")).padding(4.dp)) {
         Text("Sharing mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(2.dp))
         Text(

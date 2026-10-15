@@ -385,50 +385,53 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
         }
 
         SettingsSection(title = "Music downloads", icon = Icons.Outlined.MusicNote) {
-            Text("Audio format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "For songs and audio-only downloads. Original saves the site's own audio untouched (usually M4A, or Opus). The others convert it unless it's already in that format: MP3 plays on anything, FLAC is lossless but can't add back quality the source didn't have.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                val formats = AudioFormat.entries
-                formats.forEachIndexed { index, format ->
-                    val selected = audioFormat == format
-                    val interactionSource = remember { MutableInteractionSource() }
-                    FilterChip(
-                        selected = selected,
-                        onClick = {
-                            audioFormat = format
-                            GalleryDlPreferences.setAudioFormat(context, format)
-                        },
-                        // "Original" gets a wider share: five equal chips cut it short.
-                        modifier = Modifier
-                            .weight(if (format == AudioFormat.ORIGINAL) 1.7f else 1f)
-                            .height(40.dp)
-                            .semantics { role = Role.RadioButton },
-                        interactionSource = interactionSource,
-                        shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
-                        label = {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(format.label, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
-                            }
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                        border = null,
-                    )
+            // The whole setting (title, text, choices) lights up when Settings search jumps here.
+            Column(modifier = highlightRowModifier("Audio format")) {
+                Text("Audio format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "For songs and audio-only downloads. Original saves the site's own audio untouched (usually M4A, or Opus). The others convert it unless it's already in that format: MP3 plays on anything, FLAC is lossless but can't add back quality the source didn't have.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    val formats = AudioFormat.entries
+                    formats.forEachIndexed { index, format ->
+                        val selected = audioFormat == format
+                        val interactionSource = remember { MutableInteractionSource() }
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                audioFormat = format
+                                GalleryDlPreferences.setAudioFormat(context, format)
+                            },
+                            // "Original" gets a wider share: five equal chips cut it short.
+                            modifier = Modifier
+                                .weight(if (format == AudioFormat.ORIGINAL) 1.7f else 1f)
+                                .height(40.dp)
+                                .semantics { role = Role.RadioButton },
+                            interactionSource = interactionSource,
+                            shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                            label = {
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    Text(format.label, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            border = null,
+                        )
+                    }
                 }
             }
 
@@ -451,53 +454,56 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Text("Lyrics", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Looked up on LRCLIB by the song's title, artist and length, and saved inside the file. Synced lyrics carry timestamps, so players that support them scroll along with the song; songs without synced lyrics get plain ones.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                val modes = listOf(
-                    GalleryDlPreferences.LYRICS_SYNCED to "Synced",
-                    GalleryDlPreferences.LYRICS_PLAIN to "Plain",
-                    GalleryDlPreferences.LYRICS_OFF to "Off",
+            // The whole setting (title, text, choices) lights up when Settings search jumps here.
+            Column(modifier = highlightRowModifier("Lyrics")) {
+                Text("Lyrics", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Looked up on LRCLIB by the song's title, artist and length, and saved inside the file. Synced lyrics carry timestamps, so players that support them scroll along with the song; songs without synced lyrics get plain ones.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                modes.forEachIndexed { index, (mode, label) ->
-                    val selected = lyricsMode == mode
-                    val interactionSource = remember { MutableInteractionSource() }
-                    FilterChip(
-                        selected = selected,
-                        onClick = {
-                            lyricsMode = mode
-                            GalleryDlPreferences.setLyricsMode(context, mode)
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(40.dp)
-                            .semantics { role = Role.RadioButton },
-                        interactionSource = interactionSource,
-                        shape = rememberMorphingChipShape(index, modes.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
-                        label = {
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                Text(label, style = MaterialTheme.typography.labelLarge)
-                            }
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                        border = null,
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    val modes = listOf(
+                        GalleryDlPreferences.LYRICS_SYNCED to "Synced",
+                        GalleryDlPreferences.LYRICS_PLAIN to "Plain",
+                        GalleryDlPreferences.LYRICS_OFF to "Off",
                     )
+                    modes.forEachIndexed { index, (mode, label) ->
+                        val selected = lyricsMode == mode
+                        val interactionSource = remember { MutableInteractionSource() }
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                lyricsMode = mode
+                                GalleryDlPreferences.setLyricsMode(context, mode)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .semantics { role = Role.RadioButton },
+                            interactionSource = interactionSource,
+                            shape = rememberMorphingChipShape(index, modes.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                            label = {
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    Text(label, style = MaterialTheme.typography.labelLarge)
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            border = null,
+                        )
+                    }
                 }
             }
 
