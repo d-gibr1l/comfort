@@ -37,11 +37,37 @@ def _attempt_timeout(i):
     return _ATTEMPT_TIMEOUTS[min(i, len(_ATTEMPT_TIMEOUTS) - 1)]
 
 
+# Set once an IPv6 connect timed out and an IPv4 one then worked: IPv6 is dead on this network, so
+# every later connect in this process goes to IPv4 first instead of losing an attempt to IPv6.
+_ipv4_first = False
+
+
+def _interleave_families(infos):
+    """IPv6 and IPv4 addresses alternated (each family in its own order), as Happy Eyeballs
+    (RFC 8305) does. getaddrinfo puts all of a host's IPv6 addresses first, and with IPv6 dead (a
+    phone on such a Wi-Fi, 2026-10-15) open.spotify.com's four IPv6 addresses used up a 15s connect
+    budget (3+4+6+2s) before one IPv4 address was tried — every Spotify lookup failed, while curl,
+    which races both, connected over IPv4 in 0.1s. Alternated, the IPv4 one is second, ~3s in."""
+    v6 = [i for i in infos if i[0] == socket.AF_INET6]
+    others = [i for i in infos if i[0] != socket.AF_INET6]
+    if not v6 or not others:
+        return infos
+    first, second = (v6, others) if infos[0][0] == socket.AF_INET6 else (others, v6)
+    out = []
+    for i in range(max(len(first), len(second))):
+        if i < len(first):
+            out.append(first[i])
+        if i < len(second):
+            out.append(second[i])
+    return out
+
+
 def connect(address, timeout, source_address=None, socket_options=None, family=0, default_timeout=None):
     """Like socket.create_connection(), but a connect that stalls is retried on a new socket.
 
     [timeout] is the caller's: the overall connect budget, and what the returned socket is set to.
     [default_timeout] is the sentinel the caller uses for "use the global default"."""
+    global _ipv4_first
     host, port = address
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
@@ -51,6 +77,9 @@ def connect(address, timeout, source_address=None, socket_options=None, family=0
         infos = [info for info in infos if info[0] == af]
     if not infos:
         raise OSError("getaddrinfo returns an empty list")
+    infos = _interleave_families(infos)
+    if _ipv4_first:
+        infos.sort(key=lambda info: info[0] != socket.AF_INET)
 
     use_default = timeout is default_timeout or timeout is socket._GLOBAL_DEFAULT_TIMEOUT
     final_timeout = socket.getdefaulttimeout() if use_default else timeout
@@ -59,6 +88,7 @@ def connect(address, timeout, source_address=None, socket_options=None, family=0
 
     last_error = None
     attempt = 0
+    v6_timed_out = False
     while True:
         timed_out = False
         for af, socktype, proto, _, sockaddr in infos:
@@ -75,9 +105,13 @@ def connect(address, timeout, source_address=None, socket_options=None, family=0
                     sock.bind(source_address)
                 sock.connect(sockaddr)
                 sock.settimeout(final_timeout)
+                if v6_timed_out and af == socket.AF_INET:
+                    _ipv4_first = True
                 return sock
             except TimeoutError as e:
                 timed_out = True
+                if af == socket.AF_INET6:
+                    v6_timed_out = True
                 last_error = e
                 sock.close()
             except OSError as e:
