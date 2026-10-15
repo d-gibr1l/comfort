@@ -2106,8 +2106,16 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.glideToTop() 
 internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) {
     var failed by remember(item.id, item.thumbnailPath, item.mediaUri) { mutableStateOf(false) }
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        val context = LocalContext.current
+        val request = remember(item.id, item.thumbnailPath, item.mediaUri, item.isAudio) {
+            coil.request.ImageRequest.Builder(context)
+                .data(item.thumbnailModel())
+                // Under the file's key, so the media viewer can show it at once while it loads.
+                .memoryCacheKey(com.comfort.app.util.thumbnailCacheKey(item.id))
+                .build()
+        }
         AsyncImage(
-            model = item.thumbnailModel(),
+            model = request,
             contentDescription = item.title,
             contentScale = ContentScale.Crop,
             onError = { failed = true },

@@ -65,6 +65,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 @Composable
 fun VideoPlayerItem(
     uri: Uri,
+    /** Comfort: the memory-cache key of its Library thumbnail, shown at once until the first frame. */
+    placeholderKey: String? = null,
     isCurrentPage: Boolean,
     showControls: Boolean,
     modifier: Modifier = Modifier,
@@ -78,6 +80,7 @@ fun VideoPlayerItem(
 ) {
     VideoPlayerItemWithResolvedUri(
         uri = uri,
+        placeholderKey = placeholderKey,
         isCurrentPage = isCurrentPage,
         showControls = showControls,
         muted = muted,
@@ -93,6 +96,7 @@ fun VideoPlayerItem(
 @Composable
 fun VideoPlayerItemWithResolvedUri(
     uri: Uri,
+    placeholderKey: String? = null,
     isCurrentPage: Boolean,
     showControls: Boolean,
     modifier: Modifier = Modifier,
@@ -245,15 +249,14 @@ fun VideoPlayerItemWithResolvedUri(
             } else {
                 Modifier.fillMaxSize()
             }
-            if (!firstFrameShown) {
-                coil.compose.AsyncImage(
-                    model = coil.request.ImageRequest.Builder(context).data(uri).size(720).build(),
-                    contentDescription = null,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
-                )
+            // Comfort: the player's surface only once the video's shape is known (or after a
+            // moment): a surface laid out full-screen first flashed black over the whole page.
+            var surfaceReady by remember(uri) { mutableStateOf(false) }
+            LaunchedEffect(uri, videoAspectRatio) {
+                if (videoAspectRatio == null) delay(400)
+                surfaceReady = true
             }
-            AndroidView(
+            if (surfaceReady) AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = exoPlayer
@@ -276,6 +279,21 @@ fun VideoPlayerItemWithResolvedUri(
                 },
                 modifier = playerModifier
             )
+            // Comfort: the thumbnail until the first frame is up — over the player, not under it:
+            // the surface is a hole in the window, black until it draws, and it hid a thumbnail
+            // drawn beneath it. The Library's thumbnail shows at once (placeholderMemoryCacheKey).
+            if (!firstFrameShown) {
+                coil.compose.AsyncImage(
+                    model = remember(uri) {
+                        coil.request.ImageRequest.Builder(context).data(uri).size(720)
+                            .placeholderMemoryCacheKey(placeholderKey)
+                            .build()
+                    },
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = if (surfaceReady) playerModifier.background(Color.Black) else Modifier.fillMaxSize(),
+                )
+            }
         }
 
         // Dim Scrim overlay

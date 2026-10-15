@@ -125,6 +125,12 @@ private class MediaStoreThumbnailFetcher(
  */
 data class AudioCover(val audioUri: String?, val storedArt: String?)
 
+/** The memory-cache key a download's Library/Home thumbnail is kept under. The media viewer shows
+ * it at once as the placeholder for the download's first page (whose id is the download's) while
+ * the full picture, the video's first frame, or the song's cover loads. By id, not file: a post's
+ * first page isn't always the very file its thumbnail was made from. */
+fun thumbnailCacheKey(downloadId: String): String = "thumb:$downloadId"
+
 /** What a download's thumbnail loads: its cover for a song (an AudioCover), else thumbnailPath. */
 fun com.comfort.app.data.DownloadEntity.thumbnailModel(): Any? =
     if (isAudio) {

@@ -39,6 +39,7 @@ import com.comfort.app.ui.main.rememberUndoableDelete
 import com.comfort.app.viewmodel.DownloadsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 
 /** What the viewer pages through, in this order, and the one it opens on. */
@@ -64,14 +65,21 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
     // Live, so a favourite or a delete (and its Undo) shows here at once.
     val history by viewModel.historyFlow.collectAsStateWithLifecycle()
     val live = remember(history) { history.associateBy { it.id } }
-    // The tapped download first, so the viewer opens at once; then everything around it (each
-    // file's details, and every carousel's files, take a moment for a whole Library). The pager
-    // keys its pages, so the page on screen stays put as the others arrive around it.
+    // Everything at once when that's quick (~70 ms for a 100-item Library): the tapped item's
+    // thumbnail shows meanwhile (below). Opening on the tapped download alone and adding the rest
+    // after shifted the page for a frame as they arrived (a flicker), so that's only the fallback
+    // for a Library slow to look up. The pager keys its pages, so the page on screen stays put.
     val resolved by produceState<List<GalleryItem>?>(null, request) {
         val dao = com.comfort.app.data.AppDatabase.getDatabase(context).downloadDao()
         val tapped = request.downloads.firstOrNull { it.id == request.startId }
-        if (tapped != null) value = withContext(Dispatchers.IO) { galleryItemsFor(context, dao, listOf(tapped)) }
-        value = withContext(Dispatchers.IO) { galleryItemsFor(context, dao, request.downloads) }
+        val all = async(Dispatchers.IO) { galleryItemsFor(context, dao, request.downloads) }
+        val quick = kotlinx.coroutines.withTimeoutOrNull(600) { all.await() }
+        if (quick != null) {
+            value = quick
+        } else {
+            if (tapped != null) value = withContext(Dispatchers.IO) { galleryItemsFor(context, dao, listOf(tapped)) }
+            value = all.await()
+        }
     }
     val snackbar = remember { SnackbarHostState() }
     val requestDelete = rememberUndoableDelete(viewModel, snackbar)
@@ -80,6 +88,28 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) {
         val all = resolved
+        if (all == null) {
+            // Comfort: the tapped item's Library thumbnail while its files are looked up (a moment),
+            // where the viewer will show it, rather than an empty page flashing first.
+            // A song's page is dark: dark here too.
+            request.downloads.firstOrNull { it.id == request.startId }?.let { tapped ->
+                val file = tapped.mediaUri ?: tapped.thumbnailPath
+                if (tapped.isAudio) {
+                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
+                } else if (file != null) {
+                    coil.compose.AsyncImage(
+                        model = remember(file) {
+                            coil.request.ImageRequest.Builder(context).data(file)
+                                .placeholderMemoryCacheKey(com.comfort.app.util.thumbnailCacheKey(tapped.id))
+                                .build()
+                        },
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
         if (all != null) {
             val items = remember(all, live) { all.filter { downloadIdOf(it) in live } }
             MediaViewerScreen(
