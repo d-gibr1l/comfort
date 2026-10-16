@@ -209,7 +209,10 @@ object GalleryDlPreferences {
     // " - <text>" only when there is text; it's capped at 150 characters and "!W" folds its
     // line breaks.
     // short_id: the file's id as a 6-character code when it's long (see gallery_dl_wrapper.py).
-    const val DEFAULT_FILENAME_FORMAT = "{poster_name|category}{title|content[:150]!W:? - //} [{short_id|filename}].{extension}"
+    // [{category}]: the site it came from, last ("<poster> - <caption> [<id>] [instagram].jpg").
+    // yt-dlp and Instaloader fill this same format in too (custom_names.py).
+    const val DEFAULT_FILENAME_FORMAT = "{poster_name|category}{title|content[:150]!W:? - //} [{short_id|filename}] [{category}].{extension}"
+    private const val LEGACY_DEFAULT_FILENAME_FORMAT_6 = "{poster_name|category}{title|content[:150]!W:? - //} [{short_id|filename}].{extension}"
     private const val LEGACY_DEFAULT_FILENAME_FORMAT_5 = "{poster_name|category}{title|content[:150]!W:? - //} [{filename}].{extension}"
     private const val DEFAULT_FILENAME_TEMPLATES = """%(title)s.%(ext)s
 %(uploader)s - %(title)s [%(id)s].%(ext)s
@@ -226,7 +229,7 @@ object GalleryDlPreferences {
         val stored = prefs(context).getString(KEY_FILENAME_FORMAT, null)?.takeIf { it.isNotBlank() }
         if (stored == null || stored == LEGACY_DEFAULT_FILENAME_FORMAT || stored == LEGACY_DEFAULT_FILENAME_FORMAT_2 ||
             stored == LEGACY_DEFAULT_FILENAME_FORMAT_3 || stored == LEGACY_DEFAULT_FILENAME_FORMAT_4 ||
-            stored == LEGACY_DEFAULT_FILENAME_FORMAT_5) return DEFAULT_FILENAME_FORMAT
+            stored == LEGACY_DEFAULT_FILENAME_FORMAT_5 || stored == LEGACY_DEFAULT_FILENAME_FORMAT_6) return DEFAULT_FILENAME_FORMAT
         return stored
     }
 

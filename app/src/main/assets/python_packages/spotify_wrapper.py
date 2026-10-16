@@ -501,6 +501,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             status = yt_dlp_wrapper.download(
                 url=matched_url, download_dir=download_dir, cookies_path=cookies_path,
                 callback=_capture_and_forward, filename_format=filename_format,
+                # "{category}" in a custom filename format: where the song came from.
+                site="spotify",
                 archive_path=archive_path, js_runtime_path=js_runtime_path,
                 ffmpeg_path=ffmpeg_path, ffmpeg_lib_dir=ffmpeg_lib_dir,
                 audio_only=True, restrict_filenames=restrict_filenames,

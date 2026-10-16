@@ -1107,7 +1107,8 @@ class DownloadWorker(
  * worse. */
 internal fun derivePosterCaptionTitle(filename: String): String? {
     val withoutExtension = filename.substringBeforeLast('.', "").ifBlank { return null }
-    val stripped = withoutExtension.replace(Regex("\\s*\\[[^\\[\\]]*]\\s*$"), "").trim()
+    // Every trailing "[...]": the id, and the site after it ("... [abc123] [instagram]").
+    val stripped = withoutExtension.replace(Regex("(\\s*\\[[^\\[\\]]*])+\\s*$"), "").trim()
     return stripped.take(255).trim().ifBlank { null }
 }
 

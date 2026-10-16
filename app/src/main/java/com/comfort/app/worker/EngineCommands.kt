@@ -37,6 +37,13 @@ internal class EngineCommands(
     // retry/resume therefore re-applies exactly what the user picked in the sheet.
     private val filenameFormat = entity?.filenameTemplate?.takeIf { it.isNotBlank() }
         ?: GalleryDlPreferences.getFilenameFormat(context)
+    // yt-dlp, Spotify and Instaloader fill the same format in through gallery-dl's formatter
+    // (custom_names.py), so every download is named alike, the site included. "Trim filenames" off
+    // lifts the default's 150-character caption cap, as it did for their own naming.
+    private val customFilenameFormat by lazy {
+        if (!trimFilenames && filenameFormat == GalleryDlPreferences.DEFAULT_FILENAME_FORMAT) filenameFormat.replace("[:150]", "")
+        else filenameFormat
+    }
 
     // Advanced > Extra arguments: each engine gets the "both" set plus its own (see
     // GalleryDlPreferences.getExtraArgsFor) — the engines take different flags. The sheet's extra
@@ -147,12 +154,12 @@ internal class EngineCommands(
         ),
     )
 
-    // gallery-dl's filename-format template syntax means nothing to yt-dlp, so it isn't passed.
+    // A custom filename format (gallery-dl's syntax) is filled in by the wrapper itself.
     fun ytDlp() = EngineCommand(
         "yt-dlp", "yt_dlp_wrapper.py",
         listOf(
             "download", url, stagingDir.absolutePath, cookiesArg,
-            "", ytDlpExtraArgs, ytDlpArchivePath, limitRate, formatIdOverride,
+            customFilenameFormat, ytDlpExtraArgs, ytDlpArchivePath, limitRate, formatIdOverride,
             jsRuntimePath, ffmpegPath,
             flag(audioOnly), flag(downloadSubtitles), subtitleLangs,
             flag(embedThumbnail), flag(embedMetadata), flag(noPlaylist),
@@ -191,14 +198,13 @@ internal class EngineCommands(
     )
 
     // Always audio-only — spotify_wrapper.py hands each matched track to yt_dlp_wrapper's own
-    // download(), which is where ffmpeg/aria2c/the JS runtime are used. gallery-dl's "{keyword}"
-    // filename template isn't passed (reproduced live as a literal, unsubstituted filename that
-    // ffmpeg rejected).
+    // download(), which is where ffmpeg/aria2c/the JS runtime are used. A custom filename format is
+    // filled in there (it used to reach yt-dlp raw: a literal, unsubstituted name ffmpeg rejected).
     fun spotify() = EngineCommand(
         "Spotify", "spotify_wrapper.py",
         listOf(
             "download", url, stagingDir.absolutePath, cookiesArg,
-            "", ytDlpArchivePath, jsRuntimePath,
+            customFilenameFormat, ytDlpArchivePath, jsRuntimePath,
             ffmpegPath, ffmpegLibDir, aria2Path, aria2LibDir,
             flag(restrictFilenames),
             flag(trimFilenames),
@@ -230,6 +236,7 @@ internal class EngineCommands(
             flag(writeInfoFiles), proxyUrl, socketTimeoutSeconds,
             // The preview's saved post, reused instead of fetching it again.
             GalleryDlListing.instaloaderInfoCacheFile(context, url).absolutePath,
+            customFilenameFormat,
         ),
     )
 

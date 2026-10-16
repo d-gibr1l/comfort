@@ -31,6 +31,7 @@ import time
 import instaloader
 from instaloader import Instaloader, Post, RateController
 import net_resilience
+import custom_names
 from comfort_events import event
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
@@ -237,7 +238,7 @@ def _append_archive(path, key):
 
 def download(url, download_dir, cookies_path=None, item_filter=None, archive_path=None,
              write_info_files=False, proxy_url=None, socket_timeout_seconds=None, emit=print,
-             info_cache_path=None):
+             info_cache_path=None, filename_format=None):
     try:
         loader, post, from_cache = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds, info_cache_path)
         items = _media_items(post)
@@ -268,6 +269,32 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
     # Same "poster - caption [unique-id].ext" shape as the other engines' default filename format,
     # so DownloadWorker's derivePosterCaptionTitle recovers the same display title from it.
     safe_title = _clean(title, 90) or shortcode
+    used_names = set()
+
+    def item_name(num, is_video, key):
+        """Settings > Folders' filename format (gallery-dl's syntax, see custom_names) when the
+        user set their own, else "poster - caption [id]". Kept unique within the post."""
+        name = None
+        if filename_format:
+            caption = _caption_line(post)
+            name = custom_names.render(filename_format, {
+                "category": "instagram", "subcategory": "post",
+                "poster_name": post.owner_username or "", "username": post.owner_username or "",
+                "author": post.owner_username or "",
+                "title": _clean(caption, 150), "content": _clean(caption, 150),
+                "description": post.caption or "",
+                "id": shortcode, "shortcode": shortcode, "post_shortcode": shortcode,
+                "filename": key, "short_id": key, "num": num, "count": len(items),
+                "date": post.date_utc.strftime("%Y-%m-%d %H:%M:%S") if post.date_utc else "",
+                "extension": "mp4" if is_video else "jpg",
+                "likes": post.likes, "type": "video" if is_video else "image",
+            })
+            if name and name in used_names:
+                name = f"{name} [{key}]"
+        name = name or f"{safe_title} [{key}]"
+        used_names.add(name)
+        return name
+
     saved = 0
     fresh_urls = {}  # filled only if saved links turn out to be expired, see below
     for num, is_video, media_url, _preview in items:
@@ -277,7 +304,7 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
         if not media_url:
             emit(event("error", message=f"ERROR: Instagram didn't provide a download link for item {num} of this post"))
             continue
-        base = os.path.join(download_dir, f"{safe_title} [{key}]")
+        base = os.path.join(download_dir, item_name(num, is_video, key))
         try:
             for leftover in (base + ext for ext in (".mp4", ".jpg", ".png", ".webp", ".heic")):
                 if os.path.isfile(leftover):
@@ -363,7 +390,7 @@ if __name__ == "__main__":
         sys.exit(2)
 
     _cmd, _rest = sys.argv[1], sys.argv[2:]
-    _rest += [""] * (9 - len(_rest))
+    _rest += [""] * (10 - len(_rest))
     if _cmd == "download":
         _status = download(
             url=_rest[0], download_dir=_rest[1], cookies_path=_s(_rest[2]),
@@ -371,6 +398,7 @@ if __name__ == "__main__":
             write_info_files=(_rest[5] == "1"), proxy_url=_s(_rest[6]),
             socket_timeout_seconds=_s(_rest[7]), emit=_emit,
             info_cache_path=_s(_rest[8]),
+            filename_format=_s(_rest[9]),
         )
         print(event("exit", status=_status), flush=True)
     elif _cmd == "list":
