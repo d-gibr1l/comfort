@@ -12,6 +12,7 @@ from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcess
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 import net_resilience
+import custom_names
 from comfort_events import event, parse
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
@@ -815,9 +816,13 @@ class _CaptionPP(PostProcessor):
     filenames sanitize each field on its own and strip a separator at a field's edge. Runs
     pre_process, after the "- Topic" uploader cleanup, before the filename is worked out."""
 
-    def __init__(self, downloader, trim=True):
+    def __init__(self, downloader, trim=True, custom_format=None, site=None):
         super().__init__(downloader)
         self._trim = trim
+        # Settings > Folders' filename format (gallery-dl's syntax), when the user set their own;
+        # [site] is "{category}" when the caller knows better than the extractor (Spotify).
+        self._custom_format = custom_format
+        self._site = site
 
     def run(self, info):
         poster = str(info.get("uploader") or info.get("channel") or info.get("creator") or "").strip()
@@ -826,7 +831,31 @@ class _CaptionPP(PostProcessor):
             caption = caption.encode("utf-8")[:150].decode("utf-8", "ignore").rstrip() + "…"
         info["comfort_name"] = " - ".join(p for p in (poster, caption) if p) or "Unknown"
         info["comfort_id"] = short_id(info.get("id"))
+        if self._custom_format:
+            info["comfort_custom_name"] = custom_names.render(self._custom_format, self._fields(info, poster, caption)) \
+                or f"{info['comfort_name']} [{info['comfort_id']}]"
         return [], info
+
+    def _fields(self, info, poster, caption):
+        """This video's details under gallery-dl's field names (the format's language), on top of
+        yt-dlp's own (so "{duration}", "{upload_date}"... work as well)."""
+        extractor = str(info.get("extractor") or info.get("extractor_key") or "").split(":")[0].lower()
+        if not extractor or extractor == "generic":
+            extractor = custom_names.site_of(info.get("webpage_url") or info.get("original_url"))
+        fields = {k: v for k, v in info.items() if isinstance(v, (str, int, float)) or v is None}
+        fields.update(
+            category=self._site or extractor,
+            subcategory="",
+            poster_name=poster, author=poster, username=poster, uploader=poster,
+            title=caption, content=caption,
+            description=info.get("description") or "",
+            id=info.get("id") or "", filename=info.get("id") or "",
+            short_id=info.get("comfort_id") or "",
+            num=1, count=1,
+            date=info.get("upload_date") or "",
+            extension=info.get("ext") or "",
+        )
+        return fields
 
 
 class _FinalFilePP(PostProcessor):
@@ -1008,7 +1037,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
              override_title=None, override_artist=None, info_json_path=None,
-             audio_format=None, normalize_audio=False):
+             audio_format=None, normalize_audio=False, site=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1293,7 +1322,13 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # or a per-download override) is used exactly as given.
     # "comfort_name" is "<poster> - <caption>" with the caption cleaned up (_CaptionPP), or just
     # the poster when a post is only a link. trim_filenames (Settings > Folders) caps the caption at 150 bytes.
-    outtmpl = filename_format or "%(comfort_name,uploader,channel,creator|Unknown)s [%(comfort_id,id)s].%(ext)s"
+    # A format in gallery-dl's syntax (Settings > Folders, when changed from the default) is filled
+    # in by _CaptionPP into "comfort_custom_name"; a yt-dlp template ("%(...)s") is used as given.
+    custom_format = filename_format if filename_format and "%(" not in filename_format else None
+    if custom_format:
+        outtmpl = "%(comfort_custom_name)s.%(ext)s"
+    else:
+        outtmpl = filename_format or "%(comfort_name,uploader,channel,creator|Unknown)s [%(comfort_id,id)s].%(ext)s"
     ydl_opts = {
         "outtmpl": os.path.join(download_dir, outtmpl),
         "format": chosen_format,
@@ -1669,7 +1704,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     def _attempt(opts, reuse_info):
         with yt_dlp.YoutubeDL(opts) as ydl:
             # Added after ydl_opts' own pre_process MetadataParser, so it sees the cleaned uploader.
-            ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames), when="pre_process")
+            ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames, custom_format=custom_format, site=site), when="pre_process")
             if embed_subtitles:
                 # Same place the stock step had: after metadata/thumbnail, before trimming and
                 # _FinalFilePP. already_have_subtitle keeps the subtitle file on disk when "Save
