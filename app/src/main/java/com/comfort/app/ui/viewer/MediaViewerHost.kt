@@ -91,12 +91,9 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
         if (all == null) {
             // Comfort: the tapped item's Library thumbnail while its files are looked up (a moment),
             // where the viewer will show it, rather than an empty page flashing first.
-            // A song's page is dark: dark here too.
             request.downloads.firstOrNull { it.id == request.startId }?.let { tapped ->
                 val file = tapped.mediaUri ?: tapped.thumbnailPath
-                if (tapped.isAudio) {
-                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black))
-                } else if (file != null) {
+                if (file != null) {
                     coil.compose.AsyncImage(
                         model = remember(file) {
                             coil.request.ImageRequest.Builder(context).data(file)
@@ -160,18 +157,19 @@ private fun downloadIdOf(item: GalleryItem) = item.id.substringBefore('#')
 
 /** The downloads' saved files as GalleryItems, in order, each post's files in the post's order:
  * the ones recorded as it saved them (SavedFile); for a download from before that, its files found
- * by name, in the order they arrived; else just the file its Library tile shows (a song: the song,
- * its thumbnail is the cover). Files deleted from the phone since are left out. A few batched
+ * by name, in the order they arrived; else just the file its Library tile shows. Songs are left
+ * out (the music player plays them), as are files deleted from the phone since. A few batched
  * queries for all of them: one query per file took ~3 s for a 100-item Library. */
 private suspend fun galleryItemsFor(
     context: Context,
     dao: com.comfort.app.data.DownloadDao,
     downloads: List<DownloadEntity>,
 ): List<GalleryItem> {
-    val viewable = downloads.filter { it.status != DownloadStatus.DELETED }
+    // Songs play in the music player (ui/music), not here.
+    val viewable = downloads.filter { it.status != DownloadStatus.DELETED && !it.isAudio }
     val saved = viewable.map { it.id }.chunked(500).flatMap { dao.savedFiles(it) }.groupBy { it.downloadId }
     // Older carousels: their files' names, found in MediaStore all at once.
-    val older = viewable.filter { !it.isAudio && (saved[it.id]?.size ?: 0) <= 1 && it.downloadedItems > 1 }
+    val older = viewable.filter { (saved[it.id]?.size ?: 0) <= 1 && it.downloadedItems > 1 }
     val namesOf = older.associate { it.id to dao.downloadedFileNames(it.id) }
     val byName = filesByName(context, namesOf.values.flatten())
     val filesOf = viewable.associate { download ->
@@ -181,7 +179,6 @@ private suspend fun galleryItemsFor(
             byName[name] ?: if (name.endsWith(".webp", ignoreCase = true)) byName[name.dropLast(5) + ".jpg"] else null
         }
         download.id to when {
-            download.isAudio -> listOfNotNull(main)
             recorded.size > 1 -> recorded
             named.size > 1 -> named
             else -> listOfNotNull(main)
@@ -204,16 +201,8 @@ private suspend fun galleryItemsFor(
                 name = info?.name ?: download.title,
                 dateModified = info?.modified?.takeIf { it > 0 } ?: (download.dateAdded / 1000),
                 path = info?.path.orEmpty(),
-                // A song plays in the video player too (its controls, no picture).
-                isVideo = mime?.startsWith("video/") == true || mime?.startsWith("audio/") == true || download.isAudio,
+                isVideo = mime?.startsWith("video/") == true,
                 durationMs = info?.duration?.takeIf { it > 0 },
-                isAudio = download.isAudio,
-                songTitle = if (download.isAudio) download.title.ifBlank { info?.name ?: "" } else null,
-                songSubtitle = if (download.isAudio) {
-                    listOfNotNull(download.artist?.takeIf { it.isNotBlank() }, download.album?.takeIf { it.isNotBlank() })
-                        .joinToString(" · ").ifBlank { null }
-                } else null,
-                cover = if (download.isAudio) com.comfort.app.util.AudioCover(uri.toString(), download.thumbnailPath.takeIf { download.mediaUri != null }) else null,
             )
         }
     }

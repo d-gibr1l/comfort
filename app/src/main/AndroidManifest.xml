@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- The music player playing in the background (music/MusicService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- The music player keeps the CPU up while playing with the screen off. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Lets Settings > Downloads > Reliability launch the system's own "exempt this app from
          battery optimization" dialog (code review #19) — without it, a burst of "Start Now" taps
          can exhaust the expedited-job quota and the resulting plain background job gets silently
@@ -153,6 +157,41 @@
         <!-- WorkManager's own service, declared here only to add the foregroundServiceType that
              DownloadWorker's ForegroundInfo requires on API 34+; without a matching declaration
              here, setForeground() throws "foregroundServiceType is not a subset of ... manifest". -->
+        <!-- The music player: plays Library songs in the background, with the media notification
+             and lock-screen / Bluetooth / headset controls of its MediaSession. -->
+        <service
+            android:name=".music.MusicService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </service>
+
+        <!-- Media keys with the app closed (the music widget's buttons, headphones, a car): starts
+             the music service, which resumes the saved queue. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- The home-screen music widget. -->
+        <receiver
+            android:name=".music.MusicWidget"
+            android:exported="false"
+            android:label="Comfort music">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_music_info" />
+        </receiver>
+
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

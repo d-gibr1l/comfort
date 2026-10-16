@@ -146,6 +146,8 @@ dependencies {
   implementation("androidx.media3:media3-exoplayer:1.2.0")
   implementation("androidx.media3:media3-exoplayer-hls:1.2.0")
   implementation("androidx.media3:media3-ui:1.2.0")
+  // The music player's background playback: MediaSessionService + MediaController (music/).
+  implementation("androidx.media3:media3-session:1.2.0")
 
   // Tooling
   debugImplementation(libs.androidx.compose.ui.tooling)
