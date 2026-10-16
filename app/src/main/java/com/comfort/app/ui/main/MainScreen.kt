@@ -112,11 +112,19 @@ val NAV_BAR_RESERVED_HEIGHT = 100.dp
  * gesture, and however tall a given OEM skin makes either) instead of assuming a fixed guess
  * happens to already cover it. See [NAV_BAR_RESERVED_HEIGHT]'s own doc comment for the full story. */
 @Composable
-fun navBarClearance(): Dp {
+fun navBarClearance(): Dp = navBarOnlyClearance() + LocalMiniPlayerInset.current
+
+/** [navBarClearance] without the mini player: where the mini player itself sits. */
+@Composable
+private fun navBarOnlyClearance(): Dp {
     val inset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // No floating pill on wide windows (a side rail replaces it), so only a small margin is needed.
     return if (LocalUseNavRail.current) 16.dp + inset else NAV_BAR_RESERVED_HEIGHT + inset
 }
+
+/** The mini player's height while it shows (else 0), so every page's bottom clearance
+ * ([navBarClearance]) keeps its last row and buttons above it too. */
+val LocalMiniPlayerInset = androidx.compose.runtime.compositionLocalOf { 0.dp }
 
 /** True when the window is wide enough (tablet, or a phone in landscape) that navigation is a side
  * rail instead of the floating bottom pill. Set once in [MainScreen]. */
@@ -292,6 +300,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // The launcher icon's shortcuts (MainActivity.SHORTCUT_*): straight to their page. Paste &
     // download and Search hand over to Home and Library, which act on their signal.
     var pasteDownloadSignal by remember { mutableIntStateOf(0) }
+    // The music player's full screen (ui/music), over everything; the mini player opens it.
+    var showNowPlaying by remember { mutableStateOf(false) }
+    val music by com.comfort.app.music.MusicPlayer.state.collectAsState()
+    // Shows music already playing when the app is reopened.
+    LaunchedEffect(Unit) { com.comfort.app.music.MusicPlayer.connect(context) }
+    LaunchedEffect(music.song == null) { if (music.song == null) showNowPlaying = false }
     var librarySearchSignal by remember { mutableIntStateOf(0) }
     LaunchedEffect(shortcut) {
         val request = shortcut ?: return@LaunchedEffect
@@ -303,6 +317,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 com.comfort.app.MainActivity.SHORTCUT_PASTE_DOWNLOAD -> { selectedTab = 0; pasteDownloadSignal++ }
                 com.comfort.app.MainActivity.SHORTCUT_OPEN_LIBRARY -> selectedTab = 1
                 com.comfort.app.MainActivity.SHORTCUT_SEARCH_LIBRARY -> { selectedTab = 1; librarySearchSignal++ }
+                // The music notification's tap.
+                com.comfort.app.MainActivity.ACTION_OPEN_NOW_PLAYING -> showNowPlaying = true
             }
         }
     }
@@ -310,9 +326,25 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     val useNavRail = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= NAV_RAIL_MIN_WIDTH_DP
     // The media viewer (Photon Gallery's, ui/viewer), opened from a Library item over everything.
     var mediaViewer by remember { mutableStateOf<com.comfort.app.ui.viewer.MediaViewerRequest?>(null) }
+    val showMiniPlayer = music.song != null && !showNowPlaying && mediaViewer == null
     CompositionLocalProvider(
         LocalUseNavRail provides useNavRail,
-        com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { mediaViewer = it },
+        // A song plays in the music player (its neighbours in the list as the queue); anything
+        // else opens the media viewer, which pages through the pictures and videos only.
+        com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { request ->
+            val tapped = request.downloads.firstOrNull { it.id == request.startId }
+            if (tapped?.isAudio == true) {
+                com.comfort.app.music.MusicPlayer.play(context, request.downloads, tapped.id)
+                showNowPlaying = true
+            } else {
+                mediaViewer = request.copy(downloads = request.downloads.filter { !it.isAudio })
+            }
+        },
+        com.comfort.app.ui.music.LocalPlaySongs provides { songs, shuffle ->
+            com.comfort.app.music.MusicPlayer.play(context, songs, null, shuffle)
+            showNowPlaying = true
+        },
+        LocalMiniPlayerInset provides if (showMiniPlayer) com.comfort.app.ui.music.MINI_PLAYER_HEIGHT else 0.dp,
     ) {
     Box(modifier = Modifier.fillMaxSize()) {
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -429,6 +461,19 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             onSelect = onTabSelect,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+        // Just above the navigation pill (or the bottom edge, beside a rail), on every page.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showMiniPlayer,
+            enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = navBarOnlyClearance() - if (useNavRail) 0.dp else 8.dp)
+                .padding(horizontal = 16.dp)
+                .widthIn(max = CONTENT_MAX_WIDTH),
+        ) {
+            com.comfort.app.ui.music.MiniPlayer(onOpen = { showNowPlaying = true })
+        }
 
         // Composed after FloatingNavBar (draws on top of it) and inset by the same
         // navBarClearance() the FAB below already uses to clear the pill — otherwise this
@@ -526,6 +571,14 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // The media viewer over everything, the nav rail included (on a tablet it opened beside it).
     mediaViewer?.let { request ->
         com.comfort.app.ui.viewer.MediaViewerHost(request, viewModel, onClose = { mediaViewer = null })
+    }
+    // The music player's full screen, over everything.
+    androidx.compose.animation.AnimatedVisibility(
+        visible = showNowPlaying && music.song != null,
+        enter = androidx.compose.animation.slideInVertically { it },
+        exit = androidx.compose.animation.slideOutVertically { it },
+    ) {
+        com.comfort.app.ui.music.NowPlayingScreen(onClose = { showNowPlaying = false })
     }
     }
     }

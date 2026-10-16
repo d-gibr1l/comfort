@@ -49,6 +49,8 @@ class MainActivity : ComponentActivity() {
     const val SHORTCUT_OPEN_LIBRARY = "com.comfort.app.action.OPEN_LIBRARY"
     const val SHORTCUT_OPEN_QUEUE = "com.comfort.app.action.OPEN_QUEUE"
     const val SHORTCUT_SEARCH_LIBRARY = "com.comfort.app.action.SEARCH_LIBRARY"
+    // The music notification's tap (music/MusicService): opens Now Playing.
+    const val ACTION_OPEN_NOW_PLAYING = "com.comfort.app.action.OPEN_NOW_PLAYING"
   }
 
   /** The last shortcut used, with a count so using the same one twice still acts. */
@@ -70,7 +72,7 @@ class MainActivity : ComponentActivity() {
       openQueueSignal.intValue++
     }
     val action = intent.action
-    if (action in setOf(SHORTCUT_PASTE_DOWNLOAD, SHORTCUT_OPEN_LIBRARY, SHORTCUT_OPEN_QUEUE, SHORTCUT_SEARCH_LIBRARY)) {
+    if (action in setOf(SHORTCUT_PASTE_DOWNLOAD, SHORTCUT_OPEN_LIBRARY, SHORTCUT_OPEN_QUEUE, SHORTCUT_SEARCH_LIBRARY, ACTION_OPEN_NOW_PLAYING)) {
       shortcut.value = com.comfort.app.ui.main.ShortcutRequest(action!!, (shortcut.value?.seq ?: 0) + 1)
       // Handled: a later recreation mustn't act on it again.
       intent.action = Intent.ACTION_MAIN

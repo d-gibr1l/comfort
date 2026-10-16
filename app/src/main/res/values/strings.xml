@@ -8,4 +8,11 @@
     <string name="shortcut_queue_long">Open the download queue</string>
     <string name="shortcut_search_short">Search Library</string>
     <string name="shortcut_search_long">Search your downloads</string>
+    <!-- The home-screen music widget. -->
+    <string name="widget_music_description">The song playing, with play, pause and skip</string>
+    <string name="widget_music_idle">Nothing playing</string>
+    <string name="widget_music_previous">Previous</string>
+    <string name="widget_music_play">Play</string>
+    <string name="widget_music_pause">Pause</string>
+    <string name="widget_music_next">Next</string>
 </resources>

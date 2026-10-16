@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -478,6 +479,31 @@ fun DownloadsHistoryScreen(
                         if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
                     },
                 )
+                // The Audio filter's songs, played in the music player: all in order, or shuffled.
+                val songs = visibleItems.filter { it.isAudio && it.status != DownloadStatus.DELETED }
+                if (audioOnly && songs.isNotEmpty()) {
+                    val playSongs = com.comfort.app.ui.music.LocalPlaySongs.current
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                        Row(
+                            modifier = Modifier
+                                .widthIn(max = CONTENT_MAX_WIDTH)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            androidx.compose.material3.Button(onClick = { playSongs(songs, false) }, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Play all")
+                            }
+                            androidx.compose.material3.FilledTonalButton(onClick = { playSongs(songs, true) }, modifier = Modifier.weight(1f)) {
+                                Icon(androidx.compose.material.icons.Icons.Rounded.Shuffle, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Shuffle")
+                            }
+                        }
+                    }
+                }
             }
         }
         val topPaddingWhileSelecting = with(LocalDensity.current) {

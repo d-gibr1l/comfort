@@ -29,10 +29,4 @@ data class GalleryItem(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val fileHash: String? = null,
-    // Comfort: a song — played on AudioPlayerItem's Now Playing page, with these details.
-    val isAudio: Boolean = false,
-    val songTitle: String? = null,
-    val songSubtitle: String? = null,
-    /** Its cover, for Coil (com.comfort.app.util.AudioCover). */
-    val cover: Any? = null,
 )
