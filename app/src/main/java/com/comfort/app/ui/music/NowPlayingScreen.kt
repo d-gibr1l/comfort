@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,12 +105,25 @@ fun NowPlayingScreen(onClose: () -> Unit) {
     // Declared after the player's own, so it runs first while the queue is open.
     LightSystemBars()
 
+    // The song's lyrics (from its own tags), and whether they're shown in place of the cover.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var lyrics by remember { mutableStateOf<com.comfort.app.music.Lyrics?>(null) }
+    LaunchedEffect(song?.uri) {
+        lyrics = null
+        lyrics = song?.let { com.comfort.app.music.Lyrics.load(context, it.uri) }
+    }
+    var showLyrics by remember { mutableStateOf(false) }
+    val lyricsShown = showLyrics && lyrics != null
+
     var position by remember { mutableLongStateOf(0L) }
     var dragPosition by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(state.isPlaying, song?.id, state.seekId) {
+    // Synced lyrics move on line by line (the full view, or the two lines under the cover), so
+    // the position is read more often for them.
+    val followLyrics = lyrics?.synced == true
+    LaunchedEffect(state.isPlaying, song?.id, followLyrics, state.seekId) {
         position = MusicPlayer.position()
         while (state.isPlaying) {
-            delay(250)
+            delay(if (followLyrics) 100 else 250)
             position = MusicPlayer.position()
         }
     }
@@ -217,6 +231,23 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                                 color = Color.White.copy(alpha = 0.7f),
                             )
                         }
+                        if (lyrics != null) {
+                            IconButton(
+                                onClick = { showLyrics = !showLyrics },
+                                modifier = Modifier.size(48.dp),
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (lyricsShown) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+                                ),
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Lyrics,
+                                    contentDescription = androidx.compose.ui.res.stringResource(
+                                        if (lyricsShown) com.comfort.app.R.string.lyrics_hide else com.comfort.app.R.string.lyrics_show,
+                                    ),
+                                    tint = Color.White,
+                                )
+                            }
+                        }
                         IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = "Queue", tint = Color.White)
                         }
@@ -228,7 +259,29 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                         modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).swipeToSkip(coverSkip),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Box(
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = lyricsShown,
+                            transitionSpec = {
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 50)) +
+                                    androidx.compose.animation.scaleIn(initialScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(250, delayMillis = 50))) togetherWith
+                                    (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
+                                        androidx.compose.animation.scaleOut(targetScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(150)))
+                            },
+                            contentAlignment = Alignment.Center,
+                            label = "coverOrLyrics",
+                        ) { showingLyrics ->
+                        val shownLyrics = lyrics
+                        if (showingLyrics && shownLyrics != null) {
+                            LyricsView(
+                                lyrics = shownLyrics,
+                                positionMs = position,
+                                onSeek = { target ->
+                                    MusicPlayer.seekTo(target)
+                                    position = target
+                                },
+                                modifier = Modifier.widthIn(max = 560.dp).fillMaxSize(),
+                            )
+                        } else Box(
                             modifier = Modifier
                                 .widthIn(max = 520.dp)
                                 .fillMaxWidth()
@@ -244,9 +297,27 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                                 CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
                             }
                         }
+                        }
                     }
 
                     Column(modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp)) {
+                        // Spotify's lyric line under the cover, as two (the line and the next);
+                        // a tap opens the full lyrics. Not while those are up.
+                        val previewLyrics = lyrics
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = previewLyrics?.synced == true && !lyricsShown,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
+                        ) {
+                            if (previewLyrics != null) {
+                                LyricsPreview(
+                                    lyrics = previewLyrics,
+                                    positionMs = position,
+                                    onClick = { showLyrics = true },
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                                )
+                            }
+                        }
                         // Title, artist and album, left-aligned (Auxio's), with the song's menu.
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SongTransition(modifier = Modifier.weight(1f).sharedBounds(rememberSharedContentState("title"), anim)) { shown ->
