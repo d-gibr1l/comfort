@@ -315,7 +315,8 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                                     lyrics = previewLyrics,
                                     positionMs = position,
                                     onClick = { showLyrics = true },
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                                    // Clear of the cover above and the title below.
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
                                 )
                             }
                         }

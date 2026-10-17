@@ -52,7 +52,7 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
     val lines = lyrics.lines
     val zoom = rememberLyricsZoom()
     if (lines.isNullOrEmpty()) {
-        val base = MaterialTheme.typography.titleLarge
+        val base = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
         Box(modifier.pinchToZoom(zoom).verticalScroll(rememberScrollState())) {
             Text(
                 lyrics.plain.orEmpty(),
@@ -76,7 +76,8 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
         }
     }
 
-    val lineStyle = MaterialTheme.typography.headlineSmall.let { base ->
+    // Google Sans, as the app's titles (its bundled bold cut; other scripts fall back to the system font).
+    val lineStyle = MaterialTheme.typography.headlineSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily).let { base ->
         base.copy(fontSize = base.fontSize * zoom.floatValue, lineHeight = base.lineHeight * zoom.floatValue)
     }
     BoxWithConstraints(modifier.pinchToZoom(zoom)) {
@@ -180,10 +181,11 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
     ) { index ->
         val first = lines.getOrNull(index)
         val second = lines.getOrNull(index + 1)
-        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth()) {
+        val style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
             Text(
                 (if (index < 0) lines[0] else first)?.text?.ifBlank { "♪" } ?: "",
-                style = MaterialTheme.typography.titleMedium,
+                style = style,
                 fontWeight = FontWeight.Bold,
                 color = Color.White.copy(alpha = if (index < 0) 0.55f else 1f),
                 maxLines = 1,
@@ -191,7 +193,7 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
             )
             Text(
                 (if (index < 0) lines.getOrNull(1) else second)?.text?.ifBlank { "♪" } ?: "",
-                style = MaterialTheme.typography.titleMedium,
+                style = style,
                 fontWeight = FontWeight.Bold,
                 color = Color.White.copy(alpha = 0.55f),
                 maxLines = 1,
