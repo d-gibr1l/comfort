@@ -785,7 +785,7 @@ object GalleryDlPreferences {
     }
 
     /** Videos in the media viewer start with sound (off: muted until unmuted or volume up). */
-    fun isViewerSound(context: Context): Boolean = prefs(context).getBoolean(KEY_VIEWER_SOUND, false)
+    fun isViewerSound(context: Context): Boolean = prefs(context).getBoolean(KEY_VIEWER_SOUND, true)
 
     fun setViewerSound(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_VIEWER_SOUND, enabled).apply()

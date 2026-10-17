@@ -579,7 +579,11 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     }
     // The media viewer over everything, the nav rail included (on a tablet it opened beside it).
     mediaViewer?.let { request ->
-        com.comfort.app.ui.viewer.MediaViewerHost(request, viewModel, onClose = { mediaViewer = null })
+        com.comfort.app.ui.viewer.MediaViewerHost(request, viewModel, onClose = {
+            mediaViewer = null
+            // A video with sound paused the music: it plays on once the viewer is gone.
+            com.comfort.app.music.MusicPlayer.resumeAfterInterruption()
+        })
     }
     // The music player's full screen, over everything.
     androidx.compose.animation.AnimatedVisibility(

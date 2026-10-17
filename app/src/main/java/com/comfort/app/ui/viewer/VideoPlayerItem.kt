@@ -224,6 +224,18 @@ fun VideoPlayerItemWithResolvedUri(
     LaunchedEffect(isMuted) {
         exoPlayer.volume = if (isMuted) 0f else 1f
     }
+    // A video playing with sound takes the audio focus, so music playing (the app's own player,
+    // or another app's) pauses for it, as in other players; muted it leaves the music alone.
+    // Only the page on screen: the ones beside it are kept ready but don't play.
+    LaunchedEffect(isMuted, isCurrentPage) {
+        exoPlayer.setAudioAttributes(
+            androidx.media3.common.AudioAttributes.Builder()
+                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build(),
+            !isMuted && isCurrentPage,
+        )
+    }
 
     Box(
         modifier = modifier
