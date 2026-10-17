@@ -143,7 +143,9 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                         scope.launch {
                             val y = dragY.value
                             if (showQueue) {
-                                if (y > queueAfter) {
+                                // As far as closing the player: a pull past the list's top that
+                                // the list passes up shouldn't close it by accident.
+                                if (y > closeAfter) {
                                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
                                     showQueue = false
                                 }

@@ -263,11 +263,15 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // tap's own transition is still running.
     val pageSwipe = rememberPageSwipeState(
         current = selectedTab,
-        allowed = !showQueueScreen && outgoingTab == null && preparingTab == null,
+        // Nor while a back or an open moves the pages: a swipe took them over mid-way (a jump),
+        // and the back's selectedTab = 0 then landed under it.
+        allowed = !showQueueScreen && outgoingTab == null && preparingTab == null && !tabBack.busy && !queueBack.busy,
         onSettled = { selectedTab = it },
     )
     val onTabSelect: (Int) -> Unit = { index ->
         when {
+            // A swipe still settling would set its own page when it lands, over this tap's.
+            pageSwipe.neighbor != null -> Unit
             // Tapping the already-selected Library tab again jumps to the Queue, matching
             // the "tap again for more" pattern used elsewhere in the app.
             index == 1 && selectedTab == 1 -> openQueue()
@@ -344,7 +348,11 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             com.comfort.app.music.MusicPlayer.play(context, songs, null, shuffle)
             showNowPlaying = true
         },
-        LocalMiniPlayerInset provides if (showMiniPlayer) com.comfort.app.ui.music.MINI_PLAYER_HEIGHT else 0.dp,
+        // Animated with the bar's own slide: switched at once, pages' bottom space jumped.
+        LocalMiniPlayerInset provides androidx.compose.animation.core.animateDpAsState(
+            if (showMiniPlayer) com.comfort.app.ui.music.MINI_PLAYER_HEIGHT else 0.dp,
+            label = "miniPlayerInset",
+        ).value,
     ) {
     Box(modifier = Modifier.fillMaxSize()) {
     Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

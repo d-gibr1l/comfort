@@ -66,6 +66,12 @@ class BackRevealState internal constructor(
     // page behind (reported live, 2026-09-24).
     private var running: Job? = null
 
+    /** A transition (open, back, a back gesture) is on: the pages aren't at rest. Read from the
+     * animated values themselves, so it's right however the transition started or ended. */
+    val busy: Boolean
+        get() = frontX.isRunning || frontAlpha.isRunning || behindAlpha.isRunning ||
+            frontX.value != 0f || frontAlpha.value != 1f
+
     private fun startExclusive(block: suspend CoroutineScope.() -> Unit) {
         running?.cancel()
         running = scope.launch(block = block)

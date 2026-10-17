@@ -1302,23 +1302,36 @@ internal fun SwipeToDeleteCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
+    /** Off: the card doesn't swipe (the music queue's song playing). */
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value != SwipeToDismissBoxValue.Settled) {
-                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
-                onDelete()
-            }
-            true
-        },
-    )
-    // The swipe state is saved with the list item, so a row brought back by the snackbar's Undo
-    // came back still swiped away (only the red delete background showing). A row that's
-    // composed at all is one that should be visible: start it settled.
-    LaunchedEffect(Unit) {
-        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+    // The handler is kept by the swipe state from its first composition: read the latest onDelete
+    // through this, or a card that moved (the music queue's rows are keyed by song, not place)
+    // deleted by its old position.
+    val latestOnDelete by androidx.compose.runtime.rememberUpdatedState(onDelete)
+    // Once per dismiss: Material can confirm the same one more than once (a fling settling).
+    var deleted by remember { mutableStateOf(false) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val threshold = androidx.compose.material3.SwipeToDismissBoxDefaults.positionalThreshold
+    // Not the saveable state: a list keeps that with the item, so a row brought back by Undo
+    // came back still swiped away for a frame (a flash of the red background) before a reset.
+    // A card that's composed at all should start settled.
+    val dismissState = remember {
+        androidx.compose.material3.SwipeToDismissBoxState(
+            initialValue = SwipeToDismissBoxValue.Settled,
+            density = density,
+            confirmValueChange = { value ->
+                if (value != SwipeToDismissBoxValue.Settled && !deleted) {
+                    deleted = true
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
+                    latestOnDelete()
+                }
+                true
+            },
+            positionalThreshold = threshold,
+        )
     }
     // A tick the moment a drag crosses the delete threshold (and a lighter one if it's dragged
     // back under it), so the point of no return is felt, not just seen. targetValue is what flips
@@ -1342,6 +1355,8 @@ internal fun SwipeToDeleteCard(
     SwipeToDismissBox(
         state = dismissState,
         modifier = if (pageSwipe != null) modifier.pageSwipeEdges(pageSwipe) else modifier,
+        enableDismissFromStartToEnd = enabled,
+        enableDismissFromEndToStart = enabled,
         backgroundContent = {
             Box(
                 modifier = Modifier

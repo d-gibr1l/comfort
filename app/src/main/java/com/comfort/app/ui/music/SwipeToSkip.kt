@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -28,7 +29,9 @@ import kotlin.math.abs
  * already has its own slide (the cover going off under the finger, the next one coming in), so the
  * transition doesn't run its own as well — it slid twice. */
 class SwipeSkipState {
-    internal var swiped = false
+    /** The playId a swipe is changing from: the transition away from it runs no slide of its own.
+     * Cleared when the swipe ends, whatever happened, so it can't eat a later change's slide. */
+    internal var from: Int? = null
 }
 
 @Composable
@@ -41,15 +44,22 @@ fun Modifier.swipeToSkip(skip: SwipeSkipState? = null): Modifier {
     val scope = rememberCoroutineScope()
     val threshold = with(LocalDensity.current) { 64.dp.toPx() }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // One swipe at a time: a drag while the last one's slide runs would cancel it half-done.
+    var skipping by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     return this
         .graphicsLayer {
             translationX = offset.value
             alpha = 1f - (abs(offset.value) / size.width.coerceAtLeast(1f)).coerceIn(0f, 0.7f)
         }
-        .pointerInput(state.hasNext, state.hasPrevious) {
+        // Not keyed on hasNext/hasPrevious (they change with every skip, restarting the detector
+        // mid-gesture): `state` is read fresh each time.
+        .pointerInput(Unit) {
             detectHorizontalDragGestures(
                 onDragEnd = {
+                    if (skipping) return@detectHorizontalDragGestures
+                    skipping = true
                     scope.launch {
+                      try {
                         val width = size.width.toFloat()
                         val v = offset.value
                         val toNext = v < -threshold && state.hasNext
@@ -59,22 +69,27 @@ fun Modifier.swipeToSkip(skip: SwipeSkipState? = null): Modifier {
                             // Off the way the finger went, the song changes, and the next one
                             // comes in from the other side.
                             offset.animateTo(if (toNext) -width else width, androidx.compose.animation.core.tween(140))
-                            val before = MusicPlayer.state.value.song?.id
-                            skip?.swiped = true
+                            val before = MusicPlayer.state.value.playId
+                            skip?.from = before
                             if (toNext) MusicPlayer.next() else MusicPlayer.previousSong()
                             // Wait for the new song to be on (a moment), so the old one isn't
-                            // shown coming back in.
+                            // shown coming back in. By playId: two queued copies of one song too.
                             kotlinx.coroutines.withTimeoutOrNull(400) {
-                                MusicPlayer.state.first { it.song?.id != before }
+                                MusicPlayer.state.first { it.playId != before }
                             }
                             offset.snapTo(if (toNext) width * 0.6f else -width * 0.6f)
                         }
                         offset.animateTo(0f, spring(stiffness = 500f))
+                      } finally {
+                        skip?.from = null
+                        skipping = false
+                      }
                     }
                 },
-                onDragCancel = { scope.launch { offset.animateTo(0f, spring(stiffness = 500f)) } },
+                onDragCancel = { if (!skipping) scope.launch { offset.animateTo(0f, spring(stiffness = 500f)) } },
             ) { change, dragAmount ->
                 change.consume()
+                if (skipping) return@detectHorizontalDragGestures
                 // Resists past an end with nothing there.
                 val blocked = (offset.value + dragAmount < 0 && !state.hasNext) || (offset.value + dragAmount > 0 && !state.hasPrevious)
                 scope.launch { offset.snapTo(offset.value + if (blocked) dragAmount * 0.3f else dragAmount) }
@@ -95,13 +110,13 @@ fun SongTransition(
     content: @Composable (com.comfort.app.music.Song?) -> Unit,
 ) {
     val state by MusicPlayer.state.collectAsState()
+    // Keyed on playId, not the song: going from one queued copy of a song to the next is a change.
     androidx.compose.animation.AnimatedContent(
-        targetState = state.song,
-        contentKey = { it?.id },
+        targetState = state.playId to state.song,
+        contentKey = { it.first },
         transitionSpec = {
-            if (skip?.swiped == true) {
+            if (skip?.from != null && skip.from == initialState.first) {
                 // A swipe changed it: its own slide is already on screen.
-                skip.swiped = false
                 return@AnimatedContent androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
             }
             val forward = state.forward
@@ -112,5 +127,5 @@ fun SongTransition(
         },
         label = "song",
         modifier = modifier,
-    ) { song -> content(song) }
+    ) { (_, song) -> content(song) }
 }
