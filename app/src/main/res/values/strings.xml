@@ -98,6 +98,9 @@
         <item quantity="one">%s view</item>
         <item quantity="other">%s views</item>
     </plurals>
+    <!-- Now Playing's lyrics. -->
+    <string name="lyrics_show">Show lyrics</string>
+    <string name="lyrics_hide">Hide lyrics</string>
     <string name="action_back">Back</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
