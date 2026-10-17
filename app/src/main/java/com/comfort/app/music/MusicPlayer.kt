@@ -123,6 +123,9 @@ data class MusicState(
     /** Whether the last change of song went forward (next, or a song ending) or back: which way
      * the screens slide the new song in. */
     val forward: Boolean = true,
+    /** Goes up by one each time a song starts (also from one queued copy to another of the same
+     * song): what the screens key their change of song on. */
+    val playId: Int = 0,
 )
 
 /**
@@ -141,8 +144,28 @@ object MusicPlayer {
     private val songs = HashMap<String, Song>()
 
     private val listener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            playId++
+            // Which way: a command of ours says; a song ending goes forward; anything else (the
+            // notification, a headset) from where the two sit in play order, wraps included.
+            // A command's direction counts only just after it: Previous partway into a song restarts
+            // it (no change of song), and its direction mustn't wait for a later, unrelated one.
+            val pending = pendingForward.takeIf { android.os.SystemClock.uptimeMillis() - pendingAt < 1500 }
+            transitionForward = pending ?: if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) true else null
+            pendingForward = null
+        }
+
         override fun onEvents(player: Player, events: Player.Events) = publish(player)
     }
+
+    private var playId = 0
+    private var pendingForward: Boolean? = null
+        set(value) {
+            field = value
+            pendingAt = android.os.SystemClock.uptimeMillis()
+        }
+    private var pendingAt = 0L
+    private var transitionForward: Boolean? = null
 
     private fun withController(context: Context, action: (MediaController) -> Unit) {
         controller?.let { action(it); return }
@@ -196,13 +219,22 @@ object MusicPlayer {
         }
     }
 
-    fun next() { controller?.seekToNextMediaItem() }
+    fun next() {
+        pendingForward = true
+        controller?.seekToNextMediaItem()
+    }
 
     /** To the previous song, or back to the start of this one once it's a few seconds in. */
-    fun previous() { controller?.seekToPrevious() }
+    fun previous() {
+        pendingForward = false
+        controller?.seekToPrevious()
+    }
 
     /** Straight to the previous song (a swipe), never back to the start of this one. */
-    fun previousSong() { controller?.seekToPreviousMediaItem() }
+    fun previousSong() {
+        pendingForward = false
+        controller?.seekToPreviousMediaItem()
+    }
 
     fun seekTo(positionMs: Long) { controller?.seekTo(positionMs) }
 
@@ -247,6 +279,8 @@ object MusicPlayer {
     /** Plays the queue's song at [index] (a tap in the queue). */
     fun playAt(index: Int) {
         val c = controller ?: return
+        val order = _state.value.queue.map { it.first }
+        pendingForward = order.indexOf(index) >= order.indexOf(c.currentMediaItemIndex)
         c.seekToDefaultPosition(index)
         c.play()
     }
@@ -270,10 +304,18 @@ object MusicPlayer {
         // Forward unless the new song comes before the old one in play order (a wrap from the last
         // song to the first, with repeat all, is forward too).
         val previous = _state.value
-        val forward = if (song == null || previous.song == null || song.id == previous.song.id) previous.forward else {
-            val from = order.indexOf(previous.index)
-            val to = order.indexOf(player.currentMediaItemIndex)
-            !(to in 0 until from && !(from == order.lastIndex && to == 0))
+        val forward = when {
+            playId == previous.playId -> previous.forward
+            transitionForward != null -> transitionForward!!
+            else -> {
+                // From play order: the shorter way round, so a wrap either way reads right.
+                val from = order.indexOf(previous.index)
+                val to = order.indexOf(player.currentMediaItemIndex)
+                if (from < 0 || to < 0) true else {
+                    val ahead = (to - from + order.size) % order.size
+                    ahead <= order.size - ahead
+                }
+            }
         }
         _state.value = MusicState(
             song = song,
@@ -287,6 +329,7 @@ object MusicPlayer {
             hasPrevious = player.hasPreviousMediaItem(),
             queue = order.map { it to songOf(player.getMediaItemAt(it)) },
             forward = forward,
+            playId = playId,
         )
     }
 }

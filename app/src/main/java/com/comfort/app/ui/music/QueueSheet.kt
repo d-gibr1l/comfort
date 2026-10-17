@@ -138,6 +138,8 @@ internal fun QueuePanel() {
                     val seen = HashMap<String, Int>()
                     rows.map { (_, song) -> val n = seen.merge(song.id, 1, Int::plus)!!; "${song.id}#$n" }
                 }
+                // Where the song on is, once (not per row).
+                val currentPos = rows.indexOfFirst { it.first == state.index }
                 itemsIndexed(rows, key = { pos, _ -> keys[pos] }) { pos, (index, song) ->
                     val isDragged = dragging == index
                     // A row the dragged one passes moves a slot up or down out of its way.
@@ -152,7 +154,6 @@ internal fun QueuePanel() {
                         animationSpec = if (dragging == null) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(stiffness = 600f),
                         label = "queueShift",
                     )
-                    val currentPos = rows.indexOfFirst { it.first == state.index }
                     QueueRow(
                         song = song,
                         // Unchanged by a drag (rows stay in their slots): fading them in and out
@@ -178,14 +179,15 @@ internal fun QueuePanel() {
                                     val to = (from + kotlin.math.round(dragOffset / rowHeightPx).toInt()).coerceIn(0, rows.lastIndex)
                                     // The rows in their new order and the drag ended in one go: the
                                     // dropped row lands where it was drawn, the others where they slid.
-                                    if (to != from && to >= 0) rows = rows.toMutableList().also { it.add(to, it.removeAt(from)) }
+                                    // No move: back to the player's queue (it may have changed meanwhile).
+                                    rows = if (to != from && to >= 0) rows.toMutableList().also { it.add(to, it.removeAt(from)) } else state.queue
                                     dragging = null
                                     dragOffset = 0f
                                     // Without shuffle the rows are the queue's own order.
                                     if (to != from && to >= 0) MusicPlayer.move(from, to)
                                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureEnd)
                                 },
-                                onDragCancel = { dragging = null; dragOffset = 0f },
+                                onDragCancel = { dragging = null; dragOffset = 0f; rows = state.queue },
                             ) { change, amount ->
                                 change.consume()
                                 // Not past the list's ends.
@@ -223,34 +225,13 @@ private fun QueueRow(
     /** Swiped away sideways (null: can't be — the song on). */
     onRemove: (() -> Unit)? = null,
 ) {
-    // Always the swipe box, only its swipes switched off where a song can't go: a row that changed
+    // Library's swipe-to-remove card (its haptics, the latest handler, never shown half-dismissed).
+    // Always the card, only its swipe switched off where a song can't go: a row that changed
     // between the two (as a drag started and ended) was rebuilt, its cover reloading — a flicker.
-    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val dismiss = androidx.compose.material3.rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value != androidx.compose.material3.SwipeToDismissBoxValue.Settled && onRemove != null) {
-                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
-                onRemove()
-            }
-            true
-        },
-    )
-    androidx.compose.material3.SwipeToDismissBox(
-        state = dismiss,
+    com.comfort.app.ui.main.SwipeToDeleteCard(
+        onDelete = { onRemove?.invoke() },
         modifier = modifier,
-        enableDismissFromStartToEnd = onRemove != null,
-        enableDismissFromEndToStart = onRemove != null,
-        backgroundContent = {
-            // Behind the row as it slides: red, with a bin on the side it's uncovered from.
-            val fromStart = dismiss.dismissDirection == androidx.compose.material3.SwipeToDismissBoxValue.StartToEnd
-            Box(
-                modifier = Modifier.fillMaxWidth().height(ROW_HEIGHT).background(MaterialTheme.colorScheme.errorContainer)
-                    .padding(horizontal = 24.dp),
-                contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
-            ) {
-                Icon(androidx.compose.material.icons.Icons.Rounded.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
-            }
-        },
+        enabled = onRemove != null,
     ) {
         QueueRowContent(song, played, current, isPlaying, onClick, handle, Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow))
     }
@@ -310,6 +291,11 @@ private fun QueueRowContent(
 /** Three bars rising and falling over the playing song's cover (Auxio's playing indicator). */
 @Composable
 private fun PlayingBars(animating: Boolean) {
+    // Paused: still bars, and no animation running every frame.
+    if (!animating) {
+        Bars(listOf(0.5f, 0.8f, 0.6f))
+        return
+    }
     val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "bars")
     val phases = listOf(0, 180, 90).map { delayMs ->
         transition.animateFloat(
@@ -322,9 +308,13 @@ private fun PlayingBars(animating: Boolean) {
             label = "bar",
         )
     }
+    Bars(phases.map { it.value })
+}
+
+@Composable
+private fun Bars(heights: List<Float>) {
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom, modifier = Modifier.height(18.dp)) {
-        phases.forEachIndexed { i, phase ->
-            val h = if (animating) phase.value else listOf(0.5f, 0.8f, 0.6f)[i]
+        heights.forEach { h ->
             Box(Modifier.width(4.dp).fillMaxHeight(h).clip(RoundedCornerShape(2.dp)).background(Color.White))
         }
     }
