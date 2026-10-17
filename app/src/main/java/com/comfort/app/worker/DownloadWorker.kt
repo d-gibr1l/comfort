@@ -142,7 +142,24 @@ private object DownloadConcurrencyGate {
  * common audio containers gallery-dl/yt-dlp might hand back unmodified — used to decide whether a
  * saved file's *own* content Uri is worth trying MediaMetadataRetriever's embedded-artwork
  * extraction on at all, rather than wasting a MediaMetadataRetriever pass on every video/image. */
-private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "opus", "ogg", "flac", "wav", "alac", "wma")
+private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "opus", "ogg", "flac", "wav", "alac", "wma", "mka")
+
+// Containers that hold video or only audio: which one a file is takes a look inside it.
+private val AUDIO_OR_VIDEO_EXTENSIONS = setOf("webm", "mkv")
+
+/** Whether [file] (a .webm or .mkv) holds audio and no video: a song saved in a video container
+ * (a site's own audio-only .webm, one caught in the browser). Read with the platform's
+ * MediaExtractor; a file it can't open counts as video, as before. */
+private fun isAudioOnlyContainer(file: File): Boolean = runCatching {
+    val extractor = android.media.MediaExtractor()
+    try {
+        extractor.setDataSource(file.absolutePath)
+        val mimes = (0 until extractor.trackCount).map { extractor.getTrackFormat(it).getString(android.media.MediaFormat.KEY_MIME).orEmpty() }
+        mimes.any { it.startsWith("audio/") } && mimes.none { it.startsWith("video/") }
+    } finally {
+        extractor.release()
+    }
+}.getOrDefault(false)
 
 class DownloadWorker(
     appContext: Context,
@@ -781,8 +798,13 @@ class DownloadWorker(
                                     // lands as a bare .webm — a container AUDIO_EXTENSIONS can't
                                     // list without misclassifying real webm video. Every Spotify
                                     // download is audio, so that engine check covers it.
-                                    val isAudioFile = candidate.extension.lowercase() in AUDIO_EXTENSIONS ||
-                                        engine == DownloadEngine.SPOTIFY
+                                    // Any other engine's .webm/.mkv is looked inside: audio with no
+                                    // video is a song (it played as a video before, not in the music
+                                    // player).
+                                    val ext = candidate.extension.lowercase()
+                                    val isAudioFile = ext in AUDIO_EXTENSIONS ||
+                                        engine == DownloadEngine.SPOTIFY ||
+                                        (ext in AUDIO_OR_VIDEO_EXTENSIONS && isAudioOnlyContainer(candidate))
                                     // Held back and saved with the rest when the download ends (see
                                     // saveHeldFiles), so a carousel lands in the gallery all at once.
                                     // Counted now, so progress still moves file by file.

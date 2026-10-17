@@ -169,6 +169,7 @@ object MediaStoreHelper {
                 "mov" -> "video/quicktime"
                 "mkv" -> "video/x-matroska"
                 "webm" -> "video/webm"
+                "mka" -> "audio/x-matroska"
                 "mp3" -> "audio/mpeg"
                 "m4a" -> "audio/mp4"
                 "flac" -> "audio/flac"
@@ -203,7 +204,8 @@ object MediaStoreHelper {
         // a real video one, so the caller's own already-established audio/video knowledge
         // is trusted here instead.
         if (forceAudioMime && mimeType.startsWith("video/")) {
-            mimeType = "audio/webm"
+            // An audio-only .mkv keeps a Matroska type that matches its name.
+            mimeType = if (ext == "mkv") "audio/x-matroska" else "audio/webm"
         }
         // Kept honest here (a real .mkv file reported as "video/x-matroska", not lied about) —
         // saveToMediaStore() itself falls back to "video/mp4" only if MediaStore actually rejects
