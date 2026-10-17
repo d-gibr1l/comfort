@@ -390,6 +390,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = openQueue,
                 pasteDownloadSignal = pasteDownloadSignal,
+                active = (selectedTab == 0 || pageSwipe.involves(0)) && !showQueueScreen && mediaViewer == null && !showNowPlaying,
             )
             }
         }
@@ -751,6 +752,10 @@ fun HomeScreen(
     onOpenQueue: () -> Unit = {},
     // Bumped by the "Paste & download" shortcut.
     pasteDownloadSignal: Int = 0,
+    // Whether Home is the page on screen. It stays composed under the other pages (they reveal it
+    // on back), and its strip's auto-scroll laid it out every frame there too: a page switch ran
+    // on top of that the whole time (choppy, measured: ~70 frames a second with nothing moving).
+    active: Boolean = true,
 ) {
     var url by remember { mutableStateOf("") }
     // The in-app browser (WebBrowser), open at this address; null when closed.
@@ -1113,8 +1118,10 @@ fun HomeScreen(
                 // still holding it, on top of that.
                 val isRecentListDragged by recentListState.interactionSource.collectIsDraggedAsState()
                 val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
-                LaunchedEffect(recentDownloads.size, reducedMotion) {
-                    if (recentDownloads.size <= 1 || reducedMotion) return@LaunchedEffect
+                val homeWindowFocused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+                LaunchedEffect(recentDownloads.size, reducedMotion, active, homeWindowFocused) {
+                    // Only while Home is on screen and the app is in front (see `active`).
+                    if (recentDownloads.size <= 1 || reducedMotion || !active || !homeWindowFocused) return@LaunchedEffect
                     kotlinx.coroutines.delay(3500)
                     while (true) {
                         if (isRecentListDragged) {
