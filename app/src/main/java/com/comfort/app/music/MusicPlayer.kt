@@ -158,6 +158,12 @@ object MusicPlayer {
             pendingForward = null
         }
 
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // Paused by another player taking the audio focus (a video with sound): resumed when
+            // that's over (resumeAfterInterruption). Any other pause or play clears it.
+            pausedByFocus = !playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS
+        }
+
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
             seekId++
         }
@@ -168,6 +174,7 @@ object MusicPlayer {
     private var playId = 0
 
     private var seekId = 0
+    private var pausedByFocus = false
     private var pendingForward: Boolean? = null
         set(value) {
             field = value
@@ -218,6 +225,15 @@ object MusicPlayer {
             c.prepare()
             c.play()
         }
+    }
+
+    /** Plays on if the music was paused only because something else took the audio focus (the
+     * media viewer playing a video with sound). Android counts that as for good, so it would
+     * otherwise stay paused; a pause of the user's own isn't undone. */
+    fun resumeAfterInterruption() {
+        if (!pausedByFocus) return
+        pausedByFocus = false
+        controller?.play()
     }
 
     fun togglePlay() {
