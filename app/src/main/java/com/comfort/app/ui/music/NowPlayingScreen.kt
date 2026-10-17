@@ -141,7 +141,8 @@ fun NowPlayingScreen(onClose: () -> Unit) {
 
     // A swipe on the cover changes song with its own slide (see SwipeSkipState).
     val coverSkip = rememberSwipeSkipState()
-    // Back: the queue first, then the player.
+    // Back: the queue first, then the full lyrics, then the player (the last one declared runs first).
+    BackHandler(enabled = lyricsShown) { showLyrics = false }
     BackHandler(enabled = showQueue) { showQueue = false }
 
     Box(
