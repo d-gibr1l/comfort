@@ -122,6 +122,10 @@ internal class EngineCommands(
     private val formatSort = GalleryDlPreferences.getFormatSort(context)
     private val verboseLogging = GalleryDlPreferences.isVerboseLogging(context)
     private val embedChapters = GalleryDlPreferences.isEmbedChapters(context)
+    private val splitChapters = GalleryDlPreferences.isSplitChapters(context)
+    // SponsorBlock: the categories to cut out or to mark as chapters (the other one stays blank).
+    private val sponsorBlockMode = GalleryDlPreferences.getSponsorBlockMode(context)
+    private val sponsorBlockCategories = GalleryDlPreferences.getSponsorBlockCategories(context).joinToString(",")
     val saveSubtitleFiles = GalleryDlPreferences.isSaveSubtitleFiles(context)
     private val restrictFilenames = GalleryDlPreferences.isRestrictFilenames(context)
     private val trimFilenames = GalleryDlPreferences.isTrimFilenames(context)
@@ -194,6 +198,9 @@ internal class EngineCommands(
             GalleryDlListing.ytDlpInfoCacheFile(context, url).absolutePath,
             audioFormat.codec,
             flag(normalizeAudio),
+            if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_REMOVE) sponsorBlockCategories else "",
+            if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_MARK) sponsorBlockCategories else "",
+            flag(splitChapters),
         ),
     )
 

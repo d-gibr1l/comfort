@@ -1974,7 +1974,20 @@ private fun buildPreviewCommand(
     // own CLI-equivalent of that same callable, so shown here it's still a command a user could
     // actually run to get the identical result — just reusing the real formatter now instead of a
     // separate H:MM:SS one that silently rounded away everything sub-second.
-    segments.toClipRange(durationMs)?.let { clip -> parts += "--download-sections \"*$clip\"" }
+    val clipRange = segments.toClipRange(durationMs)
+    clipRange?.let { clip -> parts += "--download-sections \"*$clip\"" }
+
+    // ── Chapters & SponsorBlock ───────────────────────────────────────────────
+    // Left out of a trimmed download, as the download itself leaves them out (the wrapper).
+    if (clipRange == null) {
+        val categories = GalleryDlPreferences.getSponsorBlockCategories(context).joinToString(",")
+        when (GalleryDlPreferences.getSponsorBlockMode(context)) {
+            GalleryDlPreferences.SPONSORBLOCK_REMOVE -> if (categories.isNotEmpty()) parts += "--sponsorblock-remove $categories"
+            GalleryDlPreferences.SPONSORBLOCK_MARK -> if (categories.isNotEmpty()) parts += "--sponsorblock-mark $categories"
+        }
+        if (GalleryDlPreferences.isSplitChapters(context)) parts += "--split-chapters"
+    }
+    if (GalleryDlPreferences.isEmbedChapters(context)) parts += "--embed-chapters"
 
     // ── Filename template ─────────────────────────────────────────────────────
     filenameTemplate?.takeIf { it.isNotBlank() }?.let { parts += "-o \"$it\"" }
@@ -2008,6 +2021,10 @@ private fun ExtraCommandsScreen(
     onDone: () -> Unit,
 ) {
     var input by remember { mutableStateOf("") }
+    val templateContext = androidx.compose.ui.platform.LocalContext.current
+    var templates by remember { mutableStateOf(com.comfort.app.data.CommandTemplates.getAll(templateContext)) }
+    // The commands being saved as a new template (the dialog asks for its name).
+    var savingTemplate by remember { mutableStateOf<String?>(null) }
 
     fun add() {
         val trimmed = input.trim()
@@ -2100,6 +2117,46 @@ private fun ExtraCommandsScreen(
                     )
                 }
             }
+        }
+
+        // Saved templates (Settings > Advanced > Command templates): a tap adds one's arguments
+        // as a command; the current commands can be saved as a new one.
+        if (templates.isNotEmpty() || commands.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                templates.forEach { template ->
+                    val added = template.args in commands
+                    AssistChip(
+                        onClick = { if (!added) onCommandsChange(commands + template.args) },
+                        enabled = !added,
+                        label = { Text(template.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = { Icon(Icons.Outlined.Bookmarks, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    )
+                }
+                if (commands.isNotEmpty()) {
+                    AssistChip(
+                        onClick = { savingTemplate = commands.joinToString(" ") },
+                        label = { Text(androidx.compose.ui.res.stringResource(com.comfort.app.R.string.command_template_save_as)) },
+                        leadingIcon = { Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    )
+                }
+            }
+        }
+        savingTemplate?.let { args ->
+            CommandTemplateDialog(
+                initial = com.comfort.app.data.CommandTemplate("", args),
+                onDismiss = { savingTemplate = null },
+                onSave = { saved ->
+                    com.comfort.app.data.CommandTemplates.put(templateContext, saved)
+                    templates = com.comfort.app.data.CommandTemplates.getAll(templateContext)
+                    savingTemplate = null
+                },
+            )
         }
 
         OutlinedTextField(

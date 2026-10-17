@@ -141,6 +141,12 @@ object GalleryDlPreferences {
     const val DEFAULT_CONCURRENT_FRAGMENTS = 4
     const val MAX_CONCURRENT_FRAGMENTS = 16
     const val KEY_EMBED_CHAPTERS = "embed_chapters"
+    const val KEY_SPLIT_CHAPTERS = "split_chapters"
+    const val KEY_SPONSORBLOCK_MODE = "sponsorblock_mode"
+    const val KEY_SPONSORBLOCK_CATEGORIES = "sponsorblock_categories"
+    const val SPONSORBLOCK_OFF = "off"
+    const val SPONSORBLOCK_MARK = "mark"
+    const val SPONSORBLOCK_REMOVE = "remove"
     const val KEY_SAVE_SUBTITLE_FILES = "save_subtitle_files"
     const val KEY_DELETE_LEFTOVER_ON_FAILURE = "delete_leftover_on_failure"
     const val KEY_CLEANUP_LEFTOVER_INTERVAL = "cleanup_leftover_interval"
@@ -1212,6 +1218,47 @@ object GalleryDlPreferences {
     fun setEmbedChapters(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_EMBED_CHAPTERS, enabled).apply()
     }
+
+    /** yt-dlp's --split-chapters: a video with chapters is saved as one file per chapter (the
+     * whole one isn't kept). Skipped for a clipped download. */
+    fun isSplitChapters(context: Context): Boolean = prefs(context).getBoolean(KEY_SPLIT_CHAPTERS, false)
+
+    fun setSplitChapters(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SPLIT_CHAPTERS, enabled).apply()
+    }
+
+    /** SponsorBlock (YouTube): [SPONSORBLOCK_OFF], [SPONSORBLOCK_MARK] (the segments become
+     * chapters) or [SPONSORBLOCK_REMOVE] (they're cut out of the file). */
+    fun getSponsorBlockMode(context: Context): String =
+        prefs(context).getString(KEY_SPONSORBLOCK_MODE, SPONSORBLOCK_OFF) ?: SPONSORBLOCK_OFF
+
+    fun setSponsorBlockMode(context: Context, mode: String) {
+        prefs(context).edit().putString(KEY_SPONSORBLOCK_MODE, mode).apply()
+    }
+
+    /** The SponsorBlock categories acted on — its own ids ("sponsor", "selfpromo", ...). */
+    fun getSponsorBlockCategories(context: Context): Set<String> =
+        prefs(context).getString(KEY_SPONSORBLOCK_CATEGORIES, null)
+            ?.split(',')?.filter { it.isNotBlank() }?.toSet()
+            ?: DEFAULT_SPONSORBLOCK_CATEGORIES
+
+    fun setSponsorBlockCategories(context: Context, categories: Set<String>) {
+        prefs(context).edit().putString(KEY_SPONSORBLOCK_CATEGORIES, categories.joinToString(",")).apply()
+    }
+
+    /** SponsorBlock's categories, with the names shown for them; the first three are on by default. */
+    val SPONSORBLOCK_CATEGORIES = listOf(
+        "sponsor" to com.comfort.app.R.string.sponsorblock_cat_sponsor,
+        "selfpromo" to com.comfort.app.R.string.sponsorblock_cat_selfpromo,
+        "interaction" to com.comfort.app.R.string.sponsorblock_cat_interaction,
+        "intro" to com.comfort.app.R.string.sponsorblock_cat_intro,
+        "outro" to com.comfort.app.R.string.sponsorblock_cat_outro,
+        "preview" to com.comfort.app.R.string.sponsorblock_cat_preview,
+        "hook" to com.comfort.app.R.string.sponsorblock_cat_hook,
+        "filler" to com.comfort.app.R.string.sponsorblock_cat_filler,
+        "music_offtopic" to com.comfort.app.R.string.sponsorblock_cat_music_offtopic,
+    )
+    val DEFAULT_SPONSORBLOCK_CATEGORIES = setOf("sponsor", "selfpromo", "interaction")
 
     /** Saves the subtitle track as its own sidecar file (.srt/.vtt) alongside the video — a
      * separate choice from [isDownloadSubtitles], which only ever muxes the track into the video

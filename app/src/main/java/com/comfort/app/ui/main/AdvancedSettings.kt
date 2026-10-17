@@ -52,6 +52,12 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             ExtraArgsSheetField()
         }
 
+        SettingsSection(title = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.command_templates_section), icon = Icons.Outlined.Bookmarks) {
+            Column(modifier = highlightRowModifier("Command templates")) {
+                CommandTemplatesSection()
+            }
+        }
+
         SettingsSection(title = "YouTube", icon = Icons.Outlined.Memory) {
             IconToggleRow(
                 icon = Icons.Outlined.Refresh,
