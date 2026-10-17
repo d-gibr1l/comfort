@@ -126,6 +126,9 @@ data class MusicState(
     /** Goes up by one each time a song starts (also from one queued copy to another of the same
      * song): what the screens key their change of song on. */
     val playId: Int = 0,
+    /** Goes up by one each time the position jumps (a seek, Previous restarting the song): the
+     * screens read the position only while playing, so a jump while paused needs telling. */
+    val seekId: Int = 0,
 )
 
 /**
@@ -155,10 +158,16 @@ object MusicPlayer {
             pendingForward = null
         }
 
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            seekId++
+        }
+
         override fun onEvents(player: Player, events: Player.Events) = publish(player)
     }
 
     private var playId = 0
+
+    private var seekId = 0
     private var pendingForward: Boolean? = null
         set(value) {
             field = value
@@ -330,6 +339,7 @@ object MusicPlayer {
             queue = order.map { it to songOf(player.getMediaItemAt(it)) },
             forward = forward,
             playId = playId,
+            seekId = seekId,
         )
     }
 }
