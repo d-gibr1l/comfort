@@ -57,7 +57,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val song = state.song ?: return
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var position by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(state.isPlaying, song.id) {
+    LaunchedEffect(state.isPlaying, song.id, state.seekId) {
         position = MusicPlayer.position()
         while (state.isPlaying) {
             delay(500)

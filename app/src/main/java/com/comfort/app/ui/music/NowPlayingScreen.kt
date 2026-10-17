@@ -106,7 +106,7 @@ fun NowPlayingScreen(onClose: () -> Unit) {
 
     var position by remember { mutableLongStateOf(0L) }
     var dragPosition by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(state.isPlaying, song?.id) {
+    LaunchedEffect(state.isPlaying, song?.id, state.seekId) {
         position = MusicPlayer.position()
         while (state.isPlaying) {
             delay(250)
