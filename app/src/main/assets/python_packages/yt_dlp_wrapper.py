@@ -8,7 +8,7 @@ import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcessor
+from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcessor, FFmpegSplitChaptersPP
 from yt_dlp.utils import PostProcessingError
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 import net_resilience
@@ -888,6 +888,13 @@ class _FinalFilePP(PostProcessor):
         self._source_url = source_url
 
     def run(self, info):
+        parts = info.get("__comfort_parts")
+        if parts:
+            # Split by chapter (_SplitChaptersPP): each part is a file of its own, and the full one
+            # is gone. No title override: every part would get the same title.
+            for path in parts:
+                self._callback(event("file", path=os.path.abspath(path)))
+            return [], info
         filepath = info.get("filepath")
         if filepath:
             # Applied here — after every other postprocessor (ExtractAudio/EmbedThumbnail/
@@ -900,6 +907,28 @@ class _FinalFilePP(PostProcessor):
                 _apply_title_artist_override(filepath, self._override_title, self._override_artist)
             self._callback(event("file", path=os.path.abspath(filepath)))
         return [], info
+
+
+class _SplitChaptersPP(FFmpegSplitChaptersPP):
+    """yt-dlp's --split-chapters, with the full file then dropped: the chapters are what was asked
+    for. A video with fewer than two chapters is kept whole (one "chapter" would just be a copy).
+    The parts are left in info for _FinalFilePP to report, in place of the full file."""
+
+    @classmethod
+    def pp_key(cls):
+        return "SplitChapters"
+
+    def run(self, info):
+        files, info = super().run(info)
+        parts = [c["filepath"] for c in (info.get("chapters") or [])
+                 if c.get("filepath") and os.path.isfile(c["filepath"])]
+        if len(parts) < 2:
+            for path in parts:
+                if path != info.get("filepath"):
+                    os.remove(path)
+            return files, info
+        info["__comfort_parts"] = parts
+        return files + [info["filepath"]], info
 
 
 def _apply_title_artist_override(filepath, title, artist):
@@ -944,6 +973,53 @@ class _Logger:
     def error(self, msg):
         if self.callback:
             self.callback(event("error", message=msg))
+
+def search(query, count=20, proxy_url=None, page=1, cookies_path=None):
+    """YouTube search for the app's search screen: one JSON object, {"results": [...]}, each a
+    video's link, title, channel, length and thumbnail. A flat listing — the search page only, no
+    per-video extraction — so it takes a second or two. `page` (1-based) asks for the next
+    `count` results after the earlier pages'."""
+    count = max(1, min(int(count or 20), 50))
+    page = max(1, int(page or 1))
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": "in_playlist",
+        "skip_download": True,
+        "playliststart": (page - 1) * count + 1,
+        "playlistend": page * count,
+    }
+    if proxy_url:
+        opts["proxy"] = proxy_url
+    if cookies_path:
+        opts["cookiefile"] = cookies_path
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{page * count}:{query}", download=False)
+    except Exception as e:  # noqa: BLE001 - reported to the app as the screen's error
+        return json.dumps({"error": str(e)})
+    results = []
+    for entry in (info or {}).get("entries") or []:
+        video_id = entry.get("id")
+        if not video_id:
+            continue
+        # Channels and playlists can come up in a search too; only videos open as a download.
+        if entry.get("ie_key") not in (None, "Youtube"):
+            continue
+        thumbnails = entry.get("thumbnails") or []
+        thumbnail = thumbnails[-1].get("url") if thumbnails else None
+        results.append({
+            "id": video_id,
+            "url": entry.get("url") or f"https://www.youtube.com/watch?v={video_id}",
+            "title": entry.get("title") or "",
+            "channel": entry.get("channel") or entry.get("uploader") or "",
+            "duration": entry.get("duration"),
+            "views": entry.get("view_count"),
+            "thumbnail": thumbnail or f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+            "live": entry.get("live_status") == "is_live",
+        })
+    return json.dumps({"results": results})
+
 
 def probe(url):
     # "1" if yt-dlp has a real (non-generic) extractor for url, "0" otherwise (incl. on any
@@ -1037,7 +1113,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              socket_timeout_seconds=None, buffer_size_kb=None, youtube_client_rotation=False,
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
              override_title=None, override_artist=None, info_json_path=None,
-             audio_format=None, normalize_audio=False, site=None):
+             audio_format=None, normalize_audio=False, site=None,
+             sponsorblock_remove=None, sponsorblock_mark=None, split_chapters=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1093,6 +1170,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # Parsed early (not down where it's actually used, alongside the other ydl_opts) so its
     # presence can feed custom_pp_keys below, same as every other postprocessor-triggering flag.
     clip_ranges = _parse_clip_range(clip_range)
+    # SponsorBlock's segments and the chapters are times in the whole video; a clip range cuts
+    # that timeline, so a clipped download leaves them out rather than cutting at wrong times.
+    sb_remove = set() if clip_ranges or not ffmpeg_path else {c for c in (sponsorblock_remove or "").split(",") if c}
+    sb_mark = set() if clip_ranges or not ffmpeg_path else {c for c in (sponsorblock_mark or "").split(",") if c} - sb_remove
+    split_chapters = bool(split_chapters and ffmpeg_path and not clip_ranges)
+    if sb_mark:
+        # Marked segments are chapters, so they're only seen with chapters embedded.
+        embed_chapters = True
 
     custom_pp_keys = []
     if ffmpeg_path:
@@ -1329,8 +1414,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         outtmpl = "%(comfort_custom_name)s.%(ext)s"
     else:
         outtmpl = filename_format or "%(comfort_name,uploader,channel,creator|Unknown)s [%(comfort_id,id)s].%(ext)s"
+    if split_chapters:
+        # Each chapter's file: the download's own name, then its number and title.
+        chapter_tmpl = re.sub(r"\.%\(ext\)s$", "", outtmpl) + " - %(section_number)03d %(section_title)s.%(ext)s"
+        outtmpl_opt = {"default": os.path.join(download_dir, outtmpl), "chapter": os.path.join(download_dir, chapter_tmpl)}
+    else:
+        outtmpl_opt = os.path.join(download_dir, outtmpl)
     ydl_opts = {
-        "outtmpl": os.path.join(download_dir, outtmpl),
+        "outtmpl": outtmpl_opt,
         "format": chosen_format,
         "progress_hooks": [progress_hook],
         "logger": _Logger(callback),
@@ -1584,6 +1675,24 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             codec = audio_format if audio_format in ("mp3", "m4a", "opus", "flac") else "best"
             quality = {"mp3": "0", "m4a": "256", "opus": "160"}.get(codec)
             postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": codec, "preferredquality": quality})
+        if sb_remove or sb_mark:
+            # As yt-dlp's own --sponsorblock-remove/--sponsorblock-mark set them up: the segments
+            # are fetched once the video is picked, then ModifyChapters cuts the removed ones out
+            # and turns the marked ones into chapters — before FFmpegMetadata embeds chapters.
+            postprocessors.append({
+                "key": "SponsorBlock",
+                "categories": sb_remove | sb_mark,
+                "api": "https://sponsor.ajay.app",
+                "when": "after_filter",
+            })
+            postprocessors.append({
+                "key": "ModifyChapters",
+                "remove_chapters_patterns": [],
+                "remove_sponsor_segments": sb_remove,
+                "remove_ranges": [],
+                "sponsorblock_chapter_title": "[SponsorBlock]: %(category_names)l",
+                "force_keyframes": False,
+            })
         if embed_metadata or embed_chapters or audio_only:
             # A single FFmpegMetadata entry handles both — add_chapters is that postprocessor's
             # own independent kwarg (this is literally how the real CLI's --embed-chapters is
@@ -1726,6 +1835,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 if output_format == "mp4" and not audio_only:
                     # First, so everything after it writes into the final .mp4.
                     post.insert(0, _Mp4ConvertPP(ydl))
+            if split_chapters:
+                # After everything that changes the file (tags, cover, subtitles), so every part
+                # carries them; before _FinalFilePP, which reports the parts.
+                ydl.add_post_processor(_SplitChaptersPP(ydl), when="post_process")
             if ffmpeg_path and callback:
                 # See _FinalFilePP's own doc comment for why this (not postprocessor_hooks) is
                 # what reports the real final file whenever any postprocessing could happen —
@@ -2176,9 +2289,16 @@ if __name__ == "__main__":
     def _emit(line):
         print(line, flush=True)
 
-    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list", "probe"):
+    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list", "probe", "search"):
         print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <5 positional args> | probe <url>", file=_sys.stderr)
         _sys.exit(2)
+
+    if _sys.argv[1] == "search":
+        # search <query> <count> <proxy> <page> <cookies>
+        a = _sys.argv[2:]
+        print(search(a[0], count=_s(a[1]) if len(a) > 1 else None, proxy_url=_s(a[2]) if len(a) > 2 else None,
+                     page=_s(a[3]) if len(a) > 3 else None, cookies_path=_s(a[4]) if len(a) > 4 else None), flush=True)
+        _sys.exit(0)
 
     if _sys.argv[1] == "probe":
         print(probe(_sys.argv[2]), flush=True)
@@ -2239,5 +2359,8 @@ if __name__ == "__main__":
         info_json_path=(_s(a[48]) if len(a) > 48 else None),
         audio_format=(_s(a[49]) if len(a) > 49 else None),
         normalize_audio=_b(a[50]) if len(a) > 50 else False,
+        sponsorblock_remove=(_s(a[51]) if len(a) > 51 else None),
+        sponsorblock_mark=(_s(a[52]) if len(a) > 52 else None),
+        split_chapters=_b(a[53]) if len(a) > 53 else False,
     )
     print(event("exit", status=status), flush=True)

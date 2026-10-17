@@ -21,6 +21,8 @@ import com.comfort.app.data.AudioFormat
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.OutputFormat
 import com.comfort.app.data.VideoQuality
+import com.comfort.app.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
@@ -39,6 +41,9 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
     var embedThumbnail by remember { mutableStateOf(GalleryDlPreferences.isEmbedThumbnail(context)) }
     var embedMetadata by remember { mutableStateOf(GalleryDlPreferences.isEmbedMetadata(context)) }
     var embedChapters by remember { mutableStateOf(GalleryDlPreferences.isEmbedChapters(context)) }
+    var splitChapters by remember { mutableStateOf(GalleryDlPreferences.isSplitChapters(context)) }
+    var sponsorBlockMode by remember { mutableStateOf(GalleryDlPreferences.getSponsorBlockMode(context)) }
+    var sponsorBlockCategories by remember { mutableStateOf(GalleryDlPreferences.getSponsorBlockCategories(context)) }
     var writeInfoFiles by remember { mutableStateOf(GalleryDlPreferences.isWriteInfoFiles(context)) }
     var downloadSubtitles by remember { mutableStateOf(GalleryDlPreferences.isDownloadSubtitles(context)) }
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
@@ -265,6 +270,21 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             Spacer(Modifier.height(16.dp))
 
             IconToggleRow(
+                icon = Icons.Outlined.ContentCut,
+                title = stringResource(R.string.split_chapters_title),
+                subtitle = stringResource(R.string.split_chapters_subtitle),
+                checked = splitChapters,
+                onCheckedChange = {
+                    splitChapters = it
+                    GalleryDlPreferences.setSplitChapters(context, it)
+                },
+            )
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
                 icon = Icons.Outlined.Description,
                 title = "Write description / info.json files",
                 subtitle = "Save a separate JSON metadata file alongside each download.",
@@ -369,6 +389,89 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 shape = MaterialTheme.shapes.medium,
             )
+        }
+
+        SettingsSection(title = stringResource(R.string.sponsorblock_section), icon = Icons.Outlined.FastForward) {
+            Column(modifier = highlightRowModifier("SponsorBlock")) {
+                Text(stringResource(R.string.sponsorblock_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.sponsorblock_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .selectableGroup(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    val modes = listOf(
+                        GalleryDlPreferences.SPONSORBLOCK_OFF to stringResource(R.string.sponsorblock_off),
+                        GalleryDlPreferences.SPONSORBLOCK_MARK to stringResource(R.string.sponsorblock_mark),
+                        GalleryDlPreferences.SPONSORBLOCK_REMOVE to stringResource(R.string.sponsorblock_remove),
+                    )
+                    modes.forEachIndexed { index, (mode, label) ->
+                        val selected = sponsorBlockMode == mode
+                        val interactionSource = remember { MutableInteractionSource() }
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                sponsorBlockMode = mode
+                                GalleryDlPreferences.setSponsorBlockMode(context, mode)
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .semantics { role = Role.RadioButton },
+                            interactionSource = interactionSource,
+                            shape = rememberMorphingChipShape(index, modes.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                            label = {
+                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    Text(label, style = MaterialTheme.typography.labelLarge)
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            border = null,
+                        )
+                    }
+                }
+            }
+
+            ToggleReveal(sponsorBlockMode != GalleryDlPreferences.SPONSORBLOCK_OFF) {
+                Column {
+                    Spacer(Modifier.height(16.dp))
+                    Text(stringResource(R.string.sponsorblock_segments), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                    ) {
+                        GalleryDlPreferences.SPONSORBLOCK_CATEGORIES.forEach { (id, label) ->
+                            val selected = id in sponsorBlockCategories
+                            FilterChip(
+                                selected = selected,
+                                onClick = {
+                                    val next = if (selected) sponsorBlockCategories - id else sponsorBlockCategories + id
+                                    sponsorBlockCategories = next
+                                    GalleryDlPreferences.setSponsorBlockCategories(context, next)
+                                },
+                                label = { Text(stringResource(label)) },
+                                leadingIcon = if (selected) {
+                                    { Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+                                } else null,
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         SettingsSection(title = "Picture downloads", icon = Icons.Outlined.Image) {

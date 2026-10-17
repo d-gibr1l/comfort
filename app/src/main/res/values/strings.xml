@@ -15,4 +15,90 @@
     <string name="widget_music_play">Play</string>
     <string name="widget_music_pause">Pause</string>
     <string name="widget_music_next">Next</string>
+    <!-- Settings > Processing: chapters and SponsorBlock. -->
+    <string name="split_chapters_title">Split by chapters</string>
+    <string name="split_chapters_subtitle">Saves a video that has chapters as one file per chapter instead of one long file. Not done for a trimmed download.</string>
+    <string name="sponsorblock_section">SponsorBlock</string>
+    <string name="sponsorblock_title">Sponsored segments</string>
+    <string name="sponsorblock_description">YouTube only. Uses SponsorBlock\'s community-submitted times. Mark adds them as chapters you can skip; Remove cuts them out of the file. Not done for a trimmed download.</string>
+    <string name="sponsorblock_off">Off</string>
+    <string name="sponsorblock_mark">Mark</string>
+    <string name="sponsorblock_remove">Remove</string>
+    <string name="sponsorblock_segments">Segments</string>
+    <string name="sponsorblock_cat_sponsor">Sponsor</string>
+    <string name="sponsorblock_cat_selfpromo">Self-promotion</string>
+    <string name="sponsorblock_cat_interaction">Like/subscribe reminder</string>
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="sponsorblock_cat_preview">Preview/recap</string>
+    <string name="sponsorblock_cat_hook">Hook</string>
+    <string name="sponsorblock_cat_filler">Filler</string>
+    <string name="sponsorblock_cat_music_offtopic">Non-music part</string>
+    <!-- Command templates (Settings > Advanced, and a download's Commands screen). -->
+    <string name="command_templates_section">Command templates</string>
+    <string name="command_templates_description">Saved sets of arguments you can add to a download from its Commands screen, so you don\'t type them each time.</string>
+    <string name="command_template_new">New template</string>
+    <string name="command_template_edit">Edit template</string>
+    <string name="command_template_delete">Delete %1$s</string>
+    <string name="command_template_name">Name</string>
+    <string name="command_template_name_hint">e.g. Remove sponsors</string>
+    <string name="command_template_args">Arguments</string>
+    <string name="command_template_args_hint">e.g. --sponsorblock-remove all</string>
+    <string name="command_template_args_help">Real command-line flags, as on a download\'s Commands screen.</string>
+    <string name="command_template_unclosed_quotes">Unclosed quotation marks</string>
+    <string name="command_template_save_as">Save as template</string>
+    <!-- Settings > Backup & restore. -->
+    <string name="backup_title">Backup &amp; restore</string>
+    <string name="backup_root_subtitle">Settings, history and cookies</string>
+    <string name="backup_section">Back up</string>
+    <string name="backup_part_settings">Settings</string>
+    <string name="backup_part_settings_subtitle">Everything you\'ve set in Settings, the theme and command templates. Download folders aren\'t included: they have to be picked again on each install.</string>
+    <string name="backup_part_history">Library history</string>
+    <string name="backup_part_history_subtitle">The list of finished downloads. The files themselves aren\'t in the backup.</string>
+    <string name="backup_part_cookies">Cookies &amp; logins</string>
+    <string name="backup_part_cookies_subtitle">Anyone with the backup file can use these logins, so keep it private.</string>
+    <string name="backup_action">Back up to a file</string>
+    <string name="backup_saved">Backed up %1$s.</string>
+    <string name="backup_failed">Couldn\'t back up: %1$s</string>
+    <string name="backup_cookies_included">cookies</string>
+    <string name="backup_nothing">nothing</string>
+    <plurals name="backup_settings_count">
+        <item quantity="one">%d setting</item>
+        <item quantity="other">%d settings</item>
+    </plurals>
+    <plurals name="backup_history_count">
+        <item quantity="one">%d download</item>
+        <item quantity="other">%d downloads</item>
+    </plurals>
+    <string name="restore_section">Restore</string>
+    <string name="restore_description">Brings back what a backup holds. Downloads already in your Library stay as they are; settings in the backup replace yours.</string>
+    <string name="restore_action">Restore from a file</string>
+    <string name="restore_not_backup">That file isn\'t a Comfort backup.</string>
+    <string name="restore_dialog_title">Restore backup</string>
+    <string name="restore_dialog_contains">This backup has %1$s. Restore:</string>
+    <string name="restore_cookies_replace">Cookies (replaces yours)</string>
+    <string name="restore_confirm">Restore</string>
+    <string name="restore_done">Restored %1$s.</string>
+    <string name="restore_failed">Couldn\'t restore: %1$s</string>
+    <string name="restore_restart_title">Restart Comfort?</string>
+    <string name="restore_restart_text">The restored settings take effect once Comfort restarts.</string>
+    <string name="restore_restart_now">Restart</string>
+    <string name="restore_restart_later">Later</string>
+    <!-- YouTube search (Home, and its results screen). -->
+    <string name="home_link_hint">Paste a link or search YouTube</string>
+    <string name="home_search_youtube">Search YouTube</string>
+    <string name="search_youtube_hint">Search YouTube</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_retry">Try again</string>
+    <string name="search_failed">Couldn\'t search YouTube</string>
+    <string name="search_no_results">No videos found for \"%1$s\"</string>
+    <string name="search_live">LIVE</string>
+    <string name="search_download">Download</string>
+    <plurals name="search_views">
+        <item quantity="one">%s view</item>
+        <item quantity="other">%s views</item>
+    </plurals>
+    <string name="action_back">Back</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
 </resources>

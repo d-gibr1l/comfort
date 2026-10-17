@@ -760,6 +760,8 @@ fun HomeScreen(
     var url by remember { mutableStateOf("") }
     // The in-app browser (WebBrowser), open at this address; null when closed.
     var browserUrl by remember { mutableStateOf<String?>(null) }
+    // YouTube search (YouTubeSearchScreen), open for this query; null when closed.
+    var youtubeSearch by remember { mutableStateOf<String?>(null) }
     val homeContext = androidx.compose.ui.platform.LocalContext.current
     val router: LinkRouterViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     // Download: starts right away with the default settings — the same thing sharing a link into
@@ -894,16 +896,32 @@ fun HomeScreen(
                 shadowElevation = 8.dp,
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
+                    // Text that isn't a link is a YouTube search: the buttons below become one
+                    // "Search YouTube", and the keyboard's action searches.
+                    val isSearch = url.isNotBlank() && !looksLikeLink(url)
+                    fun openSearch() {
+                        if (!isSearch) return
+                        youtubeSearch = url.trim()
+                        url = ""
+                    }
                     OutlinedTextField(
                         value = url,
                         onValueChange = { url = it },
                         // A plain placeholder (no floating label) so the field reads as one
                         // resting pill with "Paste a link" sitting centered inside it, rather than
                         // a caption perched above the field's own border.
-                        placeholder = { Text("Paste a link") },
+                        placeholder = { Text(androidx.compose.ui.res.stringResource(com.comfort.app.R.string.home_link_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                         shape = MaterialTheme.shapes.extraLarge,
-                        leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
+                        leadingIcon = {
+                            androidx.compose.animation.Crossfade(targetState = isSearch, label = "fieldIcon") { search ->
+                                Icon(if (search) Icons.Outlined.Search else Icons.Outlined.Link, contentDescription = null)
+                            }
+                        },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            imeAction = if (isSearch) androidx.compose.ui.text.input.ImeAction.Search else androidx.compose.ui.text.input.ImeAction.Default,
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { openSearch() }),
                         trailingIcon = {
                             if (url.isNotEmpty()) {
                                 IconButton(onClick = { url = "" }) {
@@ -916,30 +934,48 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                if (url.isNotBlank()) {
-                                    val target = normalizeInputUrl(url)
-                                    onConfigure(target)
-                                    url = ""
-                                }
-                            },
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = MaterialTheme.shapes.extraLarge,
-                            enabled = url.isNotBlank(),
-                        ) {
-                            Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Configure")
+                    // Turning into a search, Configure slides away while Download widens into
+                    // "Search YouTube" (its icon and label crossfading), and back again.
+                    val configureShare by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (isSearch) 0f else 1f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                            stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                        ),
+                        label = "configureShare",
+                    )
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        if (configureShare > 0.001f) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (url.isNotBlank() && !isSearch) {
+                                        val target = normalizeInputUrl(url)
+                                        onConfigure(target)
+                                        url = ""
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(configureShare)
+                                    .height(52.dp)
+                                    .graphicsLayer { alpha = configureShare },
+                                shape = MaterialTheme.shapes.extraLarge,
+                                // Not switched off for a search: it greyed out at once, then faded. Its
+                                // tap does nothing then (onClick), and it's gone a moment later.
+                                enabled = url.isNotBlank(),
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                            ) {
+                                Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Configure", maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                            }
+                            Spacer(Modifier.width(12.dp * configureShare))
                         }
 
                         Button(
                             onClick = {
-                                if (url.isNotBlank()) {
+                                if (isSearch) {
+                                    openSearch()
+                                } else if (url.isNotBlank()) {
                                     val target = normalizeInputUrl(url)
                                     downloadNow(target)
                                     url = ""
@@ -949,9 +985,25 @@ fun HomeScreen(
                             shape = MaterialTheme.shapes.extraLarge,
                             enabled = url.isNotBlank(),
                         ) {
-                            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Download")
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = isSearch,
+                                transitionSpec = {
+                                    (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
+                                        androidx.compose.animation.scaleIn(initialScale = 0.9f, animationSpec = androidx.compose.animation.core.tween(220, delayMillis = 60))) togetherWith
+                                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)) using
+                                        androidx.compose.animation.SizeTransform(clip = false)
+                                },
+                                label = "primaryAction",
+                            ) { search ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(if (search) Icons.Outlined.Search else Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        if (search) androidx.compose.ui.res.stringResource(com.comfort.app.R.string.home_search_youtube) else "Download",
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -987,7 +1039,7 @@ fun HomeScreen(
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (url.isNotBlank()) "Open this link in the browser" else "Browse the web",
+                            if (url.isNotBlank() && looksLikeLink(url)) "Open this link in the browser" else "Browse the web",
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
@@ -1002,6 +1054,14 @@ fun HomeScreen(
             }
             browserUrl?.let { start ->
                 WebBrowser(startUrl = start, onDismiss = { browserUrl = null })
+            }
+            youtubeSearch?.let { query ->
+                YouTubeSearchScreen(
+                    initialQuery = query,
+                    onDismiss = { youtubeSearch = null },
+                    onConfigure = onConfigure,
+                    onDownload = { downloadNow(it) },
+                )
             }
 
             Spacer(Modifier.height(24.dp))
@@ -1475,3 +1535,11 @@ private fun HomeTipsCarousel() {
     }
 }
 
+/** Whether Home's field holds a link (opened as a download) rather than words to search YouTube
+ * for: a web address, with or without its https://. */
+private fun looksLikeLink(text: String): Boolean {
+    val t = text.trim()
+    if (t.contains("://")) return true
+    if (t.contains(' ')) return false
+    return android.util.Patterns.WEB_URL.matcher(t).matches() && t.contains('.')
+}

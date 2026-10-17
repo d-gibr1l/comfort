@@ -39,7 +39,7 @@ import androidx.compose.material.icons.outlined.*
 
 // Settings: the root list, its search, and the route each subpage is reached by.
 
-enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, ABOUT }
+enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, BACKUP, ABOUT }
 
 private fun SettingsRoute.displayName(): String = when (this) {
     SettingsRoute.ROOT -> "Settings"
@@ -50,6 +50,7 @@ private fun SettingsRoute.displayName(): String = when (this) {
     SettingsRoute.ADVANCED -> "Advanced"
     SettingsRoute.COOKIES -> "Cookies & Login"
     SettingsRoute.UPDATES -> "Updates and engines"
+    SettingsRoute.BACKUP -> "Backup & restore"
     SettingsRoute.ABOUT -> "About"
 }
 
@@ -62,6 +63,7 @@ private fun SettingsRoute.icon(): ImageVector = when (this) {
     SettingsRoute.ADVANCED -> Icons.Outlined.Terminal
     SettingsRoute.COOKIES -> Icons.Outlined.Lock
     SettingsRoute.UPDATES -> Icons.Outlined.Update
+    SettingsRoute.BACKUP -> Icons.Outlined.SettingsBackupRestore
     SettingsRoute.ABOUT -> Icons.Outlined.Info
 }
 
@@ -118,6 +120,11 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry("Embed thumbnail", "Save the video's thumbnail as cover art inside the file.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed metadata", "Tag the file with its title, uploader, and other details.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Embed chapters", "Saves chapter markers inside the video file.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Split by chapters", "Saves a video that has chapters as one file per chapter.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry("Back up", "Save your settings, Library history and cookies to a file.", SettingsRoute.BACKUP),
+    SubpageSearchEntry("Restore", "Bring back settings, history and cookies from a backup file.", SettingsRoute.BACKUP),
+    SubpageSearchEntry("Command templates", "Saved sets of arguments to add to a download.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry("SponsorBlock", "Marks or removes sponsored segments in YouTube videos.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Audio format", "Save songs and audio as MP3, M4A, Opus, FLAC, or the site's original.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Save WebP pictures as JPG", "Converts WebP pictures to JPG as they're saved.", SettingsRoute.PROCESSING),
     SubpageSearchEntry("Even out volume", "Makes every song play at the same loudness.", SettingsRoute.PROCESSING),
@@ -201,6 +208,7 @@ fun MoreScreen(
                 SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.UPDATES -> UpdatesSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.BACKUP -> BackupSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.ABOUT -> AboutScreen(onBack = onBack, highlightKey = highlightKey)
             }
         }
@@ -257,7 +265,9 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     // YTDLnis's own settings shape — see gallery-dl.md's "Break up the Downloads settings page"
     // entry for why: one page covering filenames+folders+network+scheduling+quality+embedding all
     // at once had grown too long to scan.
-    val mainItems = remember(themeSummary, filenameFormat, hasCookies) {
+    val backupTitle = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.backup_title)
+    val backupSubtitle = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.backup_root_subtitle)
+    val mainItems = remember(themeSummary, filenameFormat, hasCookies, backupTitle, backupSubtitle) {
         listOf(
             SettingsItemSpec(Icons.Outlined.WbSunny, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
             SettingsItemSpec(Icons.Outlined.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
@@ -266,6 +276,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra arguments for each engine", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
             SettingsItemSpec(Icons.Outlined.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
             SettingsItemSpec(Icons.Outlined.Update, "Updates and engines", "App, yt-dlp, gallery-dl & Instaloader", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
+            SettingsItemSpec(Icons.Outlined.SettingsBackupRestore, backupTitle, backupSubtitle, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.BACKUP, null) },
         )
     }
     val aboutItems = remember {

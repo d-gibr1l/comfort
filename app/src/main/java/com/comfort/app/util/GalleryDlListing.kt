@@ -154,7 +154,7 @@ object GalleryDlListing {
      * unlocked when the real download wouldn't actually send them either. Writes a temp filtered
      * copy only when something's actually disabled; otherwise just hands back the real file's own
      * path, avoiding pointless I/O on every listing when nothing's toggled off. */
-    private fun effectiveCookiesPath(context: Context): Pair<String, java.io.File?> {
+    internal fun effectiveCookiesPath(context: Context): Pair<String, java.io.File?> {
         val cookiesPath = CookieStore.file(context)
         if (!cookiesPath.exists() || cookiesPath.length() <= 0) return "" to null
         val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
