@@ -25,6 +25,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -322,7 +323,9 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 color = MaterialTheme.colorScheme.surface,
             ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                // Above the navigation bar: the window is edge to edge, and the buttons sat under
+                // the bar's own buttons. The sheet's colour still runs down behind it.
+                Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
                     Text("Download this how?", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(16.dp))
                     // Same connected-group AssistChip pair as the Queue card's Pause/Cancel
