@@ -1,5 +1,6 @@
 package com.comfort.app.music
 
+import kotlinx.coroutines.launch
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
@@ -218,8 +219,18 @@ object MusicPlayer {
 
     /** Plays [downloads]' songs as the queue, from [startId] (the first one if null), shuffled if asked. */
     fun play(context: Context, downloads: List<DownloadEntity>, startId: String? = null, shuffle: Boolean = false) {
-        val queue = downloads.filter { it.isAudio }.mapNotNull(Song::from)
-        if (queue.isEmpty()) return
+        // A playlist download is every one of its songs, read from its files (songsFor), so the
+        // queue is put together off the main thread first.
+        val app = context.applicationContext
+        playScope.launch {
+            val queue = songsFor(app, downloads)
+            if (queue.isNotEmpty()) playQueue(app, queue, startId, shuffle)
+        }
+    }
+
+    private val playScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate)
+
+    private fun playQueue(context: Context, queue: List<Song>, startId: String?, shuffle: Boolean) {
         queue.forEach { songs[it.id] = it }
         val start = if (shuffle && startId == null) queue.indices.random() else queue.indexOfFirst { it.id == startId }.coerceAtLeast(0)
         val items = queue.map { it.toMediaItem() }
