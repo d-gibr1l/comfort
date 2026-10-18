@@ -1,5 +1,6 @@
 package com.comfort.app
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.comfort.app.viewmodel.startedMessage
@@ -249,9 +250,9 @@ private fun MultiLinkHandler(urls: List<String>, router: LinkRouterViewModel, on
         router.downloadAll(urls) { duplicateCount ->
             val startedCount = urls.size - duplicateCount
             val message = when {
-                duplicateCount == 0 -> "${urls.size} downloads started"
-                startedCount == 0 -> "Already downloaded — see Library > Duplicates"
-                else -> "$startedCount downloads started, $duplicateCount already downloaded"
+                duplicateCount == 0 -> context.resources.getQuantityString(R.plurals.downloads_started, urls.size, urls.size)
+                startedCount == 0 -> context.getString(R.string.already_downloaded_see_duplicates)
+                else -> context.resources.getQuantityString(R.plurals.downloads_started_some_duplicates, startedCount, startedCount, duplicateCount)
             }
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             onFinished()
@@ -271,7 +272,7 @@ private fun InstantShareHandler(url: String, router: LinkRouterViewModel, onFini
     val context = LocalContext.current
     LaunchedEffect(url) {
         router.download(url) { result ->
-            Toast.makeText(context, startedMessage(result), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, startedMessage(context, result), Toast.LENGTH_SHORT).show()
             onFinished()
         }
     }
@@ -326,7 +327,7 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                 // Above the navigation bar: the window is edge to edge, and the buttons sat under
                 // the bar's own buttons. The sheet's colour still runs down behind it.
                 Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-                    Text("Download this how?", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.download_this_how), style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(16.dp))
                     // Same connected-group AssistChip pair as the Queue card's Pause/Cancel
                     // chips — two real, independent actions (not a mutually-exclusive selection),
@@ -348,7 +349,7 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                                 leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
                             ),
                             leadingIcon = { Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Configure") } },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.configure)) } },
                         )
                         AssistChip(
                             onClick = { onChoose(ShareMode.INSTANT) },
@@ -361,7 +362,7 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                             ),
                             border = null,
                             leadingIcon = { Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text("Instant") } },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.instant)) } },
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -403,7 +404,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             onDownloadNow = {
                 router.close()
                 router.download(url, forceDuplicate = true) {
-                    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
@@ -416,7 +417,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             onDismiss = onFinished,
             onDownload = { options ->
                 router.download(url, options) {
-                    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
@@ -490,7 +491,7 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                         CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "Looking at what's there…",
+                            stringResource(R.string.looking_at_what_s_there),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -505,7 +506,7 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                         ) {
                             Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(if (isDuplicate) "Redownload" else "Download")
+                            Text(if (isDuplicate) stringResource(R.string.redownload) else stringResource(R.string.search_download))
                         }
                     }
                 }
@@ -595,7 +596,7 @@ private fun SharePickerSheet(
                         // already-shown confirmation carried through, same reasoning as
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
                         downloadJob = router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
-                            Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                         }
                         visible = false
                     },

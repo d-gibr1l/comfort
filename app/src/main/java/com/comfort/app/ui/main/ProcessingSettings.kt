@@ -55,8 +55,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
     var normalizeAudio by remember { mutableStateOf(GalleryDlPreferences.isNormalizeAudio(context)) }
     var webpToJpg by remember { mutableStateOf(GalleryDlPreferences.isWebpToJpg(context)) }
 
-    SettingsSubScaffold(title = "Processing", topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Video downloads", icon = Icons.Outlined.Movie) {
+    SettingsSubScaffold(title = stringResource(R.string.processing), topicIcon = Icons.Outlined.Movie, onBack = onBack, highlightKey = highlightKey) {
+        SettingsSection(title = stringResource(R.string.video_downloads), icon = Icons.Outlined.Movie) {
             ToggleReveal(formatIdOverride.isNotBlank()) {
                 Surface(
                     shape = MaterialTheme.shapes.small,
@@ -75,7 +75,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "Format ID override is active (\"$formatIdOverride\"). Quality choices below will be bypassed.",
+                            stringResource(R.string.format_id_override_is_active_x, formatIdOverride),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onTertiaryContainer,
                         )
@@ -83,10 +83,10 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 }
             }
 
-            Text("Quality", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.quality), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Applies to video links handled by yt-dlp (YouTube, Twitter/X, and similar).",
+                stringResource(R.string.applies_to_video_links_handled_by),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -128,7 +128,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                             .semantics { role = Role.RadioButton },
                         interactionSource = interactionSource,
                         shape = rememberMorphingChipShape(index, qualities.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
-                        label = { Text(quality.label, style = MaterialTheme.typography.labelLarge) },
+                        label = { Text(quality.displayLabel, style = MaterialTheme.typography.labelLarge) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -144,10 +144,10 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Text("Output format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.output_format), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "For videos from yt-dlp sources; anything gallery-dl fetches directly keeps its own format. MKV saves the streams exactly as the site sends them. MP4 plays everywhere: video that can't go in an MP4 as it is (VP9 or AV1, like most Instagram Reels and YouTube above 1080p) is converted to H.264 on your phone's video encoder after downloading, which takes a little longer.",
+                stringResource(R.string.for_videos_from_yt_dlp_sources),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -196,8 +196,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.Outlined.VideoFile,
-                title = "Single video only",
-                subtitle = "Only downloads the specific video from a link, even if it belongs to a larger playlist or channel.",
+                title = stringResource(R.string.single_video_only),
+                subtitle = stringResource(R.string.only_downloads_the_specific_video_from),
                 checked = noPlaylist,
                 onCheckedChange = {
                     noPlaylist = it
@@ -211,8 +211,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.Outlined.FastRewind,
-                title = "Live streams from the start",
-                subtitle = "Downloads live streams from the beginning instead of the current moment.",
+                title = stringResource(R.string.live_streams_from_the_start),
+                subtitle = stringResource(R.string.downloads_live_streams_from_the_beginning),
                 checked = liveFromStart,
                 onCheckedChange = {
                     liveFromStart = it
@@ -226,8 +226,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.Outlined.Image,
-                title = "Embed thumbnail",
-                subtitle = "Save the video's thumbnail as cover art inside the file.",
+                title = stringResource(R.string.embed_thumbnail),
+                subtitle = stringResource(R.string.save_the_video_s_thumbnail_as),
                 checked = embedThumbnail,
                 onCheckedChange = {
                     embedThumbnail = it
@@ -241,8 +241,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.Outlined.Tag,
-                title = "Embed metadata",
-                subtitle = "Tag the file with its title, uploader, and other details.",
+                title = stringResource(R.string.embed_metadata),
+                subtitle = stringResource(R.string.tag_the_file_with_its_title),
                 checked = embedMetadata,
                 onCheckedChange = {
                     embedMetadata = it
@@ -256,8 +256,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.AutoMirrored.Outlined.List,
-                title = "Embed chapters",
-                subtitle = "Saves chapter markers inside the video file.",
+                title = stringResource(R.string.embed_chapters),
+                subtitle = stringResource(R.string.saves_chapter_markers_inside_the_video),
                 checked = embedChapters,
                 onCheckedChange = {
                     embedChapters = it
@@ -286,8 +286,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.Outlined.Description,
-                title = "Write description / info.json files",
-                subtitle = "Save a separate JSON metadata file alongside each download.",
+                title = stringResource(R.string.write_description_info_json_files),
+                subtitle = stringResource(R.string.save_a_separate_json_metadata_file),
                 checked = writeInfoFiles,
                 onCheckedChange = {
                     writeInfoFiles = it
@@ -301,8 +301,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = if (downloadSubtitles) Icons.Outlined.Subtitles else Icons.Outlined.SubtitlesOff,
-                title = "Download subtitles",
-                subtitle = "Fetch and embed subtitles when they're available.",
+                title = stringResource(R.string.download_subtitles),
+                subtitle = stringResource(R.string.fetch_and_embed_subtitles_when_they),
                 checked = downloadSubtitles,
                 onCheckedChange = {
                     downloadSubtitles = it
@@ -323,15 +323,15 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                         GalleryDlPreferences.setSubtitleLanguages(context, sanitized.trim())
                     },
                     modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text("Subtitle languages") },
+                    label = { Text(stringResource(R.string.subtitle_languages)) },
                     placeholder = { Text("en") },
                     singleLine = true,
                     isError = isSubtitlesError,
                     supportingText = {
                         if (isSubtitlesError) {
-                            Text("Use comma-separated language codes, e.g. \"en, es, en-US\"", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.use_comma_separated_language_codes_e), color = MaterialTheme.colorScheme.error)
                         } else {
-                            Text("Comma-separated language codes, e.g. \"en,es\".")
+                            Text(stringResource(R.string.comma_separated_language_codes_e_g))
                         }
                     },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -345,8 +345,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = if (saveSubtitleFiles) Icons.Outlined.Subtitles else Icons.Outlined.SubtitlesOff,
-                title = "Save subtitle files",
-                subtitle = "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.",
+                title = stringResource(R.string.save_subtitle_files),
+                subtitle = stringResource(R.string.saves_subtitles_as_a_separate_file),
                 checked = saveSubtitleFiles,
                 onCheckedChange = {
                     saveSubtitleFiles = it
@@ -358,10 +358,10 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Text("Format ID override", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.format_id_override), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "yt-dlp only — a raw format selector (e.g. \"137+140\", or any of yt-dlp's own -f expression syntax) that fully replaces Video quality above for every download. Leave blank to let the quality picker choose as usual.",
+                stringResource(R.string.yt_dlp_only_a_raw_format),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -375,15 +375,15 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                     GalleryDlPreferences.setFormatIdOverride(context, sanitized.trim())
                 },
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                label = { Text("Format selector") },
+                label = { Text(stringResource(R.string.format_selector)) },
                 placeholder = { Text("bv+ba/b") },
                 singleLine = true,
                 isError = isFormatOverrideError,
                 supportingText = {
                     if (isFormatOverrideError) {
-                        Text("Check expression syntax (unbalanced brackets or trailing operator)", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.check_expression_syntax_unbalanced_brackets_or), color = MaterialTheme.colorScheme.error)
                     } else if (formatIdOverride.isNotBlank()) {
-                        Text("Overrides quality and output format for all yt-dlp downloads.", color = MaterialTheme.colorScheme.tertiary)
+                        Text(stringResource(R.string.overrides_quality_and_output_format_for), color = MaterialTheme.colorScheme.tertiary)
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -392,7 +392,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
         }
 
         SettingsSection(title = stringResource(R.string.sponsorblock_section), icon = Icons.Outlined.FastForward) {
-            Column(modifier = highlightRowModifier("SponsorBlock")) {
+            Column(modifier = highlightRowModifier(stringResource(R.string.sponsorblock_section))) {
                 Text(stringResource(R.string.sponsorblock_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -474,11 +474,11 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             }
         }
 
-        SettingsSection(title = "Picture downloads", icon = Icons.Outlined.Image) {
+        SettingsSection(title = stringResource(R.string.picture_downloads), icon = Icons.Outlined.Image) {
             IconToggleRow(
                 icon = Icons.Outlined.Image,
-                title = "Save WebP pictures as JPG",
-                subtitle = "Many sites send pictures as WebP, which some apps can't open or share. Converts them to JPG as they're saved; animated ones stay WebP.",
+                title = stringResource(R.string.save_webp_pictures_as_jpg),
+                subtitle = stringResource(R.string.many_sites_send_pictures_as_webp),
                 checked = webpToJpg,
                 onCheckedChange = {
                     webpToJpg = it
@@ -487,13 +487,13 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             )
         }
 
-        SettingsSection(title = "Music downloads", icon = Icons.Outlined.MusicNote) {
+        SettingsSection(title = stringResource(R.string.music_downloads), icon = Icons.Outlined.MusicNote) {
             // The whole setting (title, text, choices) lights up when Settings search jumps here.
-            Column(modifier = highlightRowModifier("Audio format")) {
-                Text("Audio format", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Column(modifier = highlightRowModifier(stringResource(R.string.audio_format))) {
+                Text(stringResource(R.string.audio_format), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "For songs and audio-only downloads. Original saves the site's own audio untouched (usually M4A, or Opus). The others convert it unless it's already in that format: MP3 plays on anything, FLAC is lossless but can't add back quality the source didn't have.",
+                    stringResource(R.string.for_songs_and_audio_only_downloads),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -523,7 +523,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                             shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
                             label = {
                                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                    Text(format.label, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                                    Text(format.displayLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
                                 }
                             },
                             colors = FilterChipDefaults.filterChipColors(
@@ -544,8 +544,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
             IconToggleRow(
                 icon = Icons.Outlined.GraphicEq,
-                title = "Even out volume",
-                subtitle = "Makes every song play at the same loudness, so a quiet track isn't followed by a blaring one. Re-encodes the audio.",
+                title = stringResource(R.string.even_out_volume),
+                subtitle = stringResource(R.string.makes_every_song_play_at_the),
                 checked = normalizeAudio,
                 onCheckedChange = {
                     normalizeAudio = it
@@ -558,11 +558,11 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             Spacer(Modifier.height(16.dp))
 
             // The whole setting (title, text, choices) lights up when Settings search jumps here.
-            Column(modifier = highlightRowModifier("Lyrics")) {
-                Text("Lyrics", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Column(modifier = highlightRowModifier(stringResource(R.string.lyrics))) {
+                Text(stringResource(R.string.lyrics), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Looked up on LRCLIB by the song's title, artist and length, and saved inside the file. Synced lyrics carry timestamps, so players that support them scroll along with the song; songs without synced lyrics get plain ones.",
+                    stringResource(R.string.looked_up_on_lrclib_by_the),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -574,9 +574,9 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     val modes = listOf(
-                        GalleryDlPreferences.LYRICS_SYNCED to "Synced",
-                        GalleryDlPreferences.LYRICS_PLAIN to "Plain",
-                        GalleryDlPreferences.LYRICS_OFF to "Off",
+                        GalleryDlPreferences.LYRICS_SYNCED to stringResource(R.string.synced),
+                        GalleryDlPreferences.LYRICS_PLAIN to stringResource(R.string.plain),
+                        GalleryDlPreferences.LYRICS_OFF to stringResource(R.string.sponsorblock_off),
                     )
                     modes.forEachIndexed { index, (mode, label) ->
                         val selected = lyricsMode == mode
@@ -617,8 +617,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
 
                 IconToggleRow(
                     icon = Icons.Outlined.Description,
-                    title = "Save .lrc file",
-                    subtitle = "Also saves synced lyrics as a .lrc file next to the song, for players that only read those.",
+                    title = stringResource(R.string.save_lrc_file),
+                    subtitle = stringResource(R.string.also_saves_synced_lyrics_as_a),
                     checked = lyricsLrc,
                     onCheckedChange = {
                         lyricsLrc = it

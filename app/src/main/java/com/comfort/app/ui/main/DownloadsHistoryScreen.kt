@@ -1,5 +1,8 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.comfort.app.R
 import androidx.compose.foundation.gestures.animateScrollBy
 
 import android.content.ClipData
@@ -95,11 +98,11 @@ import java.util.Locale
 
 
 
-private enum class LibrarySort(val label: String) {
-    DATE_NEWEST("Newest first"),
-    DATE_OLDEST("Oldest first"),
-    NAME("Name"),
-    SIZE("Size"),
+private enum class LibrarySort(@androidx.annotation.StringRes val label: Int) {
+    DATE_NEWEST(R.string.sort_newest_first),
+    DATE_OLDEST(R.string.sort_oldest_first),
+    NAME(R.string.sort_name),
+    SIZE(R.string.sort_size),
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -418,9 +421,9 @@ fun DownloadsHistoryScreen(
             .nestedScroll(libraryHeaderScrollConnection),
     ) {
         val subtitle = if (showDuplicatesOnly) {
-            "${duplicateAttempts.size} ${if (duplicateAttempts.size == 1) "duplicate" else "duplicates"}"
+            pluralStringResource(R.plurals.duplicate_count, duplicateAttempts.size, duplicateAttempts.size)
         } else {
-            "${visibleItems.size} ${if (visibleItems.size == 1) "item" else "items"}"
+            pluralStringResource(R.plurals.item_count, visibleItems.size, visibleItems.size)
         }
 
         // Wraps the whole branch below (previously each ending in its own early return) so the
@@ -494,12 +497,12 @@ fun DownloadsHistoryScreen(
                             androidx.compose.material3.Button(onClick = { playSongs(songs, false) }, modifier = Modifier.weight(1f)) {
                                 Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Play all")
+                                Text(stringResource(R.string.play_all))
                             }
                             androidx.compose.material3.FilledTonalButton(onClick = { playSongs(songs, true) }, modifier = Modifier.weight(1f)) {
                                 Icon(androidx.compose.material.icons.Icons.Rounded.Shuffle, contentDescription = null, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Shuffle")
+                                Text(stringResource(R.string.shuffle))
                             }
                         }
                     }
@@ -515,8 +518,8 @@ fun DownloadsHistoryScreen(
                     fullHeaderContent()
                     EmptyState(
                         icon = Icons.Outlined.ContentCopy,
-                        title = "No duplicates",
-                        subtitle = "A link you share in that's already queued, running, or finished lands here instead of starting a second copy.",
+                        title = stringResource(R.string.no_duplicates),
+                        subtitle = stringResource(R.string.a_link_you_share_in_that),
                         modifier = Modifier.padding(bottom = navBarClearance()),
                     )
                 }
@@ -537,8 +540,8 @@ fun DownloadsHistoryScreen(
                 fullHeaderContent()
                 EmptyState(
                     icon = if (searching) Icons.Outlined.Search else if (showDeletedOnly) Icons.Outlined.Delete else if (favoritesOnly) Icons.Outlined.Star else Icons.Outlined.Image,
-                    title = if (searching) "No matches" else if (showDeletedOnly) "Nothing deleted" else if (favoritesOnly) "No favorites yet" else "Nothing here yet",
-                    subtitle = if (searching) "Try a different search." else if (showDeletedOnly) "Pictures you remove from your device gallery will show up here." else if (favoritesOnly) "Star a download to pin it here." else "Downloaded pictures will show up in this gallery.",
+                    title = if (searching) stringResource(R.string.no_matches) else if (showDeletedOnly) stringResource(R.string.nothing_deleted) else if (favoritesOnly) stringResource(R.string.no_favorites_yet) else stringResource(R.string.nothing_here_yet),
+                    subtitle = if (searching) stringResource(R.string.try_a_different_search) else if (showDeletedOnly) stringResource(R.string.pictures_you_remove_from_your_device) else if (favoritesOnly) stringResource(R.string.star_a_download_to_pin_it) else stringResource(R.string.downloaded_pictures_will_show_up_in),
                     modifier = Modifier.padding(bottom = navBarClearance()),
                 )
             }
@@ -738,7 +741,7 @@ fun DownloadsHistoryScreen(
                 },
                 shape = androidx.compose.material3.MaterialShapes.Arch.toShape(),
             ) {
-                Icon(Icons.Outlined.ArrowUpward, contentDescription = "Scroll to top")
+                Icon(Icons.Outlined.ArrowUpward, contentDescription = stringResource(R.string.scroll_to_top))
             }
         }
         }
@@ -760,10 +763,10 @@ fun DownloadsHistoryScreen(
 
         if (selectionMode) {
             TopAppBar(
-                title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.x_selected, selectedIds.size), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { selectedIds = emptySet() }) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cancel_selection))
                     }
                 },
                 actions = {
@@ -794,22 +797,22 @@ fun DownloadsHistoryScreen(
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                             }
-                            runCatching { context.startActivity(Intent.createChooser(intent, if (uris.size == 1) "Share" else "Share files")) }
+                            runCatching { context.startActivity(Intent.createChooser(intent, if (uris.size == 1) context.getString(R.string.share) else context.getString(R.string.share_files))) }
                         }
                     }) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Share selected")
+                        Icon(Icons.Outlined.Share, contentDescription = stringResource(R.string.share_selected))
                     }
                     IconButton(onClick = {
                         selectedIds.forEach { viewModel.setFavorite(it, true) }
                         selectedIds = emptySet()
                     }) {
-                        Icon(Icons.Outlined.Star, contentDescription = "Add selected to favorites")
+                        Icon(Icons.Outlined.Star, contentDescription = stringResource(R.string.add_selected_to_favorites))
                     }
                     IconButton(onClick = {
                         requestDelete(selectedIds)
                         selectedIds = emptySet()
                     }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "Remove selected")
+                        Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.remove_selected))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -923,7 +926,7 @@ private fun LibraryHeader(
                     PillSearchBar(
                         query = searchQuery,
                         onQueryChange = onSearchQueryChange,
-                        placeholder = "Search downloads",
+                        placeholder = stringResource(R.string.search_downloads),
                         modifier = Modifier.weight(1f),
                         autoFocus = true,
                     )
@@ -937,7 +940,7 @@ private fun LibraryHeader(
                     ) {
                         Icon(
                             Icons.Outlined.Close,
-                            contentDescription = "Close search",
+                            contentDescription = stringResource(R.string.close_search),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -956,7 +959,7 @@ private fun LibraryHeader(
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "Library",
+                            stringResource(R.string.shortcut_library_short),
                             // Same style declaration as the Settings root header's own "Settings"
                             // title (see SettingsScreen.kt's SettingsRootScreen) — displayMedium (30sp)
                             // plus the Google Sans HeaderFontFamily.
@@ -976,7 +979,7 @@ private fun LibraryHeader(
                     ) {
                         Icon(
                             Icons.Outlined.Search,
-                            contentDescription = "Search",
+                            contentDescription = stringResource(R.string.search),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -1022,14 +1025,14 @@ private fun LibraryHeader(
                 Box {
                     LibraryToolbarChip(
                         icon = Icons.Outlined.Tune,
-                        label = "Sort",
+                        label = stringResource(R.string.sort),
                         onClick = { onSortMenuExpandedChange(true) },
                         groupIndex = 0, groupSize = 4,
                     )
                     DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { onSortMenuExpandedChange(false) }) {
                         LibrarySort.entries.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option.label) },
+                                text = { Text(stringResource(option.label)) },
                                 leadingIcon = if (option == sortOption) {
                                     { Icon(Icons.Outlined.Check, contentDescription = null) }
                                 } else null,
@@ -1040,14 +1043,14 @@ private fun LibraryHeader(
                 }
                 LibraryToolbarChip(
                     icon = Icons.Outlined.Delete,
-                    label = "Deleted",
+                    label = stringResource(R.string.deleted),
                     active = showDeletedOnly,
                     onClick = onToggleShowDeletedOnly,
                     groupIndex = 1, groupSize = 4,
                 )
                 LibraryToolbarChip(
                     icon = Icons.Outlined.ContentCopy,
-                    label = "Duplicates",
+                    label = stringResource(R.string.duplicates),
                     active = showDuplicatesOnly,
                     count = duplicateAttemptsCount,
                     onClick = onToggleShowDuplicatesOnly,
@@ -1055,7 +1058,7 @@ private fun LibraryHeader(
                 )
                 LibraryToolbarChip(
                     icon = Icons.Outlined.MusicNote,
-                    label = "Audio",
+                    label = stringResource(R.string.audio),
                     active = audioOnly,
                     onClick = onToggleAudioOnly,
                     groupIndex = 3, groupSize = 4,
@@ -1069,12 +1072,12 @@ private fun LibraryHeader(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "$deletedCount ${if (deletedCount == 1) "download" else "downloads"} whose files were deleted",
+                    pluralStringResource(R.plurals.downloads_files_deleted, deletedCount, deletedCount),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onClearDeleted) { Text("Clear all") }
+                TextButton(onClick = onClearDeleted) { Text(stringResource(R.string.clear_all)) }
             }
         }
         }
@@ -1160,7 +1163,7 @@ private fun LibraryCompactBar(
             // perfectly match in the expanded state, preventing background overlap on the chips!
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Library",
+                    stringResource(R.string.shortcut_library_short),
                     style = MaterialTheme.typography.displayMedium,
                     fontFamily = HeaderFontFamily,
                     fontWeight = FontWeight.Bold,
@@ -1262,14 +1265,14 @@ private fun LibraryHeaderActions(
     IconToggleButton(checked = favoritesOnly, onCheckedChange = onFavoritesOnlyChange) {
         Icon(
             Icons.Outlined.Star,
-            contentDescription = "Favorites only",
+            contentDescription = stringResource(R.string.favorites_only),
             tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     IconButton(onClick = onToggleGridView) {
         Icon(
             if (gridView) Icons.AutoMirrored.Outlined.List else Icons.Outlined.GridView,
-            contentDescription = if (gridView) "Switch to list view" else "Switch to grid view",
+            contentDescription = if (gridView) stringResource(R.string.switch_to_list_view) else stringResource(R.string.switch_to_grid_view),
         )
     }
     // The badge sits beside the button, not inside it: BadgedBox placed it past the icon's edge,
@@ -1277,7 +1280,7 @@ private fun LibraryHeaderActions(
     // edge). Aligned to the button's own top-end corner it always stays within its 48dp area.
     Box {
         IconButton(onClick = onOpenQueue) {
-            Icon(Icons.Outlined.DownloadForOffline, contentDescription = "Active downloads")
+            Icon(Icons.Outlined.DownloadForOffline, contentDescription = stringResource(R.string.active_downloads))
         }
         if (hasActiveDownloads) {
             Badge(
@@ -1366,7 +1369,7 @@ internal fun SwipeToDeleteCard(
                     .padding(horizontal = 24.dp),
                 contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Alignment.CenterEnd else Alignment.CenterStart,
             ) {
-                Icon(Icons.Outlined.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.sponsorblock_remove), tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         },
     ) {
@@ -1456,7 +1459,7 @@ private fun DuplicatesList(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            "Already downloaded • tried again ${sdf.format(Date(attempt.dateAdded))}",
+                            stringResource(R.string.already_downloaded_tried_again_x, sdf.format(Date(attempt.dateAdded))),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -1464,10 +1467,10 @@ private fun DuplicatesList(
                         )
                     }
                     IconButton(onClick = { onRedownload(attempt) }) {
-                        Icon(Icons.Outlined.Restore, contentDescription = "Redownload")
+                        Icon(Icons.Outlined.Restore, contentDescription = stringResource(R.string.redownload))
                     }
                     IconButton(onClick = { onDismiss(attempt.id) }) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Dismiss")
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.dismiss))
                     }
                 }
             }
@@ -1672,7 +1675,7 @@ private fun HistoryGridItem(
                         modifier = Modifier.size(24.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.MoreVert, contentDescription = "More options", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
                 DownloadActionsMenu(
@@ -1707,7 +1710,7 @@ private fun HistoryGridItem(
                     .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
+                Icon(Icons.Outlined.Check, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
             }
         }
     }
@@ -1780,8 +1783,8 @@ private const val GRID_GAP_DP = 2f
 @Composable
 private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
     val (icon, tint, description) = when (status) {
-        DownloadStatus.FINISHED -> Triple(Icons.Outlined.CheckCircle, MaterialTheme.colorScheme.primary, "Succeeded")
-        DownloadStatus.ERRORED -> Triple(Icons.Outlined.Error, MaterialTheme.colorScheme.error, "Failed")
+        DownloadStatus.FINISHED -> Triple(Icons.Outlined.CheckCircle, MaterialTheme.colorScheme.primary, stringResource(R.string.succeeded))
+        DownloadStatus.ERRORED -> Triple(Icons.Outlined.Error, MaterialTheme.colorScheme.error, stringResource(R.string.failed))
         else -> return
     }
     Box(
@@ -1915,7 +1918,7 @@ private fun HistoryRow(
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.Star, contentDescription = "Favorite", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
+                        Icon(Icons.Outlined.Star, contentDescription = stringResource(R.string.favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
                     }
                 }
             }
@@ -1931,7 +1934,7 @@ private fun HistoryRow(
                         .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Outlined.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
+                    Icon(Icons.Outlined.Check, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(13.dp))
                 }
             }
         }
@@ -1947,7 +1950,7 @@ private fun HistoryRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val domain = remember(item.url) { runCatching { URI(item.url).host?.removePrefix("www.") }.getOrNull() ?: "Unknown" }
+            val domain = remember(item.url) { runCatching { URI(item.url).host?.removePrefix("www.") }.getOrNull() ?: context.getString(R.string.unknown_site) }
             // Real artist/album beats the domain for an audio download whenever it's known —
             // that's the actual point of capturing this metadata at all (see DownloadEntity's
             // own doc comments on artist/album). Falls back to the domain exactly like before
@@ -1965,15 +1968,15 @@ private fun HistoryRow(
             Spacer(Modifier.height(6.dp))
 
             val sdf = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
-            MetaRow(icon = Icons.Outlined.Layers, text = "${item.downloadedItems} • ${sdf.format(Date(item.effectiveDate))}")
+            MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, sdf.format(Date(item.effectiveDate))))
             Spacer(Modifier.height(2.dp))
-            MetaRow(icon = Icons.Outlined.SdStorage, text = "Size • ${formatFileSize(item.totalBytes)}")
+            MetaRow(icon = Icons.Outlined.SdStorage, text = stringResource(R.string.size_x, formatFileSize(item.totalBytes)))
         }
 
         // Bulk actions in the selection-mode top bar replace the per-item menu while selecting.
         if (!selectionMode) Box {
             IconButton(onClick = { menuExpanded = true }) {
-                Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
+                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
             }
             DownloadActionsMenu(
                 item = item,
@@ -2020,23 +2023,23 @@ private fun DownloadActionsMenu(
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (fileGone) {
             DropdownMenuItem(
-                text = { Text("Download again") },
+                text = { Text(stringResource(R.string.download_again)) },
                 leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
                 onClick = { onDismiss(); onRedownload() },
             )
         } else {
             DropdownMenuItem(
-                text = { Text(if (item.isFavorite) "Remove from Favorites" else "Add to Favorites") },
+                text = { Text(if (item.isFavorite) stringResource(R.string.remove_from_favorites) else stringResource(R.string.add_to_favorites)) },
                 leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
                 onClick = { onDismiss(); onToggleFavorite() },
             )
             DropdownMenuItem(
-                text = { Text("Rename") },
+                text = { Text(stringResource(R.string.rename)) },
                 leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                 onClick = { onDismiss(); onRename() },
             )
             DropdownMenuItem(
-                text = { Text("Share") },
+                text = { Text(stringResource(R.string.share)) },
                 leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
                 enabled = fileUri != null,
                 onClick = {
@@ -2047,19 +2050,19 @@ private fun DownloadActionsMenu(
                         putExtra(Intent.EXTRA_STREAM, uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    runCatching { context.startActivity(Intent.createChooser(intent, "Share")) }
+                    runCatching { context.startActivity(Intent.createChooser(intent, context.getString(R.string.share))) }
                 },
             )
             if (isVideo) {
                 DropdownMenuItem(
-                    text = { Text("Compress video") },
+                    text = { Text(stringResource(R.string.compress_video)) },
                     leadingIcon = { Icon(Icons.Outlined.Compress, contentDescription = null) },
                     onClick = { onDismiss(); compressOpen = true },
                 )
             }
         }
         DropdownMenuItem(
-            text = { Text("View Original Source") },
+            text = { Text(stringResource(R.string.view_original_source)) },
             leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
             onClick = {
                 onDismiss()
@@ -2067,21 +2070,21 @@ private fun DownloadActionsMenu(
             },
         )
         DropdownMenuItem(
-            text = { Text("Copy Post Link") },
+            text = { Text(stringResource(R.string.copy_post_link)) },
             leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
             onClick = {
                 onDismiss()
                 scope.launch {
-                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Post link", item.url)))
+                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.post_link), item.url)))
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                     }
                 }
             },
         )
         HorizontalDivider()
         DropdownMenuItem(
-            text = { Text(if (fileGone) "Remove from Library" else "Remove") },
+            text = { Text(if (fileGone) stringResource(R.string.remove_from_library) else stringResource(R.string.sponsorblock_remove)) },
             leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
             onClick = { onDismiss(); onDelete() },
         )
@@ -2098,7 +2101,7 @@ private fun RenameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename") },
+        title = { Text(stringResource(R.string.rename)) },
         text = {
             OutlinedTextField(
                 value = text,
@@ -2109,10 +2112,10 @@ private fun RenameDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { if (text.isNotBlank()) onConfirm(text) }) { Text("Save") }
+            TextButton(onClick = { if (text.isNotBlank()) onConfirm(text) }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

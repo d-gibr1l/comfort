@@ -5,6 +5,7 @@
  */
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -324,13 +325,13 @@ fun MediaViewerScreen(
         var renameValue by remember(currentItem) { mutableStateOf(renameText(currentItem)) }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showRenameDialog = false },
-            title = { androidx.compose.material3.Text("Rename") },
+            title = { androidx.compose.material3.Text(stringResource(R.string.rename)) },
             text = {
                 androidx.compose.foundation.layout.Column {
                     androidx.compose.material3.OutlinedTextField(
                         value = renameValue,
                         onValueChange = { renameValue = it },
-                        label = { androidx.compose.material3.Text("Name") },
+                        label = { androidx.compose.material3.Text(stringResource(R.string.command_template_name)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -346,14 +347,14 @@ fun MediaViewerScreen(
                         showRenameDialog = false
                     }
                 ) {
-                    androidx.compose.material3.Text("Save")
+                    androidx.compose.material3.Text(stringResource(R.string.action_save))
                 }
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(
                     onClick = { showRenameDialog = false }
                 ) {
-                    androidx.compose.material3.Text("Cancel")
+                    androidx.compose.material3.Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -577,7 +578,7 @@ fun MediaViewerScreen(
                     run {
                         AsyncImage(
                             model = request,
-                            contentDescription = "Full-screen photo",
+                            contentDescription = stringResource(R.string.full_screen_photo),
                             contentScale = ContentScale.Fit,
                             onSuccess = { state ->
                                 val size = state.painter.intrinsicSize
@@ -891,7 +892,7 @@ fun MediaViewerScreen(
                             .size(240, 360)
                             .memoryCachePolicy(CachePolicy.ENABLED)
                             .build(),
-                        contentDescription = "Minimap map",
+                        contentDescription = stringResource(R.string.minimap_map),
                         contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -989,7 +990,7 @@ fun MediaViewerScreen(
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(R.drawable.ic_ms_arrow_back),
-                        contentDescription = "Go back"
+                        contentDescription = stringResource(R.string.go_back)
                     )
                 }
                 Row(
@@ -1005,7 +1006,7 @@ fun MediaViewerScreen(
                     ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(R.drawable.ic_ms_info),
-                            contentDescription = "Info"
+                            contentDescription = stringResource(R.string.info)
                         )
                     }
 
@@ -1081,7 +1082,7 @@ fun MediaViewerScreen(
                             },
                             enabled = currentItem?.localExists == true
                         ) {
-                            Icon(ImageVector.vectorResource(R.drawable.ic_ms_share), contentDescription = "Share")
+                            Icon(ImageVector.vectorResource(R.drawable.ic_ms_share), contentDescription = stringResource(R.string.share))
                         }
                             val isFavorite = currentItem?.id?.let { favoriteIds.contains(it) } ?: false
                             // Heart pop: triggers a scale bounce when toggling to favorite
@@ -1107,7 +1108,7 @@ fun MediaViewerScreen(
                             ) {
                                 Icon(
                                     imageVector = if (isFavorite) ImageVector.vectorResource(R.drawable.ic_ms_favorite) else ImageVector.vectorResource(R.drawable.ic_ms_favorite),
-                                    contentDescription = "Favorite",
+                                    contentDescription = stringResource(R.string.favorite),
                                     tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer,
                                     modifier = Modifier.graphicsLayer {
                                         scaleX = heartScale
@@ -1125,23 +1126,23 @@ fun MediaViewerScreen(
                                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                                         }
                                         try {
-                                            context.startActivity(Intent.createChooser(editIntent, "Edit with"))
+                                            context.startActivity(Intent.createChooser(editIntent, context.getString(R.string.edit_with)))
                                         } catch (e: Exception) {
-                                            android.widget.Toast.makeText(context, "No editor available on device", android.widget.Toast.LENGTH_SHORT).show()
+                                            android.widget.Toast.makeText(context, context.getString(R.string.no_editor_available_on_device), android.widget.Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
                             ) {
-                                Icon(ImageVector.vectorResource(R.drawable.ic_ms_edit), contentDescription = "Edit")
+                                Icon(ImageVector.vectorResource(R.drawable.ic_ms_edit), contentDescription = stringResource(R.string.edit))
                             }
                             IconButton(
                                 onClick = { currentItem?.let(onDelete) }
                             ) {
-                                Icon(ImageVector.vectorResource(R.drawable.ic_ms_delete), contentDescription = "Delete")
+                                Icon(ImageVector.vectorResource(R.drawable.ic_ms_delete), contentDescription = stringResource(R.string.delete))
                             }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
-                                    Icon(ImageVector.vectorResource(R.drawable.ic_ms_more_vert), contentDescription = "More options")
+                                    Icon(ImageVector.vectorResource(R.drawable.ic_ms_more_vert), contentDescription = stringResource(R.string.more_options))
                                 }
                                 androidx.compose.material3.DropdownMenu(
                                     expanded = showMoreMenu,
@@ -1151,7 +1152,7 @@ fun MediaViewerScreen(
                                 ) {
                                     if (currentItem != null) {
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text("Open with") },
+                                            text = { Text(stringResource(R.string.open_with)) },
                                             leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_open_in_new), contentDescription = null) },
                                             enabled = currentItem.localExists,
                                             onClick = {
@@ -1163,16 +1164,16 @@ fun MediaViewerScreen(
                                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                 }
                                                 try {
-                                                    context.startActivity(Intent.createChooser(viewIntent, "Open with"))
+                                                    context.startActivity(Intent.createChooser(viewIntent, context.getString(R.string.open_with)))
                                                 } catch (e: Exception) {
-                                                    Toast.makeText(context, "No app available to open this file", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, context.getString(R.string.no_app_available_to_open_this), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )
                                     }
                                     if (currentItem != null && !currentItem.isVideo) {
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text("Set as wallpaper") },
+                                            text = { Text(stringResource(R.string.set_as_wallpaper)) },
                                             leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_image), contentDescription = null) },
                                             enabled = currentItem.localExists,
                                             onClick = {
@@ -1183,16 +1184,16 @@ fun MediaViewerScreen(
                                                     putExtra("mimeType", "image/*")
                                                 }
                                                 try {
-                                                    context.startActivity(Intent.createChooser(intent, "Set as..."))
+                                                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.set_as)))
                                                 } catch (e: Exception) {
-                                                    Toast.makeText(context, "No app available to set wallpaper", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, context.getString(R.string.no_app_available_to_set_wallpaper), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )
                                     }
                                     if (currentItem != null) {
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text("Rename") },
+                                            text = { Text(stringResource(R.string.rename)) },
                                             leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_edit), contentDescription = null) },
                                             onClick = {
                                                 showMoreMenu = false
@@ -1203,7 +1204,7 @@ fun MediaViewerScreen(
                                         // Comfort: whether videos start with sound, here where they play.
                                         var soundOn by remember { mutableStateOf(!startMuted) }
                                         androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text("Play videos with sound") },
+                                            text = { Text(stringResource(R.string.play_videos_with_sound)) },
                                             leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_volume_up), contentDescription = null) },
                                             trailingIcon = {
                                                 androidx.compose.material3.Checkbox(checked = soundOn, onCheckedChange = null)
@@ -1287,7 +1288,7 @@ fun ExifInfoCard(galleryItem: GalleryItem?, exifData: ExifData?, modifier: Modif
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // File Name — full wrap
-            InfoBlock(label = "Name", value = galleryItem.name)
+            InfoBlock(label = stringResource(R.string.command_template_name), value = galleryItem.name)
 
             // Time + Size row
             Row(
@@ -1295,12 +1296,12 @@ fun ExifInfoCard(galleryItem: GalleryItem?, exifData: ExifData?, modifier: Modif
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 InfoBlock(
-                    label = "Modified",
+                    label = stringResource(R.string.modified),
                     value = formatExifDate(galleryItem.dateModified * 1000L),
                     modifier = Modifier.weight(1f)
                 )
                 InfoBlock(
-                    label = "Size",
+                    label = stringResource(R.string.sort_size),
                     value = formatSizeToMB(galleryItem.size),
                     modifier = Modifier.weight(1f)
                 )
@@ -1315,10 +1316,10 @@ fun ExifInfoCard(galleryItem: GalleryItem?, exifData: ExifData?, modifier: Modif
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     if (resolution != null) {
-                        InfoBlock(label = "Resolution", value = resolution, modifier = Modifier.weight(1f))
+                        InfoBlock(label = stringResource(R.string.resolution), value = resolution, modifier = Modifier.weight(1f))
                     }
                     if (device != null) {
-                        InfoBlock(label = "Device", value = device, modifier = Modifier.weight(1f))
+                        InfoBlock(label = stringResource(R.string.device), value = device, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1326,11 +1327,11 @@ fun ExifInfoCard(galleryItem: GalleryItem?, exifData: ExifData?, modifier: Modif
             // Camera parameters
             val paramsParts = listOfNotNull(exifData?.focalLength, exifData?.shutterSpeed, exifData?.iso, exifData?.aperture).filter { it.isNotBlank() }
             if (paramsParts.isNotEmpty()) {
-                InfoBlock(label = "Parameters", value = paramsParts.joinToString("  •  "))
+                InfoBlock(label = stringResource(R.string.parameters), value = paramsParts.joinToString("  •  "))
             }
 
             // Path — full wrap
-            InfoBlock(label = "Path", value = galleryItem.path)
+            InfoBlock(label = stringResource(R.string.path), value = galleryItem.path)
         }
     }
 }

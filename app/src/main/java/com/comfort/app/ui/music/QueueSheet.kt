@@ -1,5 +1,7 @@
 package com.comfort.app.ui.music
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -112,15 +114,15 @@ internal fun QueuePanel() {
             ) {
                 Text(
                     buildString {
-                        append("Queue")
-                        if (state.shuffle) append(" · shuffled")
+                        append(stringResource(R.string.queue))
+                        if (state.shuffle) append(stringResource(R.string.shuffled))
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
                 )
                 if (state.count > 1) {
-                    androidx.compose.material3.TextButton(onClick = MusicPlayer::clearQueue) { Text("Clear") }
+                    androidx.compose.material3.TextButton(onClick = MusicPlayer::clearQueue) { Text(stringResource(R.string.search_clear)) }
                 }
             }
             androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -282,7 +284,7 @@ private fun QueueRowContent(
         }
         if (handle != null) {
             Box(modifier = Modifier.size(48.dp).then(handle), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.DragHandle, contentDescription = "Drag to reorder", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.DragHandle, contentDescription = stringResource(R.string.drag_to_reorder), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

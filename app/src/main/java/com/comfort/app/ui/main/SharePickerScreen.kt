@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -188,22 +190,22 @@ fun SharePickerScreen(
                 title = {
                     Text(
                         when (state) {
-                            ListingState.LOADED -> "$selectedCount of ${items.size} selected"
-                            ListingState.ERROR -> "Preview unavailable"
-                            else -> "Loading…"
+                            ListingState.LOADED -> stringResource(R.string.x_of_x_selected, selectedCount, items.size)
+                            ListingState.ERROR -> stringResource(R.string.preview_unavailable)
+                            else -> stringResource(R.string.loading)
                         },
                         fontWeight = FontWeight.Bold,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Cancel")
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_cancel))
                     }
                 },
                 actions = {
                     if (state == ListingState.LOADED) {
                         TextButton(onClick = { picker.toggleAll() }) {
-                            Text(if (allSelected) "Deselect all" else "Select all")
+                            Text(if (allSelected) stringResource(R.string.deselect_all) else stringResource(R.string.select_all))
                         }
                     }
                 },
@@ -243,7 +245,7 @@ fun SharePickerScreen(
                                 .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
                                 ?.sumOf { it.sizeBytes!! }
                             val sizeSuffix = selectedSize?.let { " · ${formatFilesize(it)}" } ?: ""
-                            Text((if (isDuplicate) "Redownload $selectedCount" else "Download $selectedCount") + sizeSuffix)
+                            Text((if (isDuplicate) stringResource(R.string.redownload_x, selectedCount) else stringResource(R.string.download_x, selectedCount)) + sizeSuffix)
                         }
                     }
                 }
@@ -270,7 +272,7 @@ fun SharePickerScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            "No internet connection",
+                            stringResource(R.string.no_internet_connection),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                         )
@@ -288,12 +290,12 @@ fun SharePickerScreen(
                         CircularWavyProgressIndicator(
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.semantics {
-                                contentDescription = "Loading gallery preview"
+                                contentDescription = context.getString(R.string.loading_gallery_preview)
                             },
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            "Looking at what's there…",
+                            stringResource(R.string.looking_at_what_s_there),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -316,7 +318,7 @@ fun SharePickerScreen(
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            "Couldn't load a preview",
+                            stringResource(R.string.couldn_t_load_a_preview),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
@@ -336,7 +338,7 @@ fun SharePickerScreen(
                             ) {
                                 Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Log in")
+                                Text(stringResource(R.string.log_in))
                             }
                             Spacer(Modifier.height(10.dp))
                         }
@@ -347,7 +349,7 @@ fun SharePickerScreen(
                         ) {
                             Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Retry preview")
+                            Text(stringResource(R.string.retry_preview))
                         }
                         Spacer(Modifier.height(10.dp))
                         OutlinedButton(
@@ -360,11 +362,11 @@ fun SharePickerScreen(
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = MaterialTheme.shapes.medium,
                         ) {
-                            Text("Try downloading anyway")
+                            Text(stringResource(R.string.try_downloading_anyway))
                         }
                         Spacer(Modifier.height(10.dp))
                         TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                            Text("Cancel")
+                            Text(stringResource(R.string.action_cancel))
                         }
                     }
                     if (showLoginDialog) {
@@ -395,7 +397,7 @@ fun SharePickerScreen(
                         if (hasVideoItems) {
                             Column(modifier = Modifier.padding(vertical = 8.dp)) {
                                 Text(
-                                    "Video quality",
+                                    stringResource(R.string.video_quality),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -443,7 +445,7 @@ fun SharePickerScreen(
                                                 contentAlignment = Alignment.Center,
                                             ) {
                                                 Text(
-                                                    quality.label,
+                                                    quality.displayLabel,
                                                     style = MaterialTheme.typography.labelLarge,
                                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
@@ -480,11 +482,11 @@ fun SharePickerScreen(
                             // same grid looked broken rather than intentional (reported live: "make
                             // the video thumbnail the same size as the picture thumbnail").
                             val compactVideo = isVideo && items.size == 1
-                            val itemA11yLabel = remember(item, selected, isVideo) {
-                                val type = if (isVideo) "Video" else "Image"
-                                val name = item.title ?: item.filename ?: "item ${item.num}"
-                                "$type $name, ${if (selected) "selected" else "not selected"}"
-                            }
+                            val itemType = stringResource(if (isVideo) R.string.video else R.string.image)
+                            val itemName = item.title ?: item.filename ?: stringResource(R.string.item_x, item.num)
+                            val itemA11yLabel = stringResource(
+                                if (selected) R.string.item_a11y_selected else R.string.item_a11y_not_selected, itemType, itemName,
+                            )
                             Column(
                                 modifier = Modifier
                                     .semantics(mergeDescendants = true) {
@@ -494,7 +496,7 @@ fun SharePickerScreen(
                                     }
                                     .clickable(
                                         onClick = toggle,
-                                        onClickLabel = if (selected) "Deselect item" else "Select item",
+                                        onClickLabel = if (selected) stringResource(R.string.deselect_item) else stringResource(R.string.select_item),
                                         role = Role.Checkbox,
                                     ),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),

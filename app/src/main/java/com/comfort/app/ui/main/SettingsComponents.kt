@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
@@ -333,7 +335,7 @@ internal fun SettingsSubPageHeader(
             ) {
                 Icon(
                     undoIcon,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.action_back),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp),
                 )
@@ -485,7 +487,7 @@ internal fun ConfirmDeleteSheet(title: String, message: String, confirmLabel: St
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = MaterialTheme.shapes.medium,
-                ) { Text("Cancel") }
+                ) { Text(stringResource(R.string.action_cancel)) }
                 Button(
                     onClick = onConfirm,
                     modifier = Modifier.weight(1f).height(50.dp),
@@ -690,7 +692,8 @@ internal fun SizeSheetField(
 ) {
     var showSheet by remember { mutableStateOf(false) }
 
-    fun format(value: String): String = if (value.isBlank()) "Unlimited" else {
+    val unlimited = stringResource(R.string.unlimited)
+    fun format(value: String): String = if (value.isBlank()) unlimited else {
         val num = value.filter { it.isDigit() || it == '.' }
         val suffix = value.filter { it.isLetter() }.lowercase()
         val unitLabel = units.firstOrNull { it.second == suffix }?.first ?: units[0].first
@@ -735,7 +738,7 @@ internal fun SizeSheetField(
                     value = numberText,
                     onValueChange = { numberText = it.filter { c -> c.isDigit() || c == '.' } },
                     modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    placeholder = { Text("Unlimited") },
+                    placeholder = { Text(stringResource(R.string.unlimited)) },
                     singleLine = true,
                     shape = MaterialTheme.shapes.medium,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
@@ -770,7 +773,7 @@ internal fun SizeSheetField(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     ConfirmCancelSplitButton(
-                        label = "Done",
+                        label = stringResource(R.string.done),
                         icon = Icons.Filled.FilledCheckCircle,
                         onConfirm = commitTyped,
                         onCancel = { showSheet = false },
@@ -794,7 +797,7 @@ internal fun ConfirmCancelSplitButton(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     confirmEnabled: Boolean = true,
-    cancelDescription: String = "Cancel",
+    cancelDescription: String = stringResource(R.string.action_cancel),
     // Every split button's look (settled live on the Queue cards, then applied everywhere): the
     // confirm half outline-only, the ✕ half in the light green of a selected filter chip.
     colors: ButtonColors = ButtonDefaults.buttonColors(

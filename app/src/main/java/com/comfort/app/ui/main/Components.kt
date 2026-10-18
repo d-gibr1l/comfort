@@ -1,5 +1,6 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -200,7 +201,7 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                 IconButton(onClick = { data.dismiss() }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Outlined.Close,
-                        contentDescription = "Dismiss",
+                        contentDescription = stringResource(R.string.dismiss),
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -225,6 +226,7 @@ fun DownloadEventSnackbars(
     queueItems: List<DownloadEntity>,
     snackbarHostState: SnackbarHostState,
 ) {
+    val eventsContext = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
     var seenFinishedIds by remember { mutableStateOf<Set<String>?>(null) }
@@ -236,7 +238,7 @@ fun DownloadEventSnackbars(
                 val item = historyItems.firstOrNull { it.id == id } ?: return@forEach
                 scope.launch {
                     snackbarHostState.showSnackbar(
-                        DownloadEventVisuals(isSuccess = true, message = "${item.title.ifBlank { "Download" }} finished")
+                        DownloadEventVisuals(isSuccess = true, message = eventsContext.getString(R.string.download_finished_named, item.title.ifBlank { eventsContext.getString(R.string.download_untitled) }))
                     )
                 }
             }
@@ -255,8 +257,11 @@ fun DownloadEventSnackbars(
                     snackbarHostState.showSnackbar(
                         DownloadEventVisuals(
                             isSuccess = false,
-                            message = "${item.title.ifBlank { "Download" }} failed" +
-                                (item.errorMessage?.takeIf { it.isNotBlank() }?.let { ": $it" } ?: ""),
+                            message = item.title.ifBlank { eventsContext.getString(R.string.download_untitled) }.let { title ->
+                                item.errorMessage?.takeIf { it.isNotBlank() }
+                                    ?.let { eventsContext.getString(R.string.download_failed_named_reason, title, it) }
+                                    ?: eventsContext.getString(R.string.download_failed_named, title)
+                            },
                         )
                     )
                 }
@@ -425,6 +430,7 @@ fun rememberUndoableDelete(
     snackbarHostState: SnackbarHostState,
 ): (Set<String>) -> Unit {
     val scope = rememberCoroutineScope()
+    val removeContext = androidx.compose.ui.platform.LocalContext.current
     return { ids ->
         if (ids.isNotEmpty()) {
             viewModel.hideForDeletion(ids)
@@ -432,8 +438,8 @@ fun rememberUndoableDelete(
                 var undone = false
                 try {
                     val result = snackbarHostState.showSnackbar(
-                        message = if (ids.size == 1) "Download removed" else "${ids.size} downloads removed",
-                        actionLabel = "Undo",
+                        message = removeContext.resources.getQuantityString(R.plurals.downloads_removed, ids.size, ids.size),
+                        actionLabel = removeContext.getString(R.string.undo),
                         duration = SnackbarDuration.Short,
                     )
                     undone = (result == androidx.compose.material3.SnackbarResult.ActionPerformed)

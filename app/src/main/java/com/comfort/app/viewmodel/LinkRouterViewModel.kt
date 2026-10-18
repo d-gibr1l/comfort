@@ -81,7 +81,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
                 _route.value = if (result.shouldUsePreviewSheet(trimmed)) LinkRoute.Preview(trimmed) else LinkRoute.Picker(trimmed, result)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _route.value = LinkRoute.Picker(trimmed, ListingResult(items = emptyList(), errorMessage = e.message ?: "Failed to load link", timedOut = false))
+                _route.value = LinkRoute.Picker(trimmed, ListingResult(items = emptyList(), errorMessage = e.message ?: getApplication<Application>().getString(com.comfort.app.R.string.failed_to_load_link), timedOut = false))
             }
         }
     }
@@ -147,10 +147,14 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         const val YT_DLP_PREVIEW_CAP_MS = 30_000L
     }
 
-    private fun titleFor(url: String) = "Downloading from ${VideoSiteRouter.siteName(url)}"
+    private fun titleFor(url: String) = getApplication<Application>().getString(com.comfort.app.R.string.downloading_from_x, VideoSiteRouter.siteName(url, getApplication<Application>().getString(com.comfort.app.R.string.this_link)))
 }
 
 /** The Toast after a one-tap download: duplicates are skipped and recorded under Library >
  * Duplicates (DownloadDispatcher's "Prevent duplicate downloads"). */
-fun startedMessage(result: EnqueueResult): String =
-    if (result is EnqueueResult.Duplicate) "Already downloaded — see Library > Duplicates" else "Download started"
+fun startedMessage(context: android.content.Context, result: EnqueueResult): String = context.getString(startedMessageRes(result))
+
+/** Which message [startedMessage] shows, as a string resource. */
+@androidx.annotation.StringRes
+fun startedMessageRes(result: EnqueueResult): Int =
+    if (result is EnqueueResult.Duplicate) com.comfort.app.R.string.already_downloaded_see_duplicates else com.comfort.app.R.string.download_started

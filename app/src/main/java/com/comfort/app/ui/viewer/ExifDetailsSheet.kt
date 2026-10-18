@@ -6,6 +6,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.res.stringResource
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -123,7 +124,7 @@ data class DetailedExifData(
 
 private val KNOWN_EXIF_TAGS = listOf(
     // Image Structure
-    "Image Structure" to listOf(
+    R.string.image_structure to listOf(
         ExifInterface.TAG_IMAGE_WIDTH,
         ExifInterface.TAG_IMAGE_LENGTH,
         ExifInterface.TAG_BITS_PER_SAMPLE,
@@ -139,7 +140,7 @@ private val KNOWN_EXIF_TAGS = listOf(
         ExifInterface.TAG_RESOLUTION_UNIT
     ),
     // Camera & Hardware
-    "Camera & Hardware" to listOf(
+    R.string.camera_hardware to listOf(
         ExifInterface.TAG_MAKE,
         ExifInterface.TAG_MODEL,
         ExifInterface.TAG_SOFTWARE,
@@ -154,7 +155,7 @@ private val KNOWN_EXIF_TAGS = listOf(
         ExifInterface.TAG_DEVICE_SETTING_DESCRIPTION
     ),
     // Capture & Exposure Parameters
-    "Capture Parameters" to listOf(
+    R.string.capture_parameters to listOf(
         ExifInterface.TAG_DATETIME,
         ExifInterface.TAG_DATETIME_ORIGINAL,
         ExifInterface.TAG_DATETIME_DIGITIZED,
@@ -189,7 +190,7 @@ private val KNOWN_EXIF_TAGS = listOf(
         ExifInterface.TAG_SCENE_TYPE
     ),
     // GPS & Positioning
-    "GPS & Location" to listOf(
+    R.string.gps_location to listOf(
         ExifInterface.TAG_GPS_VERSION_ID,
         ExifInterface.TAG_GPS_LATITUDE_REF,
         ExifInterface.TAG_GPS_LATITUDE,
@@ -248,7 +249,8 @@ suspend fun extractDetailedExif(context: Context, item: GalleryItem): DetailedEx
             val exif = ExifInterface(stream)
 
             // Extract known tags into raw tag list
-            for ((category, tags) in KNOWN_EXIF_TAGS) {
+            for ((categoryRes, tags) in KNOWN_EXIF_TAGS) {
+                val category = context.getString(categoryRes)
                 for (tagName in tags) {
                     val value = exif.getAttribute(tagName)
                     if (!value.isNullOrBlank()) {
@@ -280,48 +282,48 @@ suspend fun extractDetailedExif(context: Context, item: GalleryItem): DetailedEx
 
             val flashVal = exif.getAttributeInt(ExifInterface.TAG_FLASH, -1)
             if (flashVal != -1) {
-                flash = if (flashVal and 1 != 0) "Fired" else "Did not fire"
+                flash = if (flashVal and 1 != 0) context.getString(R.string.fired) else context.getString(R.string.did_not_fire)
             }
 
             val wbVal = exif.getAttributeInt(ExifInterface.TAG_WHITE_BALANCE, -1)
             if (wbVal != -1) {
-                whiteBalance = if (wbVal == ExifInterface.WHITE_BALANCE_AUTO.toInt()) "Auto White Balance" else "Manual White Balance"
+                whiteBalance = if (wbVal == ExifInterface.WHITE_BALANCE_AUTO.toInt()) context.getString(R.string.auto_white_balance) else context.getString(R.string.manual_white_balance)
             }
 
             val expModeVal = exif.getAttributeInt(ExifInterface.TAG_EXPOSURE_MODE, -1)
             if (expModeVal != -1) {
                 exposureMode = when (expModeVal) {
-                    ExifInterface.EXPOSURE_MODE_AUTO.toInt() -> "Auto Exposure"
-                    ExifInterface.EXPOSURE_MODE_MANUAL.toInt() -> "Manual Exposure"
-                    else -> "Auto Bracket"
+                    ExifInterface.EXPOSURE_MODE_AUTO.toInt() -> context.getString(R.string.auto_exposure)
+                    ExifInterface.EXPOSURE_MODE_MANUAL.toInt() -> context.getString(R.string.manual_exposure)
+                    else -> context.getString(R.string.auto_bracket)
                 }
             }
 
             val meterVal = exif.getAttributeInt(ExifInterface.TAG_METERING_MODE, -1)
             if (meterVal != -1) {
                 meteringMode = when (meterVal) {
-                    1 -> "Average"
-                    2 -> "Center-weighted Average"
-                    3 -> "Spot"
-                    4 -> "Multi-spot"
-                    5 -> "Pattern / Multi-segment"
-                    6 -> "Partial"
-                    else -> "Other"
+                    1 -> context.getString(R.string.average)
+                    2 -> context.getString(R.string.center_weighted_average)
+                    3 -> context.getString(R.string.spot)
+                    4 -> context.getString(R.string.multi_spot)
+                    5 -> context.getString(R.string.pattern_multi_segment)
+                    6 -> context.getString(R.string.partial)
+                    else -> context.getString(R.string.other)
                 }
             }
 
             val csVal = exif.getAttributeInt(ExifInterface.TAG_COLOR_SPACE, -1)
             if (csVal != -1) {
-                colorSpaceStr = if (csVal == 1) "sRGB" else "Uncalibrated / Adobe RGB"
+                colorSpaceStr = if (csVal == 1) "sRGB" else context.getString(R.string.uncalibrated_adobe_rgb)
             }
 
             val orientVal = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED)
             orientationStr = when (orientVal) {
-                ExifInterface.ORIENTATION_NORMAL -> "0° (Normal)"
-                ExifInterface.ORIENTATION_ROTATE_90 -> "90° Clockwise"
+                ExifInterface.ORIENTATION_NORMAL -> context.getString(R.string.n_0_normal)
+                ExifInterface.ORIENTATION_ROTATE_90 -> context.getString(R.string.n_90_clockwise)
                 ExifInterface.ORIENTATION_ROTATE_180 -> "180°"
-                ExifInterface.ORIENTATION_ROTATE_270 -> "270° Clockwise"
-                else -> "Default"
+                ExifInterface.ORIENTATION_ROTATE_270 -> context.getString(R.string.n_270_clockwise)
+                else -> context.getString(R.string.default_text)
             }
 
             imgW = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0)
@@ -375,7 +377,7 @@ suspend fun extractDetailedExif(context: Context, item: GalleryItem): DetailedEx
         } catch (_: Exception) {}
     }
 
-    val resStr = if (imgW > 0 && imgH > 0) "$imgW × $imgH px" else "Unknown Resolution"
+    val resStr = if (imgW > 0 && imgH > 0) "$imgW × $imgH px" else context.getString(R.string.unknown_resolution)
     val mpStr = if (imgW > 0 && imgH > 0) {
         val mp = (imgW.toLong() * imgH.toLong()) / 1_000_000.0
         String.format(Locale.US, "%.1f MP", mp)
@@ -390,14 +392,14 @@ suspend fun extractDetailedExif(context: Context, item: GalleryItem): DetailedEx
 
     val extension = item.name.substringAfterLast(".", "").uppercase(Locale.US)
     val formatDesc = when {
-        item.isVideo -> "Video ($extension)"
-        extension in listOf("JPG", "JPEG") -> "JPEG Image"
-        extension == "PNG" -> "PNG Image"
-        extension == "WEBP" -> "WebP Image"
-        extension == "HEIC" -> "HEIF / HEIC Image"
-        extension in listOf("DNG", "RAW", "CR2", "NEF") -> "RAW Digital Negative"
-        extension == "GIF" -> "Animated GIF"
-        else -> "$extension File"
+        item.isVideo -> context.getString(R.string.video_x, extension)
+        extension in listOf("JPG", "JPEG") -> context.getString(R.string.jpeg_image)
+        extension == "PNG" -> context.getString(R.string.png_image)
+        extension == "WEBP" -> context.getString(R.string.webp_image)
+        extension == "HEIC" -> context.getString(R.string.heif_heic_image)
+        extension in listOf("DNG", "RAW", "CR2", "NEF") -> context.getString(R.string.raw_digital_negative)
+        extension == "GIF" -> context.getString(R.string.animated_gif)
+        else -> context.getString(R.string.x_file, extension)
     }
 
     val album = item.path.substringBeforeLast("/", "").substringAfterLast("/", "Gallery")
@@ -503,14 +505,14 @@ fun ExifDetailsSheet(
                 ) {
                     Column {
                         Text(
-                            text = "Info & Metadata",
+                            text = stringResource(R.string.info_metadata),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             softWrap = false
                         )
                         Text(
-                            text = exifData?.formatDescription ?: "Media Details",
+                            text = exifData?.formatDescription ?: stringResource(R.string.media_details),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -524,7 +526,7 @@ fun ExifDetailsSheet(
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
-                        Icon(ImageVector.vectorResource(R.drawable.ic_ms_close), contentDescription = "Close")
+                        Icon(ImageVector.vectorResource(R.drawable.ic_ms_close), contentDescription = stringResource(R.string.close))
                     }
                 }
             }
@@ -571,7 +573,7 @@ fun ExifDetailsSheet(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = exifData?.formatDescription ?: "Image File",
+                                    text = exifData?.formatDescription ?: stringResource(R.string.image_file),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold,
@@ -590,7 +592,7 @@ fun ExifDetailsSheet(
 
                         if (createdDate != null) {
                             DetailKeyValueRow(
-                                label = "Date Taken / Created",
+                                label = stringResource(R.string.date_taken_created),
                                 value = formatFullTimestamp(createdDate),
                                 icon = ImageVector.vectorResource(R.drawable.ic_ms_calendar_month)
                             )
@@ -598,7 +600,7 @@ fun ExifDetailsSheet(
 
                         if (isModifiedDifferent) {
                             DetailKeyValueRow(
-                                label = "Date Modified",
+                                label = stringResource(R.string.date_modified),
                                 value = formatFullTimestamp(modifiedDate),
                                 icon = ImageVector.vectorResource(R.drawable.ic_ms_schedule)
                             )
@@ -606,7 +608,7 @@ fun ExifDetailsSheet(
 
                         // File Size Row
                         DetailKeyValueRow(
-                            label = "File Size",
+                            label = stringResource(R.string.file_size),
                             value = formatDetailedSize(galleryItem.size),
                             icon = ImageVector.vectorResource(R.drawable.ic_ms_description)
                         )
@@ -628,7 +630,7 @@ fun ExifDetailsSheet(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = "Geometry & Dimensions",
+                            text = stringResource(R.string.geometry_dimensions),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
@@ -641,14 +643,14 @@ fun ExifDetailsSheet(
                         ) {
                             // Pixel Dimensions
                             MetricBadgeBlock(
-                                label = "Dimensions",
-                                value = exifData?.resolutionString ?: "Unknown",
+                                label = stringResource(R.string.dimensions),
+                                value = exifData?.resolutionString ?: stringResource(R.string.unknown_site),
                                 modifier = Modifier.weight(1f)
                             )
                             // Megapixels
                             if (!exifData?.megapixelsString.isNullOrEmpty()) {
                                 MetricBadgeBlock(
-                                    label = "Pixel Count",
+                                    label = stringResource(R.string.pixel_count),
                                     value = exifData!!.megapixelsString,
                                     modifier = Modifier.weight(0.7f)
                                 )
@@ -662,7 +664,7 @@ fun ExifDetailsSheet(
                             // Aspect Ratio
                             if (!exifData?.aspectRatioString.isNullOrEmpty()) {
                                 MetricBadgeBlock(
-                                    label = "Aspect Ratio",
+                                    label = stringResource(R.string.aspect_ratio),
                                     value = exifData!!.aspectRatioString,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -670,7 +672,7 @@ fun ExifDetailsSheet(
                             // Color Space
                             exifData?.colorSpace?.let { cs ->
                                 MetricBadgeBlock(
-                                    label = "Color Space",
+                                    label = stringResource(R.string.color_space),
                                     value = cs,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -707,7 +709,7 @@ fun ExifDetailsSheet(
                                 )
                                 Column {
                                     Text(
-                                        text = exifData?.cameraModel ?: exifData?.cameraMaker ?: "Camera Optics",
+                                        text = exifData?.cameraModel ?: exifData?.cameraMaker ?: stringResource(R.string.camera_optics),
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         softWrap = false,
@@ -732,7 +734,7 @@ fun ExifDetailsSheet(
                             ) {
                                 exifData?.aperture?.let { ap ->
                                     ExposureBadge(
-                                        label = "Aperture",
+                                        label = stringResource(R.string.aperture),
                                         value = ap,
                                         icon = ImageVector.vectorResource(R.drawable.ic_ms_photo_camera),
                                         modifier = Modifier.weight(1f)
@@ -740,7 +742,7 @@ fun ExifDetailsSheet(
                                 }
                                 exifData?.shutterSpeed?.let { ss ->
                                     ExposureBadge(
-                                        label = "Shutter",
+                                        label = stringResource(R.string.shutter),
                                         value = ss,
                                         icon = ImageVector.vectorResource(R.drawable.ic_ms_schedule),
                                         modifier = Modifier.weight(1f)
@@ -762,7 +764,7 @@ fun ExifDetailsSheet(
                                 }
                                 (exifData?.focalLength35mm ?: exifData?.focalLength)?.let { fl ->
                                     ExposureBadge(
-                                        label = "Focal Length",
+                                        label = stringResource(R.string.focal_length),
                                         value = fl,
                                         icon = ImageVector.vectorResource(R.drawable.ic_ms_center_focus_strong),
                                         modifier = Modifier.weight(1f)
@@ -772,10 +774,10 @@ fun ExifDetailsSheet(
 
                             // Additional parameters
                             exifData?.flash?.let { fl ->
-                                DetailKeyValueRow(label = "Flash", value = fl, icon = ImageVector.vectorResource(R.drawable.ic_ms_bolt))
+                                DetailKeyValueRow(label = stringResource(R.string.flash), value = fl, icon = ImageVector.vectorResource(R.drawable.ic_ms_bolt))
                             }
                             exifData?.whiteBalance?.let { wb ->
-                                DetailKeyValueRow(label = "White Balance", value = wb, icon = ImageVector.vectorResource(R.drawable.ic_ms_tune))
+                                DetailKeyValueRow(label = stringResource(R.string.white_balance), value = wb, icon = ImageVector.vectorResource(R.drawable.ic_ms_tune))
                             }
                         }
                     }
@@ -816,7 +818,7 @@ fun ExifDetailsSheet(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Text(
-                                        text = "Location Coordinates",
+                                        text = stringResource(R.string.location_coordinates),
                                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         softWrap = false
@@ -830,8 +832,8 @@ fun ExifDetailsSheet(
                                     modifier = Modifier.clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        clipboard.setPrimaryClip(ClipData.newPlainText("Coordinates", "$lat, $lng"))
-                                        Toast.makeText(context, "Coordinates copied!", Toast.LENGTH_SHORT).show()
+                                        clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.coordinates), "$lat, $lng"))
+                                        Toast.makeText(context, context.getString(R.string.coordinates_copied), Toast.LENGTH_SHORT).show()
                                     }
                                 ) {
                                     Row(
@@ -839,9 +841,9 @@ fun ExifDetailsSheet(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        Icon(ImageVector.vectorResource(R.drawable.ic_ms_content_copy), contentDescription = "Copy", modifier = Modifier.size(14.dp))
+                                        Icon(ImageVector.vectorResource(R.drawable.ic_ms_content_copy), contentDescription = stringResource(R.string.copy), modifier = Modifier.size(14.dp))
                                         Text(
-                                            "Copy",
+                                            stringResource(R.string.copy),
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                             maxLines = 1,
                                             softWrap = false
@@ -867,7 +869,7 @@ fun ExifDetailsSheet(
                                     try {
                                         context.startActivity(mapIntent)
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "No map application available", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.no_map_application_available), Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 shape = ShapeFull,
@@ -880,7 +882,7 @@ fun ExifDetailsSheet(
                                 Icon(ImageVector.vectorResource(R.drawable.ic_ms_map), contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    "Open in Maps",
+                                    stringResource(R.string.open_in_maps),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                     maxLines = 1,
                                     softWrap = false
@@ -905,7 +907,7 @@ fun ExifDetailsSheet(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Storage Path & Album",
+                            text = stringResource(R.string.storage_path_album),
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -917,7 +919,7 @@ fun ExifDetailsSheet(
                         ) {
                             Icon(ImageVector.vectorResource(R.drawable.ic_ms_folder), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                             Text(
-                                text = exifData?.albumName ?: "Gallery",
+                                text = exifData?.albumName ?: stringResource(R.string.gallery),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 maxLines = 1,
                                 softWrap = false
@@ -953,7 +955,7 @@ fun ExifDetailsSheet(
                     Icon(ImageVector.vectorResource(R.drawable.ic_ms_code), contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "View Deep Metadata (${exifData?.allTags?.size ?: 0} Tags)",
+                        stringResource(R.string.view_deep_metadata_x_tags, exifData?.allTags?.size ?: 0),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                         maxLines = 1,
                         softWrap = false
@@ -1015,14 +1017,14 @@ private fun DeepMetadataInspectorSheet(
             ) {
                 Column {
                     Text(
-                        text = "Deep EXIF Metadata",
+                        text = stringResource(R.string.deep_exif_metadata),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         softWrap = false
                     )
                     Text(
-                        text = "${filteredTags.size} tags available",
+                        text = stringResource(R.string.x_tags_available, filteredTags.size),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -1038,8 +1040,8 @@ private fun DeepMetadataInspectorSheet(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         val formattedDump = allTags.joinToString("\n") { "[${it.category}] ${it.tag} = ${it.value}" }
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("EXIF Dump", formattedDump))
-                        Toast.makeText(context, "All metadata copied to clipboard!", Toast.LENGTH_SHORT).show()
+                        clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.exif_dump), formattedDump))
+                        Toast.makeText(context, context.getString(R.string.all_metadata_copied_to_clipboard), Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Row(
@@ -1049,7 +1051,7 @@ private fun DeepMetadataInspectorSheet(
                     ) {
                         Icon(ImageVector.vectorResource(R.drawable.ic_ms_content_copy), contentDescription = null, modifier = Modifier.size(16.dp))
                         Text(
-                            "Copy All",
+                            stringResource(R.string.copy_all_2),
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             maxLines = 1,
                             softWrap = false
@@ -1065,12 +1067,12 @@ private fun DeepMetadataInspectorSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
-                placeholder = { Text("Filter metadata tags…", style = MaterialTheme.typography.bodyMedium) },
+                placeholder = { Text(stringResource(R.string.filter_metadata_tags), style = MaterialTheme.typography.bodyMedium) },
                 leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_search), contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(ImageVector.vectorResource(R.drawable.ic_ms_close), contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                            Icon(ImageVector.vectorResource(R.drawable.ic_ms_close), contentDescription = stringResource(R.string.search_clear), modifier = Modifier.size(16.dp))
                         }
                     }
                 },
@@ -1091,7 +1093,7 @@ private fun DeepMetadataInspectorSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No metadata tags match \"$searchQuery\"",
+                        text = stringResource(R.string.no_metadata_tags_match_x, searchQuery),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1113,7 +1115,7 @@ private fun DeepMetadataInspectorSheet(
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     clipboard.setPrimaryClip(ClipData.newPlainText(tagItem.tag, tagItem.value))
-                                    Toast.makeText(context, "${tagItem.tag} copied!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.x_copied, tagItem.tag), Toast.LENGTH_SHORT).show()
                                 }
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {

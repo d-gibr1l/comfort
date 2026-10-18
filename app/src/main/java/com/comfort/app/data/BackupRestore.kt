@@ -71,7 +71,7 @@ object BackupRestore {
             historyCount = downloads.length()
             root.put("history", JSONObject().put("downloads", downloads).put("saved_files", files))
         }
-        val out = context.contentResolver.openOutputStream(uri, "wt") ?: error("Couldn't open the file")
+        val out = context.contentResolver.openOutputStream(uri, "wt") ?: error(context.getString(com.comfort.app.R.string.backup_couldnt_open_file))
         out.use { it.write(root.toString().toByteArray(Charsets.UTF_8)) }
         Contents(settingsCount, cookies.isNotBlank(), historyCount)
     }
@@ -89,7 +89,7 @@ object BackupRestore {
     /** Reads [uri]; throws [IllegalArgumentException] if it isn't a Comfort backup. */
     suspend fun read(context: Context, uri: Uri): Backup = withContext(Dispatchers.IO) {
         val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
-            ?: error("Couldn't open the file")
+            ?: error(context.getString(com.comfort.app.R.string.backup_couldnt_open_file))
         val root = runCatching { JSONObject(text) }.getOrNull()
         require(root != null && root.optString("format") == FORMAT) { "Not a Comfort backup" }
         Backup(root)

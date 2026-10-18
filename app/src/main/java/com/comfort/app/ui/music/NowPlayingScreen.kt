@@ -1,5 +1,7 @@
 package com.comfort.app.ui.music
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -222,12 +224,12 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                     // Auxio's top bar: close, "Now playing" over where in the queue, and the queue.
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Close player", tint = Color.White, modifier = Modifier.size(30.dp))
+                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.close_player), tint = Color.White, modifier = Modifier.size(30.dp))
                         }
                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Now playing", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Text(
-                                if (state.count > 1) "Song ${state.index + 1} of ${state.count}" else "Your Library",
+                                if (state.count > 1) stringResource(R.string.song_x_of_x, state.index + 1, state.count) else stringResource(R.string.your_library),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White.copy(alpha = 0.7f),
                             )
@@ -250,7 +252,7 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                             }
                         }
                         IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = "Queue", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = stringResource(R.string.queue), tint = Color.White)
                         }
                     }
 
@@ -374,7 +376,7 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                     ) {
                         Box(Modifier.size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.5f)))
                         Spacer(Modifier.height(6.dp))
-                        Text("Queue", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
+                        Text(stringResource(R.string.queue), style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
                     }
                 }
                     } else {
@@ -500,9 +502,9 @@ private fun PlaybackButtons(state: com.comfort.app.music.MusicState) {
         ToggleButton(
             icon = if (state.repeatMode == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
             description = when (state.repeatMode) {
-                Player.REPEAT_MODE_ONE -> "Repeat this song"
-                Player.REPEAT_MODE_ALL -> "Repeat all"
-                else -> "Repeat off"
+                Player.REPEAT_MODE_ONE -> stringResource(R.string.repeat_this_song)
+                Player.REPEAT_MODE_ALL -> stringResource(R.string.repeat_all)
+                else -> stringResource(R.string.repeat_off)
             },
             checked = state.repeatMode != Player.REPEAT_MODE_OFF,
             onClick = {
@@ -511,20 +513,20 @@ private fun PlaybackButtons(state: com.comfort.app.music.MusicState) {
             },
             modifier = Modifier.weight(1f),
         )
-        ControlButton(Icons.Rounded.SkipPrevious, "Previous", { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() }, Color.White.copy(alpha = 0.16f), Color.White, Modifier.weight(1.2f))
+        ControlButton(Icons.Rounded.SkipPrevious, stringResource(R.string.widget_music_previous), { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() }, Color.White.copy(alpha = 0.16f), Color.White, Modifier.weight(1.2f))
         ControlButton(
             if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-            if (state.isPlaying) "Pause" else "Play",
+            if (state.isPlaying) stringResource(R.string.widget_music_pause) else stringResource(R.string.widget_music_play),
             MusicPlayer::togglePlay,
             Color.White,
             Color.Black,
             Modifier.weight(2f),
             iconSize = 36.dp,
         )
-        ControlButton(Icons.Rounded.SkipNext, "Next", { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.next() }, Color.White.copy(alpha = 0.16f), Color.White, Modifier.weight(1.2f))
+        ControlButton(Icons.Rounded.SkipNext, stringResource(R.string.widget_music_next), { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.next() }, Color.White.copy(alpha = 0.16f), Color.White, Modifier.weight(1.2f))
         ToggleButton(
             icon = Icons.Rounded.Shuffle,
-            description = if (state.shuffle) "Shuffle on" else "Shuffle off",
+            description = if (state.shuffle) stringResource(R.string.shuffle_on) else stringResource(R.string.shuffle_off),
             checked = state.shuffle,
             onClick = {
                 haptics.performHapticFeedback(
@@ -572,6 +574,7 @@ private fun ToggleButton(
     onClick: () -> Unit,
     modifier: Modifier,
 ) {
+    val toggleState = stringResource(if (checked) R.string.on else R.string.sponsorblock_off)
     androidx.compose.material3.Surface(
         onClick = onClick,
         shape = RoundedCornerShape(36.dp),
@@ -580,7 +583,7 @@ private fun ToggleButton(
         border = if (checked) null else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
         modifier = modifier.height(56.dp).semantics {
             contentDescription = description
-            stateDescription = if (checked) "On" else "Off"
+            stateDescription = toggleState
         },
     ) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp)) }
@@ -594,11 +597,11 @@ private fun SongMenu(song: Song?) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = "More options", tint = Color.White)
+            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White)
         }
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             androidx.compose.material3.DropdownMenuItem(
-                text = { Text("Share") },
+                text = { Text(stringResource(R.string.share)) },
                 leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                 enabled = song != null && song.uri != android.net.Uri.EMPTY,
                 onClick = {
@@ -655,7 +658,7 @@ private fun QueueLayout(
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
                 modifier = Modifier.size(width = 48.dp, height = 44.dp),
             ) {
-                Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = if (state.isPlaying) "Pause" else "Play")
+                Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = if (state.isPlaying) stringResource(R.string.widget_music_pause) else stringResource(R.string.widget_music_play))
             }
             Spacer(Modifier.size(6.dp))
             androidx.compose.material3.OutlinedIconButton(
@@ -665,7 +668,7 @@ private fun QueueLayout(
                 colors = IconButtonDefaults.outlinedIconButtonColors(contentColor = Color.White),
                 modifier = Modifier.size(44.dp),
             ) {
-                Icon(Icons.Rounded.SkipNext, contentDescription = "Next")
+                Icon(Icons.Rounded.SkipNext, contentDescription = stringResource(R.string.widget_music_next))
             }
         }
         androidx.compose.material3.LinearProgressIndicator(

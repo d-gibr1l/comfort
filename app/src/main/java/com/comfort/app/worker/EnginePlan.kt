@@ -15,7 +15,7 @@ internal interface EngineExecutor {
     /** Paused or cancelled: no further engine should start. */
     val isStopped: Boolean
     /** The download can't run at all — reported as its error (an engine it needs is turned off). */
-    fun fail(message: String)
+    fun fail(@androidx.annotation.StringRes message: Int)
     /** Whether gallery-dl's listing, running alongside the download (see YtDlpFirst), found
      * pictures — waits for it to finish. False when no listing runs alongside. */
     suspend fun listedImages(): Boolean = false
@@ -71,7 +71,7 @@ internal sealed interface EnginePlan {
 
     /** No engine that can handle the link is on: the download fails straight away with [message]
      * instead of an engine error that doesn't say why. */
-    data class Unavailable(val message: String) : EnginePlan {
+    data class Unavailable(@androidx.annotation.StringRes val message: Int) : EnginePlan {
         override suspend fun execute(executor: EngineExecutor) = executor.fail(message)
     }
 
@@ -209,9 +209,10 @@ internal sealed interface EnginePlan {
             }
         }
 
-        const val OFF_YT_DLP = "yt-dlp is turned off (Settings › Updates and engines) — it's the only engine that can download this link."
-        const val OFF_SPOTIFY = "Spotify downloads need yt-dlp, which is turned off (Settings › Updates and engines)."
-        const val OFF_BOTH = "gallery-dl and yt-dlp are both turned off (Settings › Updates and engines)."
-        const val OFF_GALLERY_DL_ONLY = "This site is set to gallery-dl only, and gallery-dl is turned off (Settings › Updates and engines)."
+        // String resources (not const: R's ids aren't compile-time constants in a library-style R).
+        val OFF_YT_DLP get() = com.comfort.app.R.string.engine_off_yt_dlp
+        val OFF_SPOTIFY get() = com.comfort.app.R.string.engine_off_spotify
+        val OFF_BOTH get() = com.comfort.app.R.string.engine_off_both
+        val OFF_GALLERY_DL_ONLY get() = com.comfort.app.R.string.engine_off_gallery_dl_only
     }
 }

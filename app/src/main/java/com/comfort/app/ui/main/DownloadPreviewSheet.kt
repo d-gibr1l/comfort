@@ -1,6 +1,9 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.comfort.app.R
 import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -682,9 +685,9 @@ private fun PreviewSheetOverlayHost(
             filenameTemplate = filenameTemplate,
             onCopyLink = {
                 scope.launch {
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Link", url)))
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(context.getString(R.string.link), url)))
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                     }
                 }
             },
@@ -863,9 +866,9 @@ private fun PreviewSheetOverlayHost(
                                             extraCommands = commands,
                                         )
                                         scope.launch {
-                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("yt-dlp command", fullCmd)))
+                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(context.getString(R.string.yt_dlp_command), fullCmd)))
                                             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                                                Toast.makeText(context, "Command copied", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, context.getString(R.string.command_copied), Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     },
@@ -942,7 +945,7 @@ private fun AudioFormatChip(
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
-        PreviewChip(label = format.label, icon = Icons.Outlined.MusicNote, shape = shape, onClick = { open = true })
+        PreviewChip(label = format.displayLabel, icon = Icons.Outlined.MusicNote, shape = shape, onClick = { open = true })
         DropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
@@ -953,7 +956,7 @@ private fun AudioFormatChip(
             modifier = Modifier.width(264.dp),
         ) {
             Text(
-                "Save audio as",
+                stringResource(R.string.save_audio_as),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 6.dp),
@@ -975,7 +978,7 @@ private fun AudioFormatChip(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            option.label,
+                            option.displayLabel,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
@@ -1002,12 +1005,13 @@ private fun AudioFormatChip(
     }
 }
 
+@Composable
 private fun audioFormatHint(format: AudioFormat): String = when (format) {
-    AudioFormat.ORIGINAL -> "As the site sends it, not re-encoded"
-    AudioFormat.MP3 -> "Plays on anything"
-    AudioFormat.M4A -> "AAC, small and good quality"
-    AudioFormat.OPUS -> "Smallest at the same quality"
-    AudioFormat.FLAC -> "Lossless, biggest file"
+    AudioFormat.ORIGINAL -> stringResource(R.string.as_the_site_sends_it_not)
+    AudioFormat.MP3 -> stringResource(R.string.plays_on_anything)
+    AudioFormat.M4A -> stringResource(R.string.aac_small_and_good_quality)
+    AudioFormat.OPUS -> stringResource(R.string.smallest_at_the_same_quality)
+    AudioFormat.FLAC -> stringResource(R.string.lossless_biggest_file)
 }
 
 /** [icon] is the chip's own resting icon (what it *is*); the selected state replaces it with a
@@ -1048,14 +1052,14 @@ private fun PreviewChip(
  * has to fit five of them across a phone, so it uses tighter text than the full-width Settings
  * picker does for the same enum. */
 private val VideoQuality.chipLabel: String
-    get() = when (this) {
-        VideoQuality.BEST -> "Best Available"
+    @Composable get() = when (this) {
+        VideoQuality.BEST -> stringResource(R.string.best_available)
         VideoQuality.P2160 -> "4K"
         VideoQuality.P1440 -> "1440"
         VideoQuality.P1080 -> "1080"
         VideoQuality.P720 -> "720"
         VideoQuality.P480 -> "480"
-        VideoQuality.AUDIO_ONLY -> "Audio"
+        VideoQuality.AUDIO_ONLY -> stringResource(R.string.audio)
     }
 
 /** Bytes as the compact size the preview card shows ("10mb"). */
@@ -1181,18 +1185,18 @@ private fun MainPreviewScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(onClick = onCopyLink, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy link")
+                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_link))
             }
             // Only SONG_LIST has a selection to toggle — the control TrackListHeader used to
             // provide before it was removed, moved here so it survives without needing its own
             // dedicated row.
             if (isList) {
                 TextButton(onClick = song.onToggleAll) {
-                    Text(if (song.selectedNums.size == song.tracks.size) "Deselect all" else "Select all")
+                    Text(if (song.selectedNums.size == song.tracks.size) stringResource(R.string.deselect_all) else stringResource(R.string.select_all))
                 }
             }
             FilledTonalIconButton(onClick = onCancel, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Outlined.HighlightOff, contentDescription = "Cancel")
+                Icon(Icons.Outlined.HighlightOff, contentDescription = stringResource(R.string.action_cancel))
             }
         }
 
@@ -1305,7 +1309,7 @@ private fun MainPreviewScreen(
                 ) {
                     Spacer(modifier = Modifier.width(12.dp))
                     PreviewChip(
-                        label = "Auto engine",
+                        label = stringResource(R.string.auto_engine),
                         selected = engine == null,
                         icon = Icons.Outlined.Tune,
                         shape = FIRST_CHIP_SHAPE,
@@ -1338,14 +1342,14 @@ private fun MainPreviewScreen(
                     ) {
                         Spacer(modifier = Modifier.width(12.dp))
                         PreviewChip(
-                            label = "Save thumbnail",
+                            label = stringResource(R.string.save_thumbnail),
                             selected = saveThumbnail,
                             icon = Icons.Outlined.Image,
                             shape = FIRST_CHIP_SHAPE,
                             onClick = onToggleSaveThumbnail,
                         )
                         PreviewChip(
-                            label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
+                            label = if (commandCount > 0) stringResource(R.string.commands_x, commandCount) else stringResource(R.string.add_extra_commands),
                             selected = commandCount > 0,
                             icon = Icons.Outlined.Terminal,
                             shape = LAST_CHIP_SHAPE,
@@ -1367,7 +1371,7 @@ private fun MainPreviewScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         if (showTrim) {
                             PreviewChip(
-                                label = "Trim Video",
+                                label = stringResource(R.string.trim_video),
                                 selected = trimmed,
                                 icon = Icons.Outlined.ContentCut,
                                 shape = FIRST_CHIP_SHAPE,
@@ -1391,7 +1395,7 @@ private fun MainPreviewScreen(
                             )
                         }
                         PreviewChip(
-                            label = "Filename Templates",
+                            label = stringResource(R.string.filename_templates),
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
                             shape = LAST_CHIP_SHAPE,
@@ -1414,21 +1418,21 @@ private fun MainPreviewScreen(
                             onChange = onAudioFormatChange,
                         )
                         PreviewChip(
-                            label = "Save cover art",
+                            label = stringResource(R.string.save_cover_art),
                             selected = saveThumbnail,
                             icon = Icons.Outlined.Image,
                             shape = MIDDLE_CHIP_SHAPE,
                             onClick = onToggleSaveThumbnail,
                         )
                         PreviewChip(
-                            label = if (commandCount > 0) "Commands ($commandCount)" else "Add extra Commands",
+                            label = if (commandCount > 0) stringResource(R.string.commands_x, commandCount) else stringResource(R.string.add_extra_commands),
                             selected = commandCount > 0,
                             icon = Icons.Outlined.Terminal,
                             shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenCommands,
                         )
                         PreviewChip(
-                            label = "Filename Templates",
+                            label = stringResource(R.string.filename_templates),
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
                             shape = LAST_CHIP_SHAPE,
@@ -1469,7 +1473,7 @@ private fun MainPreviewScreen(
             // only after tapping — replaces the old flow where this always said "Download" and a
             // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
             // action to confirm.
-            Text("${if (isDuplicate) "Redownload" else "Download"}$countSuffix")
+            Text(stringResource(if (isDuplicate) R.string.redownload else R.string.download_action) + countSuffix)
         }
     }
 }
@@ -1521,7 +1525,7 @@ private fun VideoPreviewCard(
             }
             Spacer(Modifier.height(12.dp))
             Text(
-                title ?: if (loading) "Loading…" else "Untitled",
+                title ?: if (loading) stringResource(R.string.loading) else stringResource(R.string.untitled),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
@@ -1615,7 +1619,7 @@ private fun SongPreviewCard(
                             modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(4.dp))
-                        Text("Song", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.song), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     }
                     Spacer(Modifier.height(4.dp))
                     if (title != null) {
@@ -1636,14 +1640,14 @@ private fun SongPreviewCard(
                             )
                             Icon(
                                 Icons.Outlined.Edit,
-                                contentDescription = "Title and artist are editable",
+                                contentDescription = stringResource(R.string.title_and_artist_are_editable),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 6.dp).size(16.dp),
                             )
                         }
                     } else {
                         Text(
-                            if (loading) loadingStatus ?: "Loading…" else "Untitled",
+                            if (loading) loadingStatus ?: stringResource(R.string.loading) else stringResource(R.string.untitled),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
@@ -1692,7 +1696,7 @@ private fun SongPreviewCard(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "Audio · ${formatFilesize(filesizeBytes)}",
+                        stringResource(R.string.audio_x, formatFilesize(filesizeBytes)),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1778,7 +1782,7 @@ private fun AlbumHeader(
                     modifier = Modifier.size(14.dp),
                 )
                 Spacer(Modifier.width(4.dp))
-                Text("Album", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.album), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.height(2.dp))
             Text(
@@ -1790,7 +1794,7 @@ private fun AlbumHeader(
             )
             val details = listOfNotNull(
                 artist,
-                if (trackCount == 1) "1 song" else "$trackCount songs",
+                pluralStringResource(R.plurals.song_count, trackCount, trackCount),
                 totalDurationMs?.let { formatDurationShort(it) },
             ).joinToString(" · ")
             Text(
@@ -1861,7 +1865,7 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
                 ) {
                     Icon(
                         if (track.isVideo) Icons.Outlined.PlayArrow else Icons.Outlined.Image,
-                        contentDescription = if (track.isVideo) "Video" else "Picture",
+                        contentDescription = if (track.isVideo) stringResource(R.string.video) else stringResource(R.string.picture),
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(14.dp),
                     )
@@ -1871,7 +1875,7 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                track.title ?: "Untitled",
+                track.title ?: stringResource(R.string.untitled),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -2061,7 +2065,7 @@ private fun ExtraCommandsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Current Command",
+                stringResource(R.string.current_command),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
@@ -2069,7 +2073,7 @@ private fun ExtraCommandsScreen(
                 onClick = onCopy,
                 modifier = Modifier.size(48.dp),
             ) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy current command")
+                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_current_command))
             }
         }
 
@@ -2110,7 +2114,7 @@ private fun ExtraCommandsScreen(
                         trailingIcon = {
                             Icon(
                                 Icons.Outlined.Close,
-                                contentDescription = "Remove $cmd",
+                                contentDescription = stringResource(R.string.remove_x_2, cmd),
                                 modifier = Modifier.size(16.dp),
                             )
                         },
@@ -2163,11 +2167,11 @@ private fun ExtraCommandsScreen(
             value = input,
             onValueChange = { input = it },
             modifier = Modifier.fillMaxWidth().height(50.dp).clearFocusOnKeyboardDismiss(),
-            placeholder = { Text("Add Command") },
+            placeholder = { Text(stringResource(R.string.add_command)) },
             leadingIcon = { Icon(Icons.Outlined.Terminal, contentDescription = null) },
             trailingIcon = {
                 Box(modifier = Modifier.padding(end = 8.dp)) {
-                    PreviewChip(label = "Add", onClick = { add() })
+                    PreviewChip(label = stringResource(R.string.add), onClick = { add() })
                 }
             },
             singleLine = true,
@@ -2181,8 +2185,8 @@ private fun ExtraCommandsScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = "Cancel", onClick = onCancel)
-            PreviewChip(label = "Done", selected = true, onClick = onDone)
+            PreviewChip(label = stringResource(R.string.action_cancel), onClick = onCancel)
+            PreviewChip(label = stringResource(R.string.done), selected = true, onClick = onDone)
         }
     }
 }
@@ -2305,7 +2309,7 @@ private fun TrimVideoScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "Trim video",
+            stringResource(R.string.trim_video_2),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(start = 16.dp),
         )
@@ -2443,7 +2447,7 @@ private fun TrimVideoScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PreviewChip(
-                label = "Set Start",
+                label = stringResource(R.string.set_start),
                 onClick = {
                     val hasActivePlayer = streamUrls.isNotEmpty() && !streamLoadFailed && exoPlayer.playbackState != androidx.media3.common.Player.STATE_IDLE
                     val newStart = if (hasActivePlayer) exoPlayer.currentPosition else playheadMs
@@ -2458,7 +2462,7 @@ private fun TrimVideoScreen(
                 },
             )
             PreviewChip(
-                label = "Set End",
+                label = stringResource(R.string.set_end),
                 onClick = {
                     val hasActivePlayer = streamUrls.isNotEmpty() && !streamLoadFailed && exoPlayer.playbackState != androidx.media3.common.Player.STATE_IDLE
                     val newEnd = if (hasActivePlayer) exoPlayer.currentPosition else playheadMs
@@ -2503,7 +2507,7 @@ private fun TrimVideoScreen(
                         }
                     }
                 },
-                label = { Text("Start") },
+                label = { Text(stringResource(R.string.start)) },
                 singleLine = true,
                 modifier = Modifier
                     .weight(1f)
@@ -2526,7 +2530,7 @@ private fun TrimVideoScreen(
                         }
                     }
                 },
-                label = { Text("End") },
+                label = { Text(stringResource(R.string.end)) },
                 singleLine = true,
                 modifier = Modifier
                     .weight(1f)
@@ -2561,13 +2565,13 @@ private fun TrimVideoScreen(
                     },
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Icon(Icons.Outlined.Delete, contentDescription = "Delete segment")
+                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete_segment))
                 }
             }
             ChipRow(modifier = Modifier.weight(1f)) {
                 segments.forEachIndexed { index, segment ->
                     PreviewChip(
-                        label = "Cut ${index + 1}",
+                        label = stringResource(R.string.cut_x, index + 1),
                         selected = segment.id == activeId,
                         onClick = {
                             activeId = segment.id
@@ -2576,7 +2580,7 @@ private fun TrimVideoScreen(
                     )
                 }
                 PreviewChip(
-                    label = "Add a segment",
+                    label = stringResource(R.string.add_a_segment),
                     onClick = {
                         // Clamped against the real duration once it's known — repeatedly tapping
                         // this used to keep stacking 30s blocks past the actual end of the video
@@ -2601,8 +2605,8 @@ private fun TrimVideoScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = "Cancel", onClick = onCancel)
-            PreviewChip(label = "Done", selected = true, onClick = onDone)
+            PreviewChip(label = stringResource(R.string.action_cancel), onClick = onCancel)
+            PreviewChip(label = stringResource(R.string.done), selected = true, onClick = onDone)
         }
     }
 }
@@ -2644,13 +2648,13 @@ private fun FilenameTemplatesScreen(
         val onAddTemplate = {
             val trimmed = input.trim()
             when {
-                trimmed.isEmpty() -> message = "Enter a template first"
+                trimmed.isEmpty() -> message = context.getString(R.string.enter_a_template_first)
                 !GalleryDlPreferences.addFilenameTemplate(context, trimmed) ->
-                    message = "That template is already saved"
+                    message = context.getString(R.string.that_template_is_already_saved)
                 else -> {
                     onApply(trimmed)
                     input = ""
-                    message = "Template saved and applied"
+                    message = context.getString(R.string.template_saved_and_applied)
                 }
             }
         }
@@ -2659,7 +2663,7 @@ private fun FilenameTemplatesScreen(
             value = input,
             onValueChange = { input = it; message = null },
             modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-            label = { Text("Add FileName template") },
+            label = { Text(stringResource(R.string.add_filename_template)) },
             leadingIcon = { Icon(Icons.Outlined.Tag, contentDescription = null) },
             singleLine = true,
             shape = MaterialTheme.shapes.medium,
@@ -2673,9 +2677,9 @@ private fun FilenameTemplatesScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = "View Templates", onClick = onViewTemplates)
+            PreviewChip(label = stringResource(R.string.view_templates), onClick = onViewTemplates)
             PreviewChip(
-                label = "Add",
+                label = stringResource(R.string.add),
                 onClick = onAddTemplate,
             )
         }
@@ -2685,8 +2689,8 @@ private fun FilenameTemplatesScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = "Cancel", onClick = onCancel)
-            PreviewChip(label = "Done", selected = true, onClick = onDone)
+            PreviewChip(label = stringResource(R.string.action_cancel), onClick = onCancel)
+            PreviewChip(label = stringResource(R.string.done), selected = true, onClick = onDone)
         }
     }
 }
@@ -2712,9 +2716,9 @@ private fun ViewTemplatesScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
             }
-            Text("Saved templates", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.saved_templates), style = MaterialTheme.typography.titleMedium)
         }
 
         if (templates.isEmpty()) {
@@ -2724,7 +2728,7 @@ private fun ViewTemplatesScreen(
                 color = MaterialTheme.colorScheme.secondaryContainer,
             ) {
                 Text(
-                    "No saved templates yet. Add one on the previous screen and it'll show up here.",
+                    stringResource(R.string.no_saved_templates_yet_add_one),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(16.dp),
@@ -2765,7 +2769,7 @@ private fun ViewTemplatesScreen(
                             ) {
                                 Icon(
                                     Icons.Outlined.Delete,
-                                    contentDescription = "Delete template",
+                                    contentDescription = stringResource(R.string.delete_template),
                                     modifier = Modifier.size(18.dp)
                                 )
                             }

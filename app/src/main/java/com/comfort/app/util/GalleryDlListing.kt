@@ -247,7 +247,9 @@ object GalleryDlListing {
     private val listingCache = java.util.concurrent.ConcurrentHashMap<String, CachedListing>()
     private const val LISTING_CACHE_MS = 20 * 60 * 1000L
 
-    fun sanitizeErrorMessage(raw: String): String? {
+    /** [resources]: the language its generic "not usable" line is in; without, English (enough
+     * for callers that only check whether the message changed). */
+    fun sanitizeErrorMessage(raw: String, resources: android.content.res.Resources? = null): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
         // Structural markup (an actual HTML/CSS blob, real gallery-dl AbortExtraction garbage —
@@ -260,7 +262,8 @@ object GalleryDlListing {
         // full replacement threw away the one actually-informative sentence at the front of it.
         // Truncating instead keeps that sentence and only drops the boilerplate tail.
         if (MARKUP_LIKE_REGEX.containsMatchIn(trimmed.take(200))) {
-            return "This site didn't return a usable response for this link — it may require login, or this URL might not be supported."
+            return resources?.getString(com.comfort.app.R.string.listing_no_usable_response)
+                ?: "This site didn't return a usable response for this link — it may require login, or this URL might not be supported."
         }
         return if (trimmed.length > 400) trimmed.take(400).trimEnd() + "…" else trimmed
     }
@@ -278,16 +281,13 @@ object GalleryDlListing {
         kotlinx.coroutines.withTimeoutOrNull(SHEET_LISTING_CAP_MS) { listItems(context, url) }
             ?: ListingResult(
                 emptyList(),
-                errorMessage = "${VideoSiteRouter.siteName(url)} is taking too long to answer — it may be rate-limiting requests right now. You can still download the link.",
+                errorMessage = context.getString(com.comfort.app.R.string.site_taking_too_long, VideoSiteRouter.siteName(url, context.getString(com.comfort.app.R.string.this_link))),
                 timedOut = true,
             )
 
     private const val SHEET_LISTING_CAP_MS = 20_000L
 
     private fun ytDlpOn(context: Context) = GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.YT_DLP)
-
-    private const val GALLERY_DL_OFF =
-        "gallery-dl is turned off (Settings › Updates and engines), and yt-dlp couldn't preview this link."
 
     suspend fun listItems(context: Context, url: String): ListingResult = withContext(Dispatchers.IO) {
         listingCache[url]?.let { cached ->
@@ -322,10 +322,10 @@ object GalleryDlListing {
             // A turned-off engine never runs (Settings › Updates and engines) — its links get the
             // reason instead. gallery-dl being off is reported like a timeout, so a sheet still
             // tries yt-dlp's preview for the link (LinkRouterViewModel).
-            DownloadEngine.YT_DLP -> if (ytDlpOn(context)) listViaYtDlp(context, url) else ListingResult(emptyList(), com.comfort.app.worker.EnginePlan.OFF_YT_DLP)
-            DownloadEngine.SPOTIFY -> if (ytDlpOn(context)) listViaSpotify(context, url) else ListingResult(emptyList(), com.comfort.app.worker.EnginePlan.OFF_SPOTIFY)
+            DownloadEngine.YT_DLP -> if (ytDlpOn(context)) listViaYtDlp(context, url) else ListingResult(emptyList(), context.getString(com.comfort.app.worker.EnginePlan.OFF_YT_DLP))
+            DownloadEngine.SPOTIFY -> if (ytDlpOn(context)) listViaSpotify(context, url) else ListingResult(emptyList(), context.getString(com.comfort.app.worker.EnginePlan.OFF_SPOTIFY))
             DownloadEngine.GALLERY_DL -> if (!GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.GALLERY_DL)) {
-                ListingResult(emptyList(), errorMessage = GALLERY_DL_OFF, timedOut = true)
+                ListingResult(emptyList(), errorMessage = context.getString(com.comfort.app.R.string.gallery_dl_off_no_preview), timedOut = true)
             } else {
                 val result = listViaGalleryDl(context, url)
                 if (result.items.isNotEmpty()) {
@@ -421,7 +421,7 @@ object GalleryDlListing {
                 // live against a Reddit listing) - logged in full so that's visible in logcat instead
                 // of only ever showing up truncated in the picker's own error card.
                 android.util.Log.w("GalleryDlListing", "gallery-dl ERR: fallback while listing $url:\n$message")
-                return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(message))
+                return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(message, context.resources))
             }
     
             val markerIndex = rawText.indexOf(WARNINGS_MARKER)
@@ -530,7 +530,7 @@ object GalleryDlListing {
         // this way and the picker sheet just flashed and vanished into a download doomed to fail
         // the same way a moment later).
         val info = runYtDlpListInfo(context, url)
-            ?: return ListingResult(emptyList(), errorMessage = "Couldn't check this link — the download may still work, but its content couldn't be previewed.")
+            ?: return ListingResult(emptyList(), errorMessage = context.getString(com.comfort.app.R.string.listing_couldnt_check))
         val entries = info.optJSONArray("entries")
         if (entries != null) {
             val items = mutableListOf<GalleryItem>()
@@ -542,7 +542,7 @@ object GalleryDlListing {
             return ListingResult(items)
         }
         val error = info.optString("error", "").takeIf { it.isNotBlank() }
-        if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error))
+        if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error, context.resources))
         return ListingResult(listOf(entryToGalleryItem(info, 1, listIndex = 0)))
     }
 
@@ -553,7 +553,7 @@ object GalleryDlListing {
      * always audio, so the preview sheet's quality/resolution picker should never show for one. */
     private suspend fun listViaSpotify(context: Context, url: String): ListingResult {
         val info = runSpotifyListInfo(context, url)
-            ?: return ListingResult(emptyList(), errorMessage = "Couldn't check this Spotify link — the download may still work, but its content couldn't be previewed.")
+            ?: return ListingResult(emptyList(), errorMessage = context.getString(com.comfort.app.R.string.listing_couldnt_check_spotify))
         val entries = info.optJSONArray("entries")
         if (entries != null) {
             val items = mutableListOf<GalleryItem>()
@@ -565,7 +565,7 @@ object GalleryDlListing {
             return ListingResult(items)
         }
         val error = info.optString("error", "").takeIf { it.isNotBlank() }
-        if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error))
+        if (error != null) return ListingResult(emptyList(), errorMessage = sanitizeErrorMessage(error, context.resources))
         prefetchSpotifyMatch(context, url)
         return ListingResult(listOf(spotifyEntryToGalleryItem(info, 1, listIndex = 0)))
     }

@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.content.ClipData
 import android.os.Build
 import android.widget.Toast
@@ -249,7 +251,7 @@ fun QueueScreen(
                     ExtendedFloatingActionButton(
                         onClick = { viewModel.retryAll(retryAllStatus) },
                         icon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
-                        text = { Text("Retry All") },
+                        text = { Text(stringResource(R.string.retry_all)) },
                     )
                 } else if (hasActiveDownload || hasPausedDownload || isGloballyPaused) {
                     // isGloballyPaused on its own (queue otherwise empty) still needs this FAB shown —
@@ -266,7 +268,7 @@ fun QueueScreen(
                                 contentDescription = null,
                             )
                         },
-                        text = { Text(if (showResumeAction) "Resume" else "Pause") },
+                        text = { Text(if (showResumeAction) stringResource(R.string.resume) else stringResource(R.string.widget_music_pause)) },
                     )
                 }
             }
@@ -274,10 +276,10 @@ fun QueueScreen(
         topBar = {
             if (selectionMode) {
                 TopAppBar(
-                    title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
+                    title = { Text(stringResource(R.string.x_selected, selectedIds.size), fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { selectedIds = emptySet() }) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Cancel selection")
+                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cancel_selection))
                         }
                     },
                     actions = {
@@ -294,7 +296,7 @@ fun QueueScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                             Spacer(Modifier.width(6.dp))
-                            Text(if (allSelected) "Deselect all" else "Select all")
+                            Text(if (allSelected) stringResource(R.string.deselect_all) else stringResource(R.string.select_all))
                         }
                         Spacer(Modifier.width(4.dp))
                         // Only ever appears once something's actually selected — the placeholder
@@ -307,7 +309,7 @@ fun QueueScreen(
                             requestDelete(selectedIds)
                             selectedIds = emptySet()
                         }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Delete selected")
+                            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete_selected))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -423,7 +425,7 @@ fun QueueScreen(
             ) {
                 if (!selectionMode) {
                     SettingsSubPageHeader(
-                        title = "Queue",
+                        title = stringResource(R.string.queue),
                         topicIcon = Icons.Outlined.DownloadForOffline,
                         onBack = onBack,
                         topPadding = headerState.topPadding,
@@ -470,7 +472,7 @@ fun QueueScreen(
                         FilterChip(
                             selected = selectedFilter == filter,
                             onClick = { selectedFilter = filter },
-                            label = { Text(filter) },
+                            label = { Text(queueFilterLabel(filter)) },
                             shape = com.comfort.app.theme.PillShape
                         )
                     }
@@ -505,16 +507,16 @@ fun QueueScreen(
                     // the Paused tab said "No downloads in queue" while Errored/Cancelled next to it
                     // had real counts, which read as those two other tabs error being wrong).
                     val (emptyTitle, emptySubtitle) = when (filter) {
-                        "Paused" -> "No paused downloads" to "Downloads you pause will show up here."
-                        "Errored" -> "No errored downloads" to "Failed downloads will show up here so you can retry them."
-                        "Cancelled" -> "No cancelled downloads" to "Downloads you cancel will show up here."
-                        "Scheduled" -> "No scheduled downloads" to "Downloads waiting for their schedule window will show up here."
+                        "Paused" -> stringResource(R.string.no_paused_downloads) to stringResource(R.string.downloads_you_pause_will_show_up)
+                        "Errored" -> stringResource(R.string.no_errored_downloads) to stringResource(R.string.failed_downloads_will_show_up_here)
+                        "Cancelled" -> stringResource(R.string.no_cancelled_downloads) to stringResource(R.string.downloads_you_cancel_will_show_up)
+                        "Scheduled" -> stringResource(R.string.no_scheduled_downloads) to stringResource(R.string.downloads_waiting_for_their_schedule_window)
                         // Nothing running only because there's no usable connection: say so, rather than
                         // "No downloads in queue" with the In Queue chip showing a count beside it.
                         else -> if (filter == "Running" && waitingForNetwork > 0) {
-                            "Waiting for a network connection" to networkWaitSubtitle(queueContext, waitingForNetwork)
+                            stringResource(R.string.waiting_for_a_network_connection) to networkWaitSubtitle(queueContext, waitingForNetwork)
                         } else {
-                            "No downloads in queue" to "Paste a link on Home to start one."
+                            stringResource(R.string.no_downloads_in_queue) to stringResource(R.string.paste_a_link_on_home_to)
                         }
                     }
                     Box(
@@ -715,7 +717,7 @@ private fun SelectableThumbnail(
                 if (selected) {
                     Icon(
                         Icons.Outlined.Check,
-                        contentDescription = "Selected",
+                        contentDescription = stringResource(R.string.selected),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(13.dp),
                     )
@@ -799,12 +801,12 @@ private fun StoppedRow(
                 overflow = TextOverflow.Ellipsis,
             )
             val domain = remember(item.url) {
-                runCatching { android.net.Uri.parse(item.url).host?.removePrefix("www.") }.getOrNull().takeUnless { it.isNullOrBlank() } ?: "Unknown"
+                runCatching { android.net.Uri.parse(item.url).host?.removePrefix("www.") }.getOrNull().takeUnless { it.isNullOrBlank() } ?: context.getString(R.string.unknown_site)
             }
             // When, beside the site: on the status line below it was cut off ("Paused · nothing
             // saved yet · a…").
             val whenText = remember(item.downloadStartTime, item.dateAdded) {
-                (if (item.downloadStartTime > 0) "started " else "added ") + shortWhen(context, item.effectiveDate)
+                context.getString(if (item.downloadStartTime > 0) R.string.started_when else R.string.added_when, shortWhen(context, item.effectiveDate))
             }
             Text(
                 text = "$domain · $whenText",
@@ -832,10 +834,10 @@ private fun StoppedRow(
                 Spacer(Modifier.height(6.dp))
             }
             val progressText = when {
-                item.totalItems > 1 -> "${item.downloadedItems} of ${item.totalItems}"
-                item.expectedBytes > 0 && savedBytes > 0 -> "${formatFileSize(savedBytes)} of ${formatFileSize(item.expectedBytes)}"
-                item.downloadedItems > 0 -> "${item.downloadedItems} saved"
-                else -> "nothing saved yet"
+                item.totalItems > 1 -> stringResource(R.string.x_of_x, item.downloadedItems, item.totalItems)
+                item.expectedBytes > 0 && savedBytes > 0 -> stringResource(R.string.x_of_x, formatFileSize(savedBytes), formatFileSize(item.expectedBytes))
+                item.downloadedItems > 0 -> stringResource(R.string.x_saved, item.downloadedItems)
+                else -> stringResource(R.string.nothing_saved_yet)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -846,7 +848,7 @@ private fun StoppedRow(
                 )
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    text = "${if (isPaused) "Paused" else "Cancelled"} · $progressText",
+                    text = stringResource(if (isPaused) R.string.paused_progress else R.string.cancelled_progress, progressText),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -858,28 +860,28 @@ private fun StoppedRow(
 
             if (!selectionMode) {
                 IconButton(onClick = onResume) {
-                    Icon(Icons.Outlined.PlayArrow, contentDescription = "Resume")
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.resume))
                 }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
+                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
-                            text = { Text("Copy link") },
+                            text = { Text(stringResource(R.string.copy_link)) },
                             leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
                             onClick = {
                                 menuExpanded = false
                                 scope.launch {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Download link", item.url)))
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.download_link), item.url)))
                                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Remove") },
+                            text = { Text(stringResource(R.string.sponsorblock_remove)) },
                             leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                             onClick = { menuExpanded = false; onDelete() },
                         )
@@ -1003,11 +1005,11 @@ fun QueueItemCard(
                                 // the queue card alone, like a second download starting out of
                                 // nowhere with a much smaller size — this is what actually
                                 // distinguishes it from a stuck/wrong progress bar.
-                                "Extracting audio"
+                                stringResource(R.string.extracting_audio)
                             } else if (item.expectedBytes > 0 || item.totalBytes > 0 || item.liveBytes > 0 || item.totalItems > 0) {
-                                "Downloading"
+                                stringResource(R.string.downloading)
                             } else {
-                                "Fetching info..."
+                                stringResource(R.string.fetching_info)
                             }
                         }
                         else -> item.status.name.lowercase().replaceFirstChar { it.uppercase() }
@@ -1042,7 +1044,7 @@ fun QueueItemCard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "No internet connection",
+                            text = stringResource(R.string.no_internet_connection),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -1123,9 +1125,9 @@ fun QueueItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val leadingText = when {
-                        item.totalItems > 1 -> "${item.downloadedItems} of ${item.totalItems}"
+                        item.totalItems > 1 -> stringResource(R.string.x_of_x, item.downloadedItems, item.totalItems)
                         item.expectedBytes > 0 ->
-                            "${formatFileSize(item.totalBytes + item.liveBytes)} of ${formatFileSize(item.expectedBytes)}"
+                            stringResource(R.string.x_of_x, formatFileSize(item.totalBytes + item.liveBytes), formatFileSize(item.expectedBytes))
                         // A single item with no known size — an item count of "0 of 1"/"1 of 1"
                         // says nothing useful, so this space is left blank instead.
                         else -> ""
@@ -1156,7 +1158,7 @@ fun QueueItemCard(
                         else -> String.format(Locale.getDefault(), "%.2f MB/s", item.speedMbs)
                     }
                     Text(
-                        text = note ?: ("Speed: " + speedStr),
+                        text = note ?: (stringResource(R.string.speed) + speedStr),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1195,7 +1197,7 @@ fun QueueItemCard(
                             )
                             Spacer(Modifier.width(5.dp))
                             Text(
-                                text = VideoSiteRouter.siteName(item.url),
+                                text = VideoSiteRouter.siteName(item.url, stringResource(R.string.this_link)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1233,7 +1235,7 @@ fun QueueItemCard(
             } else if (item.status == DownloadStatus.QUEUED) {
                 if (isNetworkAvailable) {
                     Text(
-                        text = "Waiting to start…",
+                        text = stringResource(R.string.waiting_to_start),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1251,7 +1253,7 @@ fun QueueItemCard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = "Waiting for a network connection…",
+                            text = stringResource(R.string.waiting_for_a_network_connection_2),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -1283,7 +1285,7 @@ fun QueueItemCard(
                     )
                 }
                 Text(
-                    text = "$windowText · Up next starts it now",
+                    text = stringResource(R.string.x_up_next_starts_it_now, windowText),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1300,7 +1302,7 @@ fun QueueItemCard(
                 )
                 if (isRateLimitError(item.errorMessage)) {
                     Text(
-                        text = "Temporarily rate-limited by the site — this isn't fixed by retrying immediately. Toggling airplane mode or restarting your router usually gets a fresh IP and clears it.",
+                        text = stringResource(R.string.temporarily_rate_limited_by_the_site),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
@@ -1342,7 +1344,7 @@ fun QueueItemCard(
                                     leadingIconContentColor = MaterialTheme.colorScheme.error,
                                 ),
                                 leadingIcon = { Icon(Icons.Outlined.CancelPresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                label = { Text("Cancel", style = MaterialTheme.typography.labelLarge) },
+                                label = { Text(stringResource(R.string.action_cancel), style = MaterialTheme.typography.labelLarge) },
                             )
                             AssistChip(
                                 onClick = onPauseResume,
@@ -1356,26 +1358,26 @@ fun QueueItemCard(
                                     leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
                                 ),
                                 leadingIcon = { Icon(Icons.Outlined.PausePresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                label = { Text("Pause", style = MaterialTheme.typography.labelLarge) },
+                                label = { Text(stringResource(R.string.widget_music_pause), style = MaterialTheme.typography.labelLarge) },
                             )
                         }
                         DownloadStatus.ERRORED -> {
                             IconButton(onClick = onShowError) {
-                                Icon(Icons.Outlined.Info, contentDescription = "Error details")
+                                Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.error_details))
                             }
                             if (isCookieRelatedError(item.errorMessage)) {
                                 TextButton(onClick = onAddCookies) {
                                     Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("Add cookies")
+                                    Text(stringResource(R.string.add_cookies))
                                 }
                             }
                             TextButton(onClick = onRetry) {
-                                Text("Retry")
+                                Text(stringResource(R.string.retry))
                             }
                             // No copy button: a long-press on the card's link copies it (QueueLink).
                             IconButton(onClick = onDelete) {
-                                Icon(Icons.Outlined.Delete, contentDescription = "Remove")
+                                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.sponsorblock_remove))
                             }
                         }
                         DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
@@ -1384,11 +1386,11 @@ fun QueueItemCard(
                             // it doesn't run alongside what's already downloading; cancel on the
                             // trailing half.
                             ConfirmCancelSplitButton(
-                                label = "Up next",
+                                label = stringResource(R.string.up_next),
                                 icon = Icons.Outlined.KeyboardDoubleArrowUp,
                                 onConfirm = onStartNow,
                                 onCancel = onCancel,
-                                cancelDescription = "Cancel download",
+                                cancelDescription = stringResource(R.string.cancel_download),
                             )
                         }
                         else -> {}
@@ -1431,7 +1433,7 @@ private fun ErrorDetailsSheet(
                     modifier = Modifier.size(22.dp).padding(top = 2.dp),
                 )
                 Spacer(Modifier.width(10.dp))
-                Text("Error details", style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                Text(stringResource(R.string.error_details), style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
             }
             Spacer(Modifier.height(10.dp))
             // Each engine's own error, in the order they ran (DownloadEntity.errorDetails) — the
@@ -1444,7 +1446,7 @@ private fun ErrorDetailsSheet(
             ) {
                 if (engineErrors.isEmpty()) {
                     Text(
-                        item.errorMessage ?: "Unknown error",
+                        item.errorMessage ?: stringResource(R.string.unknown_error),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1472,21 +1474,21 @@ private fun ErrorDetailsSheet(
                             val text = engineErrors.takeIf { it.isNotEmpty() }
                                 ?.joinToString("\n\n") { (engine, message) -> "$engine: $message" }
                                 ?: item.errorMessage.orEmpty()
-                            val clipData = android.content.ClipData.newPlainText("Error message", text)
+                            val clipData = android.content.ClipData.newPlainText(context.getString(R.string.error_message), text)
                             clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(clipData))
                             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                                android.widget.Toast.makeText(context, "Error copied", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, context.getString(R.string.error_copied), android.widget.Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = MaterialTheme.shapes.medium,
-                ) { Text("Copy") }
+                ) { Text(stringResource(R.string.copy)) }
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = MaterialTheme.shapes.medium,
-                ) { Text("Done") }
+                ) { Text(stringResource(R.string.done)) }
             }
         }
     }
@@ -1495,9 +1497,9 @@ private fun ErrorDetailsSheet(
 /** "Waiting for a network connection" copy, shared by Home's notice and the Queue's Running tab:
  * how many downloads are held, and that Wi-Fi only is why when it's on. */
 internal fun networkWaitSubtitle(context: android.content.Context, count: Int): String {
-    val what = if (count == 1) "1 download starts" else "$count downloads start"
-    return if (com.comfort.app.data.GalleryDlPreferences.isWifiOnly(context)) "$what once you're on Wi-Fi (Wi-Fi only is on)."
-    else "$what as soon as you're back online."
+    val res = context.resources
+    return if (com.comfort.app.data.GalleryDlPreferences.isWifiOnly(context)) res.getQuantityString(R.plurals.downloads_start_on_wifi, count, count)
+    else res.getQuantityString(R.plurals.downloads_start_when_online, count, count)
 }
 
 /** A time today ("10:42"), or a date ("Oct 9") for anything older — in the phone's 12/24-hour style. */
@@ -1523,17 +1525,17 @@ internal fun scheduleTexts(context: android.content.Context): Pair<String, Strin
     )
     val start = com.comfort.app.data.GalleryDlPreferences.getScheduleStartMinutes(context)
     val end = com.comfort.app.data.GalleryDlPreferences.getScheduleEndMinutes(context)
-    val window = "Downloads run ${clock(start)}–${clock(end)}"
+    val window = context.getString(R.string.downloads_run_x_x, clock(start), clock(end))
     val delay = com.comfort.app.data.DownloadDispatcher.scheduleDelayMillis(context)
-    if (delay <= 0) return "Starting soon, the window is open" to window
+    if (delay <= 0) return context.getString(R.string.starting_soon_the_window_is_open) to window
     val minutes = (delay + 59_999) / 60_000
     val inText = when {
-        minutes < 60 -> "$minutes min"
-        minutes % 60 == 0L -> "${minutes / 60} h"
-        else -> "${minutes / 60} h ${minutes % 60} min"
+        minutes < 60 -> context.getString(R.string.x_min, minutes)
+        minutes % 60 == 0L -> context.getString(R.string.x_h, minutes / 60)
+        else -> context.getString(R.string.x_h_x_min, minutes / 60, minutes % 60)
     }
     val startsAt = timeFormat.format(Date(System.currentTimeMillis() + delay))
-    return "Starts at $startsAt · in $inText" to window
+    return context.getString(R.string.starts_at_x_in_x, startsAt, inText) to window
 }
 
 /** A queue card's link, without the scheme/"www." and cut off with an ellipsis so it never pushes
@@ -1551,15 +1553,15 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Bool
             .clip(MaterialTheme.shapes.small)
             .combinedClickable(
                 enabled = enabled,
-                onClickLabel = "Open link",
-                onLongClickLabel = "Copy link",
+                onClickLabel = stringResource(R.string.open_link),
+                onLongClickLabel = stringResource(R.string.copy_link),
                 onClick = { runCatching { uriHandler.openUri(url) } },
                 onLongClick = {
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager)
-                        ?.setPrimaryClip(ClipData.newPlainText("Download link", url))
+                        ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.download_link), url))
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                     }
                 },
             )
@@ -1582,3 +1584,16 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Bool
         )
     }
 }
+
+/** A filter's name as shown; the filters themselves are keyed by their English names. */
+@Composable
+private fun queueFilterLabel(filter: String): String = stringResource(
+    when (filter) {
+        "Running" -> R.string.queue_filter_running
+        "In Queue" -> R.string.queue_filter_in_queue
+        "Paused" -> R.string.queue_filter_paused
+        "Scheduled" -> R.string.queue_filter_scheduled
+        "Errored" -> R.string.queue_filter_errored
+        else -> R.string.queue_filter_cancelled
+    }
+)

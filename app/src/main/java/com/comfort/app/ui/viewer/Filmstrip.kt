@@ -1,5 +1,7 @@
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,7 +76,7 @@ fun Filmstrip(items: List<GalleryItem>, current: GalleryItem?, onPick: (GalleryI
                 AsyncImage(
                     // Thumbnail-sized: served from the system's own thumbnail cache.
                     model = ImageRequest.Builder(context).data(item.uri).size(192).build(),
-                    contentDescription = "Item ${index + 1}",
+                    contentDescription = stringResource(R.string.item_x_2, index + 1),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )

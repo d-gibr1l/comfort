@@ -1,5 +1,8 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.comfort.app.R
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -54,7 +57,7 @@ import androidx.compose.material.icons.outlined.*
  * moved out of About into their own page so updating isn't buried under version info and credits. */
 @Composable
 internal fun UpdatesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
-    SettingsSubScaffold(title = "Updates and engines", topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = stringResource(R.string.updates_and_engines), topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
         EngineChoiceSection()
         SitesSection()
         AppUpdateSection()
@@ -88,9 +91,9 @@ private fun EngineChoiceSection() {
         choice = com.comfort.app.worker.EngineChoice.load(context)
     }
 
-    SettingsSection(title = "Which engines run", icon = Icons.Outlined.Tune) {
+    SettingsSection(title = stringResource(R.string.which_engines_run), icon = Icons.Outlined.Tune) {
         Text(
-            "Turn engines on or off, and choose which one tries first when both can download a link. YouTube and other video sites always use yt-dlp, and Spotify needs it too.",
+            stringResource(R.string.turn_engines_on_or_off_and),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -111,27 +114,27 @@ private fun EngineChoiceSection() {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(engineLabel(engine), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                     Text(
-                        if (on) engineRole(engine) else "Off — never runs or updates",
+                        if (on) engineRole(engine) else stringResource(R.string.off_never_runs_or_updates),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = { move(index, -1) }, enabled = index > 0) {
-                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Move ${engineLabel(engine)} up")
+                    Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = stringResource(R.string.move_x_up, engineLabel(engine)))
                 }
                 IconButton(onClick = { move(index, +1) }, enabled = index < reorderable.lastIndex) {
-                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Move ${engineLabel(engine)} down")
+                    Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.move_x_down, engineLabel(engine)))
                 }
                 Switch(
                     checked = on,
-                    modifier = Modifier.semantics { contentDescription = "${engineLabel(engine)} engine" },
+                    modifier = Modifier.semantics { contentDescription = context.getString(R.string.x_engine, engineLabel(engine)) },
                     onCheckedChange = { turnOn ->
                         haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                         when {
                             turnOn -> setOn(engine, true)
                             choice.enabled.size <= 1 -> {
                                 haptics.performHapticFeedback(HapticFeedbackType.Reject)
-                                android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, context.getString(R.string.keep_at_least_one_engine_on), android.widget.Toast.LENGTH_SHORT).show()
                             }
                             else -> confirmOff = engine
                         }
@@ -153,19 +156,19 @@ private fun EngineChoiceSection() {
             Column(modifier = Modifier.weight(1f)) {
                 Text(engineLabel(instaloader), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    if (instaloaderOn) "Instagram posts, reels and carousels — always tried first for Instagram" else "Off — Instagram goes to gallery-dl and yt-dlp",
+                    if (instaloaderOn) stringResource(R.string.instagram_posts_reels_and_carousels_always) else stringResource(R.string.off_instagram_goes_to_gallery_dl),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Switch(
                 checked = instaloaderOn,
-                modifier = Modifier.semantics { contentDescription = "Instaloader engine" },
+                modifier = Modifier.semantics { contentDescription = context.getString(R.string.instaloader_engine) },
                 onCheckedChange = { turnOn ->
                     haptics.performHapticFeedback(if (turnOn) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
                     if (!turnOn && choice.enabled.size <= 1) {
                         haptics.performHapticFeedback(HapticFeedbackType.Reject)
-                        android.widget.Toast.makeText(context, "Keep at least one engine on.", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.keep_at_least_one_engine_on), android.widget.Toast.LENGTH_SHORT).show()
                     } else {
                         setOn(instaloader, turnOn)
                     }
@@ -176,13 +179,13 @@ private fun EngineChoiceSection() {
 
     confirmOff?.let { engine ->
         ConfirmDeleteSheet(
-            title = "Turn off ${engineLabel(engine)}?",
+            title = stringResource(R.string.turn_off_x, engineLabel(engine)),
             message = if (engine == com.comfort.app.data.DownloadEngine.YT_DLP) {
-                "YouTube, Spotify and every video download will stop working until you turn it back on. It also won't be kept updated."
+                stringResource(R.string.youtube_spotify_and_every_video_download)
             } else {
-                "Image galleries (Pixiv, Twitter/X pictures, Reddit galleries, …) won't download until you turn it back on; links yt-dlp handles still will. It also won't be kept updated."
+                stringResource(R.string.image_galleries_pixiv_twitter_x_pictures)
             },
-            confirmLabel = "Turn off",
+            confirmLabel = stringResource(R.string.turn_off),
             onConfirm = {
                 setOn(engine, false)
                 confirmOff = null
@@ -224,14 +227,14 @@ private fun SitesSection() {
         revision++
     }
 
-    SettingsSection(title = "Sites", icon = Icons.Outlined.Public, onClick = { open = true }) {
+    SettingsSection(title = stringResource(R.string.sites), icon = Icons.Outlined.Public, onClick = { open = true }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Outlined.AltRoute, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Which engine each site uses", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.which_engine_each_site_uses), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                 Text(
-                    if (changes == 0) "Every supported site, by engine" else "$changes ${if (changes == 1) "site" else "sites"} changed by you",
+                    if (changes == 0) stringResource(R.string.every_supported_site_by_engine) else pluralStringResource(R.plurals.sites_changed_by_you, changes, changes),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -281,9 +284,9 @@ private fun SitesSection() {
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text("Sites", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.sites), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        "Choose which engine a site's links go to",
+                        stringResource(R.string.choose_which_engine_a_site_s),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -294,16 +297,16 @@ private fun SitesSection() {
             Spacer(Modifier.height(20.dp))
             androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text("Add a site", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.add_a_site), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = input,
                         onValueChange = { input = it; justAdded = null },
-                        placeholder = { Text("tiktok.com, or paste a link") },
+                        placeholder = { Text(stringResource(R.string.tiktok_com_or_paste_a_link)) },
                         leadingIcon = { Icon(Icons.Outlined.Link, contentDescription = null) },
                         trailingIcon = {
                             if (input.isNotEmpty()) {
-                                IconButton(onClick = { input = "" }) { Icon(Icons.Outlined.Close, contentDescription = "Clear") }
+                                IconButton(onClick = { input = "" }) { Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.search_clear)) }
                             }
                         },
                         singleLine = true,
@@ -322,10 +325,10 @@ private fun SitesSection() {
                     )
                     Text(
                         when {
-                            justAdded != null -> "Added $justAdded"
-                            input.isBlank() -> "A domain or any link from the site"
-                            site == null -> "That isn't a site"
-                            else -> "Adds $site"
+                            justAdded != null -> stringResource(R.string.added_x, justAdded.orEmpty())
+                            input.isBlank() -> stringResource(R.string.a_domain_or_any_link_from)
+                            site == null -> stringResource(R.string.that_isn_t_a_site)
+                            else -> stringResource(R.string.adds_x, site)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = when {
@@ -358,7 +361,7 @@ private fun SitesSection() {
                     ) {
                         Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Add to ${siteRouteTitle(addTo)}")
+                        Text(stringResource(R.string.add_to_x, siteRouteTitle(addTo)))
                     }
                 }
             }
@@ -368,7 +371,7 @@ private fun SitesSection() {
             androidx.compose.material3.Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     Text(
-                        "Supported sites",
+                        stringResource(R.string.supported_sites),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -393,7 +396,7 @@ private fun SitesSection() {
                             }
                         }
                         loadFailed -> Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            SettingsErrorBanner("Couldn't read the engines' site lists.")
+                            SettingsErrorBanner(stringResource(R.string.couldn_t_read_the_engines_site))
                             Spacer(Modifier.height(4.dp))
                             TextButton(onClick = {
                                 coroutineScope.launch {
@@ -404,13 +407,13 @@ private fun SitesSection() {
                             }) {
                                 Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Retry")
+                                Text(stringResource(R.string.retry))
                             }
                         }
                         else -> Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(Modifier.width(10.dp))
-                            Text("Reading the engines…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.reading_the_engines), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -418,7 +421,7 @@ private fun SitesSection() {
 
             Spacer(Modifier.height(16.dp))
             Text(
-                "A site on no list tries gallery-dl first, with yt-dlp for its videos. Instagram posts use Instaloader and Spotify its own engine either way.",
+                stringResource(R.string.a_site_on_no_list_tries),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp),
@@ -432,7 +435,7 @@ private fun SitesSection() {
                 }) {
                     Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Restore defaults")
+                    Text(stringResource(R.string.restore_defaults))
                 }
             }
             Spacer(Modifier.windowInsetsBottomHeight(androidx.compose.foundation.layout.WindowInsets.navigationBars))
@@ -440,22 +443,25 @@ private fun SitesSection() {
     }
 }
 
+@Composable
 private fun siteRouteTitle(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> "Only gallery-dl"
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> "Only yt-dlp"
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> "Both"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> stringResource(R.string.only_gallery_dl)
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> stringResource(R.string.only_yt_dlp)
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> stringResource(R.string.both)
 }
 
+@Composable
 private fun siteRouteShortLabel(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
     com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> "gallery-dl"
     com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> "yt-dlp"
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> "Both"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> stringResource(R.string.both)
 }
 
+@Composable
 private fun siteRouteMeaning(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> "gallery-dl downloads these, videos too"
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> "yt-dlp downloads these"
-    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> "gallery-dl first, yt-dlp for videos"
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.GALLERY_DL_ONLY -> stringResource(R.string.gallery_dl_downloads_these_videos_too)
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.YT_DLP_ONLY -> stringResource(R.string.yt_dlp_downloads_these)
+    com.comfort.app.data.VideoSiteRouter.SiteRoute.BOTH -> stringResource(R.string.gallery_dl_first_yt_dlp_for)
 }
 
 private fun siteRouteIcon(route: com.comfort.app.data.VideoSiteRouter.SiteRoute) = when (route) {
@@ -492,7 +498,12 @@ private fun SiteListSheet(
                 Column {
                     Text(siteRouteTitle(route), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        (if (query.isNotBlank()) "%,d of %,d sites · ".format(shown.size, sites.size) else "%,d sites · ".format(sites.size)) + siteRouteMeaning(route),
+                        stringResource(
+                            R.string.site_count_and_meaning,
+                            if (query.isNotBlank()) pluralStringResource(R.plurals.sites_shown_of, sites.size, "%,d".format(shown.size), "%,d".format(sites.size))
+                            else pluralStringResource(R.plurals.site_count_grouped, sites.size, "%,d".format(sites.size)),
+                            siteRouteMeaning(route),
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -503,12 +514,12 @@ private fun SiteListSheet(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Search sites") },
+                placeholder = { Text(stringResource(R.string.search_sites)) },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) {
                         IconButton(onClick = { query = "" }) {
-                            Icon(Icons.Outlined.Close, contentDescription = "Clear search")
+                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.clear_search))
                         }
                     }
                 },
@@ -540,14 +551,14 @@ private fun SiteListSheet(
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(site, style = MaterialTheme.typography.bodyLarge)
-                            if (changed) Text("Changed by you", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            if (changed) Text(stringResource(R.string.changed_by_you), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
                         androidx.compose.foundation.layout.Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = "Move $site") }
+                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.move_x, site)) }
                             androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 com.comfort.app.data.VideoSiteRouter.SiteRoute.entries.filter { it != route }.forEach { to ->
                                     androidx.compose.material3.DropdownMenuItem(
-                                        text = { Text("Move to ${siteRouteTitle(to)}") },
+                                        text = { Text(stringResource(R.string.move_to_x, siteRouteTitle(to))) },
                                         leadingIcon = { Icon(siteRouteIcon(to), contentDescription = null) },
                                         onClick = {
                                             haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -558,7 +569,7 @@ private fun SiteListSheet(
                                 }
                                 if (changed) {
                                     androidx.compose.material3.DropdownMenuItem(
-                                        text = { Text("Reset to default") },
+                                        text = { Text(stringResource(R.string.reset_to_default)) },
                                         leadingIcon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
                                         onClick = {
                                             haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -574,7 +585,7 @@ private fun SiteListSheet(
                 if (shown.isEmpty()) {
                     item {
                         Text(
-                            if (sites.isEmpty()) "No sites in this list." else "No site matches \"${query.trim()}\"",
+                            if (sites.isEmpty()) stringResource(R.string.no_sites_in_this_list) else stringResource(R.string.no_site_matches_x, query.trim()),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 16.dp),
@@ -676,11 +687,12 @@ private fun engineIconByName(name: String): ImageVector? = when {
     else -> null
 }
 
+@Composable
 private fun engineRole(engine: com.comfort.app.data.DownloadEngine) = when (engine) {
-    com.comfort.app.data.DownloadEngine.YT_DLP -> "Video and audio, on YouTube and every other site"
-    com.comfort.app.data.DownloadEngine.GALLERY_DL -> "Images and galleries from hundreds of sites"
-    com.comfort.app.data.DownloadEngine.INSTALOADER -> "Instagram posts, reels and carousels"
-    com.comfort.app.data.DownloadEngine.SPOTIFY -> "Spotify tracks, via yt-dlp"
+    com.comfort.app.data.DownloadEngine.YT_DLP -> stringResource(R.string.video_and_audio_on_youtube_and)
+    com.comfort.app.data.DownloadEngine.GALLERY_DL -> stringResource(R.string.images_and_galleries_from_hundreds_of)
+    com.comfort.app.data.DownloadEngine.INSTALOADER -> stringResource(R.string.instagram_posts_reels_and_carousels)
+    com.comfort.app.data.DownloadEngine.SPOTIFY -> stringResource(R.string.spotify_tracks_via_yt_dlp)
 }
 
 @Composable
@@ -690,9 +702,9 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "—"
     }
 
-    SettingsSubScaffold(title = "About", topicIcon = Icons.Outlined.Info, onBack = onBack, highlightKey = highlightKey) {
+    SettingsSubScaffold(title = stringResource(R.string.about), topicIcon = Icons.Outlined.Info, onBack = onBack, highlightKey = highlightKey) {
         SettingsSection(
-            title = "App", 
+            title = stringResource(R.string.app), 
             icon = Icons.Outlined.Info,
             onClick = {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/d-gibr1l/comfort"))
@@ -703,14 +715,14 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.semantics {
                     role = Role.Button
-                    contentDescription = "Comfort version $versionName, open project page"
+                    contentDescription = context.getString(R.string.comfort_version_x_open_project_page, versionName)
                 }
             ) {
                 AppIconTile(size = 48.dp)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Comfort", style = MaterialTheme.typography.titleSmall)
-                    Text("Version $versionName", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.version_x, versionName), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -722,7 +734,7 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
         // (FfmpegRuntime) merging video/audio, QuickJS (QuickJsRuntime) solving yt-dlp's JS
         // challenges, and aria2 (Aria2Runtime) doing real multi-connection downloads — none of them
         // previously credited or linked anywhere in the app.
-        SettingsSection(title = "Credits", icon = Icons.Outlined.Link) {
+        SettingsSection(title = stringResource(R.string.credits), icon = Icons.Outlined.Link) {
             // gallery-dl, QuickJS, and aria2 have no usable real-logo asset (gallery-dl and QuickJS
             // ship no logo at all; aria2's only asset is a 16x16 favicon too small to read as
             // anything but a blob at chip size) — those three keep a generic Material icon.
@@ -736,7 +748,7 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     CreditEntry(icon = FeatherIcons.Instagram, title = "Instaloader", url = "https://github.com/instaloader/instaloader"),
                     CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_ffmpeg, title = "FFmpeg", url = "https://ffmpeg.org"),
                     CreditEntry(icon = Icons.Outlined.Memory, title = "QuickJS", url = "https://bellard.org/quickjs/"),
-                    CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = "Python runtime", url = "https://github.com/deniscerri/ytdlnis-packages"),
+                    CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = context.getString(R.string.python_runtime), url = "https://github.com/deniscerri/ytdlnis-packages"),
                     CreditEntry(icon = Icons.Outlined.Bolt, title = "aria2", url = "https://aria2.github.io/"),
                 )
             }
@@ -768,7 +780,7 @@ internal fun QuickAppUpdateSection() {
     val current = status
     if (current == null || !current.updateAvailable) return
 
-    SettingsSection(title = "App update available", icon = Icons.Outlined.Download) {
+    SettingsSection(title = stringResource(R.string.app_update_available), icon = Icons.Outlined.Download) {
         AppUpdateRow(
             status = current,
             downloadProgress = downloadProgress,
@@ -795,13 +807,13 @@ private fun AppUpdateSection() {
 
     LaunchedEffect(Unit) { updates.checkApp() }
 
-    SettingsSection(title = "App Update", icon = Icons.Outlined.SystemUpdate) {
+    SettingsSection(title = stringResource(R.string.app_update), icon = Icons.Outlined.SystemUpdate) {
         val current = status
         if (current == null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(10.dp))
-                Text("Checking for updates…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.checking_for_updates), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             AppUpdateRow(
@@ -821,7 +833,7 @@ private fun AppUpdateSection() {
             } else {
                 Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Check for updates")
+                Text(stringResource(R.string.check_for_updates))
             }
         }
     }
@@ -850,14 +862,14 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
             status.updateAvailable -> Button(
                 onClick = onUpdate,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-            ) { Text("Update to v${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
+            ) { Text(stringResource(R.string.update_to_v_x, status.latestVersion.orEmpty()), style = MaterialTheme.typography.labelMedium) }
             status.latestVersion != null -> Text(
-                "Up to date",
+                stringResource(R.string.up_to_date),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
             else -> Text(
-                "Couldn't check",
+                stringResource(R.string.couldn_t_check),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -885,7 +897,7 @@ internal fun QuickEngineUpdateSection() {
     val outdated = statuses?.filter { it.updateAvailable && EngineUpdater.isOn(context, it.engine) } ?: return
     if (outdated.isEmpty()) return
 
-    SettingsSection(title = "Updates available", icon = Icons.Outlined.Update) {
+    SettingsSection(title = stringResource(R.string.updates_available), icon = Icons.Outlined.Update) {
         outdated.forEachIndexed { index, status ->
             EngineUpdateRow(
                 status = status,
@@ -922,11 +934,11 @@ private fun EnginesSection() {
     // channel preference itself, so Stable -> Nightly/Master needs one against that new source.
     LaunchedEffect(ytDlpChannel, galleryDlChannel, instaloaderChannel) { updates.checkEngines() }
 
-    SettingsSection(title = "Engines", icon = Icons.Outlined.Extension) {
+    SettingsSection(title = stringResource(R.string.engines), icon = Icons.Outlined.Extension) {
         IconToggleRow(
             icon = Icons.Outlined.SystemUpdateAlt,
-            title = "Auto-update",
-            subtitle = "Automatically installs newer yt-dlp, gallery-dl and Instaloader updates when found.",
+            title = stringResource(R.string.auto_update),
+            subtitle = stringResource(R.string.automatically_installs_newer_yt_dlp_gallery),
             checked = autoUpdate,
             onCheckedChange = {
                 autoUpdate = it
@@ -942,7 +954,7 @@ private fun EnginesSection() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(10.dp))
-                Text("Checking for updates…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.checking_for_updates), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             currentStatuses.forEachIndexed { index, status ->
@@ -986,7 +998,7 @@ private fun EnginesSection() {
             } else {
                 Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Check for updates")
+                Text(stringResource(R.string.check_for_updates))
             }
         }
     }
@@ -1006,7 +1018,7 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
         Column(modifier = Modifier.weight(1f)) {
             Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                status.installedVersion?.let { "v$it" } ?: "Version unknown",
+                status.installedVersion?.let { "v$it" } ?: stringResource(R.string.version_unknown),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1016,14 +1028,14 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
             status.updateAvailable -> Button(
                 onClick = onUpdate,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-            ) { Text("Update to ${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
+            ) { Text(stringResource(R.string.update_to_x, status.latestVersion.orEmpty()), style = MaterialTheme.typography.labelMedium) }
             status.latestVersion != null -> Text(
-                "Up to date",
+                stringResource(R.string.up_to_date),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
             else -> Text(
-                "Couldn't check",
+                stringResource(R.string.couldn_t_check),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1061,7 +1073,7 @@ private fun EngineCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text(
-                        status.installedVersion?.let { "v$it" } ?: "Version unknown",
+                        status.installedVersion?.let { "v$it" } ?: stringResource(R.string.version_unknown),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1071,20 +1083,20 @@ private fun EngineCard(
                     status.updateAvailable -> Button(
                         onClick = onUpdate,
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    ) { Text("Update to ${status.latestVersion}", style = MaterialTheme.typography.labelMedium) }
+                    ) { Text(stringResource(R.string.update_to_x, status.latestVersion.orEmpty()), style = MaterialTheme.typography.labelMedium) }
                     status.latestVersion != null -> Surface(
                         shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                     ) {
                         Text(
-                            "Up to date",
+                            stringResource(R.string.up_to_date),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         )
                     }
                     else -> Text(
-                        "Couldn't check",
+                        stringResource(R.string.couldn_t_check),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1107,13 +1119,13 @@ private fun EngineChannelPicker(
     onChannelChange: (EngineUpdateChannel) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
-    val bleedingEdgeLabel = if (engine == EngineUpdater.YT_DLP) "Nightly" else "Master"
+    val bleedingEdgeLabel = if (engine == EngineUpdater.YT_DLP) stringResource(R.string.nightly) else stringResource(R.string.master)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         listOf(
-            EngineUpdateChannel.STABLE to "Stable",
+            EngineUpdateChannel.STABLE to stringResource(R.string.stable),
             EngineUpdateChannel.BLEEDING_EDGE to bleedingEdgeLabel,
         ).forEach { (value, label) ->
             val selected = channel == value
@@ -1167,7 +1179,7 @@ private fun CreditChip(entry: CreditEntry, modifier: Modifier = Modifier) {
         modifier = modifier
             .semantics {
                 role = Role.Button
-                contentDescription = "Open ${entry.title} website"
+                contentDescription = context.getString(R.string.open_x_website, entry.title)
             }
             .clickable {
                 haptics.performHapticFeedback(HapticFeedbackType.ContextClick)

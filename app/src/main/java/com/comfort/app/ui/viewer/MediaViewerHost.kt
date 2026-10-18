@@ -1,5 +1,6 @@
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.res.stringResource
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -123,7 +124,7 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
                 extraMenuItems = { item, close ->
                     val download = live[downloadIdOf(item)] ?: return@MediaViewerScreen
                     DropdownMenuItem(
-                        text = { Text("View original source") },
+                        text = { Text(stringResource(R.string.view_original_source_2)) },
                         leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_open_in_new), contentDescription = null) },
                         onClick = {
                             close()
@@ -131,12 +132,12 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Copy post link") },
+                        text = { Text(stringResource(R.string.copy_post_link_2)) },
                         leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_content_copy), contentDescription = null) },
                         onClick = {
                             close()
                             scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText("Post link", download.url)))
+                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.post_link), download.url)))
                             }
                         },
                     )

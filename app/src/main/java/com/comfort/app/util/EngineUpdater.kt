@@ -311,7 +311,7 @@ object EngineUpdater {
                 // stop being true between when the user opened this screen and when they tapped
                 // Update.
                 if (AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()) {
-                    error("Can't update while a download is running — wait for it to finish first")
+                    error(context.getString(com.comfort.app.R.string.engine_update_download_running))
                 }
                 if (!PythonRuntime.ensureProvisioned(context)) error("Python runtime isn't provisioned yet")
 
@@ -330,7 +330,7 @@ object EngineUpdater {
                     val actual = sha256Of(tempFile)
                     if (!actual.equals(status.sha256, ignoreCase = true)) {
                         tempFile.delete()
-                        error("Downloaded file didn't match the checksum published for it — aborted, nothing was installed")
+                        error(context.getString(com.comfort.app.R.string.engine_update_checksum_mismatch))
                     }
                 }
 
@@ -357,7 +357,7 @@ object EngineUpdater {
                         File(staging, "${engine.packageDirName}-$version.dist-info").mkdirs()
                     }
                     if (!File(staging, "${engine.packageDirName}/__init__.py").isFile) {
-                        error("The download didn't contain ${engine.displayName} — nothing was changed")
+                        error(context.getString(com.comfort.app.R.string.engine_update_missing_package, engine.displayName))
                     }
 
                     // Shares PythonRuntime's provisioning Mutex, so the swap can't race a concurrent
@@ -388,7 +388,7 @@ object EngineUpdater {
                 // PythonRuntime.warmUpInBackground for the measured cost).
                 PythonRuntime.precompileInBackground(context, java.io.File(PythonRuntime.sitePackagesDir(context), engine.packageDirName))
 
-                installedVersion(context, engine) ?: error("Update installed but its version couldn't be read back")
+                installedVersion(context, engine) ?: error(context.getString(com.comfort.app.R.string.engine_update_version_unreadable))
             }
         }
     }
