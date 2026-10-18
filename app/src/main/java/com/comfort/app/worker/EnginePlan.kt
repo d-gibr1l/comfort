@@ -88,6 +88,10 @@ internal sealed interface EnginePlan {
             val probe = executor.probe()
             if (probe.ytDlpHasExtractor == false && probe.galleryDlHasExtractor == true) {
                 executor.run(DownloadEngine.GALLERY_DL)
+                // The probe reads the raw link, and a share link (Reddit's /s/<code>) doesn't match
+                // yt-dlp's own pattern though its generic extractor follows it: a "no" there isn't
+                // proof. So if gallery-dl saved nothing (blocked, say), yt-dlp still gets its turn.
+                if (!executor.isStopped && executor.savedCount == 0) executor.run(DownloadEngine.YT_DLP)
                 return
             }
             executor.run(DownloadEngine.YT_DLP)

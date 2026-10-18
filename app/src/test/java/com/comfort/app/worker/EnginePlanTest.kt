@@ -169,6 +169,15 @@ class EnginePlanTest {
     }
 
     @Test
+    fun ytDlpStillRunsWhenGalleryDlSavesNothingOnAProbedGalleryDlOnlyLink() = runTest {
+        // A Reddit share link: the raw-URL probe says only gallery-dl knows it, gallery-dl is
+        // blocked and saves nothing — yt-dlp gets its turn instead of the download just failing.
+        val executor = FakeExecutor(probeResult = EngineProbe.Result(galleryDlHasExtractor = true, ytDlpHasExtractor = false))
+        EnginePlan.planFor(GALLERY_DL, GALLERY_DL, supplementVideo = false).execute(executor)
+        assertEquals(listOf("GALLERY_DL(excludeVideo=false)", "YT_DLP"), executor.ran)
+    }
+
+    @Test
     fun galleryDlOffSendsItsLinksToYtDlpAlone() = runTest {
         assertEquals(listOf("YT_DLP"), ranWith(GALLERY_DL, choice(INSTALOADER, GALLERY_DL, YT_DLP, off = setOf(GALLERY_DL))))
     }
