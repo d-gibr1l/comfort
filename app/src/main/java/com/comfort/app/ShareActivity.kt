@@ -459,7 +459,7 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
             modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dragOffsetPx.roundToInt()) },
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().height(280.dp).pointerInput(Unit) {
+                modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
                             change.consume()
@@ -477,7 +477,9 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                 color = MaterialTheme.colorScheme.surface,
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
+                // Its 280dp above the navigation bar: the window is edge to edge, and the Download
+                // button sat under the bar's own buttons. The sheet's colour runs down behind it.
+                Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().height(280.dp)) {
                     // Same wavy indicator + copy as SharePickerScreen's own LOADING state (see its
                     // ListingState.LOADING branch) — this sheet covers the exact same listing
                     // fetch, just before ShareRouter knows which real screen to hand off to, so it
@@ -584,6 +586,9 @@ private fun SharePickerSheet(
                 color = MaterialTheme.colorScheme.surface,
             ) {
                 SharePickerScreen(
+                    // Above the navigation bar (the window is edge to edge); in the app, the
+                    // picker's ModalBottomSheet already keeps it clear.
+                    modifier = Modifier.navigationBarsPadding(),
                     url = url,
                     onDismiss = { visible = false },
                     onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate ->
