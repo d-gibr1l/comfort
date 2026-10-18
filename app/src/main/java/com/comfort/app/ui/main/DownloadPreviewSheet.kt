@@ -356,6 +356,12 @@ fun DownloadPreviewSheet(
     // not-slow-enough drag — still commits straight to Hidden regardless of this value. Not
     // fixable without forking that internal fling behavior; not worth doing for this app.
     val density = LocalDensity.current
+    // Material's fling closes the sheet at ~125dp/s however short the drag (see above), so a small
+    // scroll that reached the sheet closed it. The close is refused unless the sheet has been pulled
+    // at least this far down from where it sits open: it springs back instead.
+    val minDismissDragPx = with(density) { 160.dp.toPx() }
+    val sheetStateRef = remember { arrayOfNulls<SheetState>(1) }
+    var expandedOffsetPx by remember { androidx.compose.runtime.mutableFloatStateOf(Float.NaN) }
     val sheetState = remember {
         SheetState(
             skipPartiallyExpanded = true,
@@ -374,12 +380,24 @@ fun DownloadPreviewSheet(
                         revertOverlay()
                     }
                     false
+                } else if (target == SheetValue.Hidden) {
+                    val offset = sheetStateRef[0]?.let { runCatching { it.requireOffset() }.getOrNull() }
+                    offset == null || expandedOffsetPx.isNaN() || offset - expandedOffsetPx >= minDismissDragPx
                 } else {
                     true
                 }
             },
             skipHiddenState = false,
         )
+    }
+    sheetStateRef[0] = sheetState
+    // Where the sheet sits open (its content's height decides it), read whenever it comes to rest.
+    LaunchedEffect(sheetState) {
+        snapshotFlow { sheetState.currentValue to sheetState.isAnimationRunning }.collect { (value, animating) ->
+            if (value == SheetValue.Expanded && !animating) {
+                runCatching { sheetState.requireOffset() }.getOrNull()?.let { expandedOffsetPx = it }
+            }
+        }
     }
 
     // The link's data — the listing pass, the selection, the editable song title/artist and the
@@ -440,6 +458,9 @@ fun DownloadPreviewSheet(
             }
         },
         sheetState = sheetState,
+        // Never under the status bar: opened full height, its top (and the handle) sat under the
+        // camera. The padding is outside the sheet's surface, so a shorter sheet looks the same.
+        modifier = Modifier.statusBarsPadding(),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         // The default (BottomSheetDefaults.windowInsets) pads our whole content lambda above the
         // navigation bar *before* it ever reaches us — which is exactly how MAIN gets to bleed
@@ -620,7 +641,8 @@ private fun PreviewSheetOverlayHost(
     LaunchedEffect(overlayOpen) { if (overlayOpen) dragOffsetPx = 0f }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val thresholdPx = remember(density) { with(density) { 48.dp.toPx() } }
+    // How far the overlay panel has to be pulled down to close (it was 48dp: a nudge closed it).
+    val thresholdPx = remember(density) { with(density) { 140.dp.toPx() } }
     val nestedScrollConnection = remember(scope, onRevertOverlay, thresholdPx) {
         object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
             override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
@@ -644,7 +666,7 @@ private fun PreviewSheetOverlayHost(
             }
             override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
                 if (dragOffsetPx > 0f) {
-                    if (available.y > 1000f || dragOffsetPx > thresholdPx) {
+                    if ((available.y > 4000f && dragOffsetPx > thresholdPx / 3) || dragOffsetPx > thresholdPx) {
                         onRevertOverlay()
                     } else {
                         scope.launch {
@@ -799,7 +821,7 @@ private fun PreviewSheetOverlayHost(
                                 dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
                             },
                             onDragEnd = {
-                                if (dragOffsetPx > 48.dp.toPx()) {
+                                if (dragOffsetPx > thresholdPx) {
                                     onRevertOverlay()
                                 } else {
                                     dragScope.launch {
