@@ -466,7 +466,9 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                             dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
                         },
                         onDragEnd = {
-                            if (dragOffsetPx > 300f) {
+                            // A third of the sheet's height (it was a fixed 300px, ~110dp: a short
+                            // scroll that reached the sheet closed it).
+                            if (dragOffsetPx > size.height / 3f) {
                                 visible = false
                             } else {
                                 dragOffsetPx = 0f
@@ -574,7 +576,9 @@ private fun SharePickerSheet(
                             dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
                         },
                         onDragEnd = {
-                            if (dragOffsetPx > 300f) {
+                            // A third of the sheet's height (it was a fixed 300px, ~110dp: a short
+                            // scroll that reached the sheet closed it).
+                            if (dragOffsetPx > size.height / 3f) {
                                 visible = false
                             } else {
                                 dragOffsetPx = 0f
