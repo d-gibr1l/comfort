@@ -1,5 +1,8 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.comfort.app.R
 import androidx.compose.runtime.collectAsState
 import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 import com.comfort.app.viewmodel.CookiesViewModel
@@ -123,10 +126,10 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         )
     }
 
-    SettingsSubScaffold(title = "Cookies & Login", topicIcon = Icons.Outlined.Lock, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Cookies", icon = Icons.Outlined.Lock) {
+    SettingsSubScaffold(title = stringResource(R.string.cookies_login), topicIcon = Icons.Outlined.Lock, onBack = onBack, highlightKey = highlightKey) {
+        SettingsSection(title = stringResource(R.string.cookies), icon = Icons.Outlined.Lock) {
             Text(
-                "Sign in through the built-in browser to unlock private/age-restricted content, or paste a cookies.txt below.",
+                stringResource(R.string.sign_in_through_the_built_in),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -146,7 +149,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "Consider using a secondary/throwaway account rather than your primary one — heavy download activity risks a site-level restriction on the account behind the cookies, not just this device.",
+                    stringResource(R.string.consider_using_a_secondary_throwaway_account),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -160,16 +163,16 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             ) {
                 Icon(Icons.Outlined.Public, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Log in via built-in browser")
+                Text(stringResource(R.string.log_in_via_built_in_browser))
             }
 
             ToggleReveal(extractedCookies.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies extracted successfully", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cookies_extracted_successfully), tint = MaterialTheme.colorScheme.primary)
             }
 
             Spacer(Modifier.height(20.dp))
-            Text("Or paste raw cookies manually", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.or_paste_raw_cookies_manually), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
 
             OutlinedTextField(
@@ -180,7 +183,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     savedConfirmation = false
                 },
                 modifier = Modifier.fillMaxWidth().height(160.dp).clearFocusOnKeyboardDismiss(),
-                label = { Text("cookies.txt contents") },
+                label = { Text(stringResource(R.string.cookies_txt_contents)) },
                 maxLines = 10,
                 shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -193,7 +196,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     val trimmed = pastedCookies.trim()
                     when {
                         trimmed.isBlank() -> {
-                            pasteError = "Please paste cookie text first."
+                            pasteError = context.getString(R.string.please_paste_cookie_text_first)
                             savedConfirmation = false
                         }
                         // The parser decides first: it also takes cookies.txt lines whose tabs became
@@ -203,11 +206,11 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                         !cookiesViewModel.savePasted(pastedCookies) -> {
                             pasteError = when {
                                 trimmed.startsWith("{") || trimmed.startsWith("[") ->
-                                    "Detected JSON format. Comfort requires Netscape cookies.txt format (tab-separated columns). Please export in Netscape format from your browser extension."
+                                    context.getString(R.string.detected_json_format_comfort_requires_netscape)
                                 trimmed.contains("Cookie:") || (trimmed.contains("=") && !trimmed.contains("\t")) ->
-                                    "Detected HTTP header format (\"name=value\"). Comfort requires Netscape cookies.txt format with domain, path, expiry, and values separated by tabs."
+                                    context.getString(R.string.detected_http_header_format_name_value)
                                 else ->
-                                    "Couldn't find any valid cookies in that text — it needs to be real tab-separated Netscape format (domain, includeSubdomains, path, secure, expiry, name, value per line)."
+                                    context.getString(R.string.couldn_t_find_any_valid_cookies)
                             }
                             savedConfirmation = false
                         }
@@ -215,7 +218,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             pastedCookies = ""
                             pasteError = null
                             savedConfirmation = true
-                            Toast.makeText(context, "Cookies saved and applied", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.cookies_saved_and_applied), Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -224,12 +227,12 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             ) {
                 Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Save cookies")
+                Text(stringResource(R.string.save_cookies))
             }
 
             ToggleReveal(savedConfirmation) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cookies saved and applied", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cookies_saved_and_applied), tint = MaterialTheme.colorScheme.primary)
             }
             pasteError?.let { message ->
                 Spacer(Modifier.height(8.dp))
@@ -256,27 +259,31 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         // Still sourced from the real cookies.txt (see savedCookiesContent's own comment), so it
         // always reflects exactly what a download would actually send. (cookieSites itself is
         // declared up with parsedCookies, not here — see that declaration's own comment for why.)
-        SettingsSection(title = "Saved cookies (${cookieSites.size})", icon = Icons.AutoMirrored.Outlined.List) {
+        SettingsSection(title = stringResource(R.string.saved_cookies_x, cookieSites.size), icon = Icons.AutoMirrored.Outlined.List) {
             if (cookieSites.isEmpty()) {
                 Text(
-                    "No cookies saved yet.",
+                    stringResource(R.string.no_cookies_saved_yet),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 cookieSites.forEachIndexed { index, site ->
                     val enabled = site.rootDomain !in disabledDomains
+                    val siteDescription = stringResource(
+                        R.string.view_cookies_for_site_count, site.label,
+                        pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(MaterialTheme.shapes.small)
                             .clickable(
-                                onClickLabel = "View cookies for ${site.label}",
+                                onClickLabel = stringResource(R.string.view_cookies_for_x, site.label),
                                 onClick = { viewingSite = site },
                             )
                             .semantics(mergeDescendants = false) {
                                 role = Role.Button
-                                contentDescription = "View cookies for ${site.label}, ${site.cookies.size} cookie${if (site.cookies.size == 1) "" else "s"}"
+                                contentDescription = siteDescription
                             }
                             .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -288,7 +295,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             pendingDelete = PendingCookieDelete.Site(site)
                         }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Remove ${site.label}'s cookies", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.remove_x_s_cookies, site.label), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -300,7 +307,11 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                "${site.cookies.size} cookie${if (site.cookies.size == 1) "" else "s"} · ${formatCookieExpiry(site.soonestExpiryEpochSeconds)}",
+                                stringResource(
+                                    R.string.cookie_count_and_expiry,
+                                    pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
+                                    formatCookieExpiry(context, site.soonestExpiryEpochSeconds),
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -312,12 +323,12 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             val text = site.cookies.joinToString("\n") { it.rawLine }
                             scope.launch {
                                 runCatching {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("${site.label} cookies", text)))
-                                    Toast.makeText(context, "Copied ${site.label} cookies to clipboard", Toast.LENGTH_SHORT).show()
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(context.getString(R.string.x_cookies, site.label), text)))
+                                    Toast.makeText(context, context.getString(R.string.copied_x_cookies_to_clipboard, site.label), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${site.label}'s cookies", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_x_s_cookies, site.label), modifier = Modifier.size(18.dp))
                         }
                         // Kept, not deleted — a saved login the user just doesn't want *sent* right
                         // now (a stale account, testing anonymous behavior, ...) without losing it
@@ -331,7 +342,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                                 cookiesViewModel.setSiteEnabled(site.rootDomain, checked)
                             },
                             modifier = Modifier.semantics {
-                                contentDescription = "Enable cookies for ${site.label}"
+                                contentDescription = context.getString(R.string.enable_cookies_for_x, site.label)
                             },
                             // Same fix as IconToggleRow's own Switch: the default unchecked thumb
                             // color is nearly invisible against the unchecked track in this theme
@@ -356,7 +367,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             scope.launch {
                                 runCatching {
                                     clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("cookies.txt", savedCookiesContent)))
-                                    Toast.makeText(context, "Copied all cookies to clipboard", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.copied_all_cookies_to_clipboard), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -365,7 +376,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     ) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Copy all")
+                        Text(stringResource(R.string.copy_all))
                     }
                     OutlinedButton(
                         onClick = {
@@ -378,7 +389,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     ) {
                         Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Clear all")
+                        Text(stringResource(R.string.clear_all))
                     }
                 }
             }
@@ -392,13 +403,13 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 scope.launch {
                     runCatching {
                         clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(label, text)))
-                        Toast.makeText(context, "Copied $label to clipboard", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.copied_x_to_clipboard, label), Toast.LENGTH_SHORT).show()
                     }
                 }
             },
             onSave = { editedValues ->
                 cookiesViewModel.saveEdits(editedValues)
-                Toast.makeText(context, "Saved changes for ${site.label}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.saved_changes_for_x, site.label), Toast.LENGTH_SHORT).show()
                 viewingSite = null
             },
             onDismiss = { viewingSite = null },
@@ -407,15 +418,18 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
     pendingDelete?.let { pending ->
         val (title, message) = when (pending) {
-            is PendingCookieDelete.Site -> "Remove ${pending.site.label}?" to
-                "This deletes ${pending.site.cookies.size} saved cookie${if (pending.site.cookies.size == 1) "" else "s"} for ${pending.site.label}. You'll need to sign in there again next time."
-            PendingCookieDelete.All -> "Clear all cookies?" to
-                "This deletes all ${parsedCookies.size} saved cookie${if (parsedCookies.size == 1) "" else "s"} across ${cookieSites.size} site${if (cookieSites.size == 1) "" else "s"}. You'll need to sign in again everywhere."
+            is PendingCookieDelete.Site -> stringResource(R.string.remove_x, pending.site.label) to
+                pluralStringResource(R.plurals.delete_site_cookies_message, pending.site.cookies.size, pending.site.cookies.size, pending.site.label)
+            PendingCookieDelete.All -> stringResource(R.string.clear_all_cookies) to
+                pluralStringResource(
+                    R.plurals.delete_all_cookies_message, parsedCookies.size, parsedCookies.size,
+                    pluralStringResource(R.plurals.site_count, cookieSites.size, cookieSites.size),
+                )
         }
         ConfirmDeleteSheet(
             title = title,
             message = message,
-            confirmLabel = "Delete",
+            confirmLabel = stringResource(R.string.delete),
             onConfirm = {
                 when (pending) {
                     is PendingCookieDelete.Site -> cookiesViewModel.deleteSite(pending.site)
@@ -447,6 +461,7 @@ private fun SiteCookiesSheet(
     onSave: (Map<ParsedCookie, String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val edits = remember(site) { mutableStateMapOf<ParsedCookie, String>() }
     val haptics = LocalHapticFeedback.current
     fun currentValue(cookie: ParsedCookie) = edits[cookie] ?: cookie.value
@@ -458,7 +473,11 @@ private fun SiteCookiesSheet(
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).imePadding()) {
             Text(site.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "${site.cookies.size} cookie${if (site.cookies.size == 1) "" else "s"} · ${formatCookieExpiry(site.soonestExpiryEpochSeconds)}",
+                stringResource(
+                    R.string.cookie_count_and_expiry,
+                    pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
+                    formatCookieExpiry(context, site.soonestExpiryEpochSeconds),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -481,9 +500,9 @@ private fun SiteCookiesSheet(
                         trailingIcon = {
                             IconButton(onClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onCopy("${cookie.name} cookie", currentValue(cookie))
+                                onCopy(context.getString(R.string.x_cookie, cookie.name), currentValue(cookie))
                             }) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy ${cookie.name}", modifier = Modifier.size(18.dp))
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_x, cookie.name), modifier = Modifier.size(18.dp))
                             }
                         },
                         modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
@@ -500,16 +519,16 @@ private fun SiteCookiesSheet(
                         val text = site.cookies.joinToString("\n") { cookie ->
                             (edits[cookie]?.let { cookie.withValue(it) } ?: cookie).rawLine
                         }
-                        onCopy("${site.label} cookies", text)
+                        onCopy(context.getString(R.string.x_cookies, site.label), text)
                     },
                 ) {
                     Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Copy all")
+                    Text(stringResource(R.string.copy_all))
                 }
                 Spacer(Modifier.weight(1f))
                 ConfirmCancelSplitButton(
-                    label = "Save",
+                    label = stringResource(R.string.action_save),
                     icon = Icons.Outlined.Save,
                     onConfirm = {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -523,12 +542,13 @@ private fun SiteCookiesSheet(
     }
 }
 
-private fun formatCookieExpiry(epochSeconds: Long): String {
-    if (epochSeconds <= 0L) return "Session"
-    if (epochSeconds > 32503680000L) return "Persistent"
+private fun formatCookieExpiry(context: android.content.Context, epochSeconds: Long): String {
+    if (epochSeconds <= 0L) return context.getString(R.string.session)
+    if (epochSeconds > 32503680000L) return context.getString(R.string.persistent)
     val millis = epochSeconds * 1000L
-    if (millis < System.currentTimeMillis()) return "Expired"
-    return java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
+    if (millis < System.currentTimeMillis()) return context.getString(R.string.expired)
+    // The user's own date style (in their language), not a fixed English pattern.
+    return java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(millis))
 }
 
 @Composable
@@ -551,11 +571,11 @@ private fun CookieLoginSiteDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Log in via built-in browser") },
+        title = { Text(stringResource(R.string.log_in_via_built_in_browser)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 Text(
-                    "Choose a site to open in the login browser:",
+                    stringResource(R.string.choose_a_site_to_open_in),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -578,13 +598,13 @@ private fun CookieLoginSiteDialog(
                     ) {
                         Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Enter custom URL…")
+                        Text(stringResource(R.string.enter_custom_url))
                     }
                 } else {
                     OutlinedTextField(
                         value = customUrl,
                         onValueChange = { customUrl = it },
-                        label = { Text("Custom URL") },
+                        label = { Text(stringResource(R.string.custom_url)) },
                         placeholder = { Text("https://example.com/login") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
@@ -604,7 +624,7 @@ private fun CookieLoginSiteDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.medium,
                     ) {
-                        Text("Open custom URL")
+                        Text(stringResource(R.string.open_custom_url))
                     }
                 }
             }
@@ -612,7 +632,7 @@ private fun CookieLoginSiteDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
@@ -635,7 +655,7 @@ fun CookieLoginDialog(
         startUrl = loginUrl,
         onDismiss = onDismiss,
         startDesktop = true,
-        primaryAction = BrowserAction("Extract cookies", Icons.Outlined.Cookie) { url ->
+        primaryAction = BrowserAction(stringResource(R.string.extract_cookies), Icons.Outlined.Cookie) { url ->
             scope.launch(Dispatchers.IO) {
                 runCatching { CookieManager.getInstance().flush() }
                 val cookieHeader = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull()

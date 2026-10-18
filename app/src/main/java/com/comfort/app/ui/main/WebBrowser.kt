@@ -1,5 +1,8 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.comfort.app.R
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -354,7 +357,7 @@ fun WebBrowser(
                                     }
 
                                     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                                        if (request.isForMainFrame) loadError = error.description?.toString()?.ifBlank { null } ?: "The page didn't load."
+                                        if (request.isForMainFrame) loadError = error.description?.toString()?.ifBlank { null } ?: context.getString(R.string.the_page_didn_t_load)
                                     }
                                 }
                                 loadUrl(normalizeBrowserAddress(startUrl))
@@ -397,7 +400,7 @@ fun WebBrowser(
                             sniffer.recorder.start()
                             // Again from the start, so the first pieces (the initialization) are caught.
                             webView?.reload()
-                            Toast.makeText(context, "Recording. Play the video to the end, then tap Stop and save.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.recording_play_the_video_to_the), Toast.LENGTH_LONG).show()
                         },
                         onQueue = { item ->
                             queuedMedia = queuedMedia + item.url
@@ -406,7 +409,7 @@ fun WebBrowser(
                             val title = pageTitle
                             scope.launch {
                                 queueCaught(context, item, page, title, userAgent)
-                                android.widget.Toast.makeText(context, "Added to Queue", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, context.getString(R.string.added_to_queue), android.widget.Toast.LENGTH_SHORT).show()
                             }
                         },
                         onDismiss = { mediaSheetOpen = false },
@@ -427,7 +430,7 @@ fun WebBrowser(
                                 savingRecording = false
                                 Toast.makeText(
                                     context,
-                                    if (saved != null) "Recording saved to your Library" else "Couldn't save the recording",
+                                    if (saved != null) context.getString(R.string.recording_saved_to_your_library) else context.getString(R.string.couldn_t_save_the_recording),
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             }
@@ -438,20 +441,15 @@ fun WebBrowser(
 
                 if (fullScreenView == null && !WindowInsets.isImeVisible) {
                     val mediaBadgeText = remember(rankedMedia.size) { badgeCountText(rankedMedia.size) }
-                    val mediaContentDesc = remember(rankedMedia.size) {
-                        when (rankedMedia.size) {
-                            0 -> "Media on this page"
-                            1 -> "Media on this page, 1 found"
-                            else -> "Media on this page, ${rankedMedia.size} found"
-                        }
-                    }
+                    val mediaContentDesc = if (rankedMedia.isEmpty()) stringResource(R.string.media_on_this_page)
+                        else pluralStringResource(R.plurals.media_on_page_found, rankedMedia.size, rankedMedia.size)
                     BottomAppBar(
                         actions = {
                             IconButton(onClick = { webView?.goBack() }, enabled = canGoBack) {
-                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
                             }
                             IconButton(onClick = { webView?.goForward() }, enabled = canGoForward) {
-                                Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "Forward")
+                                Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = stringResource(R.string.forward))
                             }
                             // The media found on the page, counted live. The badge sits in the
                             // button's own corner (as on the Library's queue button), where it
@@ -476,11 +474,11 @@ fun WebBrowser(
                             }
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
+                                    Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Share page") },
+                                        text = { Text(stringResource(R.string.share_page)) },
                                         leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
@@ -488,7 +486,7 @@ fun WebBrowser(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Find in page") },
+                                        text = { Text(stringResource(R.string.find_in_page)) },
                                         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
@@ -496,7 +494,7 @@ fun WebBrowser(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Desktop site") },
+                                        text = { Text(stringResource(R.string.desktop_site)) },
                                         leadingIcon = { Icon(Icons.Outlined.DesktopWindows, contentDescription = null) },
                                         trailingIcon = { Checkbox(checked = desktopMode, onCheckedChange = null) },
                                         modifier = Modifier.semantics {
@@ -510,19 +508,19 @@ fun WebBrowser(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Copy link") },
+                                        text = { Text(stringResource(R.string.copy_link)) },
                                         leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
                                             (context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager)
-                                                ?.setPrimaryClip(ClipData.newPlainText("Link", currentUrl))
+                                                ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.link), currentUrl))
                                             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                                                Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Open in another browser") },
+                                        text = { Text(stringResource(R.string.open_in_another_browser)) },
                                         leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },
                                         onClick = {
                                             menuOpen = false
@@ -549,7 +547,7 @@ fun WebBrowser(
                                     ExtendedFloatingActionButton(
                                         onClick = { mediaSheetOpen = true },
                                         icon = { Icon(Icons.Outlined.Download, contentDescription = null) },
-                                        text = { Text("Download") },
+                                        text = { Text(stringResource(R.string.search_download)) },
                                         containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
                                         elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
                                     )
@@ -586,12 +584,11 @@ private fun CaughtMediaSheet(
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
-            Text("Media on this page", style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.media_on_this_page), style = MaterialTheme.typography.titleLarge)
             Text(
                 when (shown.size) {
-                    0 -> "Nothing found yet"
-                    1 -> "1 found"
-                    else -> "${shown.size} found, best match first"
+                    0 -> stringResource(R.string.nothing_found_yet)
+                    else -> pluralStringResource(R.plurals.media_found_best_first, shown.size, shown.size)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -610,7 +607,7 @@ private fun CaughtMediaSheet(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Play the video, or scroll to where the pictures are. Media shows up here as the page loads it.",
+                    stringResource(R.string.play_the_video_or_scroll_to),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -632,16 +629,16 @@ private fun CaughtMediaSheet(
                     val size = com.comfort.app.util.MediaSniffer.sizeOf(item)
                     ListItem(
                         overlineContent = if (i == 0 && shown.size > 1) {
-                            { Text("Best match", color = MaterialTheme.colorScheme.primary) }
+                            { Text(stringResource(R.string.best_match), color = MaterialTheme.colorScheme.primary) }
                         } else null,
                         headlineContent = {
                             Text(
                                 listOfNotNull(
                                     when (item.kind) {
-                                        com.comfort.app.util.MediaSniffer.Kind.STREAM -> "Video stream"
-                                        com.comfort.app.util.MediaSniffer.Kind.AUDIO -> "Audio"
-                                        com.comfort.app.util.MediaSniffer.Kind.IMAGE -> "Picture"
-                                        else -> "Video"
+                                        com.comfort.app.util.MediaSniffer.Kind.STREAM -> stringResource(R.string.video_stream)
+                                        com.comfort.app.util.MediaSniffer.Kind.AUDIO -> stringResource(R.string.audio)
+                                        com.comfort.app.util.MediaSniffer.Kind.IMAGE -> stringResource(R.string.picture)
+                                        else -> stringResource(R.string.video)
                                     },
                                     size?.let { (w, h) -> qualityLabel(item.kind, w, h) },
                                     item.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
@@ -662,7 +659,7 @@ private fun CaughtMediaSheet(
                             if (isQueued) {
                                 Icon(
                                     Icons.Outlined.CheckCircle,
-                                    contentDescription = "Added to Queue",
+                                    contentDescription = stringResource(R.string.added_to_queue),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(40.dp).padding(8.dp),
                                 )
@@ -671,20 +668,20 @@ private fun CaughtMediaSheet(
                                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
                                     onQueue(item)
                                 }) {
-                                    Icon(Icons.Outlined.Download, contentDescription = "Download")
+                                    Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.search_download))
                                 }
                             }
                         },
                         modifier = Modifier
                             .semantics {
                                 if (isQueued) {
-                                    stateDescription = "Added to Queue"
+                                    stateDescription = context.getString(R.string.added_to_queue)
                                 }
                             }
                             .clickable(
                                 enabled = !isQueued,
                                 role = Role.Button,
-                                onClickLabel = "Download",
+                                onClickLabel = stringResource(R.string.search_download),
                             ) {
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
                                 onQueue(item)
@@ -703,15 +700,15 @@ private fun CaughtMediaSheet(
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text(
-                        if (drmProtected) "This video is protected" else "Not the video you want?",
+                        if (drmProtected) stringResource(R.string.this_video_is_protected) else stringResource(R.string.not_the_video_you_want),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         if (drmProtected) {
-                            "The site uses copy protection (DRM), so a recording of it wouldn't play."
+                            stringResource(R.string.the_site_uses_copy_protection_drm)
                         } else {
-                            "This player builds its video from pieces. Comfort can record them while it plays: the page reloads, you play the video to the end, then tap Stop and save."
+                            stringResource(R.string.this_player_builds_its_video_from)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -721,7 +718,7 @@ private fun CaughtMediaSheet(
                         FilledTonalButton(onClick = onRecord) {
                             Icon(Icons.Outlined.FiberManualRecord, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text("Record while it plays")
+                            Text(stringResource(R.string.record_while_it_plays))
                         }
                     }
                 }
@@ -750,18 +747,18 @@ private fun RecordingBar(bytes: Long, ended: Boolean, saving: Boolean, onStop: (
             Spacer(Modifier.width(10.dp))
             Text(
                 when {
-                    saving -> "Saving the recording…"
-                    ended -> "Recorded to the end · " + android.text.format.Formatter.formatShortFileSize(context, bytes)
-                    bytes > 0 -> "Recording · " + android.text.format.Formatter.formatShortFileSize(context, bytes)
-                    else -> "Recording · play the video"
+                    saving -> stringResource(R.string.saving_the_recording)
+                    ended -> stringResource(R.string.recorded_to_the_end) + android.text.format.Formatter.formatShortFileSize(context, bytes)
+                    bytes > 0 -> stringResource(R.string.recording) + android.text.format.Formatter.formatShortFileSize(context, bytes)
+                    else -> stringResource(R.string.recording_play_the_video)
                 },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.weight(1f),
             )
             if (!saving) {
-                TextButton(onClick = onCancel) { Text("Cancel") }
-                Button(onClick = onStop, enabled = bytes > 0) { Text("Stop and save") }
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+                Button(onClick = onStop, enabled = bytes > 0) { Text(stringResource(R.string.stop_and_save)) }
             }
         }
     }
@@ -930,7 +927,7 @@ private fun AddressBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.Outlined.Close, contentDescription = "Close browser")
+            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.close_browser))
         }
         Surface(
             modifier = Modifier.weight(1f).height(48.dp),
@@ -947,7 +944,7 @@ private fun AddressBar(
                         secure -> Icons.Outlined.Lock
                         else -> Icons.Outlined.Public
                     },
-                    contentDescription = if (!editing && secure) "Secure connection" else null,
+                    contentDescription = if (!editing && secure) stringResource(R.string.secure_connection) else null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
@@ -976,7 +973,7 @@ private fun AddressBar(
                     )
                     if (editing && addressField.text.isEmpty()) {
                         Text(
-                            "Search or type a link",
+                            stringResource(R.string.search_or_type_a_link),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -985,14 +982,14 @@ private fun AddressBar(
                 if (editing) {
                     if (addressField.text.isNotEmpty()) {
                         IconButton(onClick = { onAddressChange(TextFieldValue("")) }) {
-                            Icon(Icons.Outlined.Clear, contentDescription = "Clear address", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Icon(Icons.Outlined.Clear, contentDescription = stringResource(R.string.clear_address), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 } else {
                     IconButton(onClick = onReloadOrStop) {
                         Icon(
                             if (isLoading) Icons.Outlined.Close else Icons.Outlined.Refresh,
-                            contentDescription = if (isLoading) "Stop loading" else "Reload",
+                            contentDescription = if (isLoading) stringResource(R.string.stop_loading) else stringResource(R.string.reload),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -1022,7 +1019,7 @@ private fun FindInPageBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close find")
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.close_find))
         }
         Surface(
             modifier = Modifier.weight(1f).height(48.dp),
@@ -1045,26 +1042,27 @@ private fun FindInPageBar(
                         modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     )
                     if (query.isEmpty()) {
-                        Text("Find in page", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.find_in_page), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 if (query.isNotEmpty()) {
+                    val matchesDescription = if (total == 0) stringResource(R.string.no_matches_found) else stringResource(R.string.x_of_x_matches, active, total)
                     Text(
                         "$active/$total",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics {
-                            contentDescription = if (total == 0) "No matches found" else "$active of $total matches"
+                            contentDescription = matchesDescription
                         },
                     )
                 }
             }
         }
         IconButton(onClick = onPrevious, enabled = total > 0) {
-            Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = "Previous match")
+            Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = stringResource(R.string.previous_match))
         }
         IconButton(onClick = onNext, enabled = total > 0) {
-            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = "Next match")
+            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.next_match))
         }
     }
 }
@@ -1086,7 +1084,7 @@ private fun PageError(message: String, onRetry: () -> Unit) {
             modifier = Modifier.size(48.dp),
         )
         Spacer(Modifier.height(16.dp))
-        Text("Couldn't open this page", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.couldn_t_open_this_page), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
             message,
@@ -1098,7 +1096,7 @@ private fun PageError(message: String, onRetry: () -> Unit) {
         FilledTonalButton(onClick = onRetry) {
             Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Try again")
+            Text(stringResource(R.string.search_retry))
         }
     }
 }

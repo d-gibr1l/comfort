@@ -78,7 +78,7 @@ class PreviewSheetViewModel(
                 if (_editedArtist.value == null) result?.artist?.let { _editedArtist.value = cleanArtistName(it).trim() }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _status.value = "Failed to load preview"
+                _status.value = context.getString(com.comfort.app.R.string.failed_to_load_preview)
             } finally {
                 _loading.value = false
             }

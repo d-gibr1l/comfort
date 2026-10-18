@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -98,6 +100,8 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
     }
 
     val coroutineScope = rememberCoroutineScope()
+    val lightOptionsDescription = stringResource(R.string.light_theme_options)
+    val darkOptionsDescription = stringResource(R.string.dark_theme_options)
     val lightSelectedIndex = remember(availableThemes, themeState.lightTheme) {
         availableThemes.indexOf(themeState.lightTheme).coerceAtLeast(0)
     }
@@ -132,7 +136,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 Icon(Icons.Outlined.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "APP THEME",
+                    stringResource(R.string.app_theme),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold,
@@ -140,7 +144,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
             Spacer(Modifier.height(16.dp))
 
-            ThemeHeading(Icons.Outlined.LightMode, "Light theme", isActive = !effectiveDark)
+            ThemeHeading(Icons.Outlined.LightMode, stringResource(R.string.light_theme), isActive = !effectiveDark)
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 state = lightRowState,
@@ -157,7 +161,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 // extra the bleed measures into, making the bleed pointless.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { contentDescription = "Light theme options" }
+                    .semantics { contentDescription = lightOptionsDescription }
                     .layout { measurable, constraints ->
                         val bleed = 20.dp.roundToPx()
                         val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
@@ -186,7 +190,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
             Spacer(Modifier.height(24.dp))
 
-            ThemeHeading(Icons.Outlined.DarkMode, "Dark theme", isActive = effectiveDark)
+            ThemeHeading(Icons.Outlined.DarkMode, stringResource(R.string.dark_theme), isActive = effectiveDark)
             Spacer(Modifier.height(10.dp))
             LazyRow(
                 state = darkRowState,
@@ -194,7 +198,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 // Same bleed + contentPadding technique as the Light theme row above.
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { contentDescription = "Dark theme options" }
+                    .semantics { contentDescription = darkOptionsDescription }
                     .layout { measurable, constraints ->
                         val bleed = 20.dp.roundToPx()
                         val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed * 2))
@@ -232,8 +236,8 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ThemeToggleRow(
                         icon = Icons.Outlined.BrightnessAuto,
-                        title = "Follow system theme",
-                        subtitle = "Switch between your light and dark theme automatically.",
+                        title = stringResource(R.string.follow_system_theme),
+                        subtitle = stringResource(R.string.switch_between_your_light_and_dark),
                         checked = themeState.mode == ThemeMode.SYSTEM,
                         onCheckedChange = { follow ->
                             themeState.setMode(if (follow) ThemeMode.SYSTEM else if (effectiveDark) ThemeMode.DARK else ThemeMode.LIGHT)
@@ -246,8 +250,8 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     ) {
                         ThemeToggleRow(
                             icon = Icons.Outlined.Contrast,
-                            title = "Pure black dark mode",
-                            subtitle = "Use true black backgrounds in dark theme.",
+                            title = stringResource(R.string.pure_black_dark_mode),
+                            subtitle = stringResource(R.string.use_true_black_backgrounds_in_dark),
                             checked = themeState.pureBlack,
                             onCheckedChange = { themeState.setPureBlack(it) },
                         )
@@ -260,7 +264,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
         }
         StatusBarScrim(alpha = { 1f - headerState.reveal.fraction }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(
-            title = "Appearance",
+            title = stringResource(R.string.appearance),
             topicIcon = Icons.Outlined.WbSunny,
             onBack = onBack,
             topPadding = headerState.topPadding,
@@ -300,7 +304,7 @@ private fun ThemeHeading(
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 Text(
-                    "Active",
+                    stringResource(R.string.active),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
@@ -395,8 +399,8 @@ private fun ThemePreviewCard(
             baseScheme
         }
     }
-    val label = if (isDark) theme.darkLabel else theme.lightLabel
-    val accessibilityLabel = "${if (isDark) "Dark" else "Light"} theme: $label"
+    val label = stringResource(if (isDark) theme.darkLabel else theme.lightLabel)
+    val accessibilityLabel = stringResource(if (isDark) R.string.dark_theme_named else R.string.light_theme_named, label)
 
     Column(
         modifier = Modifier.width(100.dp),

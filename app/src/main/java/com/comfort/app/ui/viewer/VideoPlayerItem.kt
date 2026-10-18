@@ -5,6 +5,7 @@
  */
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -348,7 +349,7 @@ fun VideoPlayerItemWithResolvedUri(
                 Icon(
                     // Comfort: the filled symbols; the outlined ones Photon ships read as "00" at this size.
                     imageVector = if (isPlaying) androidx.compose.material.icons.Icons.Rounded.Pause else androidx.compose.material.icons.Icons.Rounded.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    contentDescription = if (isPlaying) stringResource(R.string.widget_music_pause) else stringResource(R.string.widget_music_play),
                     tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(28.dp)
                 )
@@ -430,7 +431,7 @@ fun VideoPlayerItemWithResolvedUri(
                     ) {
                         Icon(
                             imageVector = if (isMuted) ImageVector.vectorResource(R.drawable.ic_ms_volume_off) else ImageVector.vectorResource(R.drawable.ic_ms_volume_up),
-                            contentDescription = if (isMuted) "Unmute" else "Mute",
+                            contentDescription = if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute),
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(20.dp)
                         )

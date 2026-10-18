@@ -1,5 +1,7 @@
 package com.comfort.app.worker
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.content.Context
 import android.content.pm.ServiceInfo
 import androidx.work.CoroutineWorker
@@ -502,7 +504,7 @@ class DownloadWorker(
                     val entries = org.json.JSONArray()
                     synchronized(attemptedEngines) {
                         for (engine in attemptedEngines) {
-                            val message = engineErrors[engine] ?: "Ran, but found nothing to download (no error reported)"
+                            val message = engineErrors[engine] ?: applicationContext.getString(R.string.ran_but_found_nothing_to_download)
                             entries.put(org.json.JSONObject().put("engine", engine).put("message", message.take(2000)))
                         }
                     }
@@ -764,15 +766,15 @@ class DownloadWorker(
                         // tweet gallery-dl couldn't see used to show yt-dlp's "No video could be
                         // found in this tweet" for a picture carousel.
                         is EngineEvent.NoResults -> {
-                            recordEngineError("No content found at this link (gallery-dl found no results)")
+                            recordEngineError(applicationContext.getString(R.string.no_content_found_at_this_link))
                             lastErrorLine.getAndUpdate { current ->
                                 if (current == null || GalleryDlListing.sanitizeErrorMessage(current) != current || isNotItsKind(current)) {
-                                    "No content found at this link — it may need cookies for a logged-in session, or be unavailable"
+                                    applicationContext.getString(R.string.no_content_found_at_this_link_2)
                                 } else current
                             }
                         }
                         // Listing-only progress text, and the engines' warnings/debug/status lines.
-                        is EngineEvent.RateLimited -> DownloadNotes.set(downloadId, "Rate-limited by ${event.site} — waiting until ${event.until}")
+                        is EngineEvent.RateLimited -> DownloadNotes.set(downloadId, applicationContext.getString(R.string.rate_limited_by_x_waiting_until, event.site, event.until))
                         is EngineEvent.Status, EngineEvent.Ignored -> Unit
                         is EngineEvent.File -> {
                             DownloadNotes.clear(downloadId)
@@ -861,9 +863,10 @@ class DownloadWorker(
                     override suspend fun probe() = EngineProbe.probeBoth(applicationContext, url)
                     override val savedCount: Int get() = savedSoFar.get()
                     override val isStopped: Boolean get() = this@DownloadWorker.isStopped
-                    override fun fail(message: String) {
-                        lastErrorLine.compareAndSet(null, message)
-                        recordEngineError(message)
+                    override fun fail(message: Int) {
+                        val text = applicationContext.getString(message)
+                        lastErrorLine.compareAndSet(null, text)
+                        recordEngineError(text)
                     }
                     override suspend fun listedImages(): Boolean = alongsideListing.get()?.await() ?: false
                 }
@@ -1033,8 +1036,8 @@ class DownloadWorker(
                     // preview step) can also surface gallery-dl's raw HTML/CSS-blob exception text
                     // verbatim as its "error", which used to show up unfiltered in this terminal
                     // failure notification and toast.
-                    val errorMsg = GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: "No downloadable content found at this link")
-                        ?: "No downloadable content found at this link"
+                    val errorMsg = GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this), applicationContext.resources)
+                        ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this)
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
                     dao.setErrorDetails(downloadId, errorDetailsJson())
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
@@ -1078,7 +1081,7 @@ class DownloadWorker(
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     Result.success()
                 } else {
-                    val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it) }
+                    val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it, applicationContext.resources) }
                     dao.updateError(downloadId, DownloadStatus.ERRORED, sanitized)
                     // Not an engine's error (the app itself failed), and the per-engine record is out
                     // of scope here: clear any older details so the sheet shows this message.

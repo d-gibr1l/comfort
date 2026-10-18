@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -41,17 +43,19 @@ import androidx.compose.material.icons.outlined.*
 
 enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, BACKUP, ABOUT }
 
-private fun SettingsRoute.displayName(): String = when (this) {
-    SettingsRoute.ROOT -> "Settings"
-    SettingsRoute.APPEARANCE -> "Appearance"
-    SettingsRoute.FOLDERS -> "Folders"
-    SettingsRoute.DOWNLOADS -> "Downloads"
-    SettingsRoute.PROCESSING -> "Processing"
-    SettingsRoute.ADVANCED -> "Advanced"
-    SettingsRoute.COOKIES -> "Cookies & Login"
-    SettingsRoute.UPDATES -> "Updates and engines"
-    SettingsRoute.BACKUP -> "Backup & restore"
-    SettingsRoute.ABOUT -> "About"
+/** The page's name, as a string resource. */
+@androidx.annotation.StringRes
+private fun SettingsRoute.displayName(): Int = when (this) {
+    SettingsRoute.ROOT -> R.string.backup_part_settings
+    SettingsRoute.APPEARANCE -> R.string.appearance
+    SettingsRoute.FOLDERS -> R.string.folders
+    SettingsRoute.DOWNLOADS -> R.string.downloads
+    SettingsRoute.PROCESSING -> R.string.processing
+    SettingsRoute.ADVANCED -> R.string.advanced
+    SettingsRoute.COOKIES -> R.string.cookies_login
+    SettingsRoute.UPDATES -> R.string.updates_and_engines
+    SettingsRoute.BACKUP -> R.string.backup_title
+    SettingsRoute.ABOUT -> R.string.about
 }
 
 private fun SettingsRoute.icon(): ImageVector = when (this) {
@@ -71,9 +75,15 @@ private fun SettingsRoute.icon(): ImageVector = when (this) {
  * which only covers the handful of top-level nav entries on the Settings root. Lets the search bar
  * match something like "TLS" or "aria2c" against a row buried three screens deep without that
  * screen's own composable ever running. */
-internal data class SubpageSearchEntry(val title: String, val subtitle: String, val route: SettingsRoute) {
-    fun matches(query: String): Boolean =
-        title.contains(query, ignoreCase = true) || subtitle.contains(query, ignoreCase = true)
+internal data class SubpageSearchEntry(
+    @androidx.annotation.StringRes val title: Int,
+    @androidx.annotation.StringRes val subtitle: Int,
+    val route: SettingsRoute,
+) {
+    /** Matched in the language shown: the same strings the rows themselves use. */
+    fun matches(resources: android.content.res.Resources, query: String): Boolean =
+        resources.getString(title).contains(query, ignoreCase = true) ||
+            resources.getString(subtitle).contains(query, ignoreCase = true)
 }
 
 // Hand-maintained index of every toggle/field across the settings sub-screens — title/subtitle
@@ -84,80 +94,80 @@ internal data class SubpageSearchEntry(val title: String, val subtitle: String, 
 // changes. Order doesn't matter — this is only ever filtered, never displayed as-is.
 internal val SUBPAGE_SEARCH_INDEX = listOf(
     // Downloads
-    SubpageSearchEntry("Sharing mode", "Configure, Instant, or Always ask — what Comfort does with a link shared to it.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Multiple concurrent downloads", "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Wi-Fi only", "Queued downloads wait for a Wi-Fi connection instead of using mobile data.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Speed limit", "Caps download bandwidth for all future downloads.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Retries", "How many times a failed request is retried before giving up. Off uses the engine's built-in default.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Fragment retries", "How many times a failed video/audio fragment is retried. Off shares the main Retries budget.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Proxy", "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Force IPv4", "Forces connections over IPv4. Try this if downloads fail due to broken IPv6 routes.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Skip certificate checks", "Disables security certificate checks. Only enable this if a server is misconfigured.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Concurrent fragments", "How many fragments of a single video to download in parallel.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Sleep interval", "Adds a random delay before requests to avoid triggering rate limits and bot bans.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Socket timeout", "How long to wait on a stalled connection before retrying. Off uses the engine's default.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Buffer size", "The size of each read chunk (yt-dlp only). Rarely worth changing from the default.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Multi-connection downloads (aria2c)", "Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Restrict to time window", "New downloads wait in the queue until the window opens.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Use alarm for scheduling", "Ensures scheduled downloads start exactly on time by bypassing Android's battery-saving delays.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Limit max file size", "Files larger than this are skipped instead of downloaded.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Download delay", "Adds a delay between a finished download and the next one in the queue.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Incognito by default", "Downloads are still saved to your device, but won't appear in the app's History or Library.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Prevent duplicate downloads", "Skips downloading a link if it's already queued, running, or finished.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Remember last quality", "Makes the quality chosen on the download sheet the new default for future downloads.", SettingsRoute.DOWNLOADS),
-    SubpageSearchEntry("Clean up leftover downloads", "Automatically deletes partial files when a download is cancelled or fails.", SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.sharing_mode, R.string.configure_instant_or_always_ask_what, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.multiple_concurrent_downloads, R.string.run_more_than_one_download_at, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.wi_fi_only, R.string.queued_downloads_wait_for_a_wi, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.speed_limit, R.string.caps_download_bandwidth_for_all_future, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.retries, R.string.how_many_times_a_failed_request, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.fragment_retries, R.string.how_many_times_a_failed_video, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.proxy, R.string.routes_all_future_downloads_through_this, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.force_ipv4, R.string.forces_connections_over_ipv4_try_this, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.skip_certificate_checks, R.string.disables_security_certificate_checks_only_enable, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.concurrent_fragments, R.string.how_many_fragments_of_a_single, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.sleep_interval, R.string.adds_a_random_delay_before_requests, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.socket_timeout, R.string.how_long_to_wait_on_a, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.buffer_size, R.string.the_size_of_each_read_chunk, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.multi_connection_downloads_aria2c, R.string.downloads_files_faster_by_splitting_them, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.restrict_to_time_window, R.string.new_downloads_wait_in_the_queue, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.use_alarm_for_scheduling, R.string.ensures_scheduled_downloads_start_exactly_on, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.limit_max_file_size, R.string.files_larger_than_this_are_skipped, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.download_delay, R.string.adds_a_delay_between_a_finished, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.incognito_by_default, R.string.downloads_are_still_saved_to_your, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.prevent_duplicate_downloads, R.string.skips_downloading_a_link_if_it, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.remember_last_quality, R.string.makes_the_quality_chosen_on_the, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.clean_up_leftover_downloads, R.string.automatically_deletes_partial_files_when_a, SettingsRoute.DOWNLOADS),
 
     // Folders
-    SubpageSearchEntry("Filename format", "How downloaded files are named.", SettingsRoute.FOLDERS),
-    SubpageSearchEntry("Restrict filenames", "Removes special characters and replaces spaces with underscores. Safer for sharing and older file systems.", SettingsRoute.FOLDERS),
-    SubpageSearchEntry("Trim filenames", "Caps long titles at 150 characters (only applies to the default filename format).", SettingsRoute.FOLDERS),
-    SubpageSearchEntry("Download location", "Where downloaded files are saved.", SettingsRoute.FOLDERS),
-    SubpageSearchEntry("Storage", "How much space downloads are using.", SettingsRoute.FOLDERS),
+    SubpageSearchEntry(R.string.filename_format, R.string.how_downloaded_files_are_named, SettingsRoute.FOLDERS),
+    SubpageSearchEntry(R.string.restrict_filenames, R.string.removes_special_characters_and_replaces_spaces, SettingsRoute.FOLDERS),
+    SubpageSearchEntry(R.string.trim_filenames, R.string.caps_long_titles_at_150_characters, SettingsRoute.FOLDERS),
+    SubpageSearchEntry(R.string.download_location, R.string.where_downloaded_files_are_saved, SettingsRoute.FOLDERS),
+    SubpageSearchEntry(R.string.storage, R.string.how_much_space_downloads_are_using, SettingsRoute.FOLDERS),
 
     // Processing
-    SubpageSearchEntry("Single video only", "Only downloads the specific video from a link, even if it belongs to a larger playlist or channel.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Live streams from the start", "Downloads live streams from the beginning instead of the current moment.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Embed thumbnail", "Save the video's thumbnail as cover art inside the file.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Embed metadata", "Tag the file with its title, uploader, and other details.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Embed chapters", "Saves chapter markers inside the video file.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Split by chapters", "Saves a video that has chapters as one file per chapter.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Back up", "Save your settings, Library history and cookies to a file.", SettingsRoute.BACKUP),
-    SubpageSearchEntry("Restore", "Bring back settings, history and cookies from a backup file.", SettingsRoute.BACKUP),
-    SubpageSearchEntry("Command templates", "Saved sets of arguments to add to a download.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("SponsorBlock", "Marks or removes sponsored segments in YouTube videos.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Audio format", "Save songs and audio as MP3, M4A, Opus, FLAC, or the site's original.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Save WebP pictures as JPG", "Converts WebP pictures to JPG as they're saved.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Even out volume", "Makes every song play at the same loudness.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Lyrics", "Adds synced or plain lyrics to downloaded songs.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Save .lrc file", "Also saves synced lyrics as a .lrc file next to the song.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Write description / info.json files", "Save a separate JSON metadata file alongside each download.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Download subtitles", "Fetch and embed subtitles when they're available.", SettingsRoute.PROCESSING),
-    SubpageSearchEntry("Save subtitle files", "Saves subtitles as a separate file (.srt/.vtt) next to the video instead of only embedding them.", SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.single_video_only, R.string.only_downloads_the_specific_video_from, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.live_streams_from_the_start, R.string.downloads_live_streams_from_the_beginning, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.embed_thumbnail, R.string.save_the_video_s_thumbnail_as, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.embed_metadata, R.string.tag_the_file_with_its_title, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.embed_chapters, R.string.saves_chapter_markers_inside_the_video, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.split_chapters_title, R.string.saves_a_video_that_has_chapters, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.backup_section, R.string.save_your_settings_library_history_and, SettingsRoute.BACKUP),
+    SubpageSearchEntry(R.string.restore_section, R.string.bring_back_settings_history_and_cookies, SettingsRoute.BACKUP),
+    SubpageSearchEntry(R.string.command_templates_section, R.string.saved_sets_of_arguments_to_add, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.sponsorblock_section, R.string.marks_or_removes_sponsored_segments_in, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.audio_format, R.string.save_songs_and_audio_as_mp3, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.save_webp_pictures_as_jpg, R.string.converts_webp_pictures_to_jpg_as, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.even_out_volume, R.string.makes_every_song_play_at_the_2, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.lyrics, R.string.adds_synced_or_plain_lyrics_to, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.save_lrc_file, R.string.also_saves_synced_lyrics_as_a_2, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.write_description_info_json_files, R.string.save_a_separate_json_metadata_file, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.download_subtitles, R.string.fetch_and_embed_subtitles_when_they, SettingsRoute.PROCESSING),
+    SubpageSearchEntry(R.string.save_subtitle_files, R.string.saves_subtitles_as_a_separate_file, SettingsRoute.PROCESSING),
 
     // Advanced
-    SubpageSearchEntry("Extra arguments", "Raw gallery-dl command-line arguments.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Rotate player clients", "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Which engines run", "Turn yt-dlp, gallery-dl or Instaloader off, and choose which tries a link first.", SettingsRoute.UPDATES),
-    SubpageSearchEntry("Impersonate a browser", "Makes the app look like a real web browser to bypass bot detection on strict websites.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("yt-dlp extractor arguments", "Site-specific extractor options passed straight to yt-dlp.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Format sort", "Custom yt-dlp format-selection priority.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Custom headers", "Extra HTTP headers sent with every request.", SettingsRoute.ADVANCED),
-    SubpageSearchEntry("Verbose logging", "Logs all internal yt-dlp debug output for advanced troubleshooting.", SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.extra_arguments, R.string.raw_gallery_dl_command_line_arguments, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.rotate_player_clients, R.string.automatically_switches_between_android_ios_and, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.which_engines_run, R.string.turn_yt_dlp_gallery_dl_or, SettingsRoute.UPDATES),
+    SubpageSearchEntry(R.string.impersonate_a_browser, R.string.makes_the_app_look_like_a, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.yt_dlp_extractor_arguments, R.string.site_specific_extractor_options_passed_straight, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.format_sort, R.string.custom_yt_dlp_format_selection_priority, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.custom_headers, R.string.extra_http_headers_sent_with_every, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.verbose_logging, R.string.logs_all_internal_yt_dlp_debug, SettingsRoute.ADVANCED),
 
     // Cookies & Login
-    SubpageSearchEntry("Cookies", "Sign in to sites that require it, via a real embedded browser.", SettingsRoute.COOKIES),
-    SubpageSearchEntry("Saved cookies", "Sites you've already signed in to.", SettingsRoute.COOKIES),
+    SubpageSearchEntry(R.string.cookies, R.string.sign_in_to_sites_that_require, SettingsRoute.COOKIES),
+    SubpageSearchEntry(R.string.saved_cookies, R.string.sites_you_ve_already_signed_in, SettingsRoute.COOKIES),
 
     // Appearance
-    SubpageSearchEntry("Follow system theme", "Switch between your light and dark theme automatically.", SettingsRoute.APPEARANCE),
-    SubpageSearchEntry("Pure black dark mode", "Use true black backgrounds in dark theme.", SettingsRoute.APPEARANCE),
-    SubpageSearchEntry("Light theme", "Pick this app's light-mode color scheme.", SettingsRoute.APPEARANCE),
-    SubpageSearchEntry("Dark theme", "Pick this app's dark-mode color scheme.", SettingsRoute.APPEARANCE),
+    SubpageSearchEntry(R.string.follow_system_theme, R.string.switch_between_your_light_and_dark, SettingsRoute.APPEARANCE),
+    SubpageSearchEntry(R.string.pure_black_dark_mode, R.string.use_true_black_backgrounds_in_dark, SettingsRoute.APPEARANCE),
+    SubpageSearchEntry(R.string.light_theme, R.string.pick_this_app_s_light_mode, SettingsRoute.APPEARANCE),
+    SubpageSearchEntry(R.string.dark_theme, R.string.pick_this_app_s_dark_mode, SettingsRoute.APPEARANCE),
 
     // About
-    SubpageSearchEntry("App update", "Check for a newer version of this app.", SettingsRoute.UPDATES),
-    SubpageSearchEntry("Engines", "Update yt-dlp, gallery-dl and Instaloader independently of an app update.", SettingsRoute.UPDATES),
-    SubpageSearchEntry("Credits", "gallery-dl, yt-dlp, Instaloader, FFmpeg, QuickJS, aria2, and the bundled Python runtime.", SettingsRoute.ABOUT),
+    SubpageSearchEntry(R.string.app_update_2, R.string.check_for_a_newer_version_of, SettingsRoute.UPDATES),
+    SubpageSearchEntry(R.string.engines, R.string.update_yt_dlp_gallery_dl_and, SettingsRoute.UPDATES),
+    SubpageSearchEntry(R.string.credits, R.string.gallery_dl_yt_dlp_instaloader_ffmpeg, SettingsRoute.ABOUT),
 )
 
 /** [route]/[onNavigate] are hoisted up to MainScreen rather than owned here — this composable
@@ -226,7 +236,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> systemDark
     }
-    val themeSummary = if (effectiveDark) themeState.darkTheme.darkLabel else themeState.lightTheme.lightLabel
+    val themeSummary = stringResource(if (effectiveDark) themeState.darkTheme.darkLabel else themeState.lightTheme.lightLabel)
     var filenameFormat by remember { mutableStateOf(GalleryDlPreferences.getFilenameFormat(context)) }
     val cookieVersion by com.comfort.app.data.CookieStore.version.collectAsState()
     val hasCookies = remember(cookieVersion) { GalleryDlPreferences.getCookies(context).isNotBlank() }
@@ -267,28 +277,30 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     // at once had grown too long to scan.
     val backupTitle = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.backup_title)
     val backupSubtitle = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.backup_root_subtitle)
-    val mainItems = remember(themeSummary, filenameFormat, hasCookies, backupTitle, backupSubtitle) {
+    // Not remembered: their text comes from resources, read while composing (a cheap list).
+    val mainItems = run {
         listOf(
-            SettingsItemSpec(Icons.Outlined.WbSunny, "Appearance", themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
-            SettingsItemSpec(Icons.Outlined.Folder, "Folders", filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
-            SettingsItemSpec(Icons.Outlined.Download, "Downloads", "Network, scheduling, and queue behavior", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
-            SettingsItemSpec(Icons.Outlined.Movie, "Processing", "Quality, format, and embedding", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
-            SettingsItemSpec(Icons.Outlined.Terminal, "Advanced", "Extra arguments for each engine", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
-            SettingsItemSpec(Icons.Outlined.Lock, "Cookies & Login", if (hasCookies) "Configured" else "Not set", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
-            SettingsItemSpec(Icons.Outlined.Update, "Updates and engines", "App, yt-dlp, gallery-dl & Instaloader", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
+            SettingsItemSpec(Icons.Outlined.WbSunny, stringResource(R.string.appearance), themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
+            SettingsItemSpec(Icons.Outlined.Folder, stringResource(R.string.folders), filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
+            SettingsItemSpec(Icons.Outlined.Download, stringResource(R.string.downloads), stringResource(R.string.network_scheduling_and_queue_behavior), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
+            SettingsItemSpec(Icons.Outlined.Movie, stringResource(R.string.processing), stringResource(R.string.quality_format_and_embedding), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
+            SettingsItemSpec(Icons.Outlined.Terminal, stringResource(R.string.advanced), stringResource(R.string.extra_arguments_for_each_engine), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },
+            SettingsItemSpec(Icons.Outlined.Lock, stringResource(R.string.cookies_login), if (hasCookies) stringResource(R.string.configured) else stringResource(R.string.not_set), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
+            SettingsItemSpec(Icons.Outlined.Update, stringResource(R.string.updates_and_engines), stringResource(R.string.app_yt_dlp_gallery_dl_instaloader), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
             SettingsItemSpec(Icons.Outlined.SettingsBackupRestore, backupTitle, backupSubtitle, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.BACKUP, null) },
         )
     }
-    val aboutItems = remember {
-        listOf(SettingsItemSpec(Icons.Outlined.Info, "About", "Version, credits & source", SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT, null) })
+    val aboutItems = run {
+        listOf(SettingsItemSpec(Icons.Outlined.Info, stringResource(R.string.about), stringResource(R.string.version_credits_source), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ABOUT, null) })
     }
     val filteredMainItems = mainItems.filter { it.matches(searchQuery) }
     val filteredAboutItems = aboutItems.filter { it.matches(searchQuery) }
     val isSearching = searchQuery.isNotBlank()
+    val searchResources = androidx.compose.ui.platform.LocalContext.current.resources
     // Only computed while actually searching — SUBPAGE_SEARCH_INDEX.filter() over ~50 static
     // entries is cheap enough to just do inline (no remember needed), but there's no reason to pay
     // even that when the search bar is empty and this can never show anything anyway.
-    val filteredSubpageResults = if (isSearching) SUBPAGE_SEARCH_INDEX.filter { it.matches(searchQuery) } else emptyList()
+    val filteredSubpageResults = if (isSearching) SUBPAGE_SEARCH_INDEX.filter { it.matches(searchResources, searchQuery) } else emptyList()
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(
@@ -302,7 +314,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
         ) {
             ExpressiveSettingsList(
                 items = filteredMainItems,
-                emptyMessage = "No settings match \"$searchQuery\"".takeIf {
+                emptyMessage = stringResource(R.string.no_settings_match_x, searchQuery).takeIf {
                     isSearching && filteredMainItems.isEmpty() && filteredAboutItems.isEmpty() && filteredSubpageResults.isEmpty()
                 },
             )
@@ -317,11 +329,12 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             if (isSearching && filteredSubpageResults.isNotEmpty()) {
                 ExpressiveSettingsList(
                     items = filteredSubpageResults.map { entry ->
-                        SettingsItemSpec(entry.route.icon(), entry.title, "In ${entry.route.displayName()}", SettingsItemColor.SURFACE_HIGH) {
+                        val title = stringResource(entry.title)
+                        SettingsItemSpec(entry.route.icon(), title, stringResource(R.string.in_x, stringResource(entry.route.displayName())), SettingsItemColor.SURFACE_HIGH) {
                             // The search field's keyboard would otherwise stay up over the page.
                             focusManager.clearFocus()
                             keyboard?.hide()
-                            onNavigate(entry.route, entry.title)
+                            onNavigate(entry.route, title)
                         }
                     },
                 )
@@ -383,7 +396,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                         ) {
                             Icon(
                                 Icons.Outlined.Close,
-                                contentDescription = "Close search",
+                                contentDescription = stringResource(R.string.close_search),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -404,7 +417,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            "Settings",
+                            stringResource(R.string.backup_part_settings),
                             style = MaterialTheme.typography.displayMedium,
                             fontFamily = com.comfort.app.theme.HeaderFontFamily,
                             fontWeight = FontWeight.Bold,
@@ -416,7 +429,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
                         ) {
                             Icon(
                                 Icons.Outlined.Search,
-                                contentDescription = "Search",
+                                contentDescription = stringResource(R.string.search),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
@@ -434,7 +447,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
 fun PillSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    placeholder: String = "Search",
+    placeholder: String = stringResource(R.string.search),
     modifier: Modifier = Modifier,
     // Focus the field and bring up the keyboard as soon as the bar appears — for a bar opened by
     // tapping a search icon, which otherwise needed a second tap on the field itself.
@@ -487,7 +500,7 @@ fun PillSearchBar(
             // there's something to clear.
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.search_clear), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 }
             }
         }

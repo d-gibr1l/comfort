@@ -38,11 +38,8 @@ class ViewModelsAuditTest {
 
     @Test
     fun linkRouter_startedMessage_distinguishesDuplicateAndSuccess() {
-        val dupMsg = startedMessage(EnqueueResult.Duplicate("dup-123"))
-        assertEquals("Already downloaded — see Library > Duplicates", dupMsg)
-
-        val successMsg = startedMessage(EnqueueResult.Started("new-123"))
-        assertEquals("Download started", successMsg)
+        assertEquals(com.comfort.app.R.string.already_downloaded_see_duplicates, startedMessageRes(EnqueueResult.Duplicate("dup-123")))
+        assertEquals(com.comfort.app.R.string.download_started, startedMessageRes(EnqueueResult.Started("new-123")))
     }
 
     @Test

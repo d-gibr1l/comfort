@@ -271,8 +271,8 @@ object VideoSiteRouter {
      * the URL itself. Used as the placeholder title for a download until the real poster/caption
      * is known (see DownloadWorker's derivePosterCaptionTitle), and as the fallback if it never
      * is (a custom filename format, or an engine that never reports one). */
-    fun siteName(url: String): String {
-        val host = normalizedHost(url) ?: return "this link"
+    fun siteName(url: String, fallback: String = "this link"): String {
+        val host = normalizedHost(url) ?: return fallback
         val parts = host.split('.')
         val suffixLabels = if (parts.size >= 3 && "${parts[parts.size - 2]}.${parts.last()}" in twoLabelSuffixes) 2 else 1
         val label = parts.getOrNull(parts.size - 1 - suffixLabels) ?: parts.first()

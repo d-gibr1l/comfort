@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import com.comfort.app.viewmodel.DownloadsSettingsViewModel
 import android.content.Intent
 import android.net.Uri
@@ -116,8 +118,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
         }
     }
 
-    SettingsSubScaffold(title = "Downloads", topicIcon = Icons.Outlined.Download, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Sharing", icon = Icons.Outlined.Share) {
+    SettingsSubScaffold(title = stringResource(R.string.downloads), topicIcon = Icons.Outlined.Download, onBack = onBack, highlightKey = highlightKey) {
+        SettingsSection(title = stringResource(R.string.sharing), icon = Icons.Outlined.Share) {
             ShareModeRow(
                 mode = shareMode,
                 onModeChange = {
@@ -127,11 +129,11 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             )
         }
 
-        SettingsSection(title = "Concurrent downloads", icon = Icons.Outlined.Layers) {
+        SettingsSection(title = stringResource(R.string.concurrent_downloads), icon = Icons.Outlined.Layers) {
             IconToggleRow(
                 icon = if (concurrentDownloadsEnabled) Icons.Outlined.Layers else Icons.Outlined.LayersClear,
-                title = "Multiple concurrent downloads",
-                subtitle = "Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.",
+                title = stringResource(R.string.multiple_concurrent_downloads),
+                subtitle = stringResource(R.string.run_more_than_one_download_at),
                 checked = concurrentDownloadsEnabled,
                 onCheckedChange = {
                     concurrentDownloadsEnabled = it
@@ -146,7 +148,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     // off, so the slider (only shown while it's on) has nothing meaningful to say
                     // at that value; every position on it should actually mean "more than one."
                     valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_DOWNLOADS,
-                    label = { "$it at once" },
+                    label = { context.getString(R.string.x_at_once, it) },
                     onValueChange = {
                         concurrentDownloads = it
                         downloadsSettings.setConcurrentDownloads(it)
@@ -155,11 +157,11 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             }
         }
 
-        SettingsSection(title = "Network", icon = Icons.Outlined.Wifi) {
+        SettingsSection(title = stringResource(R.string.network), icon = Icons.Outlined.Wifi) {
             IconToggleRow(
                 icon = if (wifiOnly) Icons.Outlined.Wifi else Icons.Outlined.WifiOff,
-                title = "Wi-Fi only",
-                subtitle = "Queued downloads wait for a Wi-Fi connection instead of using mobile data.",
+                title = stringResource(R.string.wi_fi_only),
+                subtitle = stringResource(R.string.queued_downloads_wait_for_a_wi),
                 checked = wifiOnly,
                 onCheckedChange = {
                     wifiOnly = it
@@ -177,8 +179,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 } else {
                     Icons.Outlined.Speed
                 },
-                title = "Speed limit",
-                subtitle = "Caps download bandwidth for all future downloads.",
+                title = stringResource(R.string.speed_limit),
+                subtitle = stringResource(R.string.caps_download_bandwidth_for_all_future),
                 checked = speedLimitEnabled,
                 onCheckedChange = {
                     speedLimitEnabled = it
@@ -189,7 +191,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 Spacer(Modifier.height(16.dp))
                 SizeSheetField(
                     currentValue = speedLimit,
-                    label = "Speed limit",
+                    label = stringResource(R.string.speed_limit),
                     units = SPEED_UNITS,
                     onValueChange = {
                         speedLimit = it
@@ -204,8 +206,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.Refresh,
-                title = "Retries",
-                subtitle = "How many times a failed request is retried before giving up. Off uses the engine's built-in default.",
+                title = stringResource(R.string.retries),
+                subtitle = stringResource(R.string.how_many_times_a_failed_request),
                 checked = networkRetriesEnabled,
                 onCheckedChange = {
                     networkRetriesEnabled = it
@@ -217,7 +219,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 SettingsSlider(
                     value = networkRetries,
                     valueRange = 1..GalleryDlPreferences.MAX_NETWORK_RETRIES,
-                    label = { "$it retries" },
+                    label = { context.getString(R.string.x_retries, it) },
                     onValueChange = {
                         networkRetries = it
                         GalleryDlPreferences.setNetworkRetries(context, it)
@@ -231,8 +233,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.Refresh,
-                title = "Fragment retries",
-                subtitle = "How many times a failed video/audio fragment is retried. Off shares the main Retries budget.",
+                title = stringResource(R.string.fragment_retries),
+                subtitle = stringResource(R.string.how_many_times_a_failed_video),
                 checked = fragmentRetriesEnabled,
                 onCheckedChange = {
                     fragmentRetriesEnabled = it
@@ -244,7 +246,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 SettingsSlider(
                     value = fragmentRetries,
                     valueRange = 1..GalleryDlPreferences.MAX_FRAGMENT_RETRIES,
-                    label = { "$it retries" },
+                    label = { context.getString(R.string.x_retries, it) },
                     onValueChange = {
                         fragmentRetries = it
                         GalleryDlPreferences.setFragmentRetries(context, it)
@@ -258,8 +260,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.Lock,
-                title = "Proxy",
-                subtitle = "Routes all future downloads through this proxy. Supports http://, https:// and socks5://.",
+                title = stringResource(R.string.proxy),
+                subtitle = stringResource(R.string.routes_all_future_downloads_through_this),
                 checked = proxyEnabled,
                 onCheckedChange = {
                     proxyEnabled = it
@@ -276,15 +278,15 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         downloadsSettings.setProxyUrl(it)
                     },
                     modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text("Proxy") },
-                    placeholder = { Text("None") },
+                    label = { Text(stringResource(R.string.proxy)) },
+                    placeholder = { Text(stringResource(R.string.none)) },
                     singleLine = true,
                     isError = isProxyError,
                     supportingText = {
                         if (isProxyError) {
-                            Text("Must start with http://, https://, or socks5://", color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.must_start_with_http_https_or), color = MaterialTheme.colorScheme.error)
                         } else if (proxyUrl.isBlank()) {
-                            Text("e.g. http://10.0.0.1:8080 or socks5://127.0.0.1:1080")
+                            Text(stringResource(R.string.e_g_http_10_0_0))
                         }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
@@ -298,8 +300,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.Public,
-                title = "Force IPv4",
-                subtitle = "Forces connections over IPv4. Try this if downloads fail due to broken IPv6 routes.",
+                title = stringResource(R.string.force_ipv4),
+                subtitle = stringResource(R.string.forces_connections_over_ipv4_try_this),
                 checked = forceIpv4,
                 onCheckedChange = {
                     forceIpv4 = it
@@ -313,8 +315,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.GppBad,
-                title = "Skip certificate checks",
-                subtitle = "Disables security certificate checks. Only enable this if a server is misconfigured.",
+                title = stringResource(R.string.skip_certificate_checks),
+                subtitle = stringResource(R.string.disables_security_certificate_checks_only_enable),
                 checked = noCheckCertificates,
                 onCheckedChange = {
                     noCheckCertificates = it
@@ -328,8 +330,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.AutoMirrored.Outlined.CallSplit,
-                title = "Concurrent fragments",
-                subtitle = "How many fragments of a single video to download in parallel.",
+                title = stringResource(R.string.concurrent_fragments),
+                subtitle = stringResource(R.string.how_many_fragments_of_a_single),
                 checked = concurrentFragmentsEnabled,
                 onCheckedChange = {
                     concurrentFragmentsEnabled = it
@@ -343,7 +345,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     // Same reasoning as Concurrent downloads' own slider above — 1 is already what
                     // the toggle above means when off.
                     valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_FRAGMENTS,
-                    label = { "$it at once" },
+                    label = { context.getString(R.string.x_at_once, it) },
                     onValueChange = {
                         concurrentFragments = it
                         GalleryDlPreferences.setConcurrentFragments(context, it)
@@ -357,8 +359,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = if (sleepIntervalEnabled) Icons.Outlined.AvTimer else Icons.Outlined.TimerOff,
-                title = "Sleep interval",
-                subtitle = "Adds a random delay before requests to avoid triggering rate limits and bot bans.",
+                title = stringResource(R.string.sleep_interval),
+                subtitle = stringResource(R.string.adds_a_random_delay_before_requests),
                 checked = sleepIntervalEnabled,
                 onCheckedChange = {
                     sleepIntervalEnabled = it
@@ -387,8 +389,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.Schedule,
-                title = "Socket timeout",
-                subtitle = "How long to wait on a stalled connection before retrying. Off uses the engine's default.",
+                title = stringResource(R.string.socket_timeout),
+                subtitle = stringResource(R.string.how_long_to_wait_on_a),
                 checked = socketTimeoutEnabled,
                 onCheckedChange = {
                     socketTimeoutEnabled = it
@@ -414,8 +416,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.Storage,
-                title = "Buffer size",
-                subtitle = "The size of each read chunk (yt-dlp only). Rarely worth changing from the default.",
+                title = stringResource(R.string.buffer_size),
+                subtitle = stringResource(R.string.the_size_of_each_read_chunk),
                 checked = bufferSizeEnabled,
                 onCheckedChange = {
                     bufferSizeEnabled = it
@@ -451,8 +453,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 } else {
                     Icons.Outlined.FlashOff
                 },
-                title = "Multi-connection downloads (aria2c)",
-                subtitle = "Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.",
+                title = stringResource(R.string.multi_connection_downloads_aria2c),
+                subtitle = stringResource(R.string.downloads_files_faster_by_splitting_them),
                 checked = aria2Enabled,
                 onCheckedChange = {
                     aria2Enabled = it
@@ -461,20 +463,18 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             )
         }
 
-        SettingsSection(title = "Reliability", icon = Icons.Outlined.Bolt) {
+        SettingsSection(title = stringResource(R.string.reliability), icon = Icons.Outlined.Bolt) {
             if (batteryUnrestricted) {
-                StatusRow(Icons.Outlined.CheckCircle, "Unrestricted — downloads can keep running in the background.", MaterialTheme.colorScheme.primary)
+                StatusRow(Icons.Outlined.CheckCircle, stringResource(R.string.unrestricted_downloads_can_keep_running_in), MaterialTheme.colorScheme.primary)
             } else {
                 Text(
-                    "Unrestricted background activity",
+                    stringResource(R.string.unrestricted_background_activity),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Without this, Android's Battery Saver can silently freeze a download that's " +
-                        "waiting to start once the app is backgrounded — especially after \"Start now\" " +
-                        "is tapped several times in a row. Recommended if downloads seem to get stuck.",
+                    stringResource(R.string.without_this_android_s_battery_saver),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -495,16 +495,16 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 ) {
                     Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Allow unrestricted background activity")
+                    Text(stringResource(R.string.allow_unrestricted_background_activity))
                 }
             }
         }
 
-        SettingsSection(title = "Schedule", icon = Icons.Outlined.Schedule) {
+        SettingsSection(title = stringResource(R.string.schedule), icon = Icons.Outlined.Schedule) {
             IconToggleRow(
                 icon = Icons.Outlined.Schedule,
-                title = "Restrict to time window",
-                subtitle = "New downloads wait in the queue until the window opens.",
+                title = stringResource(R.string.restrict_to_time_window),
+                subtitle = stringResource(R.string.new_downloads_wait_in_the_queue),
                 checked = scheduleEnabled,
                 onCheckedChange = {
                     scheduleEnabled = it
@@ -520,7 +520,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 ) {
                     TimePickerButton(
                         modifier = Modifier.weight(1f),
-                        label = "Start",
+                        label = stringResource(R.string.start),
                         minutesSinceMidnight = scheduleStartMin,
                         onPicked = { minutes ->
                             scheduleStartMin = minutes
@@ -529,7 +529,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     )
                     TimePickerButton(
                         modifier = Modifier.weight(1f),
-                        label = "End",
+                        label = stringResource(R.string.end),
                         minutesSinceMidnight = scheduleEndMin,
                         onPicked = { minutes ->
                             scheduleEndMin = minutes
@@ -540,7 +540,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 ToggleReveal(scheduleStartMin == scheduleEndMin) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Start and end times are identical; downloads will run continuously without time restrictions.",
+                        stringResource(R.string.start_and_end_times_are_identical),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -552,8 +552,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
                 IconToggleRow(
                     icon = Icons.Outlined.Refresh,
-                    title = "Use alarm for scheduling",
-                    subtitle = "Ensures scheduled downloads start exactly on time by bypassing Android's battery-saving delays.",
+                    title = stringResource(R.string.use_alarm_for_scheduling),
+                    subtitle = stringResource(R.string.ensures_scheduled_downloads_start_exactly_on),
                     checked = alarmSchedulingEnabled,
                     onCheckedChange = {
                         alarmSchedulingEnabled = it
@@ -563,11 +563,11 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             }
         }
 
-        SettingsSection(title = "Max file size", icon = Icons.Outlined.SdStorage) {
+        SettingsSection(title = stringResource(R.string.max_file_size), icon = Icons.Outlined.SdStorage) {
             IconToggleRow(
                 icon = Icons.Outlined.SdStorage,
-                title = "Limit max file size",
-                subtitle = "Files larger than this are skipped instead of downloaded.",
+                title = stringResource(R.string.limit_max_file_size),
+                subtitle = stringResource(R.string.files_larger_than_this_are_skipped),
                 checked = maxFilesizeEnabled,
                 onCheckedChange = {
                     maxFilesizeEnabled = it
@@ -579,7 +579,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 Spacer(Modifier.height(16.dp))
                 SizeSheetField(
                     currentValue = maxFilesize,
-                    label = "Max file size",
+                    label = stringResource(R.string.max_file_size),
                     units = FILESIZE_UNITS,
                     onValueChange = {
                         maxFilesize = it
@@ -590,11 +590,11 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
         }
 
         // Imported from YTDLnis's own "Download Delay" and "Incognito" settings.
-        SettingsSection(title = "Pacing & privacy", icon = Icons.Outlined.VisibilityOff) {
+        SettingsSection(title = stringResource(R.string.pacing_privacy), icon = Icons.Outlined.VisibilityOff) {
             IconToggleRow(
                 icon = Icons.Outlined.Schedule,
-                title = "Download delay",
-                subtitle = "Adds a delay between a finished download and the next one in the queue.",
+                title = stringResource(R.string.download_delay),
+                subtitle = stringResource(R.string.adds_a_delay_between_a_finished),
                 checked = downloadDelayEnabled,
                 onCheckedChange = {
                     downloadDelayEnabled = it
@@ -613,7 +613,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         GalleryDlPreferences.setDownloadDelaySeconds(context, seconds)
                     },
                     modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text("Seconds") },
+                    label = { Text(stringResource(R.string.seconds)) },
                     placeholder = { Text("0") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
@@ -627,8 +627,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_domino_mask),
-                title = "Incognito by default",
-                subtitle = "Downloads are still saved to your device, but won't appear in the app's History or Library.",
+                title = stringResource(R.string.incognito_by_default),
+                subtitle = stringResource(R.string.downloads_are_still_saved_to_your),
                 checked = incognitoDefault,
                 onCheckedChange = {
                     incognitoDefault = it
@@ -642,8 +642,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.ContentCopy,
-                title = "Prevent duplicate downloads",
-                subtitle = "Skips downloading a link if it's already queued, running, or finished.",
+                title = stringResource(R.string.prevent_duplicate_downloads),
+                subtitle = stringResource(R.string.skips_downloading_a_link_if_it),
                 checked = preventDuplicateDownloads,
                 onCheckedChange = {
                     preventDuplicateDownloads = it
@@ -661,8 +661,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                 } else {
                     ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_high_quality_off)
                 },
-                title = "Remember last quality",
-                subtitle = "Makes the quality chosen on the download sheet the new default for future downloads.",
+                title = stringResource(R.string.remember_last_quality),
+                subtitle = stringResource(R.string.makes_the_quality_chosen_on_the),
                 checked = rememberDownloadType,
                 onCheckedChange = {
                     rememberDownloadType = it
@@ -676,8 +676,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
             IconToggleRow(
                 icon = Icons.Outlined.DeleteForever,
-                title = "Clean up leftover downloads",
-                subtitle = "Automatically deletes partial files when a download is cancelled or fails.",
+                title = stringResource(R.string.clean_up_leftover_downloads),
+                subtitle = stringResource(R.string.automatically_deletes_partial_files_when_a),
                 checked = deleteLeftoverOnFailure,
                 onCheckedChange = {
                     deleteLeftoverOnFailure = it
@@ -687,7 +687,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
             ToggleReveal(deleteLeftoverOnFailure) {
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "\"On failure\" only runs from inside the download itself, so it can't catch the app being killed outright — the periodic options add that as a backstop, on top of the same on-failure cleanup.",
+                    stringResource(R.string.on_failure_only_runs_from_inside),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -705,7 +705,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                     // that state, so (same off-value-redundancy fix as Concurrent downloads/
                     // fragments' sliders) it's deliberately excluded from what's reachable once
                     // the toggle reveals this row, rather than being selectable two different ways.
-                    val cleanupOptions = listOf("" to "On failure", "daily" to "Daily", "weekly" to "Weekly", "monthly" to "Monthly")
+                    val cleanupOptions = listOf("" to stringResource(R.string.on_failure), "daily" to stringResource(R.string.daily), "weekly" to stringResource(R.string.weekly), "monthly" to stringResource(R.string.monthly))
                     cleanupOptions.forEachIndexed { index, (value, label) ->
                         val interactionSource = remember { MutableInteractionSource() }
                         val selected = cleanupLeftoverInterval == value
@@ -759,9 +759,10 @@ private fun TimePickerButton(
     var showPicker by remember { mutableStateOf(false) }
     val formattedTime = String.format(Locale.getDefault(), "%d:%02d %s", displayHour, minute, amPm)
 
+    val timeDescription = stringResource(R.string.x_schedule_time_x, label, formattedTime)
     OutlinedButton(
         modifier = modifier.semantics {
-            contentDescription = "$label schedule time: $formattedTime"
+            contentDescription = timeDescription
         },
         shape = MaterialTheme.shapes.medium,
         onClick = { showPicker = true },
@@ -797,8 +798,8 @@ private fun TimePickerButton(
                     )
                     Spacer(Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showPicker = false }) { Text("Cancel") }
-                        TextButton(onClick = { onPicked(pendingMinutes); showPicker = false }) { Text("Done") }
+                        TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) }
+                        TextButton(onClick = { onPicked(pendingMinutes); showPicker = false }) { Text(stringResource(R.string.done)) }
                     }
                 }
             }
@@ -812,11 +813,11 @@ private fun TimePickerButton(
  * genuine third option (Always ask) existed that a boolean couldn't represent. */
 @Composable
 private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (com.comfort.app.data.ShareMode) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().then(highlightRowModifier("Sharing mode")).padding(4.dp)) {
-        Text("Sharing mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+    Column(modifier = Modifier.fillMaxWidth().then(highlightRowModifier(stringResource(R.string.sharing_mode))).padding(4.dp)) {
+        Text(stringResource(R.string.sharing_mode), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(2.dp))
         Text(
-            "What happens when you share a link to Comfort.",
+            stringResource(R.string.what_happens_when_you_share_a),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -844,7 +845,7 @@ private fun ShareModeRow(mode: com.comfort.app.data.ShareMode, onModeChange: (co
                     shape = rememberMorphingChipShape(index, options.size, selected = mode == option, interactionSource = interactionSource, height = 40.dp),
                     label = {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text(option.label, style = MaterialTheme.typography.labelLarge)
+                            Text(option.displayLabel, style = MaterialTheme.typography.labelLarge)
                         }
                     },
                     colors = FilterChipDefaults.filterChipColors(

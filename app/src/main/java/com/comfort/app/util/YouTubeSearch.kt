@@ -41,7 +41,7 @@ object YouTubeSearch {
         run.exceptionOrNull()?.let { if (it is CancellationException) throw it; return Result.failure(it) }
         // The JSON is the last line printed; anything on stderr comes before it.
         val json = lines.lastOrNull { it.isNotBlank() }?.let { runCatching { JSONObject(it.trim()) }.getOrNull() }
-            ?: return Result.failure(IllegalStateException(lines.lastOrNull { it.isNotBlank() } ?: "No results"))
+            ?: return Result.failure(IllegalStateException(lines.lastOrNull { it.isNotBlank() } ?: context.getString(com.comfort.app.R.string.search_no_results_short)))
         json.optString("error").takeIf { it.isNotBlank() }?.let { return Result.failure(IllegalStateException(it)) }
         val array = json.optJSONArray("results") ?: return Result.success(emptyList())
         return Result.success((0 until array.length()).mapNotNull { i ->

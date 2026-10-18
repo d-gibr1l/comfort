@@ -5,6 +5,8 @@
  */
 package com.comfort.app.ui.viewer
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -136,7 +138,7 @@ object ShareUtils {
             Intent(Intent.ACTION_SEND).apply {
                 type = singleMime
                 putExtra(Intent.EXTRA_STREAM, singleUri)
-                clipData = ClipData.newUri(context.contentResolver, "Media", singleUri)
+                clipData = ClipData.newUri(context.contentResolver, context.getString(R.string.media), singleUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         } else {
@@ -144,7 +146,7 @@ object ShareUtils {
                 type = mimeType
                 putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(urisToShare))
                 val firstUri = urisToShare.first()
-                val clip = ClipData.newRawUri("Shared Media", firstUri)
+                val clip = ClipData.newRawUri(context.getString(R.string.shared_media), firstUri)
                 for (i in 1 until urisToShare.size) {
                     clip.addItem(ClipData.Item(urisToShare[i]))
                 }
@@ -153,7 +155,7 @@ object ShareUtils {
             }
         }
 
-        val chooser = Intent.createChooser(intent, "Share via").apply {
+        val chooser = Intent.createChooser(intent, context.getString(R.string.share_via)).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(chooser)

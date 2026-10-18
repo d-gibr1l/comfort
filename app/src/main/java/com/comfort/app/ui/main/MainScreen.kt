@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import com.comfort.app.viewmodel.startedMessage
 import com.comfort.app.viewmodel.LinkRouterViewModel
 import com.comfort.app.viewmodel.LinkRoute
@@ -80,12 +82,14 @@ import com.comfort.app.viewmodel.DownloadsViewModel
 // downloadable-at-runtime families, so it ships as a bundled resource like any other static asset.
 private val CrystalRadioKit = FontFamily(Font(R.font.crystal_radio_kit))
 
-private data class NavTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class NavTab(@androidx.annotation.StringRes val labelRes: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    val label: String @Composable get() = stringResource(labelRes)
+}
 
 private val tabs = listOf(
-    NavTab("Home", Icons.Outlined.Home),
-    NavTab("Library", Icons.Outlined.Image),
-    NavTab("Settings", Icons.Outlined.Settings),
+    NavTab(R.string.nav_home, Icons.Outlined.Home),
+    NavTab(R.string.nav_library, Icons.Outlined.Image),
+    NavTab(R.string.nav_settings, Icons.Outlined.Settings),
 )
 
 
@@ -542,7 +546,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "Looking at what's there…",
+                        stringResource(R.string.looking_at_what_s_there),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -606,6 +610,8 @@ private fun SideNavRail(
     hasEngineUpdate: Boolean,
     onSelect: (Int) -> Unit,
 ) {
+    val activeDownloadsDescription = pluralStringResource(R.plurals.active_downloads_count, activeDownloadsCount, activeDownloadsCount)
+    val updatesAvailableDescription = stringResource(R.string.updates_available)
     NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
         Spacer(Modifier.weight(1f))
         tabs.forEachIndexed { index, tab ->
@@ -618,7 +624,7 @@ private fun SideNavRail(
                             Badge(
                                 containerColor = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.semantics {
-                                    contentDescription = "$activeDownloadsCount active downloads"
+                                    contentDescription = activeDownloadsDescription
                                 },
                             ) { Text(badgeCountText(activeDownloadsCount)) }
                         }) { Icon(tab.icon, contentDescription = tab.label) }
@@ -626,7 +632,7 @@ private fun SideNavRail(
                             Badge(
                                 containerColor = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.semantics {
-                                    contentDescription = "Updates available"
+                                    contentDescription = updatesAvailableDescription
                                 },
                             )
                         }) { Icon(tab.icon, contentDescription = tab.label) }
@@ -648,6 +654,8 @@ private fun FloatingNavBar(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val activeDownloadsDescription = pluralStringResource(R.plurals.active_downloads_count, activeDownloadsCount, activeDownloadsCount)
+    val updatesAvailableDescription = stringResource(R.string.updates_available)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -694,8 +702,8 @@ private fun FloatingNavBar(
                             .clickable(
                                 role = Role.Tab,
                                 onClickLabel = if (selected) {
-                                    if (index == 1) "Open queue" else if (index == 2) "Reset settings" else null
-                                } else "Switch to ${tab.label}",
+                                    if (index == 1) stringResource(R.string.open_queue) else if (index == 2) stringResource(R.string.reset_settings) else null
+                                } else stringResource(R.string.switch_to_x, tab.label),
                             ) { onSelect(index) }
                             .padding(horizontal = if (selected) 20.dp else 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -706,7 +714,7 @@ private fun FloatingNavBar(
                                 Badge(
                                     containerColor = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.semantics {
-                                        contentDescription = "$activeDownloadsCount active downloads"
+                                        contentDescription = activeDownloadsDescription
                                     },
                                 ) {
                                     Text(badgeCountText(activeDownloadsCount))
@@ -719,7 +727,7 @@ private fun FloatingNavBar(
                                 Badge(
                                     containerColor = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.semantics {
-                                        contentDescription = "Updates available"
+                                        contentDescription = updatesAvailableDescription
                                     },
                                 )
                             }) {
@@ -773,7 +781,7 @@ fun HomeScreen(
     // and message included. Configure is the other button.
     fun downloadNow(link: String) {
         router.download(link) { result ->
-            android.widget.Toast.makeText(homeContext, startedMessage(result), android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(homeContext, startedMessage(homeContext, result), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     val clipboard = androidx.compose.ui.platform.LocalClipboard.current
@@ -816,7 +824,7 @@ fun HomeScreen(
             clipboardSuggestion = null
             downloadNow(target)
         } else {
-            android.widget.Toast.makeText(homeContext, "No link copied", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(homeContext, homeContext.getString(R.string.no_link_copied), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -929,7 +937,7 @@ fun HomeScreen(
                         trailingIcon = {
                             if (url.isNotEmpty()) {
                                 IconButton(onClick = { url = "" }) {
-                                    Icon(Icons.Outlined.Close, contentDescription = "Clear link")
+                                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.clear_link))
                                 }
                             }
                         },
@@ -970,7 +978,7 @@ fun HomeScreen(
                             ) {
                                 Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Configure", maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                                Text(stringResource(R.string.configure), maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
                             }
                             Spacer(Modifier.width(12.dp * configureShare))
                         }
@@ -1003,7 +1011,7 @@ fun HomeScreen(
                                     Icon(if (search) Icons.Outlined.Search else Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        if (search) androidx.compose.ui.res.stringResource(com.comfort.app.R.string.home_search_youtube) else "Download",
+                                        if (search) androidx.compose.ui.res.stringResource(com.comfort.app.R.string.home_search_youtube) else stringResource(R.string.search_download),
                                         maxLines = 1,
                                     )
                                 }
@@ -1043,12 +1051,12 @@ fun HomeScreen(
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            if (url.isNotBlank() && looksLikeLink(url)) "Open this link in the browser" else "Browse the web",
+                            if (url.isNotBlank() && looksLikeLink(url)) stringResource(R.string.open_this_link_in_the_browser) else stringResource(R.string.browse_the_web),
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            "Find videos and pictures on any site",
+                            stringResource(R.string.find_videos_and_pictures_on_any),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1071,7 +1079,7 @@ fun HomeScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                "Supported sources",
+                stringResource(R.string.supported_sources),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1083,7 +1091,7 @@ fun HomeScreen(
                 Triple("Twitter / X", FeatherIcons.Twitter, MaterialTheme.colorScheme.primary),
                 Triple("Pixiv", Icons.Outlined.Image, MaterialTheme.colorScheme.primary),
                 Triple("Instagram", FeatherIcons.Instagram, MaterialTheme.colorScheme.primary),
-                Triple("+ hundreds more", Icons.Outlined.Public, MaterialTheme.colorScheme.primary),
+                Triple(stringResource(R.string.hundreds_more), Icons.Outlined.Public, MaterialTheme.colorScheme.primary),
             )
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1148,7 +1156,7 @@ fun HomeScreen(
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Waiting for a network connection",
+                                stringResource(R.string.waiting_for_a_network_connection),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                             )
@@ -1165,7 +1173,7 @@ fun HomeScreen(
             if (recentDownloads.isNotEmpty()) {
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    "Recently downloaded",
+                    stringResource(R.string.recently_downloaded),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1268,7 +1276,7 @@ fun HomeScreen(
                     homeScope.launch {
                         val clipText = readClipboardText()
                         if (clipText.isNullOrBlank()) {
-                            android.widget.Toast.makeText(homeContext, "Nothing to paste", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(homeContext, homeContext.getString(R.string.nothing_to_paste), android.widget.Toast.LENGTH_SHORT).show()
                         } else {
                             url = clipText
                             ClipboardSuggestionState.lastHandled = clipText
@@ -1278,7 +1286,7 @@ fun HomeScreen(
                 }
             },
             icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = null) },
-            text = { Text(if (clipboardSuggestion != null) "Paste copied link" else "Paste") },
+            text = { Text(if (clipboardSuggestion != null) stringResource(R.string.paste_copied_link) else stringResource(R.string.paste)) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = navBarClearance(), end = 24.dp),
@@ -1362,7 +1370,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                     )
                 } else {
                     Text(
-                        "Downloading…",
+                        stringResource(R.string.downloading_2),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1417,7 +1425,7 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(
                 role = Role.Button,
-                onClickLabel = "Open",
+                onClickLabel = stringResource(R.string.open),
                 onClick = onClick,
             ),
     ) {
@@ -1471,11 +1479,11 @@ private fun HomeCardThumbnail(path: String?, refererUrl: String, title: String, 
 // multi-select and auto-updating engines especially, both added the same session this carousel
 // was, with no other obvious discovery path on Home.
 private val HOME_TIPS = listOf(
-    "Long-press a card in Queue to select multiple downloads at once." to Icons.Outlined.CheckBox,
-    "yt-dlp, gallery-dl and Instaloader auto-update in the background — check Settings > Updates." to Icons.Outlined.Refresh,
-    "Add cookies from Settings to unlock private or age-restricted content." to Icons.Outlined.Lock,
-    "Tap a queued download's \"Up next\" to move it to the front of the line, skipping any schedule wait." to Icons.Outlined.Bolt,
-    "Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads." to Icons.Outlined.Settings,
+    R.string.long_press_a_card_in_queue to Icons.Outlined.CheckBox,
+    R.string.yt_dlp_gallery_dl_and_instaloader to Icons.Outlined.Refresh,
+    R.string.add_cookies_from_settings_to_unlock to Icons.Outlined.Lock,
+    R.string.tap_a_queued_download_s_up to Icons.Outlined.Bolt,
+    R.string.choose_mp4_or_mkv_output_and to Icons.Outlined.Settings,
 )
 
 @Composable
@@ -1494,7 +1502,7 @@ private fun HomeTipsCarousel() {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                onClickLabel = "Next tip",
+                onClickLabel = stringResource(R.string.next_tip),
                 role = androidx.compose.ui.semantics.Role.Button,
             ) {
                 index = (index + 1) % HOME_TIPS.size
@@ -1514,7 +1522,8 @@ private fun HomeTipsCarousel() {
             },
             label = "homeTip",
         ) { i ->
-            val (tip, icon) = HOME_TIPS[i]
+            val (tipRes, icon) = HOME_TIPS[i]
+            val tip = stringResource(tipRes)
             Row(
                 modifier = Modifier.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,

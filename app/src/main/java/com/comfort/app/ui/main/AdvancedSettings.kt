@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,12 +41,12 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
     val isFormatSortError = formatSort.isNotBlank() && !isValidFormatSort(formatSort)
 
     val isCustomHeadersDirty = customHeaders.trim() != GalleryDlPreferences.getCustomHeaders(context).trim()
-    val customHeadersError = validateCustomHeaders(customHeaders)
+    val customHeadersError = validateCustomHeaders(customHeaders)?.let { stringResource(it.message, it.line) }
 
-    SettingsSubScaffold(title = "Advanced", topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Extra arguments", icon = Icons.Outlined.Terminal) {
+    SettingsSubScaffold(title = stringResource(R.string.advanced), topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
+        SettingsSection(title = stringResource(R.string.extra_arguments), icon = Icons.Outlined.Terminal) {
             Text(
-                "Extra command-line arguments added to every download. For advanced users.",
+                stringResource(R.string.extra_command_line_arguments_added_to),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -53,16 +55,16 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
         }
 
         SettingsSection(title = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.command_templates_section), icon = Icons.Outlined.Bookmarks) {
-            Column(modifier = highlightRowModifier("Command templates")) {
+            Column(modifier = highlightRowModifier(stringResource(R.string.command_templates_section))) {
                 CommandTemplatesSection()
             }
         }
 
-        SettingsSection(title = "YouTube", icon = Icons.Outlined.Memory) {
+        SettingsSection(title = stringResource(R.string.youtube), icon = Icons.Outlined.Memory) {
             IconToggleRow(
                 icon = Icons.Outlined.Refresh,
-                title = "Rotate player clients",
-                subtitle = "Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.",
+                title = stringResource(R.string.rotate_player_clients),
+                subtitle = stringResource(R.string.automatically_switches_between_android_ios_and),
                 checked = youtubeClientRotation,
                 onCheckedChange = {
                     youtubeClientRotation = it
@@ -71,11 +73,11 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
         }
 
-        SettingsSection(title = "Bot detection", icon = Icons.Outlined.Lock) {
+        SettingsSection(title = stringResource(R.string.bot_detection), icon = Icons.Outlined.Lock) {
             IconToggleRow(
                 icon = Icons.Outlined.GppBad,
-                title = "Impersonate a browser",
-                subtitle = "Makes the app look like a real web browser to bypass bot detection on strict websites.",
+                title = stringResource(R.string.impersonate_a_browser),
+                subtitle = stringResource(R.string.makes_the_app_look_like_a),
                 checked = impersonateEnabled,
                 onCheckedChange = {
                     impersonateEnabled = it
@@ -84,11 +86,9 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
             )
         }
 
-        SettingsSection(title = "yt-dlp extractor arguments", icon = Icons.Outlined.Tune) {
+        SettingsSection(title = stringResource(R.string.yt_dlp_extractor_arguments), icon = Icons.Outlined.Tune) {
             Text(
-                "Site-specific yt-dlp tuning (throttling workarounds, player client selection, etc). " +
-                    "CLI syntax, e.g. \"youtube:player_client=android,web\". Separate multiple " +
-                    "extractors with whitespace.",
+                stringResource(R.string.site_specific_yt_dlp_tuning_throttling),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -98,7 +98,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 value = extractorArgs,
                 onValueChange = { extractorArgs = it; extractorArgsSaved = false },
                 modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
-                label = { Text("e.g. youtube:player_client=android") },
+                label = { Text(stringResource(R.string.e_g_youtube_player_client_android)) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                 shape = MaterialTheme.shapes.medium,
             )
@@ -116,7 +116,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save extractor arguments")
+                    Text(stringResource(R.string.save_extractor_arguments))
                 }
             } else {
                 OutlinedButton(
@@ -130,22 +130,21 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save extractor arguments")
+                    Text(stringResource(R.string.save_extractor_arguments))
                 }
             }
 
             ToggleReveal(extractorArgsSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Extractor arguments saved", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.extractor_arguments_saved), tint = MaterialTheme.colorScheme.primary)
             }
         }
 
         // Imported from YTDLnis's own advanced_preferences.xml (Format Sorting, User Agent
         // Header) — yt-dlp only, same reasoning as this screen's other two fields above.
-        SettingsSection(title = "Format sort", icon = Icons.Outlined.FilterAlt) {
+        SettingsSection(title = stringResource(R.string.format_sort), icon = Icons.Outlined.FilterAlt) {
             Text(
-                "Raw yt-dlp --format-sort syntax (e.g. \"codec:vp9,fps\"), applied after this app's own " +
-                    "quality-cap and MP4-compatibility bias so it can still reorder or override them.",
+                stringResource(R.string.raw_yt_dlp_format_sort_syntax),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -155,12 +154,12 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 value = formatSort,
                 onValueChange = { formatSort = it; formatSortSaved = false },
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                label = { Text("e.g. codec:vp9,fps") },
+                label = { Text(stringResource(R.string.e_g_codec_vp9_fps)) },
                 singleLine = true,
                 isError = isFormatSortError,
                 supportingText = {
                     if (isFormatSortError) {
-                        Text("Cannot contain quotes, newlines, or shell characters", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.cannot_contain_quotes_newlines_or_shell), color = MaterialTheme.colorScheme.error)
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -180,7 +179,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save format sort")
+                    Text(stringResource(R.string.save_format_sort))
                 }
             } else {
                 OutlinedButton(
@@ -194,20 +193,19 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save format sort")
+                    Text(stringResource(R.string.save_format_sort))
                 }
             }
 
             ToggleReveal(formatSortSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Format sort saved", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.format_sort_saved), tint = MaterialTheme.colorScheme.primary)
             }
         }
 
-        SettingsSection(title = "Custom headers", icon = Icons.Outlined.Terminal) {
+        SettingsSection(title = stringResource(R.string.custom_headers), icon = Icons.Outlined.Terminal) {
             Text(
-                "One \"Header-Name: value\" per line, sent on every yt-dlp download — overrides that " +
-                    "header's own default (including User-Agent/Referer) rather than only adding new ones.",
+                stringResource(R.string.one_header_name_value_per_line),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -217,7 +215,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 value = customHeaders,
                 onValueChange = { customHeaders = it; customHeadersSaved = false },
                 modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
-                label = { Text("e.g. Referer: https://example.com") },
+                label = { Text(stringResource(R.string.e_g_referer_https_example_com)) },
                 isError = customHeadersError != null,
                 supportingText = {
                     if (customHeadersError != null) {
@@ -241,7 +239,7 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save headers")
+                    Text(stringResource(R.string.save_headers))
                 }
             } else {
                 OutlinedButton(
@@ -255,21 +253,21 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save headers")
+                    Text(stringResource(R.string.save_headers))
                 }
             }
 
             ToggleReveal(customHeadersSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Headers saved", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.headers_saved), tint = MaterialTheme.colorScheme.primary)
             }
         }
 
-        SettingsSection(title = "Debugging", icon = Icons.Outlined.Code) {
+        SettingsSection(title = stringResource(R.string.debugging), icon = Icons.Outlined.Code) {
             IconToggleRow(
                 icon = Icons.Outlined.Terminal,
-                title = "Verbose logging",
-                subtitle = "Logs all internal yt-dlp debug output for advanced troubleshooting.",
+                title = stringResource(R.string.verbose_logging),
+                subtitle = stringResource(R.string.logs_all_internal_yt_dlp_debug),
                 checked = verboseLogging,
                 onCheckedChange = {
                     verboseLogging = it
@@ -295,8 +293,8 @@ private fun ExtraArgsSheetField() {
 
     IconToggleRow(
         icon = Icons.Outlined.Terminal,
-        title = "Use extra arguments",
-        subtitle = "Off keeps them saved but adds none to downloads.",
+        title = stringResource(R.string.use_extra_arguments),
+        subtitle = stringResource(R.string.off_keeps_them_saved_but_adds),
         checked = enabled,
         onCheckedChange = {
             enabled = it
@@ -307,17 +305,18 @@ private fun ExtraArgsSheetField() {
 
     val setCount = listOf(bothArgs, ytDlpArgs, galleryDlArgs).count { it.isNotBlank() }
     val summary = when {
-        setCount == 0 -> "None"
+        setCount == 0 -> stringResource(R.string.none)
         else -> listOfNotNull(
-            "both".takeIf { bothArgs.isNotBlank() },
+            stringResource(R.string.extra_args_both_short).takeIf { bothArgs.isNotBlank() },
             "yt-dlp".takeIf { ytDlpArgs.isNotBlank() },
             "gallery-dl".takeIf { galleryDlArgs.isNotBlank() },
-        ).joinToString(", ", prefix = "Set for ")
+        ).joinToString(", ", prefix = stringResource(R.string.set_for))
     }
+    val summaryDescription = stringResource(R.string.extra_arguments_x, summary)
     OutlinedButton(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = "Extra arguments: $summary" },
+            .semantics { contentDescription = summaryDescription },
         shape = MaterialTheme.shapes.medium,
         enabled = enabled,
         onClick = { showSheet = true },
@@ -328,7 +327,7 @@ private fun ExtraArgsSheetField() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
-                Text("Extra arguments", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.extra_arguments), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(summary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -353,42 +352,42 @@ private fun ExtraArgsSheetField() {
                     .padding(bottom = 24.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                Text("Extra arguments", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.extra_arguments), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Real command-line flags. Each engine gets the \"Both\" set plus its own.",
+                    stringResource(R.string.real_command_line_flags_each_engine),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 ExtraArgsSection(
-                    title = "Both",
-                    subtitle = "Passed to yt-dlp and gallery-dl. Only flags both understand.",
+                    title = stringResource(R.string.both),
+                    subtitle = stringResource(R.string.passed_to_yt_dlp_and_gallery),
                     value = draftBoth,
                     onValueChange = { draftBoth = it },
-                    placeholder = "e.g. --no-mtime",
+                    placeholder = stringResource(R.string.e_g_no_mtime),
                     isError = bothHasUnclosedQuotes,
-                    errorMessage = "Unclosed quotation marks — arguments may be ignored",
+                    errorMessage = stringResource(R.string.unclosed_quotation_marks_arguments_may_be),
                 )
                 ExtraArgsSection(
                     title = "yt-dlp",
-                    subtitle = "Passed to yt-dlp only.",
+                    subtitle = stringResource(R.string.passed_to_yt_dlp_only),
                     value = draftYtDlp,
                     onValueChange = { draftYtDlp = it },
-                    placeholder = "e.g. --extractor-args \"youtube:player_client=web\"",
+                    placeholder = stringResource(R.string.e_g_extractor_args_youtube_player),
                     isError = ytDlpHasUnclosedQuotes,
-                    errorMessage = "Unclosed quotation marks — arguments may be ignored",
+                    errorMessage = stringResource(R.string.unclosed_quotation_marks_arguments_may_be),
                 )
                 ExtraArgsSection(
                     title = "gallery-dl",
-                    subtitle = "Passed to gallery-dl only.",
+                    subtitle = stringResource(R.string.passed_to_gallery_dl_only),
                     value = draftGalleryDl,
                     onValueChange = { draftGalleryDl = it },
-                    placeholder = "e.g. --write-metadata",
+                    placeholder = stringResource(R.string.e_g_write_metadata),
                     isError = galleryDlHasUnclosedQuotes,
-                    errorMessage = "Unclosed quotation marks — arguments may be ignored",
+                    errorMessage = stringResource(R.string.unclosed_quotation_marks_arguments_may_be),
                 )
                 Text(
-                    "Instaloader has none: it runs as a library here, not a command line.",
+                    stringResource(R.string.instaloader_has_none_it_runs_as),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 12.dp),
@@ -396,7 +395,7 @@ private fun ExtraArgsSheetField() {
                 Spacer(Modifier.height(24.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     ConfirmCancelSplitButton(
-                        label = "Save",
+                        label = stringResource(R.string.action_save),
                         icon = Icons.Filled.FilledCheckCircle,
                         confirmEnabled = !hasAnyQuoteError,
                         onConfirm = {
@@ -446,19 +445,23 @@ private fun ExtraArgsSection(
     )
 }
 
-internal fun validateCustomHeaders(headersText: String): String? {
+/** A problem with the custom headers' text: which line, and what's wrong (a string resource
+ * taking the line number). */
+internal data class HeaderError(val line: Int, @androidx.annotation.StringRes val message: Int)
+
+internal fun validateCustomHeaders(headersText: String): HeaderError? {
     for ((index, line) in headersText.lineSequence().withIndex()) {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) continue
         if (!trimmed.contains(':')) {
-            return "Line ${index + 1}: Missing colon ':' between header name and value"
+            return HeaderError(index + 1, R.string.line_x_missing_colon_between_header)
         }
         val name = trimmed.substringBefore(':').trim()
         if (name.isEmpty()) {
-            return "Line ${index + 1}: Header name cannot be empty"
+            return HeaderError(index + 1, R.string.line_x_header_name_cannot_be)
         }
         if (name.any { it.isWhitespace() }) {
-            return "Line ${index + 1}: Header name cannot contain spaces"
+            return HeaderError(index + 1, R.string.line_x_header_name_cannot_contain)
         }
     }
     return null

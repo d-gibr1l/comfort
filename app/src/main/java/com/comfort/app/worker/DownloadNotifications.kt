@@ -1,5 +1,6 @@
 package com.comfort.app.worker
 
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
@@ -70,10 +71,10 @@ object DownloadNotifications {
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Downloads",
+            context.getString(R.string.downloads),
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shows download progress and completion"
+            description = context.getString(R.string.shows_download_progress_and_completion)
         }
         manager.createNotificationChannel(channel)
     }
@@ -162,8 +163,8 @@ object DownloadNotifications {
         ensureChannel(context)
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_logo)
-            .setContentTitle("Downloading…")
-            .setContentText("Comfort is downloading in the background")
+            .setContentTitle(context.getString(R.string.downloading_2))
+            .setContentText(context.getString(R.string.comfort_is_downloading_in_the_background))
             .setContentIntent(openQueuePendingIntent(context))
             // The summary of the downloads' group: Android shows the group's own notifications
             // (each download's progress) under the app's heading and hides the summary itself, so
@@ -197,7 +198,7 @@ object DownloadNotifications {
     ): Notification {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         ensureChannel(context)
-        val sizeText = if (expectedBytes > 0) "${formatFileSize(currentBytes)} of ${formatFileSize(expectedBytes)}" else null
+        val sizeText = if (expectedBytes > 0) context.getString(R.string.x_of_x, formatFileSize(currentBytes), formatFileSize(expectedBytes)) else null
         val speedText = if (speedMbs > 0.01f) "%.1f MB/s".format(speedMbs) else null
         val byteDetail = listOfNotNull(sizeText, speedText).joinToString(" · ")
         return NotificationCompat.Builder(context, CHANNEL_ID)
@@ -209,9 +210,13 @@ object DownloadNotifications {
                     // Real byte-level detail (size + speed) already implies progress more
                     // usefully than a bare percent would, so it takes priority when available.
                     byteDetail.isNotBlank() -> byteDetail
-                    progressPercent != null -> "$progressPercent% · ${if (safeDownloadedItems > 0) "$safeDownloadedItems downloaded" else "Downloading…"}"
-                    safeDownloadedItems > 0 -> "$safeDownloadedItems downloaded"
-                    else -> "Starting…"
+                    progressPercent != null -> context.getString(
+                        R.string.percent_and_status, progressPercent,
+                        if (safeDownloadedItems > 0) context.resources.getQuantityString(R.plurals.items_downloaded, safeDownloadedItems, safeDownloadedItems)
+                        else context.getString(R.string.downloading_ellipsis),
+                    )
+                    safeDownloadedItems > 0 -> context.resources.getQuantityString(R.plurals.items_downloaded, safeDownloadedItems, safeDownloadedItems)
+                    else -> context.getString(R.string.starting)
                 }
             )
             .setContentIntent(openQueuePendingIntent(context))
@@ -220,11 +225,11 @@ object DownloadNotifications {
             .setProgress(100, progressPercent ?: 0, progressPercent == null)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(
-                0, "Pause",
+                0, context.getString(R.string.widget_music_pause),
                 actionPendingIntent(context, DownloadActionReceiver.ACTION_PAUSE, downloadId),
             )
             .addAction(
-                0, "Cancel",
+                0, context.getString(R.string.action_cancel),
                 actionPendingIntent(context, DownloadActionReceiver.ACTION_CANCEL, downloadId),
             )
             .build()
@@ -250,7 +255,8 @@ object DownloadNotifications {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         // "picture(s)" used to be hardcoded here regardless of what actually got saved — a
         // downloaded video or audio file still read "1 picture saved," which looked like a bug.
-        val text = if (safeDownloadedItems > 0) "$safeDownloadedItems item${if (safeDownloadedItems == 1) "" else "s"} saved" else "Nothing new to download"
+        val text = if (safeDownloadedItems > 0) context.resources.getQuantityString(R.plurals.items_saved, safeDownloadedItems, safeDownloadedItems)
+            else context.getString(R.string.nothing_new_to_download)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
             // still uses — so "this one finished" is visible at a glance in the shade/status bar
@@ -289,14 +295,14 @@ object DownloadNotifications {
                     PendingIntent.getActivity(context, requestBase, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
                 )
                 .addAction(
-                    0, "Open",
+                    0, context.getString(R.string.open),
                     PendingIntent.getActivity(context, requestBase + 1, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
                 )
                 .addAction(
-                    0, "Share",
+                    0, context.getString(R.string.share),
                     PendingIntent.getActivity(
                         context, requestBase + 2,
-                        Intent.createChooser(shareIntent, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        Intent.createChooser(shareIntent, context.getString(R.string.share)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                     ),
                 )
@@ -319,12 +325,12 @@ object DownloadNotifications {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_logo)
             .setContentTitle(title)
-            .setContentText("Paused")
+            .setContentText(context.getString(R.string.queue_filter_paused))
             .setOngoing(false)
             .setAutoCancel(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(
-                0, "Resume",
+                0, context.getString(R.string.resume),
                 actionPendingIntent(context, DownloadActionReceiver.ACTION_RESUME, downloadId),
             )
             .build()
@@ -337,7 +343,7 @@ object DownloadNotifications {
             // of the plain app icon, so a failure reads as clearly wrong at a glance.
             .setSmallIcon(R.drawable.ic_notif_error)
             .setContentTitle(title)
-            .setContentText(errorMessage?.takeIf { it.isNotBlank() } ?: "Download failed")
+            .setContentText(errorMessage?.takeIf { it.isNotBlank() } ?: context.getString(R.string.download_failed))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()

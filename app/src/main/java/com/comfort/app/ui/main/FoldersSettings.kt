@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -93,10 +95,10 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         }
     }
 
-    SettingsSubScaffold(title = "Folders", topicIcon = Icons.Outlined.Folder, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = "Filename format", icon = Icons.Outlined.TextFields) {
+    SettingsSubScaffold(title = stringResource(R.string.folders), topicIcon = Icons.Outlined.Folder, onBack = onBack, highlightKey = highlightKey) {
+        SettingsSection(title = stringResource(R.string.filename_format), icon = Icons.Outlined.TextFields) {
             Text(
-                "Filename format applied to every downloaded file.",
+                stringResource(R.string.filename_format_applied_to_every_downloaded),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -113,7 +115,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 value = filenameFormat,
                 onValueChange = { filenameFormat = it; filenameFormatSaved = false },
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                label = { Text("Filename format") },
+                label = { Text(stringResource(R.string.filename_format)) },
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -134,12 +136,12 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             ) {
                 Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Save format")
+                Text(stringResource(R.string.save_format))
             }
 
             ToggleReveal(filenameFormatSaved) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Filename format saved", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.filename_format_saved), tint = MaterialTheme.colorScheme.primary)
             }
 
             Spacer(Modifier.height(16.dp))
@@ -148,8 +150,8 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             IconToggleRow(
                 icon = Icons.Outlined.TextFields,
-                title = "Restrict filenames",
-                subtitle = "Removes special characters and replaces spaces with underscores. Safer for sharing and older file systems.",
+                title = stringResource(R.string.restrict_filenames),
+                subtitle = stringResource(R.string.removes_special_characters_and_replaces_spaces),
                 checked = restrictFilenames,
                 onCheckedChange = {
                     restrictFilenames = it
@@ -163,8 +165,8 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 
             IconToggleRow(
                 icon = Icons.Outlined.ContentCut,
-                title = "Trim filenames",
-                subtitle = "Caps long titles at 150 characters (only applies to the default filename format).",
+                title = stringResource(R.string.trim_filenames),
+                subtitle = stringResource(R.string.caps_long_titles_at_150_characters),
                 checked = trimFilenames,
                 onCheckedChange = {
                     trimFilenames = it
@@ -173,7 +175,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             )
         }
 
-        SettingsSection(title = "Download location", icon = Icons.Outlined.Folder) {
+        SettingsSection(title = stringResource(R.string.download_location), icon = Icons.Outlined.Folder) {
             val locationName by produceState<String?>(initialValue = null, downloadLocationUri) {
                 value = withContext(Dispatchers.IO) {
                     downloadLocationUri?.let { uri ->
@@ -186,9 +188,9 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             }
             Text(
                 when {
-                    downloadLocationUri == null -> "Saving to the default Download/Comfort folder."
-                    locationName != null -> "Saving to \"$locationName\"."
-                    else -> "Selected folder is inaccessible or permission was lost. Falling back to default Download/Comfort folder."
+                    downloadLocationUri == null -> stringResource(R.string.saving_to_the_default_download_comfort)
+                    locationName != null -> stringResource(R.string.saving_to_x, locationName.orEmpty())
+                    else -> stringResource(R.string.selected_folder_is_inaccessible_or_permission)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (downloadLocationUri != null && locationName == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -196,7 +198,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             if (locationName != null) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Custom folders won't automatically appear in Photos/Gallery apps — only the default location is indexed as media.",
+                    stringResource(R.string.custom_folders_won_t_automatically_appear),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -213,7 +215,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 ) {
                     Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Choose folder")
+                    Text(stringResource(R.string.choose_folder))
                 }
                 if (downloadLocationUri != null) {
                     OutlinedButton(
@@ -224,7 +226,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                         modifier = Modifier.weight(1f).height(50.dp),
                         shape = MaterialTheme.shapes.medium,
                     ) {
-                        Text("Use default")
+                        Text(stringResource(R.string.use_default))
                     }
                 }
             }
@@ -234,8 +236,8 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Spacer(Modifier.height(16.dp))
 
             FolderOverrideRow(
-                label = "Audio folder",
-                fallbackDescription = "audio downloads land in the folder above (or the default) unless this is set.",
+                label = stringResource(R.string.audio_folder),
+                fallbackDescription = stringResource(R.string.audio_downloads_land_in_the_folder),
                 uri = audioLocationUri,
                 onChoose = { audioLocationLauncher.launch(null) },
                 onUseDefault = {
@@ -249,8 +251,8 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Spacer(Modifier.height(16.dp))
 
             FolderOverrideRow(
-                label = "Video folder",
-                fallbackDescription = "video downloads land in the folder above (or the default) unless this is set.",
+                label = stringResource(R.string.video_folder),
+                fallbackDescription = stringResource(R.string.video_downloads_land_in_the_folder),
                 uri = videoLocationUri,
                 onChoose = { videoLocationLauncher.launch(null) },
                 onUseDefault = {
@@ -260,7 +262,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             )
         }
 
-        SettingsSection(title = "Storage", icon = Icons.Outlined.SdStorage) {
+        SettingsSection(title = stringResource(R.string.storage), icon = Icons.Outlined.SdStorage) {
             var cacheSizeBytes by remember { mutableStateOf<Long?>(null) }
             var isClearingCache by remember { mutableStateOf(false) }
             var cacheCleared by remember { mutableStateOf(false) }
@@ -272,14 +274,14 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             Text(
                 cacheSizeBytes?.let { bytes ->
                     val mb = bytes / (1024f * 1024f)
-                    if (mb >= 1f) String.format(Locale.getDefault(), "Cache: %.1f MB", mb) else "Cache: ${bytes / 1024} KB"
-                } ?: "Calculating cache size…",
+                    if (mb >= 1f) stringResource(R.string.cache_x_mb, String.format(Locale.getDefault(), "%.1f", mb)) else stringResource(R.string.cache_x_kb, bytes / 1024)
+                } ?: stringResource(R.string.calculating_cache_size),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Leftover temp files from interrupted downloads and preview thumbnails. Safe to clear — nothing here is a finished download.",
+                stringResource(R.string.leftover_temp_files_from_interrupted_downloads),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -345,16 +347,16 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                 if (isClearingCache) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Clearing cache…")
+                    Text(stringResource(R.string.clearing_cache))
                 } else {
                     Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Clear cache")
+                    Text(stringResource(R.string.clear_cache))
                 }
             }
             ToggleReveal(cacheCleared) {
                 Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = "Cache cleared", tint = MaterialTheme.colorScheme.primary)
+                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cache_cleared), tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -388,9 +390,9 @@ private fun FolderOverrideRow(
     Spacer(Modifier.height(4.dp))
     Text(
         when {
-            uri == null -> "Not set — $fallbackDescription"
-            name != null -> "Saving to \"$name\"."
-            else -> "Folder inaccessible or permission lost — $fallbackDescription"
+            uri == null -> stringResource(R.string.not_set_x, fallbackDescription)
+            name != null -> stringResource(R.string.saving_to_x, name.orEmpty())
+            else -> stringResource(R.string.folder_inaccessible_or_permission_lost_x, fallbackDescription)
         },
         style = MaterialTheme.typography.bodySmall,
         color = if (uri != null && name == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -404,7 +406,7 @@ private fun FolderOverrideRow(
         ) {
             Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Choose folder")
+            Text(stringResource(R.string.choose_folder))
         }
         if (uri != null) {
             OutlinedButton(
@@ -412,7 +414,7 @@ private fun FolderOverrideRow(
                 modifier = Modifier.weight(1f).height(50.dp),
                 shape = MaterialTheme.shapes.medium,
             ) {
-                Text("Use default")
+                Text(stringResource(R.string.use_default))
             }
         }
     }

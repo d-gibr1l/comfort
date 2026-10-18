@@ -1,5 +1,7 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,7 +42,7 @@ internal fun CompressDialog(item: DownloadEntity, fileUri: Uri, onDismiss: () ->
 
     AlertDialog(
         onDismissRequest = ::close,
-        title = { Text(if (running) "Compressing…" else "Compress video") },
+        title = { Text(if (running) stringResource(R.string.compressing) else stringResource(R.string.compress_video)) },
         text = {
             Column {
                 val current = info
@@ -59,14 +61,14 @@ internal fun CompressDialog(item: DownloadEntity, fileUri: Uri, onDismiss: () ->
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    current == null -> Text("Reading the video…", style = MaterialTheme.typography.bodyMedium)
+                    current == null -> Text(stringResource(R.string.reading_the_video), style = MaterialTheme.typography.bodyMedium)
                     targets.isEmpty() -> Text(
-                        "This video is already ${current.shortSide}p, as small as Compress makes it.",
+                        stringResource(R.string.this_video_is_already_x_p, current.shortSide),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     else -> {
                         Text(
-                            "Saves a smaller copy next to the original (${current.shortSide}p, ${formatFileSize(current.bytes)}).",
+                            stringResource(R.string.saves_a_smaller_copy_next_to, current.shortSide, formatFileSize(current.bytes)),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(16.dp))
@@ -98,7 +100,7 @@ internal fun CompressDialog(item: DownloadEntity, fileUri: Uri, onDismiss: () ->
                         target?.let { t ->
                             Spacer(Modifier.height(10.dp))
                             Text(
-                                "About ${formatFileSize(VideoCompressor.estimateBytes(current, t))}",
+                                stringResource(R.string.about_x, formatFileSize(VideoCompressor.estimateBytes(current, t))),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -118,17 +120,17 @@ internal fun CompressDialog(item: DownloadEntity, fileUri: Uri, onDismiss: () ->
                             val saved = VideoCompressor.compress(context, item, fileUri, t) { progress = it }
                             Toast.makeText(
                                 context,
-                                if (saved != null) "Saved the ${t}p copy" else "Couldn't compress this video",
+                                if (saved != null) context.getString(R.string.saved_the_p_copy, t) else context.getString(R.string.couldn_t_compress_this_video),
                                 Toast.LENGTH_SHORT,
                             ).show()
                             onDismiss()
                         }
                     },
-                ) { Text("Compress") }
+                ) { Text(stringResource(R.string.compress)) }
             }
         },
         dismissButton = {
-            TextButton(onClick = ::close) { Text("Cancel") }
+            TextButton(onClick = ::close) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

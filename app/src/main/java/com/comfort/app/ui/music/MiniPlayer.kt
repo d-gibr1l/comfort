@@ -1,5 +1,7 @@
 package com.comfort.app.ui.music
 
+import androidx.compose.ui.res.stringResource
+import com.comfort.app.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,6 +59,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val song = state.song ?: return
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     var position by remember { mutableLongStateOf(0L) }
+    val openPlayerDescription = stringResource(R.string.now_playing_x_open_player, song.title)
     LaunchedEffect(state.isPlaying, song.id, state.seekId) {
         position = MusicPlayer.position()
         while (state.isPlaying) {
@@ -73,7 +76,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
-            .semantics { contentDescription = "Now playing: ${song.title}. Open player" }
+            .semantics { contentDescription = openPlayerDescription }
             // Swipe up opens Now Playing, like a tap.
             .pointerInput(Unit) {
                 var total = 0f
@@ -122,22 +125,22 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
                 }
                 if (state.count > 1) {
                     IconButton(onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() }) {
-                        Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous")
+                        Icon(Icons.Rounded.SkipPrevious, contentDescription = stringResource(R.string.widget_music_previous))
                     }
                 }
                 IconButton(onClick = MusicPlayer::togglePlay) {
                     Icon(
                         if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        contentDescription = if (state.isPlaying) stringResource(R.string.widget_music_pause) else stringResource(R.string.widget_music_play),
                     )
                 }
                 if (state.count > 1) {
                     IconButton(onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.next() }) {
-                        Icon(Icons.Rounded.SkipNext, contentDescription = "Next")
+                        Icon(Icons.Rounded.SkipNext, contentDescription = stringResource(R.string.widget_music_next))
                     }
                 }
                 IconButton(onClick = MusicPlayer::stop) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Stop music")
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.stop_music))
                 }
             }
         }

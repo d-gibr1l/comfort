@@ -27,7 +27,7 @@ class EnginePlanTest {
             if (engine == stopAfter) isStopped = true
         }
         override suspend fun probe() = probeResult
-        override fun fail(message: String) { ran += "FAIL: $message" }
+        override fun fail(message: Int) { ran += "FAIL: $message" }
         override suspend fun listedImages(): Boolean { ran += "LISTING"; return listed }
     }
 

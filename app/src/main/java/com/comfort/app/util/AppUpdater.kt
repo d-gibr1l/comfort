@@ -157,7 +157,7 @@ object AppUpdater {
                     promptInstall(appContext, apkFile)
                 }
             }.onFailure { e ->
-                downloadError.value = "Couldn't download update: ${e.message}"
+                downloadError.value = appContext.getString(com.comfort.app.R.string.couldnt_download_update, e.message.orEmpty())
                 downloadProgress.value = null
             }
         }
@@ -167,7 +167,7 @@ object AppUpdater {
         if (canInstall(context)) {
             installApk(context, apkFile)
         } else {
-            downloadError.value = "Allow installing from this app in the settings screen that just opened, then tap Update again."
+            downloadError.value = context.getString(com.comfort.app.R.string.allow_installing_then_update)
             requestInstallPermission(context)
         }
     }

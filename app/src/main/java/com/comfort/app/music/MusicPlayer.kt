@@ -64,7 +64,7 @@ data class Song(
                     if (t.startsWith(prefix, ignoreCase = true) && t.length > prefix.length) return t.substring(prefix.length).trim()
                 }
             }
-            return t.ifBlank { "Unknown" }
+            return t.ifBlank { unknownTitle() }
         }
 
         private const val EXTRA_FILE = "comfort.file"
@@ -78,7 +78,7 @@ data class Song(
             return Song(
                 id = item.mediaId,
                 uri = file?.let(Uri::parse) ?: Uri.EMPTY,
-                title = md.title?.toString() ?: "Unknown",
+                title = md.title?.toString() ?: unknownTitle(),
                 artist = md.artist?.toString(),
                 album = md.albumTitle?.toString(),
                 cover = file?.let { AudioCover(it, storedArt) } ?: md.artworkUri,
@@ -180,6 +180,9 @@ object MusicPlayer {
             field = value
             pendingAt = android.os.SystemClock.uptimeMillis()
         }
+    // For text the songs need without a context of their own ("Unknown" for a song with no title).
+    internal var appContext: Context? = null
+        private set
     private var pendingAt = 0L
     private var transitionForward: Boolean? = null
 
@@ -209,6 +212,7 @@ object MusicPlayer {
 
     /** Connects, so the state shows music already playing (the app reopened while it played). */
     fun connect(context: Context) {
+        appContext = context.applicationContext
         if (controller == null && future == null) withController(context) {}
     }
 
@@ -359,3 +363,6 @@ object MusicPlayer {
         )
     }
 }
+
+/** "Unknown", in the app's language once the player has a context. */
+private fun unknownTitle(): String = MusicPlayer.appContext?.getString(com.comfort.app.R.string.unknown_title) ?: "Unknown"

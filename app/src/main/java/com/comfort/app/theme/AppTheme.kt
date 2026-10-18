@@ -1,5 +1,6 @@
 package com.comfort.app.theme
 
+import com.comfort.app.R
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -139,26 +140,26 @@ private fun buildDark(primary: Color, onPrimary: Color, primaryContainer: Color,
 // its scheme is derived on the fly from the device wallpaper (Android 12+ only), so callers must
 // special-case `isDynamic` rather than reading `light`/`dark` for it.
 enum class AppTheme(
-    val lightLabel: String,
-    val darkLabel: String,
+    @androidx.annotation.StringRes val lightLabel: Int,
+    @androidx.annotation.StringRes val darkLabel: Int,
     val isDynamic: Boolean = false,
     val light: ColorScheme? = null,
     val dark: ColorScheme? = null,
 ) {
     DYNAMIC(
-        lightLabel = "Dynamic (from wallpaper)",
-        darkLabel = "Dynamic (from wallpaper)",
+        lightLabel = R.string.dynamic_from_wallpaper,
+        darkLabel = R.string.dynamic_from_wallpaper,
         isDynamic = true,
     ),
     DEFAULT(
-        lightLabel = "Pure White",
-        darkLabel = "Dark",
+        lightLabel = R.string.pure_white,
+        darkLabel = R.string.dark,
         light = LightColorScheme,
         dark = DarkColorScheme,
     ),
     SUNSET(
-        lightLabel = "Sunset Coral",
-        darkLabel = "Ember Night",
+        lightLabel = R.string.sunset_coral,
+        darkLabel = R.string.ember_night,
         light = buildLight(
             // Slightly darker than AccentRed (same hue): as link/accent text it was 4.13:1 on cards.
             primary = Color(0xFFA85523), onPrimary = Color.White,
@@ -174,8 +175,8 @@ enum class AppTheme(
         ),
     ),
     BLOSSOM(
-        lightLabel = "Spring Blossom",
-        darkLabel = "Midnight Dusk",
+        lightLabel = R.string.spring_blossom,
+        darkLabel = R.string.midnight_dusk,
         light = buildLight(
             // Was 0xFFC43C97 (same hue): 4.18:1 as accent text on cards, now 4.61.
             primary = Color(0xFFB9388E), onPrimary = Color.White,
@@ -194,8 +195,8 @@ enum class AppTheme(
         ),
     ),
     OCEAN(
-        lightLabel = "Teal Tide",
-        darkLabel = "Sapphire Dusk",
+        lightLabel = R.string.teal_tide,
+        darkLabel = R.string.sapphire_dusk,
         light = buildLight(
             // Slightly darker than Teal40 (same hue): 4.04:1 as accent text on cards, now 4.72.
             primary = Color(0xFF0B786E), onPrimary = Color.White,
@@ -211,8 +212,8 @@ enum class AppTheme(
         ),
     ),
     LAVENDER(
-        lightLabel = "Lavender",
-        darkLabel = "Violet Night",
+        lightLabel = R.string.lavender,
+        darkLabel = R.string.violet_night,
         light = buildLight(
             primary = Color(0xFF7B46AF), onPrimary = Color.White,
             primaryContainer = Color(0xFFEBDDFB), onPrimaryContainer = Color(0xFF350A64),
@@ -227,8 +228,8 @@ enum class AppTheme(
         ),
     ),
     TOKYO(
-        lightLabel = "Tokyo Light",
-        darkLabel = "Tokyo Night",
+        lightLabel = R.string.tokyo_light,
+        darkLabel = R.string.tokyo_night,
         light = buildLight(
             primary = Color(0xFF0072B2), onPrimary = Color.White,
             primaryContainer = Color(0xFFD6E9F8), onPrimaryContainer = Color(0xFF00304D),
@@ -246,8 +247,8 @@ enum class AppTheme(
         ),
     ),
     LIME(
-        lightLabel = "Lime Fizz",
-        darkLabel = "Flat Lime",
+        lightLabel = R.string.lime_fizz,
+        darkLabel = R.string.flat_lime,
         light = buildLight(
             // Was 0xFF12803B (same hue): 4.44:1 as accent text on cards, now 4.68.
             primary = Color(0xFF117C39), onPrimary = Color.White,
@@ -266,8 +267,8 @@ enum class AppTheme(
         ),
     ),
     MONOCHROME(
-        lightLabel = "Yang",
-        darkLabel = "Yin",
+        lightLabel = R.string.yang,
+        darkLabel = R.string.yin,
         light = buildLight(
             primary = Color(0xFF1A1A1A), onPrimary = Color.White,
             primaryContainer = Color(0xFFE0E0E0), onPrimaryContainer = Color(0xFF1A1A1A),
@@ -287,8 +288,8 @@ enum class AppTheme(
     // which buildLight/buildDark don't expose. Paired with ExpressiveShapes (see Shape.kt) and
     // MotionScheme.expressive() in Theme.kt's GalleryDLTheme switch.
     CUSTOM(
-        lightLabel = "Custom",
-        darkLabel = "Custom",
+        lightLabel = R.string.custom,
+        darkLabel = R.string.custom,
         light = lightColorScheme(
             primary = Color(0xFF3E6700),
             onPrimary = Color(0xFFFFFFFF),
@@ -389,8 +390,8 @@ enum class AppTheme(
         ),
     ),
     EXPRESSIVE(
-        lightLabel = "Expressive Purple",
-        darkLabel = "Expressive Purple",
+        lightLabel = R.string.expressive_purple,
+        darkLabel = R.string.expressive_purple,
         // Medium-contrast M3 purple: a deeper primary (#4C3889) and darker onSurfaceVariant/outline
         // than the baseline scheme this started from, which is what the download preview sheet's
         // own design was drawn against.

@@ -118,11 +118,11 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
                     publishEngines(updated)
                 }
                 result.onFailure { e ->
-                    _engineError.value = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
+                    _engineError.value = getApplication<Application>().getString(com.comfort.app.R.string.couldn_t_update_engine, status.engine.displayName, e.message ?: getApplication<Application>().getString(com.comfort.app.R.string.unknown_error))
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _engineError.value = "Couldn't update ${status.engine.displayName}: ${e.message ?: "unknown error"}"
+                _engineError.value = getApplication<Application>().getString(com.comfort.app.R.string.couldn_t_update_engine, status.engine.displayName, e.message ?: getApplication<Application>().getString(com.comfort.app.R.string.unknown_error))
             } finally {
                 _updatingEngines.update { it - key }
             }
