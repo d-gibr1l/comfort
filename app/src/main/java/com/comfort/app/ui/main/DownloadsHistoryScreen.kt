@@ -125,6 +125,10 @@ fun DownloadsHistoryScreen(
     // build). Hidden, it's put back the way a fresh visit starts — no filter, selection or search,
     // newest first, at the top — and its Back handlers stay off, so Back on Home is Home's.
     isVisible: Boolean = true,
+    // Held by MainScreen, so the place it was scrolled to survives the screen being rebuilt
+    // (it isn't kept between visits while something's downloading).
+    listState: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState = rememberLazyGridState(),
 ) {
     // Library's own topic icon in its header — same role Icons.Outlined.SettingsApplications
     // plays in the Settings root header (see SettingsScreen.kt's SettingsRootScreen).
@@ -175,14 +179,16 @@ fun DownloadsHistoryScreen(
     // reset scroll position back to the top as a side effect. A freshly-finished download lands at
     // the top of the newest-first list, so without this, coming back from Queue silently leaves
     // you scrolled wherever you were before, with the new item off-screen above.
-    val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
     val scrollTopScope = rememberCoroutineScope()
+    // Only when the Queue actually closes, not each time this screen is built (it ran then too,
+    // so coming back to the Library always landed at the top).
+    var queueWasOpen by remember { mutableStateOf(isQueueOpen) }
     LaunchedEffect(isQueueOpen) {
-        if (!isQueueOpen) {
+        if (queueWasOpen && !isQueueOpen) {
             listState.scrollToItem(0)
             gridState.scrollToItem(0)
         }
+        queueWasOpen = isQueueOpen
     }
 
     // Every earlier version here — an alpha-crossfaded pair, a single continuously-morphing
@@ -361,14 +367,20 @@ fun DownloadsHistoryScreen(
         if (isVisible) {
             viewModel.scanForDeletedMedia()
         } else {
+            // Back to the top only when the list itself is about to change (a filter, search or
+            // sort put back); otherwise the next visit picks up where this one was scrolled to.
+            val listChanges = favoritesOnly || showDeletedOnly || showDuplicatesOnly || audioOnly ||
+                searchQuery.isNotEmpty() || sortOption != LibrarySort.DATE_NEWEST
             selectedIds = emptySet()
             favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false; audioOnly = false
             searchQuery = ""
             searchExpanded = false
             sortOption = LibrarySort.DATE_NEWEST
             sortMenuExpanded = false
-            listState.scrollToItem(0)
-            gridState.scrollToItem(0)
+            if (listChanges) {
+                listState.scrollToItem(0)
+                gridState.scrollToItem(0)
+            }
         }
     }
 
@@ -1321,11 +1333,20 @@ internal fun SwipeToDeleteCard(
     // Not the saveable state: a list keeps that with the item, so a row brought back by Undo
     // came back still swiped away for a frame (a flash of the red background) before a reset.
     // A card that's composed at all should start settled.
+    // Material deletes on any flick past its speed floor however short it was: a light flick
+    // deleted the card. A delete now needs the card slid this much of its width; a flick that
+    // didn't get it that far springs back.
+    var cardWidthPx by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val stateRef = remember { arrayOfNulls<androidx.compose.material3.SwipeToDismissBoxState>(1) }
     val dismissState = remember {
         androidx.compose.material3.SwipeToDismissBoxState(
             initialValue = SwipeToDismissBoxValue.Settled,
             density = density,
             confirmValueChange = { value ->
+                if (value != SwipeToDismissBoxValue.Settled) {
+                    val slid = stateRef[0]?.let { runCatching { kotlin.math.abs(it.requireOffset()) }.getOrNull() } ?: 0f
+                    if (cardWidthPx > 0f && slid < cardWidthPx * MIN_DELETE_SWIPE_FRACTION) return@SwipeToDismissBoxState false
+                }
                 if (value != SwipeToDismissBoxValue.Settled && !deleted) {
                     deleted = true
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.Confirm)
@@ -1336,6 +1357,7 @@ internal fun SwipeToDeleteCard(
             positionalThreshold = threshold,
         )
     }
+    stateRef[0] = dismissState
     // A tick the moment a drag crosses the delete threshold (and a lighter one if it's dragged
     // back under it), so the point of no return is felt, not just seen. targetValue is what flips
     // at that threshold mid-drag; drop(1) skips its initial Settled emission.
@@ -1357,7 +1379,8 @@ internal fun SwipeToDeleteCard(
     val pageSwipe = LocalPageSwipe.current
     SwipeToDismissBox(
         state = dismissState,
-        modifier = if (pageSwipe != null) modifier.pageSwipeEdges(pageSwipe) else modifier,
+        modifier = (if (pageSwipe != null) modifier.pageSwipeEdges(pageSwipe) else modifier)
+            .onSizeChanged { cardWidthPx = it.width.toFloat() },
         enableDismissFromStartToEnd = enabled,
         enableDismissFromEndToStart = enabled,
         backgroundContent = {
@@ -2192,3 +2215,6 @@ internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifie
 
 /** The width (dp) the grid's tile sizes are measured against at most — about a big phone's. */
 private const val GRID_SIZE_REF_DP = 480f
+
+/** How much of its width a card has to be slid for a swipe to delete it (a flick included). */
+private const val MIN_DELETE_SWIPE_FRACTION = 0.4f
