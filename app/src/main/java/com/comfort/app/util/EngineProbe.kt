@@ -33,8 +33,15 @@ object EngineProbe {
     suspend fun probeBoth(context: Context, url: String): Result = coroutineScope {
         val galleryDl = async { runProbe(context, "gallery_dl_wrapper.py", url) }
         val ytDlp = async { runProbe(context, "yt_dlp_wrapper.py", url) }
-        Result(galleryDl.await(), ytDlp.await())
+        // A share link (Reddit's /r/<sub>/s/<code>) never matches yt-dlp's own patterns, which want
+        // the post's real address — but its generic extractor follows the redirect fine. So a "no"
+        // from yt-dlp there isn't a no: it's unknown, which no plan skips yt-dlp for.
+        val yt = ytDlp.await()
+        Result(galleryDl.await(), if (yt == false && SHARE_LINK.containsMatchIn(url)) null else yt)
     }
+
+    // Reddit's share links: reddit.com/r/<sub>/s/<code> and /u/<user>/s/<code> (any subdomain).
+    private val SHARE_LINK = Regex("""^https?://([\w-]+\.)?reddit\.com/(r|u|user)/[^/]+/s/""", RegexOption.IGNORE_CASE)
 
     private suspend fun runProbe(context: Context, script: String, url: String): Boolean? {
         var lastLine: String? = null
