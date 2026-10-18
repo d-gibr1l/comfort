@@ -250,6 +250,10 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // the slide starts, and the slide itself only has to draw a page that's already there.
     var preparingTab by remember { mutableStateOf<Int?>(null) }
     val keepLibrary = keepSettings && activeDownloadsCount == 0
+    // The Library's scroll position, held here: the Library itself is rebuilt each visit while
+    // something's downloading (above), and its place in the list went with it.
+    val libraryListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val libraryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     val tabScope = rememberCoroutineScope()
     fun enterTab(index: Int, enter: () -> Unit) {
         if (preparingTab != null) return
@@ -430,6 +434,8 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             ) {
                 when (tab) {
                     1 -> DownloadsHistoryScreen(
+                        listState = libraryListState,
+                        gridState = libraryGridState,
                         viewModel = viewModel,
                         onOpenQueue = openQueue,
                         isQueueOpen = showQueueScreen,
