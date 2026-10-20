@@ -169,6 +169,11 @@ object PythonRuntime {
             // the engines so adding it didn't need a PROVISION_VERSION bump (which would have
             // rolled back every engine updated in-app).
             context.assets.open("python_packages/pysocks.whl").use { unzipStreamTo(it, sitePackagesDir(context)) }
+            // yt-dlp-ejs 0.8.0 (pure Python, 53KB): the JS challenge solver's "lib" script, which
+            // yt-dlp doesn't build in for QuickJS (only the core one) — without it YouTube's
+            // challenges were skipped ("[jsc] ... was skipped"), losing formats. Must match the
+            // bundled yt-dlp's EJS version (yt_dlp/extractor/youtube/jsc/_builtin/vendor/_info.py).
+            context.assets.open("python_packages/yt_dlp_ejs.whl").use { unzipStreamTo(it, sitePackagesDir(context)) }
             marker.writeText(installId)
             android.util.Log.i("PythonRuntime", "wrapper scripts copied for $installId")
         }
