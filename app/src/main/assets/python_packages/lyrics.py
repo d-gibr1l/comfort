@@ -21,6 +21,8 @@ import sys
 import urllib.parse
 import urllib.request
 
+import net_resilience  # its urlopen: through the job's proxy, a SOCKS one included
+
 _CACERT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cacert.pem")
 _UA = "Comfort (https://github.com/d-gibr1l/comfort)"
 
@@ -45,7 +47,7 @@ def _get(url):
     ctx = ssl.create_default_context(cafile=_CACERT) if os.path.exists(_CACERT) else None
     req = urllib.request.Request(url, headers={"User-Agent": _UA})
     try:
-        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+        with net_resilience.urlopen(req, timeout=10, context=ctx) as resp:
             return json.loads(resp.read().decode("utf-8", "replace"))
     except urllib.error.HTTPError as e:
         if e.code == 404:

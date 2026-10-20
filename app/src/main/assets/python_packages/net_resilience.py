@@ -21,6 +21,7 @@ same network, 25 each, twice: 87.1s vs 57.9s total (worst 13.7s vs 8.2s), then 1
 also brought back to yt-dlp's own timeout: curl_cffi turns yt-dlp's (timeout, timeout) into a
 40s no-data limit (connect + read), so a connection that died mid-file sat 40s before a retry.
 """
+import os
 import socket
 import time
 
@@ -220,6 +221,105 @@ def install():
             pass  # a library changed shape: that one keeps its stock behaviour
 
 
+# --- SOCKS proxies for urllib -------------------------------------------------------------------
+# requests (gallery-dl, Instaloader) does SOCKS through PySocks on its own; urllib (the size checks
+# below, Spotify's lookups, lyrics) doesn't — its ProxyHandler only speaks HTTP, so a socks:// proxy
+# made it tunnel HTTP to the SOCKS port and fail. build_opener()/urlopen() here are urllib's own,
+# except through PySocks when the proxy is a SOCKS one. Not PySocks's own sockshandler: it calls
+# ssl.match_hostname, gone since Python 3.12.
+
+_SOCKS_TYPES = {"socks4": (1, False), "socks4a": (1, True), "socks5": (2, False), "socks5h": (2, True)}
+
+
+def _env_proxy():
+    for name in ("https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY", "http_proxy", "HTTP_PROXY"):
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
+def _socks_args(proxy_url):
+    """PySocks' connection arguments for a socks:// proxy URL, None for any other kind. Raises when
+    it is one and PySocks is missing: failing beats a request that skips the proxy."""
+    import urllib.parse
+    parts = urllib.parse.urlsplit(proxy_url or "")
+    kind = _SOCKS_TYPES.get((parts.scheme or "").lower())
+    if kind is None:
+        return None
+    import socks  # noqa: F401 — PySocks, bundled (see PythonRuntime)
+    proxy_type, rdns = kind
+    user = urllib.parse.unquote(parts.username) if parts.username else None
+    password = urllib.parse.unquote(parts.password) if parts.password else None
+    return (proxy_type, parts.hostname, parts.port or 1080, rdns, user, password)
+
+
+def _socks_connection_classes():
+    import http.client
+    import socks
+
+    def connect(conn):
+        proxy_type, host, port, rdns, user, password = conn.socks_args
+        return socks.create_connection((conn.host, conn.port), conn.timeout, None,
+                                       proxy_type, host, port, rdns, user, password)
+
+    class SocksHTTPConnection(http.client.HTTPConnection):
+        def __init__(self, *args, socks_args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.socks_args = socks_args
+
+        def connect(self):
+            self.sock = connect(self)
+
+    class SocksHTTPSConnection(http.client.HTTPSConnection):
+        def __init__(self, *args, socks_args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.socks_args = socks_args
+
+        def connect(self):
+            self.sock = self._context.wrap_socket(connect(self), server_hostname=self.host)
+
+    return SocksHTTPConnection, SocksHTTPSConnection
+
+
+def build_opener(*handlers, proxy_url=None):
+    """urllib.request.build_opener(*handlers) through [proxy_url], or the job's own proxy (the
+    environment PythonRuntime sets) without one — a SOCKS one included."""
+    import functools
+    import urllib.request
+    proxy = proxy_url or _env_proxy()
+    socks_args = _socks_args(proxy) if proxy else None
+    if socks_args is None:
+        if proxy_url:
+            handlers += (urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url}),)
+        return urllib.request.build_opener(*handlers)
+    http_class, https_class = _socks_connection_classes()
+    context = next((h._context for h in handlers if isinstance(h, urllib.request.HTTPSHandler)), None)
+
+    class SocksHandler(urllib.request.HTTPHandler, urllib.request.HTTPSHandler):
+        def __init__(self):
+            urllib.request.HTTPHandler.__init__(self)
+            urllib.request.HTTPSHandler.__init__(self, context=context)
+
+        def http_open(self, req):
+            return self.do_open(functools.partial(http_class, socks_args=socks_args), req)
+
+        def https_open(self, req):
+            return self.do_open(functools.partial(https_class, socks_args=socks_args), req, context=self._context)
+
+    rest = [h for h in handlers if not isinstance(h, (urllib.request.HTTPHandler, urllib.request.HTTPSHandler, urllib.request.ProxyHandler))]
+    # ProxyHandler({}): the environment's socks:// proxy must not also be tried as an HTTP one.
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), SocksHandler(), *rest)
+
+
+def urlopen(req, timeout=None, context=None):
+    """urllib.request.urlopen(req, timeout=..., context=...), through the job's proxy whatever kind
+    it is."""
+    import urllib.request
+    handlers = (urllib.request.HTTPSHandler(context=context),) if context is not None else ()
+    return build_opener(*handlers).open(req, timeout=timeout)
+
+
 # --- Media sizes -------------------------------------------------------------------------------
 # For listings whose engine doesn't report sizes (gallery-dl's --dump-json, Instaloader): asks the
 # media server itself, so the preview can show how big a download will be before it starts.
@@ -255,7 +355,7 @@ def _size_of(url, timeout, headers):
     for method, extra in attempts:
         try:
             req = urllib.request.Request(url, method=method, headers={**base, **extra})
-            with urllib.request.urlopen(req, timeout=timeout, context=context) as resp:
+            with urlopen(req, timeout=timeout, context=context) as resp:
                 total = (resp.headers.get("Content-Range") or "").rpartition("/")[2]
                 if total.isdigit():
                     return int(total)

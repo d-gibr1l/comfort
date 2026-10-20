@@ -164,6 +164,11 @@ object PythonRuntime {
                     File(root, name).outputStream().use { input.copyTo(it) }
                 }
             }
+            // PySocks (pure Python, 17KB): SOCKS proxies for requests, so gallery-dl and
+            // Instaloader, and net_resilience's urllib openers. Unpacked here rather than with
+            // the engines so adding it didn't need a PROVISION_VERSION bump (which would have
+            // rolled back every engine updated in-app).
+            context.assets.open("python_packages/pysocks.whl").use { unzipStreamTo(it, sitePackagesDir(context)) }
             marker.writeText(installId)
             android.util.Log.i("PythonRuntime", "wrapper scripts copied for $installId")
         }
