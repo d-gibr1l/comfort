@@ -113,7 +113,8 @@ internal class EngineCommands(
         ITEM_FILTER_NUMS_RE.find(entity?.itemFilter.orEmpty())?.groupValues?.get(1).orEmpty()
     }
 
-    // Imported from YTDLnis's settings screens — see GalleryDlPreferences for why they're yt-dlp-only.
+    // Imported from YTDLnis's settings screens. Mostly yt-dlp only; force IPv4, skipped certificate
+    // checks, restricted filenames and the sleep interval go to every engine.
     private val forceIpv4 = GalleryDlPreferences.isForceIpv4(context)
     private val concurrentFragments = GalleryDlPreferences.getEffectiveConcurrentFragments(context)
     private val noCheckCertificates = GalleryDlPreferences.isNoCheckCertificates(context)
@@ -155,6 +156,8 @@ internal class EngineCommands(
             entity?.itemFilter.orEmpty(), flag(excludeVideo),
             networkRetries, maxFilesize, flag(writeInfoFiles), proxyUrl,
             socketTimeoutSeconds,
+            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+            flag(restrictFilenames), flag(forceIpv4), flag(noCheckCertificates),
         ),
     )
 

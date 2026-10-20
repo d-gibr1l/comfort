@@ -206,7 +206,7 @@ def probe(url):
     except Exception:
         return "0"
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None):
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None, sleep_interval_seconds=None, restrict_filenames=False, force_ipv4=False, no_check_certificates=False):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -267,6 +267,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # covers both the metadata/listing request and each individual file fetch, same two
         # config paths "retries" above already needed to cover both places.
         args.extend(["-o", f"extractor.timeout={socket_timeout_seconds}", "-o", f"downloader.timeout={socket_timeout_seconds}"])
+    # Settings > Downloads / Folders options the other engines follow too, through gallery-dl's own:
+    if sleep_interval_seconds:
+        # A random 2-to-N second pause before each file, like yt-dlp's --min/--max-sleep-interval.
+        args.extend(["--sleep", f"2-{max(2, int(sleep_interval_seconds))}"])
+    if restrict_filenames:
+        # Only letters, digits, "_" and "." (the rest becomes "_"), as with yt-dlp's restricted names.
+        args.extend(["-o", "path-restrict=ascii"])
+    if force_ipv4:
+        args.append("--force-ipv4")
+    if no_check_certificates:
+        args.append("--no-check-certificate")
     if write_info_files:
         # gallery-dl's closest analog to yt-dlp's --write-info-json: one JSON sidecar per
         # downloaded file, containing the same metadata used for --filename/-filter expressions.
@@ -454,6 +465,10 @@ if __name__ == "__main__":
             write_info_files=(_rest[11] == "1") if len(_rest) > 11 else False,
             proxy_url=_s(_rest[12]) if len(_rest) > 12 else None,
             socket_timeout_seconds=_s(_rest[13]) if len(_rest) > 13 else None,
+            sleep_interval_seconds=_s(_rest[14]) if len(_rest) > 14 else None,
+            restrict_filenames=(_rest[15] == "1") if len(_rest) > 15 else False,
+            force_ipv4=(_rest[16] == "1") if len(_rest) > 16 else False,
+            no_check_certificates=(_rest[17] == "1") if len(_rest) > 17 else False,
         )
         print(event("exit", status=_status), file=_real_stdout, flush=True)
     elif _cmd == "list_items":

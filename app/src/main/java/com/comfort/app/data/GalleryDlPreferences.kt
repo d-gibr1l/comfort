@@ -1037,13 +1037,12 @@ object GalleryDlPreferences {
     }
 
     // --- Imported from YTDLnis's own settings screens (see gallery-dl.md's "YTDLnis settings
-    // import" entry), adapted to this app's engine (yt-dlp only for all of these — same precedent
-    // as live_from_start/js_runtimes/impersonation elsewhere in this file: gallery-dl's own CLI-arg
-    // shape doesn't map cleanly onto them, and its existing free-form "Extra arguments" field
-    // already lets a power user pass the equivalent raw flag by hand). ---
+    // import" entry). Mostly yt-dlp only. Force IPv4, skipping certificate checks, restricted
+    // filenames and the sleep interval reach every engine (EngineCommands): gallery-dl through
+    // its own equivalents, Instaloader through instaloader_wrapper.py. ---
 
-    /** yt-dlp's own -4/--force-ipv4 (binds outgoing connections to 0.0.0.0, forcing IPv4
-     * resolution) — useful on networks where IPv6 routing to a given site is broken/blocked but
+    /** yt-dlp's and gallery-dl's -4/--force-ipv4 (binds outgoing connections to 0.0.0.0, forcing
+     * IPv4 resolution; Instaloader: net_resilience.force_ipv4) — useful on networks where IPv6 routing to a given site is broken/blocked but
      * IPv4 works fine. */
     fun isForceIpv4(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_FORCE_IPV4, false)
@@ -1084,7 +1083,8 @@ object GalleryDlPreferences {
         return getConcurrentFragments(context)
     }
 
-    /** yt-dlp's own --no-check-certificate — skips TLS certificate validation. Only useful against
+    /** --no-check-certificate (yt-dlp, gallery-dl; Instaloader's requests too) — skips TLS
+     * certificate validation. Only useful against
      * a self-signed/misconfigured server; off by default since it's a real security downgrade. */
     fun isNoCheckCertificates(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_NO_CHECK_CERTIFICATES, false)
@@ -1341,9 +1341,9 @@ object GalleryDlPreferences {
         prefs(context).edit().putString(KEY_VIDEO_LOCATION_URI, uri?.toString()).apply()
     }
 
-    /** yt-dlp's own --restrict-filenames (ASCII-only, no spaces/special characters in the
-     * output filename). Off by default: names keep their spaces and punctuation, the same as
-     * gallery-dl's, which this setting doesn't affect. */
+    /** yt-dlp's --restrict-filenames (ASCII-only, no spaces/special characters in the output
+     * filename); gallery-dl's path-restrict=ascii and Instaloader's wrapper do the same. Off by
+     * default: names keep their spaces and punctuation. */
     fun isRestrictFilenames(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_RESTRICT_FILENAMES, false)
     }
