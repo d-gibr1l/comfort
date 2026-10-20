@@ -54,6 +54,22 @@ class _RateLimited(Exception):
     pass
 
 
+class _ProxyUnsupported(Exception):
+    pass
+
+
+def _check_proxy(proxy_url):
+    """Instaloader talks through requests, which needs PySocks for a socks:// proxy — not in this
+    runtime. Without it every request would fail one by one (and be retried); stopping here says so
+    at once, and the download goes on to the other engines (yt-dlp has its own SOCKS support)."""
+    if not proxy_url or not proxy_url.lower().startswith("socks"):
+        return
+    try:
+        import socks  # noqa: F401
+    except ImportError:
+        raise _ProxyUnsupported() from None
+
+
 class _FailFastRateController(RateController):
     def sleep(self, secs):
         if secs > _MAX_RATE_LIMIT_WAIT_SECONDS:
@@ -123,11 +139,15 @@ def _new_loader(session_cookies, proxy_url, timeout_seconds):
         # to fetch a post, and test_login() would cost an extra request against the rate limit.
         loader.load_session(cookies.get("ds_user_id") or "user", cookies)
     if proxy_url:
+        # Only the main session: Instaloader makes a fresh session for each query and each file,
+        # and those get the proxy from the environment PythonRuntime sets for every job.
         loader.context._session.proxies = {"http": proxy_url, "https": proxy_url}
     return loader
 
 
 def _friendly_error(exc):
+    if isinstance(exc, _ProxyUnsupported):
+        return "Instaloader can't use a SOCKS proxy — use an http:// proxy, or turn off Instaloader in Settings"
     if isinstance(exc, _RateLimited):
         return "Instagram is rate-limiting requests right now — try again in a few minutes"
     if isinstance(exc, instaloader.exceptions.LoginRequiredException):
@@ -164,6 +184,7 @@ def _fetch_post(url, cookies_path, proxy_url, timeout_seconds, info_cache_path=N
     shortcode = shortcode_of(url)
     if not shortcode:
         raise ValueError("Not an Instagram post or reel link")
+    _check_proxy(proxy_url)
     session = _read_instagram_cookies(cookies_path)
     if _fresh_cache(info_cache_path):
         try:

@@ -46,7 +46,7 @@ object EngineProbe {
             // listed above would leave yt-dlp out entirely. Follow its redirects and ask yt-dlp
             // about where it lands — if it knows that address, its "no" was about the short link
             // only. (A site that really is gallery-dl's alone, Pixiv say, doesn't redirect.)
-            gd == true -> resolveRedirect(url)?.let { target ->
+            gd == true -> resolveRedirect(context, url)?.let { target ->
                 if (runProbe(context, "yt_dlp_wrapper.py", target) == true) null else false
             } ?: false
             else -> false
@@ -55,13 +55,15 @@ object EngineProbe {
     }
 
     /** Where [url] redirects to (following up to [MAX_REDIRECTS] hops), or null when it doesn't
-     * redirect or the request fails. Only the headers are read: no page is downloaded. */
-    private suspend fun resolveRedirect(url: String): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+     * redirect or the request fails. Only the headers are read: no page is downloaded. Through the
+     * proxy setting; not asked at all when that proxy can't be used from here (see [proxyFor]). */
+    private suspend fun resolveRedirect(context: Context, url: String): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val proxy = proxyFor(com.comfort.app.data.GalleryDlPreferences.getEffectiveProxyUrl(context)) ?: return@withContext null
         var current = url
         var redirected = false
         repeat(MAX_REDIRECTS) {
             val next = runCatching {
-                val connection = java.net.URL(current).openConnection() as java.net.HttpURLConnection
+                val connection = java.net.URL(current).openConnection(proxy) as java.net.HttpURLConnection
                 try {
                     connection.instanceFollowRedirects = false
                     connection.requestMethod = "HEAD"
@@ -79,6 +81,22 @@ object EngineProbe {
             redirected = true
         }
         current.takeIf { redirected }
+    }
+
+    /** The proxy setting for a plain HttpURLConnection: NO_PROXY without one, null for one it can't
+     * go through — a login in it (HttpURLConnection has no per-request proxy login), a TLS
+     * ("https://") proxy, or no port. A request that would skip the proxy is never made. */
+    internal fun proxyFor(proxyUrl: String): java.net.Proxy? {
+        if (proxyUrl.isBlank()) return java.net.Proxy.NO_PROXY
+        val uri = runCatching { java.net.URI(proxyUrl.trim()) }.getOrNull() ?: return null
+        val type = when (uri.scheme?.lowercase()) {
+            "http" -> java.net.Proxy.Type.HTTP
+            "socks4", "socks4a", "socks5", "socks5h" -> java.net.Proxy.Type.SOCKS
+            else -> return null
+        }
+        val host = uri.host ?: return null
+        if (uri.port <= 0 || uri.userInfo != null) return null
+        return java.net.Proxy(type, java.net.InetSocketAddress.createUnresolved(host, uri.port))
     }
 
     private const val MAX_REDIRECTS = 5
