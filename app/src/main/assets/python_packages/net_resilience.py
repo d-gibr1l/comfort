@@ -63,6 +63,16 @@ def _interleave_families(infos):
     return out
 
 
+# Settings > Downloads' "Force IPv4" for engines that have no option of their own (see force_ipv4).
+_forced_family = 0
+
+
+def force_ipv4():
+    """Every connection this process makes afterwards is IPv4 only."""
+    global _forced_family
+    _forced_family = socket.AF_INET
+
+
 def connect(address, timeout, source_address=None, socket_options=None, family=0, default_timeout=None):
     """Like socket.create_connection(), but a connect that stalls is retried on a new socket.
 
@@ -72,7 +82,7 @@ def connect(address, timeout, source_address=None, socket_options=None, family=0
     host, port = address
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
-    infos = socket.getaddrinfo(host, port, family, socket.SOCK_STREAM)
+    infos = socket.getaddrinfo(host, port, family or _forced_family, socket.SOCK_STREAM)
     if source_address is not None:
         af = socket.AF_INET6 if ":" in source_address[0] else socket.AF_INET
         infos = [info for info in infos if info[0] == af]

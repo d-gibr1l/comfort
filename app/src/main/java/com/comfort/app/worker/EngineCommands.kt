@@ -244,6 +244,10 @@ internal class EngineCommands(
             // The preview's saved post, reused instead of fetching it again.
             GalleryDlListing.instaloaderInfoCacheFile(context, url).absolutePath,
             customFilenameFormat,
+            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+            // The Settings > Downloads options every engine honours.
+            limitRate, networkRetries, maxFilesize,
+            flag(restrictFilenames), flag(forceIpv4), flag(noCheckCertificates),
         ),
     )
 

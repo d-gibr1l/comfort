@@ -24,6 +24,7 @@ picker's "num in {...}" filter means the same items to either engine.
 
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -39,6 +40,8 @@ _SHORTCODE_RE = re.compile(
     r"instagram\.com/(?:[A-Za-z0-9_.]+/)?(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)", re.IGNORECASE,
 )
 _ITEM_FILTER_RE = re.compile(r"\{([\d,\s]+)\}")
+# What download_pic saves: the extension comes from the server's Content-Type ("jpeg" -> "jpg").
+_MEDIA_EXTENSIONS = (".mp4", ".jpg", ".png", ".webp", ".heic", ".gif")
 _BAD_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
 # Rate-limit waits longer than this abort instead of sleeping: Instaloader's own default is to wait
 # out a 429 for as long as Instagram asks (often many minutes), which would leave a download
@@ -52,6 +55,85 @@ _INFO_CACHE_MAX_AGE_SECONDS = 20 * 60
 
 class _RateLimited(Exception):
     pass
+
+
+class _TooLarge(Exception):
+    pass
+
+
+# Settings > Downloads for this one job (set by download()): the ones that apply to every engine.
+_SETTINGS = {"limit_rate": None, "retries": None, "max_filesize": None, "restrict": False}
+
+
+def _parse_size(value):
+    """"500k", "2M", "1g" or plain bytes (Settings' speed limit and max file size, the form yt-dlp
+    and gallery-dl take) -> bytes, 1024-based like theirs. None when unset or unreadable."""
+    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*([kmg]?)\s*", value or "", re.IGNORECASE)
+    if not m:
+        return None
+    return int(float(m.group(1)) * 1024 ** "_kmg".index((m.group(2) or "_").lower()))
+
+
+def _write_raw(context):
+    """Instaloader's InstaloaderContext.write_raw, plus the speed limit (bytes/s, averaged over the
+    file like yt-dlp's --limit-rate) and max file size (the file is skipped, as with the others:
+    _TooLarge, from its Content-Length or once it gets past the limit)."""
+    import requests
+
+    def write_raw(resp, filename):
+        rate, max_bytes = _SETTINGS["limit_rate"], _SETTINGS["max_filesize"]
+        temp = filename + ".temp"
+        if not isinstance(resp, requests.Response):
+            with open(temp, "wb") as f:
+                f.write(resp)
+            os.replace(temp, filename)
+            return
+        length = resp.headers.get("Content-Length")
+        if max_bytes and length and length.isdigit() and int(length) > max_bytes:
+            resp.close()
+            raise _TooLarge()
+        started, written = time.monotonic(), 0
+        try:
+            with open(temp, "wb") as f:
+                while True:
+                    chunk = resp.raw.read(64 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    written += len(chunk)
+                    if max_bytes and written > max_bytes:
+                        raise _TooLarge()
+                    if rate:
+                        ahead = written / rate - (time.monotonic() - started)
+                        if ahead > 0:
+                            time.sleep(ahead)
+        except BaseException:
+            try:
+                os.remove(temp)
+            except OSError:
+                pass
+            raise
+        os.replace(temp, filename)
+
+    return write_raw
+
+
+def _apply_network_settings(retries, no_check_certificates, force_ipv4):
+    """For this whole process (one download job): certificate checks off, IPv4 only."""
+    _SETTINGS["retries"] = retries
+    if force_ipv4:
+        net_resilience.force_ipv4()
+    if no_check_certificates:
+        import requests
+        import urllib3
+        urllib3.disable_warnings()
+        original = requests.Session.request
+
+        def request(self, *args, **kwargs):
+            kwargs["verify"] = False
+            return original(self, *args, **kwargs)
+
+        requests.Session.request = request
 
 
 class _ProxyUnsupported(Exception):
@@ -122,12 +204,18 @@ def _read_instagram_cookies(cookies_path):
 def _new_loader(session_cookies, proxy_url, timeout_seconds):
     loader = Instaloader(
         quiet=True,
+        # Instaloader's own pause before every instagram.com request (random, ~1.7s on average, up
+        # to 15s) is off: a post is one lookup, and the slow part of a rate limit is handled by
+        # _FailFastRateController. Settings > Downloads' sleep interval applies instead, between
+        # files (see download()), the way it does for yt-dlp.
+        sleep=False,
         download_pictures=False, download_videos=False, download_video_thumbnails=False,
         save_metadata=False, compress_json=False,
         # 20s of silence (yt-dlp's default too) already means a dead connection; 60s here showed
         # up as a download frozen for 2 minutes (a stalled read, then a retry that stalled too).
         # One more attempt instead, each on a fresh connection.
-        max_connection_attempts=3,
+        # Settings > Downloads' retries (attempts = retries + 1), else 3 attempts.
+        max_connection_attempts=int(_SETTINGS["retries"]) + 1 if _SETTINGS["retries"] else 3,
         request_timeout=float(timeout_seconds) if timeout_seconds else 20.0,
         rate_controller=lambda ctx: _FailFastRateController(ctx),
     )
@@ -138,6 +226,7 @@ def _new_loader(session_cookies, proxy_url, timeout_seconds):
         # Any non-empty username marks the context as logged in; the real username isn't needed
         # to fetch a post, and test_login() would cost an extra request against the rate limit.
         loader.load_session(cookies.get("ds_user_id") or "user", cookies)
+    loader.context.write_raw = _write_raw(loader.context)
     if proxy_url:
         # Only the main session: Instaloader makes a fresh session for each query and each file,
         # and those get the proxy from the environment PythonRuntime sets for every job.
@@ -259,14 +348,34 @@ def _append_archive(path, key):
 
 def download(url, download_dir, cookies_path=None, item_filter=None, archive_path=None,
              write_info_files=False, proxy_url=None, socket_timeout_seconds=None, emit=print,
-             info_cache_path=None, filename_format=None):
+             info_cache_path=None, filename_format=None, sleep_interval_seconds=None,
+             limit_rate=None, retries=None, max_filesize=None, restrict_filenames=False,
+             force_ipv4=False, no_check_certificates=False):
+    _SETTINGS.update(limit_rate=_parse_size(limit_rate), max_filesize=_parse_size(max_filesize),
+                     restrict=restrict_filenames)
+    _apply_network_settings(retries, no_check_certificates, force_ipv4)
     try:
         loader, post, from_cache = _fetch_post(url, cookies_path, proxy_url, socket_timeout_seconds, info_cache_path)
         items = _media_items(post)
-    except Exception as exc:  # noqa: BLE001
+        return _download_post(loader, post, from_cache, items, url, download_dir, cookies_path, item_filter,
+                              archive_path, write_info_files, proxy_url, socket_timeout_seconds, emit,
+                              filename_format, sleep_interval_seconds)
+    except Exception as exc:  # noqa: BLE001 — reported as an error line, never a bare traceback
         emit(event("error", message=f"ERROR: {_friendly_error(exc)}"))
         return "error"
 
+
+def _restricted(name):
+    """Settings > Folders' "Restrict filenames": yt-dlp's own rule (ASCII only, "_" for spaces and
+    special characters), so a file is named the same way whichever engine saved it."""
+    if not _SETTINGS["restrict"]:
+        return name
+    from yt_dlp.utils import sanitize_filename
+    return sanitize_filename(name, restricted=True) or name
+
+
+def _download_post(loader, post, from_cache, items, url, download_dir, cookies_path, item_filter, archive_path,
+                   write_info_files, proxy_url, socket_timeout_seconds, emit, filename_format, sleep_interval_seconds):
     wanted = _parse_item_filter(item_filter)
     if wanted is not None:
         items = [it for it in items if it[0] in wanted]
@@ -312,11 +421,12 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
             })
             if name and name in used_names:
                 name = f"{name} [{key}]"
-        name = name or f"{safe_title} [{key}]"
+        name = _restricted(name or f"{safe_title} [{key}]")
         used_names.add(name)
         return name
 
     saved = 0
+    fetched_one = False
     fresh_urls = {}  # filled only if saved links turn out to be expired, see below
     for num, is_video, media_url, _preview in items:
         key = f"{shortcode}_{num}" if multi else shortcode
@@ -325,14 +435,24 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
         if not media_url:
             emit(event("error", message=f"ERROR: Instagram didn't provide a download link for item {num} of this post"))
             continue
+        max_bytes = _SETTINGS["max_filesize"]
+        if max_bytes and sizes.get(media_url, 0) > max_bytes:
+            continue  # skipped, not failed: the same as yt-dlp's and gallery-dl's max file size
         base = os.path.join(download_dir, item_name(num, is_video, key))
+        # Settings > Downloads' sleep interval: a random 2-to-N second pause before each file but
+        # the first, like yt-dlp's --min/--max-sleep-interval.
+        if sleep_interval_seconds and fetched_one:
+            time.sleep(random.uniform(2, max(2, int(sleep_interval_seconds))))
+        fetched_one = True
         try:
-            for leftover in (base + ext for ext in (".mp4", ".jpg", ".png", ".webp", ".heic")):
+            for leftover in (base + ext + temp for ext in _MEDIA_EXTENSIONS for temp in ("", ".temp")):
                 if os.path.isfile(leftover):
                     os.remove(leftover)
             media_url = fresh_urls.get(num, media_url)
             try:
                 loader.download_pic(base, media_url, post.date_utc)
+            except _TooLarge:
+                raise
             except Exception:  # noqa: BLE001
                 if not from_cache:
                     raise
@@ -343,11 +463,14 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
                 fresh_urls.update({n: m for n, _v, m, _p in _media_items(post)})
                 media_url = fresh_urls.get(num, media_url)
                 loader.download_pic(base, media_url, post.date_utc)
+        except _TooLarge:
+            continue
         except Exception as exc:  # noqa: BLE001
             emit(event("error", message=f"ERROR: {_friendly_error(exc)}"))
             continue
         prefix = os.path.basename(base) + "."
-        produced = [n for n in os.listdir(download_dir) if n.startswith(prefix)]
+        produced = sorted(n for n in os.listdir(download_dir)
+                          if n.startswith(prefix) and os.path.splitext(n)[1].lower() in _MEDIA_EXTENSIONS)
         if not produced:
             continue
         _append_archive(archive_path, key)
@@ -355,7 +478,7 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
         saved += 1
 
     if write_info_files and saved:
-        info_base = os.path.join(download_dir, f"{safe_title} [{shortcode}]")
+        info_base = os.path.join(download_dir, _restricted(f"{safe_title} [{shortcode}]"))
         try:
             with open(info_base + ".description", "w", encoding="utf-8") as f:
                 f.write(post.caption or "")
@@ -373,9 +496,13 @@ def list_items(url, cookies_path=None, proxy_url=None, socket_timeout_seconds=No
         items = _media_items(post)
         # After _media_items, so the full metadata it may have fetched is saved along with it.
         _save_post(post, info_cache_path)
+        return _list_json(post, items)
     except Exception as exc:  # noqa: BLE001
         message = _friendly_error(exc)
         return json.dumps([[-1, {"error": type(exc).__name__, "message": message}]])
+
+
+def _list_json(post, items):
     caption = post.caption or ""
     # Asked from Instagram's media servers in parallel (a few seconds at most): Instaloader itself
     # doesn't list sizes, and the preview shows how big the download will be.
@@ -411,7 +538,7 @@ if __name__ == "__main__":
         sys.exit(2)
 
     _cmd, _rest = sys.argv[1], sys.argv[2:]
-    _rest += [""] * (10 - len(_rest))
+    _rest += [""] * (17 - len(_rest))
     if _cmd == "download":
         _status = download(
             url=_rest[0], download_dir=_rest[1], cookies_path=_s(_rest[2]),
@@ -420,6 +547,10 @@ if __name__ == "__main__":
             socket_timeout_seconds=_s(_rest[7]), emit=_emit,
             info_cache_path=_s(_rest[8]),
             filename_format=_s(_rest[9]),
+            sleep_interval_seconds=_s(_rest[10]),
+            limit_rate=_s(_rest[11]), retries=_s(_rest[12]), max_filesize=_s(_rest[13]),
+            restrict_filenames=(_rest[14] == "1"), force_ipv4=(_rest[15] == "1"),
+            no_check_certificates=(_rest[16] == "1"),
         )
         print(event("exit", status=_status), flush=True)
     elif _cmd == "list":
