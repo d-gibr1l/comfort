@@ -251,12 +251,17 @@ object DownloadNotifications {
         )
     }
 
-    fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?) {
+    /** [missingItems]: how many of the download's items failed while the rest saved (see
+     * DownloadWorker) — said in the text, so a partly saved post doesn't read as complete. */
+    fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?, missingItems: Int = 0) {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         // "picture(s)" used to be hardcoded here regardless of what actually got saved — a
         // downloaded video or audio file still read "1 picture saved," which looked like a bug.
-        val text = if (safeDownloadedItems > 0) context.resources.getQuantityString(R.plurals.items_saved, safeDownloadedItems, safeDownloadedItems)
-            else context.getString(R.string.nothing_new_to_download)
+        val text = when {
+            missingItems > 0 -> context.resources.getQuantityString(R.plurals.items_saved_some_failed, missingItems, safeDownloadedItems, missingItems)
+            safeDownloadedItems > 0 -> context.resources.getQuantityString(R.plurals.items_saved, safeDownloadedItems, safeDownloadedItems)
+            else -> context.getString(R.string.nothing_new_to_download)
+        }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
             // still uses — so "this one finished" is visible at a glance in the shade/status bar
