@@ -38,6 +38,7 @@ import urllib.request
 
 import yt_dlp
 import yt_dlp_wrapper
+import net_resilience
 
 _SPOTIFY_URL_RE = re.compile(r"open\.spotify\.com/(track|album|playlist)/([a-zA-Z0-9]+)")
 
@@ -59,7 +60,7 @@ def _ssl_context():
 
 def _fetch(url, timeout=15):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+    with net_resilience.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
         return resp.read()
 
 
@@ -70,7 +71,7 @@ def _resolve_redirect(url):
         return url
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}, method="HEAD")
-        with urllib.request.urlopen(req, timeout=10, context=_ssl_context()) as resp:
+        with net_resilience.urlopen(req, timeout=10, context=_ssl_context()) as resp:
             return resp.geturl()
     except Exception:
         return url

@@ -1985,9 +1985,8 @@ def _page_opener(ydl_opts):
     handlers = [urllib.request.HTTPCookieProcessor(jar)]
     if os.path.exists(_CACERT_PATH):
         handlers.append(urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=_CACERT_PATH)))
-    if ydl_opts.get("proxy"):
-        handlers.append(urllib.request.ProxyHandler({"http": ydl_opts["proxy"], "https": ydl_opts["proxy"]}))
-    return urllib.request.build_opener(*handlers), headers
+    # net_resilience's: urllib's own ProxyHandler can't use a socks:// proxy.
+    return net_resilience.build_opener(*handlers, proxy_url=ydl_opts.get("proxy")), headers
 
 
 def _literal_metadata(extra_args):
