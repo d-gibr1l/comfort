@@ -935,6 +935,17 @@
         <item quantity="other">%d items saved</item>
     </plurals>
     <string name="nothing_new_to_download">Nothing new to download</string>
+    <!-- Notification text: %1$d saved, %2$d (the quantity) failed. -->
+    <plurals name="items_saved_some_failed">
+        <item quantity="one">%1$d saved, %2$d couldn\'t be downloaded</item>
+        <item quantity="other">%1$d saved, %2$d couldn\'t be downloaded</item>
+    </plurals>
+    <!-- A Library card's note: %1$d (the quantity) of %2$d items failed. -->
+    <plurals name="items_couldnt_be_downloaded">
+        <item quantity="one">%1$d of %2$d items couldn\'t be downloaded</item>
+        <item quantity="other">%1$d of %2$d items couldn\'t be downloaded</item>
+    </plurals>
+    <string name="download_missing_items">Download the missing items</string>
     <plurals name="downloads_started">
         <item quantity="one">%d download started</item>
         <item quantity="other">%d downloads started</item>

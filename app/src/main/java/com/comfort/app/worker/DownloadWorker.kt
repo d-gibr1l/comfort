@@ -1049,8 +1049,19 @@ class DownloadWorker(
                     return@withContext Result.success()
                 }
 
+                // Some of it saved, some of it failed: a carousel whose later items errored, a
+                // playlist with tracks that wouldn't download. It still finishes (what's saved stays
+                // in the Library), but marked: the missing count is kept as the row's errorMessage and
+                // the Library offers to fetch just those (this download's archives skip what's saved).
+                // Only with a real error: fewer files than listed items alone can be one file holding
+                // several items. A later complete run clears the mark.
+                val totalItems = totalItemsRef.get()
+                val missingItems = if (lastErrorLine.get() != null && totalItems > savedCount.get()) totalItems - savedCount.get() else 0
+                val incompleteMessage = if (missingItems > 0) {
+                    applicationContext.resources.getQuantityString(R.plurals.items_couldnt_be_downloaded, missingItems, missingItems, totalItems)
+                } else null
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
-                DownloadNotifications.notifyFinished(applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail)
+                DownloadNotifications.notifyFinished(applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail, missingItems)
                 if (entity?.incognito == true) {
                     // Imported from YTDLnis's own Incognito setting (see
                     // GalleryDlPreferences.isIncognitoDefault's doc comment): the real file is
@@ -1059,7 +1070,8 @@ class DownloadWorker(
                     // having happened in this app's own Library/queue, is removed.
                     dao.delete(downloadId)
                 } else {
-                    dao.updateStatus(downloadId, DownloadStatus.FINISHED)
+                    dao.updateError(downloadId, DownloadStatus.FINISHED, incompleteMessage)
+                    dao.setErrorDetails(downloadId, if (incompleteMessage != null) errorDetailsJson() else null)
                 }
                 DownloadDispatcher.forgetLock(downloadId)
                 Result.success()

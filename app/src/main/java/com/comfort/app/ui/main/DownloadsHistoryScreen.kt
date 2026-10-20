@@ -652,6 +652,7 @@ fun DownloadsHistoryScreen(
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
+                            onDownloadMissing = { viewModel.retryDownload(item.id) },
                         )
                     }
                 }
@@ -682,6 +683,7 @@ fun DownloadsHistoryScreen(
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
+                            onDownloadMissing = { viewModel.retryDownload(item.id) },
                         )
                     }
                     // Same entrance/removal pattern as the grid above and the Download Queue's own
@@ -1597,6 +1599,7 @@ private fun HistoryGridItem(
     onToggleFavorite: () -> Unit,
     onRename: (String) -> Unit,
     onRedownload: () -> Unit,
+    onDownloadMissing: () -> Unit,
 ) {
     val context = LocalContext.current
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
@@ -1666,13 +1669,18 @@ private fun HistoryGridItem(
             isVideo -> Icons.Filled.PlayArrow
             else -> null
         }
-        if (typeIcon != null || item.downloadedItems > 1) {
+        val incomplete = item.missingItems > 0
+        if (typeIcon != null || item.downloadedItems > 1 || incomplete) {
             Row(
                 modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (typeIcon != null) MediaBadge(icon = typeIcon, text = null)
-                if (item.downloadedItems > 1) MediaBadge(icon = Icons.Outlined.Layers, text = "${item.downloadedItems}")
+                if (incomplete) {
+                    MediaBadge(icon = Icons.Outlined.Warning, text = "${item.downloadedItems}/${item.totalItems}", tint = Color(0xFFFFB74D))
+                } else if (item.downloadedItems > 1) {
+                    MediaBadge(icon = Icons.Outlined.Layers, text = "${item.downloadedItems}")
+                }
             }
         }
 
@@ -1708,6 +1716,7 @@ private fun HistoryGridItem(
                     onToggleFavorite = onToggleFavorite,
                     onRename = { showRenameDialog = true },
                     onRedownload = onRedownload,
+                    onDownloadMissing = onDownloadMissing,
                     onDelete = onDelete,
                 )
             }
@@ -1835,6 +1844,7 @@ private fun HistoryRow(
     onToggleFavorite: () -> Unit,
     onRename: (String) -> Unit,
     onRedownload: () -> Unit,
+    onDownloadMissing: () -> Unit,
 ) {
     val context = LocalContext.current
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
@@ -1994,6 +2004,10 @@ private fun HistoryRow(
             MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, sdf.format(Date(item.effectiveDate))))
             Spacer(Modifier.height(2.dp))
             MetaRow(icon = Icons.Outlined.SdStorage, text = stringResource(R.string.size_x, formatFileSize(item.totalBytes)))
+            if (item.missingItems > 0) {
+                Spacer(Modifier.height(2.dp))
+                MetaRow(icon = Icons.Outlined.Warning, text = item.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
+            }
         }
 
         // Bulk actions in the selection-mode top bar replace the per-item menu while selecting.
@@ -2008,6 +2022,7 @@ private fun HistoryRow(
                 onToggleFavorite = onToggleFavorite,
                 onRename = { showRenameDialog = true },
                 onRedownload = onRedownload,
+                onDownloadMissing = onDownloadMissing,
                 onDelete = onDelete,
             )
         }
@@ -2025,6 +2040,7 @@ private fun DownloadActionsMenu(
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit,
     onRedownload: () -> Unit,
+    onDownloadMissing: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -2051,6 +2067,14 @@ private fun DownloadActionsMenu(
                 onClick = { onDismiss(); onRedownload() },
             )
         } else {
+            // Runs the same download again: its archives skip what's already saved.
+            if (item.missingItems > 0) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.download_missing_items)) },
+                    leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                    onClick = { onDismiss(); onDownloadMissing() },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(if (item.isFavorite) stringResource(R.string.remove_from_favorites) else stringResource(R.string.add_to_favorites)) },
                 leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
@@ -2144,13 +2168,22 @@ private fun RenameDialog(
 }
 
 @Composable
-private fun MetaRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun MetaRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
         Spacer(Modifier.width(5.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
+
+/** How many of a finished download's items failed while the rest saved — DownloadWorker keeps the
+ * note saying so as a FINISHED row's errorMessage. 0 for a complete download. */
+private val DownloadEntity.missingItems: Int
+    get() = if (status == DownloadStatus.FINISHED && !errorMessage.isNullOrBlank()) (totalItems - downloadedItems).coerceAtLeast(0) else 0
 
 
 
