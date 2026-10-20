@@ -287,6 +287,25 @@ object PythonRuntime {
         serverFailedAt = 0L
     }
 
+    /** The proxy setting as the environment variables every HTTP client in a job reads on its
+     * own: requests (gallery-dl, Instaloader, including the sessions Instaloader makes itself for
+     * each query and file, which a proxy set on its main session never reached), urllib (the size
+     * checks, Spotify's lookups, lyrics), yt-dlp when no --proxy is given, and the aria2c/ffmpeg a
+     * download starts. Each job's own, never the fork server's: the setting can change any time.
+     * Empty with no proxy. */
+    private fun proxyEnvironment(context: Context): Map<String, String> {
+        val proxy = GalleryDlPreferences.getEffectiveProxyUrl(context).trim()
+        if (proxy.isEmpty()) return emptyMap()
+        val env = LinkedHashMap<String, String>()
+        for (name in listOf("http_proxy", "https_proxy", "all_proxy")) {
+            env[name] = proxy
+            env[name.uppercase()] = proxy
+        }
+        env["no_proxy"] = "localhost,127.0.0.1,::1"
+        env["NO_PROXY"] = env.getValue("no_proxy")
+        return env
+    }
+
     private fun pythonProcess(context: Context, args: List<String>): ProcessBuilder {
         val nativeLibDir = helperNativeLibDir(context)
             ?: error("App nativeLibraryDir not found (this should never happen)")
@@ -320,6 +339,7 @@ object PythonRuntime {
                 val request = org.json.JSONObject()
                     .put("script", script)
                     .put("args", org.json.JSONArray(args))
+                    .put("env", org.json.JSONObject(proxyEnvironment(context) as Map<*, *>))
                 socket.outputStream.write("$request\n".toByteArray())
                 socket.outputStream.flush()
             } catch (e: java.io.IOException) {
@@ -515,7 +535,9 @@ object PythonRuntime {
         onLine: suspend (String) -> Unit,
     ): Int = withContext(Dispatchers.IO) {
         val scriptFile = File(runtimeRoot(context), script)
-        val process = pythonProcess(context, listOf(scriptFile.absolutePath) + args).start()
+        val process = pythonProcess(context, listOf(scriptFile.absolutePath) + args)
+            .apply { environment().putAll(proxyEnvironment(context)) }
+            .start()
 
         try {
             var exitCode = 0

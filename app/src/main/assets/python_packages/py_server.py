@@ -50,10 +50,13 @@ def _load(path):
     return code
 
 
-def _run_job(conn, script, args):
-    """In the forked child. Never returns."""
+def _run_job(conn, script, args, env=None):
+    """In the forked child. Never returns. [env]: the job's own environment variables (the proxy
+    setting, see PythonRuntime.proxyEnvironment) — set here, after the fork, so they never outlive
+    the job."""
     code = 1
     try:
+        os.environ.update(env or {})
         os.setpgid(0, 0)
         signal.signal(signal.SIGCHLD, signal.SIG_DFL)
         os.write(conn.fileno(), f"{CONTROL}pid {os.getpid()}\n".encode())
@@ -182,8 +185,10 @@ def main():
                 raise PermissionError
             request = _read_request(conn)
             script, args = request["script"], request["args"]
+            env = request.get("env") or {}
             if not (isinstance(script, str) and script.endswith("_wrapper.py") and "/" not in script
-                    and isinstance(args, list) and all(isinstance(a, str) for a in args)):
+                    and isinstance(args, list) and all(isinstance(a, str) for a in args)
+                    and isinstance(env, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in env.items())):
                 raise ValueError
         except BaseException:
             conn.close()
@@ -191,7 +196,7 @@ def main():
         last_job = time.monotonic()
         if os.fork() == 0:
             server.close()
-            _run_job(conn, script, args)
+            _run_job(conn, script, args, env)
         conn.close()
 
     server.close()
