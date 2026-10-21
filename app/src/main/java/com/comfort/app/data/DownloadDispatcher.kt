@@ -73,7 +73,18 @@ object DownloadDispatcher {
      * done, and the fresh Mutex still serializes whatever comes next correctly either way. */
     fun forgetLock(id: String) {
         locks.remove(id)
+        stagingLocks.remove(id)
     }
+
+    private val stagingLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
+
+    /** Held while a download's finished files are copied out of its staging dir into the gallery
+     * (DownloadWorker's saveHeldFiles), and taken before that dir is deleted: a cancel used to
+     * delete it mid-copy, leaving a cut-off file in the gallery. A cancel that comes first just
+     * means nothing more is saved. Its own lock, not [withDownloadLock]: a cancel holds that one
+     * while it waits for the worker's job to be cancelled. */
+    suspend fun <T> withStagingLock(id: String, block: suspend () -> T): T =
+        stagingLocks.computeIfAbsent(id) { Mutex() }.withLock { block() }
 
     /** Cancels one download's job, then has the queue checked for downloads that lost theirs.
      *
@@ -433,7 +444,7 @@ object DownloadDispatcher {
             // later anyway once PythonRuntime's own cancellation-triggered kill lands — so a rare
             // near-miss here just leaves the same harmless private-cache leftover this was already
             // living with, never a real failure.
-            deleteStagingDir(context, id)
+            withStagingLock(id) { deleteStagingDir(context, id) }
         }
         // cancelWorkManagerJob() above already schedules debounced repair via requestQueueRepair().
     }
@@ -527,7 +538,7 @@ object DownloadDispatcher {
             File(context.filesDir, "archives/$id.sqlite3").delete()
             File(context.filesDir, "archives/$id.ytdlp.txt").delete()
             File(context.filesDir, "archives/$id.instaloader.txt").delete()
-            deleteStagingDir(context, id)
+            withStagingLock(id) { deleteStagingDir(context, id) }
             dao.clearDownloadedFileRecords(id)
             dao.clearSavedFiles(id)
             dao.delete(id)

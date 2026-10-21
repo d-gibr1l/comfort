@@ -314,12 +314,18 @@ class DownloadWorker(
                 // recorded pause/cancel the instant the gate lets this worker through, before its
                 // own cancellation ever catches up — showing "Downloading..." for a download the
                 // user just explicitly stopped.
-                val freshStatus = dao.getById(downloadId)?.status
-                if (freshStatus == null || freshStatus == DownloadStatus.PAUSED || freshStatus == DownloadStatus.CANCELLED) {
+                // One conditional write, not a read then a write: a pause/cancel landing between the
+                // two used to be overwritten with RUNNING, and the cancellation then requeued it
+                // (RUNNING -> QUEUED), bringing a paused download back. Only a download still
+                // waiting to start (or one whose earlier run was cut off, still RUNNING) starts.
+                val started = dao.updateStatusIfIn(
+                    downloadId, DownloadStatus.RUNNING,
+                    listOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED, DownloadStatus.RUNNING),
+                )
+                if (started == 0) {
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
                 }
-                dao.updateStatus(downloadId, DownloadStatus.RUNNING)
                 val startTime = System.currentTimeMillis()
                 dao.setStartTime(downloadId, startTime)
 
@@ -656,6 +662,9 @@ class DownloadWorker(
                     val batch = synchronized(heldFiles) { heldFiles.toList().also { heldFiles.clear() } }
                     if (batch.isEmpty()) return
                     val firstBatch = !firstBatchSaved.getAndSet(true)
+                    // Under the staging lock: a cancel waits for these copies to finish before it
+                    // deletes the staging dir (DownloadDispatcher.withStagingLock).
+                    DownloadDispatcher.withStagingLock(downloadId) {
                     for ((index, held) in batch.withIndex().reversed()) {
                         val (file, isAudio, position) = held
                         try {
@@ -665,6 +674,7 @@ class DownloadWorker(
                             savedCount.decrementAndGet()
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
                         }
+                    }
                     }
                 }
 
