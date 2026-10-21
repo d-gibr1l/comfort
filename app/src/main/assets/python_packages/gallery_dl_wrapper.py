@@ -206,6 +206,30 @@ def probe(url):
     except Exception:
         return "0"
 
+def _has_reddit_login(cookies_path):
+    """True if cookies.txt holds a logged-in Reddit session (a reddit_session cookie)."""
+    try:
+        with open(cookies_path, encoding="utf-8", errors="replace") as f:
+            for raw in f:
+                parts = raw.rstrip("\r\n").split("\t")
+                if len(parts) > 6 and "reddit.com" in parts[0] and parts[5] == "reddit_session" and parts[6]:
+                    return True
+    except (OSError, TypeError):
+        pass
+    return False
+
+
+def _reddit_client_args(cookies_path):
+    """The anonymous app-token client-id (see download()'s comment) — unless the user is logged in
+    to Reddit. That token mode sends every request to oauth.reddit.com without the user's cookies,
+    and Reddit now blocks it by IP ("You've been blocked by network security", 403, seen live
+    2026-10-21) while the same post's .json fetched with the user's own reddit_session cookie still
+    returns 200. So with a login, leave client-id unset: gallery-dl's plain mode, with the cookies."""
+    if cookies_path and _has_reddit_login(cookies_path):
+        return []
+    return ["-o", "extractor.reddit.client-id=6N9uN0krSDE-ig"]
+
+
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None, sleep_interval_seconds=None, restrict_filenames=False, force_ipv4=False, no_check_certificates=False):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
@@ -225,7 +249,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # client-id, contended across every anonymous gallery-dl install), unlike REST mode's
     # un-recoverable 403. Also incidentally re-enables reddit.py's own "allow downloading from
     # quarantined subreddits" cookie logic, which is dead code under REST mode.
-    args = ["gallery-dl", "--directory", download_dir, "-o", "extractor.reddit.client-id=6N9uN0krSDE-ig"]
+    args = ["gallery-dl", "--directory", download_dir] + _reddit_client_args(cookies_path)
     if cookies_path:
         args.extend(["--cookies", cookies_path])
     if filename_format:
@@ -371,7 +395,7 @@ def list_items(url, cookies_path=None, extra_args=None):
     implies simulate mode on its own, so no separate --simulate flag is needed."""
     original_argv = sys.argv
     # Same fix as download()'s own identical line — see its comment for the full reasoning.
-    args = ["gallery-dl", "--dump-json", "-o", "extractor.reddit.client-id=6N9uN0krSDE-ig"]
+    args = ["gallery-dl", "--dump-json"] + _reddit_client_args(cookies_path)
     if cookies_path:
         args.extend(["--cookies", cookies_path])
     if extra_args:
