@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalClipboard
@@ -484,7 +485,14 @@ fun QueueScreen(
             // filters, the neighbouring filter's beside it (PageSwipe.kt). Keyed per filter, so the
             // list a swipe brings in stays the same instance once it's the current one.
             val currentIndex = filters.indexOf(selectedFilter)
-            val shownFilters = listOfNotNull(selectedFilter, filterSwipe.neighbor?.let { filters[it] })
+            // The tabs either side are kept built (measured, not placed: not drawn, not touchable),
+            // so a swipe doesn't have to build the page it brings in. Building it as the swipe
+            // started stalled a frame (~80ms for the Errored tab's cards), and the swipe's speed
+            // read as 0 across the stall, so a quick flick snapped back.
+            val shownFilters = (
+                listOf(selectedFilter) +
+                    listOfNotNull(filters.getOrNull(currentIndex - 1), filters.getOrNull(currentIndex + 1), filterSwipe.neighbor?.let { filters[it] })
+            ).distinct()
             CompositionLocalProvider(LocalPageSwipe provides filterSwipe) {
             for (filter in shownFilters) key(filter) {
                 val pageIndex = filters.indexOf(filter)
@@ -494,7 +502,14 @@ fun QueueScreen(
                 LaunchedEffect(Unit) { if (filter != selectedFilter) pageListState.scrollToItem(0) }
                 Box(
                     modifier = Modifier.fillMaxSize().then(
-                        if (filterSwipe.involves(pageIndex)) Modifier.pageSwipeLayer(filterSwipe, pageIndex, currentIndex) else Modifier
+                        when {
+                            filterSwipe.involves(pageIndex) -> Modifier.pageSwipeLayer(filterSwipe, pageIndex, currentIndex)
+                            filter == selectedFilter -> Modifier
+                            else -> Modifier.layout { measurable, constraints ->
+                                measurable.measure(constraints)
+                                layout(0, 0) {}
+                            }
+                        }
                     )
                 ) {
                 if (pageItems.isEmpty()) {
@@ -613,24 +628,12 @@ fun QueueScreen(
                                 exit = ExitTransition.None,
                                 modifier = Modifier.animateItem().padding(horizontal = 16.dp),
                             ) {
-                            // Swipe-to-delete is only offered for downloads that are already stopped
-                            // for good (errored or cancelled) — everything still active or resumable
-                            // (running, queued, scheduled, paused) should require a deliberate tap
-                            // instead of a stray swipe wiping it out. Also suppressed for the whole
-                            // list while multi-select is active — a swipe gesture competing with
-                            // tap-to-toggle-selection on the same cards would be janky either way.
-                            if (!selectionMode && (item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.ERRORED)) {
-                                // Library's shared swipe card (same reveal background, plus its swipe
-                                // haptics), with this card's own rounded shape.
-                                SwipeToDeleteCard(
-                                    onDelete = { requestDelete(setOf(item.id)) },
-                                    shape = RoundedCornerShape(20.dp),
-                                ) {
-                                    row()
-                                }
-                            } else {
-                                row()
-                            }
+                            // No swipe-to-remove on Queue cards: a sideways swipe anywhere here moves
+                            // between the filters (PageSwipe.kt). On a card it went to the card's own
+                            // swipe, and the card's page-turning edge strips sit in Android's
+                            // back-gesture zone, so fast swipes almost never turned the page. Every
+                            // card has its own delete/Cancel button.
+                            row()
                             }
                         }
                 }

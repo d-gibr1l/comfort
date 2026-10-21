@@ -24,6 +24,7 @@ import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
@@ -161,11 +162,35 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
         while (target == null) {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
-            if (!change.pressed || event.changes.count { it.pressed } > 1) return@awaitEachGesture
+            if (event.changes.count { it.pressed } > 1) return@awaitEachGesture
+            if (!change.pressed) {
+                // Lifted before any move carried it far enough to take: a very fast flick does
+                // most of its distance in the lift itself (one move, or none, then the up), and
+                // was simply dropped. Clearly sideways and past the same distance, it turns the
+                // page, at the speed it was flicked.
+                val step = change.positionChangeIgnoreConsumed()
+                val flickX = dx + step.x
+                val flickY = dy + step.y
+                val systemCancelled = change.isConsumed || change.uptimeMillis == change.previousUptimeMillis
+                if (!systemCancelled && abs(flickX) > slop * TAKE_AFTER_SLOPS && abs(flickX) > abs(flickY)) {
+                    val flickTarget = state.neighborFor(flickX) ?: return@awaitEachGesture
+                    val width = size.width.toFloat().coerceAtLeast(1f)
+                    tracker.addPointerInputChange(change)
+                    // Down and up alone (no move between) give the tracker nothing to measure:
+                    // then it's the whole distance over the whole time.
+                    val tracked = tracker.calculateVelocity().x
+                    val elapsed = (change.uptimeMillis - down.uptimeMillis).coerceAtLeast(1L)
+                    val velocity = if (tracked != 0f) tracked else flickX * 1000f / elapsed
+                    state.begin(flickTarget)
+                    state.dragBy(flickX / width)
+                    state.release(velocity / width)
+                }
+                return@awaitEachGesture
+            }
             val step = change.positionChangeIgnoreConsumed()
             dx += step.x
             dy += step.y
-            tracker.addPosition(change.uptimeMillis, change.position)
+            tracker.addPointerInputChange(change)
             if (abs(dy) > slop && abs(dy) >= abs(dx)) return@awaitEachGesture
             if (down.id in state.edgeDowns) {
                 if (abs(dx) > slop) {
@@ -185,6 +210,9 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
         }
         state.begin(target)
         val width = size.width.toFloat().coerceAtLeast(1f)
+        // The distance it took to be taken counts too: a flick taken on one long move then lifted
+        // otherwise stayed at 0 and snapped back, however fast.
+        state.dragBy(dx / width)
         var cancelled = true
         try {
             while (true) {
@@ -194,10 +222,14 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
                     // Compose turns a cancelled gesture into a release of its own: already
                     // consumed, at the same time as the event before. A real lift is neither.
                     cancelled = change.isConsumed || change.uptimeMillis == change.previousUptimeMillis
-                    if (!cancelled) tracker.addPosition(change.uptimeMillis, change.position)
+                    if (!cancelled) tracker.addPointerInputChange(change)
                     break
                 }
-                tracker.addPosition(change.uptimeMillis, change.position)
+                // With the moves Android batched into this event (its history), not just the
+                // newest: when bringing in the next page stalls a frame (the Queue's Errored list,
+                // say), the moves arrive batched, and without them the lift looked like the finger
+                // had stopped — velocity 0, so a quick flick snapped back.
+                tracker.addPointerInputChange(change)
                 state.dragBy(change.positionChangeIgnoreConsumed().x / width)
                 change.consume()
             }
