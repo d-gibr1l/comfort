@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.heightIn
@@ -137,6 +139,13 @@ data class DownloadEventVisuals(
 fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
     SnackbarHost(hostState = hostState, modifier = modifier) { data ->
         val visuals = data.visuals
+        // A finished download and a failed one look different: a green check on the usual bar, and
+        // an error-coloured bar with a warning sign. Any other snackbar (a delete's Undo) is plain.
+        val kind = (visuals as? DownloadEventVisuals)?.isSuccess
+        val container = if (kind == false) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.inverseSurface
+        val content = if (kind == false) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.inverseOnSurface
+        // Green readable on the bar: light on the dark bar (light theme), dark on the light one.
+        val successGreen = if (MaterialTheme.colorScheme.inverseSurface.luminance() < 0.5f) Color(0xFF81C995) else Color(0xFF1E8E3E)
         // A sideways swipe either way slides it off and dismisses it, the same as its ✕: past a
         // third of its width, or a quick flick; a short drag springs back.
         // Plain state set straight from each drag delta. (An Animatable snapped from a coroutine per
@@ -172,16 +181,25 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                     },
                 ),
             shape = MaterialTheme.shapes.extraSmall,
-            color = MaterialTheme.colorScheme.inverseSurface,
-            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            color = container,
+            contentColor = content,
             shadowElevation = 6.dp,
         ) {
             Row(
                 modifier = Modifier
                     .heightIn(min = 48.dp)
-                    .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    .padding(start = if (kind != null) 12.dp else 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (kind != null) {
+                    Icon(
+                        if (kind) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
+                        contentDescription = null,
+                        tint = if (kind) successGreen else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
                 // Capped however long the message is: error text is sanitized at the source
                 // (GalleryDlListing.sanitizeErrorMessage), and this keeps it from ever filling the
                 // screen anyway.
