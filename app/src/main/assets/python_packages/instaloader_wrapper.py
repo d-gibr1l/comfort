@@ -42,6 +42,7 @@ _SHORTCODE_RE = re.compile(
 _ITEM_FILTER_RE = re.compile(r"\{([\d,\s]+)\}")
 # What download_pic saves: the extension comes from the server's Content-Type ("jpeg" -> "jpg").
 _MEDIA_EXTENSIONS = (".mp4", ".jpg", ".png", ".webp", ".heic", ".gif")
+_RESTRICT_RE = re.compile(r"[^0-9A-Za-z_.\[\]-]")
 _BAD_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\r\n\t]+')
 # Rate-limit waits longer than this abort instead of sleeping: Instaloader's own default is to wait
 # out a 429 for as long as Instagram asks (often many minutes), which would leave a download
@@ -366,12 +367,13 @@ def download(url, download_dir, cookies_path=None, item_filter=None, archive_pat
 
 
 def _restricted(name):
-    """Settings > Folders' "Restrict filenames": yt-dlp's own rule (ASCII only, "_" for spaces and
-    special characters), so a file is named the same way whichever engine saved it."""
+    """Settings > Folders' "Restrict filenames": the characters yt-dlp's restricted names keep
+    (letters, digits, "_", ".", "-" and the "[id]" brackets), anything else "_" — the same rule
+    gallery_dl_wrapper gives gallery-dl, so a file is named alike whichever engine saved it.
+    (yt-dlp's own sanitize_filename, used before, also dropped the brackets.)"""
     if not _SETTINGS["restrict"]:
         return name
-    from yt_dlp.utils import sanitize_filename
-    return sanitize_filename(name, restricted=True) or name
+    return _RESTRICT_RE.sub("_", name).strip("_") or name
 
 
 def _download_post(loader, post, from_cache, items, url, download_dir, cookies_path, item_filter, archive_path,
