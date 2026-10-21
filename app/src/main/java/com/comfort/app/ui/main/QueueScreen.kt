@@ -1547,7 +1547,7 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Bool
     val context = LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    val shortLink = remember(url) { url.substringAfter("://").removePrefix("www.").substringBefore('?').trimEnd('/') }
+    val shortLink = remember(url) { shortQueueLink(url) }
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
@@ -1584,6 +1584,24 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Bool
         )
     }
 }
+
+/** [url] without the scheme, "www." and the share-tracking parameters ("?si=", "?igsh=", "utm_..."),
+ * but keeping the ones that say what it is: a YouTube link's video ID lives in "?v=", and cutting
+ * the whole query showed every one of them as just "youtube.com/watch". */
+internal fun shortQueueLink(url: String): String {
+    val base = url.substringAfter("://").removePrefix("www.").substringBefore('#')
+    val path = base.substringBefore('?').trimEnd('/')
+    val kept = base.substringAfter('?', "").split('&').filter { param ->
+        val name = param.substringBefore('=').lowercase()
+        param.isNotBlank() && name !in TRACKING_PARAMS && !name.startsWith("utm_")
+    }
+    return if (kept.isEmpty()) path else path + "?" + kept.joinToString("&")
+}
+
+private val TRACKING_PARAMS = setOf(
+    "si", "igsh", "igshid", "fbclid", "gclid", "feature", "pp", "share_id", "share_app_id",
+    "is_from_webapp", "sender_device", "web_id", "ref", "ref_src", "s", "t", "xmt", "mibextid", "rdt",
+)
 
 /** A filter's name as shown; the filters themselves are keyed by their English names. */
 @Composable
