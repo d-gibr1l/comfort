@@ -373,6 +373,57 @@ def _patch_ffmpeg_env(ffmpeg_path):
         _orig_init(self, args, *rest, **kwargs)
 
     Popen.__init__ = _init
+    _patch_ffprobe_fallback()
+
+
+_INPUT_FORMAT_RE = re.compile(r"Input #0, (.+?), from ")
+_DURATION_RE = re.compile(r"Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)")
+_STREAM_LINE_RE = re.compile(r"Stream #\d+:\d+(?:\[\w+\])?(?:\((\w+)\))?[^:]*: (Video|Audio|Subtitle|Data|Attachment): ([^\n]+)")
+
+
+def _ffprobe_like(executable, path):
+    """What `ffprobe -show_format -show_streams -print_format json` would say about `path`, as much
+    of it as `ffmpeg -i` prints: the container, the duration, and each stream's type, codec, size
+    and language. There's no ffprobe in the app, and yt-dlp asks it for the real duration before
+    SponsorBlock cuts or chapters split a file, for the codecs before concatenating, and whether an
+    HLS download needs its MPEG-TS fixed — all of which failed on the phone with "ffprobe not
+    found" (worked on a PC, which has one)."""
+    out = subprocess.run([executable, "-hide_banner", "-i", path], capture_output=True,
+                         text=True, errors="replace", timeout=60, env=_ffmpeg_env()).stderr
+    fmt = {}
+    m = _INPUT_FORMAT_RE.search(out)
+    if m:
+        fmt["format_name"] = m.group(1)
+    m = _DURATION_RE.search(out)
+    if m:
+        fmt["duration"] = str(int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)))
+    streams = []
+    for index, (language, kind, rest) in enumerate(_STREAM_LINE_RE.findall(out)):
+        stream = {"index": index, "codec_type": kind.lower(), "codec_name": rest.split()[0].rstrip(",")}
+        size = re.search(r"(\d{2,5})x(\d{2,5})", rest) if kind == "Video" else None
+        if size:
+            stream.update(width=int(size.group(1)), height=int(size.group(2)))
+        if language:
+            stream["tags"] = {"language": language}
+        if "attached pic" in rest:
+            stream["disposition"] = {"attached_pic": 1}
+        streams.append(stream)
+    return {"format": fmt, "streams": streams}
+
+
+def _patch_ffprobe_fallback():
+    """yt-dlp's get_metadata_object, answered from ffmpeg (_ffprobe_like) when there's no ffprobe
+    beside it — it otherwise just raises "ffprobe not found"."""
+    from yt_dlp.postprocessor.ffmpeg import FFmpegPostProcessor
+    original = FFmpegPostProcessor.get_metadata_object
+
+    def get_metadata_object(self, path, opts=[]):
+        if self.probe_basename == "ffprobe" or not self.available:
+            return original(self, path, opts)
+        return _ffprobe_like(self.executable, path)
+
+    FFmpegPostProcessor.get_metadata_object = get_metadata_object
+
 
 def _parse_size(size_str):
     """Converts gallery-dl-style size strings ("500k", "2M", "1G") into a plain byte-count
@@ -918,10 +969,28 @@ class _SplitChaptersPP(FFmpegSplitChaptersPP):
     def pp_key(cls):
         return "SplitChapters"
 
+    # Containers with no room for a picture stream: an audio download's embedded cover shows up in
+    # ffmpeg as a second (video) stream, and copying it ("-map 0") failed every part with
+    # "Unsupported codec id in stream 1" — so for these only the audio is copied, and the cover is
+    # then copied over as the tag these formats keep it in (_copy_cover_tag).
+    _AUDIO_ONLY_EXTS = ("opus", "ogg", "oga", "webm", "weba")
+
+    def stream_copy_opts(self, copy=True, *, ext=None):
+        opts = list(FFmpegSplitChaptersPP.stream_copy_opts(copy, ext=ext))
+        if self._audio_only_copy:
+            opts[1] = "0:a"
+        return opts
+
     def run(self, info):
+        self._audio_only_copy = (
+            os.path.splitext(info.get("filepath") or "")[1].lstrip(".").lower() in self._AUDIO_ONLY_EXTS
+            and info.get("vcodec") in (None, "none")  # a .webm can be a video
+        )
         files, info = super().run(info)
         parts = [c["filepath"] for c in (info.get("chapters") or [])
                  if c.get("filepath") and os.path.isfile(c["filepath"])]
+        if self._audio_only_copy:
+            self._copy_cover_tag(info.get("filepath"), parts)
         if len(parts) < 2:
             for path in parts:
                 if path != info.get("filepath"):
@@ -929,6 +998,24 @@ class _SplitChaptersPP(FFmpegSplitChaptersPP):
             return files, info
         info["__comfort_parts"] = parts
         return files + [info["filepath"]], info
+
+    @staticmethod
+    def _copy_cover_tag(source, parts):
+        """The full file's embedded cover (Ogg/Opus keep it as a METADATA_BLOCK_PICTURE tag, which
+        the audio-only copy above doesn't carry) onto each part. Best-effort: a part without it
+        just has no cover."""
+        try:
+            import mutagen
+            pictures = (mutagen.File(source) or {}).get("metadata_block_picture")
+            if not pictures:
+                return
+            for path in parts:
+                part = mutagen.File(path)
+                if part is not None and part.tags is not None:
+                    part["metadata_block_picture"] = pictures
+                    part.save()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _apply_title_artist_override(filepath, title, artist):
