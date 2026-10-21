@@ -272,8 +272,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # A random 2-to-N second pause before each file, like yt-dlp's --min/--max-sleep-interval.
         args.extend(["--sleep", f"2-{max(2, int(sleep_interval_seconds))}"])
     if restrict_filenames:
-        # Only letters, digits, "_" and "." (the rest becomes "_"), as with yt-dlp's restricted names.
-        args.extend(["-o", "path-restrict=ascii"])
+        # yt-dlp's restricted names' characters: letters, digits, "_", ".", "-" and the "[id]"
+        # brackets; anything else (spaces included) becomes "_". gallery-dl's own "ascii" also
+        # turned "-" and the brackets into "_" ("imgur__6WDRFne___imgur_.jpg").
+        args.extend(["-o", r"path-restrict=^0-9A-Za-z_.\[\]-"])
     if force_ipv4:
         args.append("--force-ipv4")
     if no_check_certificates:
