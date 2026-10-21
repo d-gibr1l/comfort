@@ -805,6 +805,8 @@ internal fun ConfirmCancelSplitButton(
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ),
     outlinedConfirm: Boolean = true,
+    // The trailing half's icon: ✕ for cancel, a bin where it deletes (an errored Queue card).
+    cancelIcon: ImageVector = Icons.Outlined.Close,
 ) {
     SplitButtonLayout(
         modifier = modifier,
@@ -822,7 +824,7 @@ internal fun ConfirmCancelSplitButton(
         },
         trailingButton = {
             SplitButtonDefaults.TrailingButton(onClick = onCancel, colors = colors) {
-                Icon(Icons.Outlined.Close, contentDescription = cancelDescription, modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize))
+                Icon(cancelIcon, contentDescription = cancelDescription, modifier = Modifier.size(SplitButtonDefaults.TrailingIconSize))
             }
         },
     )

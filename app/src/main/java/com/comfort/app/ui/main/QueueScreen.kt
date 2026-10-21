@@ -1372,13 +1372,17 @@ fun QueueItemCard(
                                     Text(stringResource(R.string.add_cookies))
                                 }
                             }
-                            TextButton(onClick = onRetry) {
-                                Text(stringResource(R.string.retry))
-                            }
-                            // No copy button: a long-press on the card's link copies it (QueueLink).
-                            IconButton(onClick = onDelete) {
-                                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.sponsorblock_remove))
-                            }
+                            // Retry and delete as one split button, like "Up next" / cancel on a
+                            // queued card. No copy button: a long-press on the card's link copies it
+                            // (QueueLink).
+                            ConfirmCancelSplitButton(
+                                label = stringResource(R.string.retry),
+                                icon = Icons.Outlined.Refresh,
+                                onConfirm = onRetry,
+                                onCancel = onDelete,
+                                cancelDescription = stringResource(R.string.sponsorblock_remove),
+                                cancelIcon = Icons.Outlined.Delete,
+                            )
                         }
                         DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
                             // Same split button as Settings' edit sheets: "Up next" moves this
