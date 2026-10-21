@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.gestures.draggable
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import kotlin.math.PI
@@ -125,90 +129,106 @@ data class DownloadEventVisuals(
     override val duration: SnackbarDuration = if (isSuccess) SnackbarDuration.Short else SnackbarDuration.Long
 }
 
-/** Shared "download finished/failed" toast styling for both Library and the Download Queue — a
- * free-floating rounded card with a solid-color circular icon badge, matching the icon-badge
- * language used throughout the rest of the app (Home's tip rows, About's engine rows, ...) instead
- * of Material's plain flat Snackbar default, which reads as the same flat grey block for both a
- * success and a failure until you actually read the text. A custom Surface (not Snackbar's own
- * shape/color slots) is what makes the solid icon badge and the pill dismiss button possible —
- * Snackbar's own API only exposes a single flat containerColor for the whole bar. */
+/** Every snackbar in the app (Library, the Download Queue, the media viewer): Material 3's
+ * standard one — a dark inverse-surface bar (light in dark mode) with small corners, the message,
+ * the action in inversePrimary and a ✕ — drawn here rather than with Snackbar() so it can also be
+ * swiped away. */
 @Composable
 fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier = Modifier) {
     SnackbarHost(hostState = hostState, modifier = modifier) { data ->
         val visuals = data.visuals
-        val isSuccess = (visuals as? DownloadEventVisuals)?.isSuccess ?: true
-        // Success reads as "finished" more clearly in the app's own teal (already reserved for
-        // progress/success states — see Color.kt) than the brand indigo Snackbar used to borrow
-        // from primaryContainer, which reads as "just another accent," not specifically "done."
-        val accent = if (isSuccess) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
-        val onAccent = if (isSuccess) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onError
+        // A sideways swipe either way slides it off and dismisses it, the same as its ✕: past a
+        // third of its width, or a quick flick; a short drag springs back.
+        // Plain state set straight from each drag delta. (An Animatable snapped from a coroutine per
+        // delta let a late snap cancel the slide-off animation after release — and the dismiss
+        // that came after it — leaving the snackbar stuck part-way.)
+        var swipeOffset by remember(data) { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        var swipeWidth by remember(data) { mutableStateOf(1f) }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                // 12dp under it so it floats clear of whatever is below — on a Queue tab without
+                // Retry All it otherwise sat flush on the navigation bar, reading as a white bar.
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp)
+                .onSizeChanged { swipeWidth = it.width.toFloat().coerceAtLeast(1f) }
+                // Slides only, no fade: a half-faded snackbar let what's under it show through.
+                .graphicsLayer { translationX = swipeOffset }
+                .draggable(
+                    orientation = androidx.compose.foundation.gestures.Orientation.Horizontal,
+                    state = androidx.compose.foundation.gestures.rememberDraggableState { delta -> swipeOffset += delta },
+                    onDragStopped = { velocity ->
+                        val offset = swipeOffset
+                        val flung = kotlin.math.abs(velocity) > 1500f && kotlin.math.sign(velocity) == kotlin.math.sign(offset)
+                        if (kotlin.math.abs(offset) > swipeWidth / 3f || flung) {
+                            val target = if (offset < 0f) -swipeWidth * 1.2f else swipeWidth * 1.2f
+                            try {
+                                androidx.compose.animation.core.animate(offset, target, animationSpec = androidx.compose.animation.core.tween(160)) { value, _ -> swipeOffset = value }
+                            } finally {
+                                data.dismiss()
+                            }
+                        } else {
+                            androidx.compose.animation.core.animate(offset, 0f, animationSpec = androidx.compose.animation.core.spring()) { value, _ -> swipeOffset = value }
+                        }
+                    },
+                ),
+            shape = MaterialTheme.shapes.extraSmall,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
             shadowElevation = 6.dp,
         ) {
             Row(
-                modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(accent),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        if (isSuccess) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = onAccent,
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                // Capped regardless of how long visuals.message turns out to be — error text is
-                // sanitized at the source now (see GalleryDlListing.sanitizeErrorMessage), but this
-                // is the last line of defense against a toast ever filling the whole screen the way
-                // one reproduced live before that existed, not something to rely on that alone for.
+                // Capped however long the message is: error text is sanitized at the source
+                // (GalleryDlListing.sanitizeErrorMessage), and this keeps it from ever filling the
+                // screen anyway.
                 Text(
                     visuals.message,
-                    modifier = Modifier.weight(1f),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                // This custom Surface replaces Snackbar's own layout entirely (see the doc comment
-                // above), which means Compose's default action-button rendering never runs either —
-                // an actionLabel passed to showSnackbar() silently had no on-screen button at all
-                // until this was added, discovered live: the Queue screen's delete-undo Snackbar
-                // (see QueueScreen.requestDelete) always fell through to the real delete because its
-                // "Undo" was never actually clickable, only the dismiss X below was, and dismissing
-                // early resolves showSnackbar() as Dismissed same as letting it time out.
+                // Drawn here, not by Snackbar(): an actionLabel would otherwise have no button
+                // (the Queue's delete-undo "Undo" once wasn't clickable because of exactly that).
                 visuals.actionLabel?.let { actionLabel ->
-                    TextButton(onClick = { data.performAction() }) {
-                        Text(
-                            actionLabel,
-                            color = accent,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    TextButton(
+                        onClick = { data.performAction() },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.inversePrimary),
+                    ) {
+                        Text(actionLabel, style = MaterialTheme.typography.labelLarge)
                     }
                 }
-                IconButton(onClick = { data.dismiss() }, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = { data.dismiss() }) {
                     Icon(
                         Icons.Outlined.Close,
                         contentDescription = stringResource(R.string.dismiss),
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
         }
     }
+}
+
+/** The snackbar job each host is showing or waiting to show: [showReplacing] cancels it, so a new
+ * snackbar replaces the current one instead of queueing behind it. Main thread only. */
+private val currentSnackbarJobs = java.util.WeakHashMap<SnackbarHostState, kotlinx.coroutines.Job>()
+
+/** Launches [show] (a showSnackbar call on [host]) in place of whatever [host] is showing or still
+ * has waiting. SnackbarHostState shows one at a time and queues the rest, so after a burst (Retry
+ * All, several deletes) each dismissed snackbar made an older one appear — reported as "old
+ * snackbars keep appearing". A replaced delete-undo snackbar ends its Undo window (its finally
+ * runs), the same as letting it time out. */
+fun kotlinx.coroutines.CoroutineScope.showReplacing(host: SnackbarHostState, show: suspend () -> Unit): kotlinx.coroutines.Job {
+    currentSnackbarJobs[host]?.cancel()
+    val job = launch { show() }
+    currentSnackbarJobs[host] = job
+    job.invokeOnCompletion { if (currentSnackbarJobs[host] === job) currentSnackbarJobs.remove(host) }
+    return job
 }
 
 /** Fires a [DownloadEventVisuals] snackbar for any download that finishes or fails while the
@@ -234,13 +254,15 @@ fun DownloadEventSnackbars(
         val currentIds = historyItems.map { it.id }.toSet()
         val previous = seenFinishedIds
         if (previous != null) {
-            (currentIds - previous).forEach { id ->
-                val item = historyItems.firstOrNull { it.id == id } ?: return@forEach
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        DownloadEventVisuals(isSuccess = true, message = eventsContext.getString(R.string.download_finished_named, item.title.ifBlank { eventsContext.getString(R.string.download_untitled) }))
-                    )
-                }
+            val finished = (currentIds - previous).mapNotNull { id -> historyItems.firstOrNull { it.id == id } }
+            // Several at once read as one snackbar ("3 downloads finished"), not a row of them.
+            val message = when (finished.size) {
+                0 -> null
+                1 -> eventsContext.getString(R.string.download_finished_named, finished[0].title.ifBlank { eventsContext.getString(R.string.download_untitled) })
+                else -> eventsContext.resources.getQuantityString(R.plurals.downloads_finished, finished.size, finished.size)
+            }
+            if (message != null) scope.showReplacing(snackbarHostState) {
+                snackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = message))
             }
         }
         seenFinishedIds = currentIds
@@ -251,20 +273,18 @@ fun DownloadEventSnackbars(
         val erroredNow = queueItems.filter { it.status == DownloadStatus.ERRORED }.map { it.id }.toSet()
         val previous = seenErroredIds
         if (previous != null) {
-            (erroredNow - previous).forEach { id ->
-                val item = queueItems.firstOrNull { it.id == id } ?: return@forEach
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        DownloadEventVisuals(
-                            isSuccess = false,
-                            message = item.title.ifBlank { eventsContext.getString(R.string.download_untitled) }.let { title ->
-                                item.errorMessage?.takeIf { it.isNotBlank() }
-                                    ?.let { eventsContext.getString(R.string.download_failed_named_reason, title, it) }
-                                    ?: eventsContext.getString(R.string.download_failed_named, title)
-                            },
-                        )
-                    )
+            val failed = (erroredNow - previous).mapNotNull { id -> queueItems.firstOrNull { it.id == id } }
+            val message = when (failed.size) {
+                0 -> null
+                1 -> failed[0].title.ifBlank { eventsContext.getString(R.string.download_untitled) }.let { title ->
+                    failed[0].errorMessage?.takeIf { it.isNotBlank() }
+                        ?.let { eventsContext.getString(R.string.download_failed_named_reason, title, it) }
+                        ?: eventsContext.getString(R.string.download_failed_named, title)
                 }
+                else -> eventsContext.resources.getQuantityString(R.plurals.downloads_failed, failed.size, failed.size)
+            }
+            if (message != null) scope.showReplacing(snackbarHostState) {
+                snackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = false, message = message))
             }
         }
         seenErroredIds = erroredNow
@@ -434,7 +454,7 @@ fun rememberUndoableDelete(
     return { ids ->
         if (ids.isNotEmpty()) {
             viewModel.hideForDeletion(ids)
-            scope.launch {
+            scope.showReplacing(snackbarHostState) {
                 var undone = false
                 try {
                     val result = snackbarHostState.showSnackbar(
