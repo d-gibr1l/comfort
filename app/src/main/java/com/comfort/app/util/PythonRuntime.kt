@@ -545,9 +545,23 @@ object PythonRuntime {
         onLine: suspend (String) -> Unit,
     ): Int = withContext(Dispatchers.IO) {
         val scriptFile = File(runtimeRoot(context), script)
-        val process = pythonProcess(context, listOf(scriptFile.absolutePath) + args)
+        // Through DIRECT_BOOTSTRAP, not the script itself: the job gets its own process group and
+        // reports its pid, so a cancel kills it *with* the ffmpeg/aria2c it started (they'd
+        // otherwise keep running, orphaned, after Python itself was killed) — the same as a fork
+        // server job (py_server.py does the setpgid there).
+        val process = pythonProcess(context, listOf("-c", DIRECT_BOOTSTRAP, scriptFile.absolutePath) + args)
             .apply { environment().putAll(proxyEnvironment(context)) }
             .start()
+        val groupPid = java.util.concurrent.atomic.AtomicInteger(0)
+        fun killAll() {
+            groupPid.get().takeIf { it > 0 }?.let { pid ->
+                runCatching { Os.kill(-pid, android.system.OsConstants.SIGKILL) }
+            }
+            if (process.isAlive) {
+                process.destroyForcibly()
+                runCatching { process.waitFor() }
+            }
+        }
 
         try {
             var exitCode = 0
@@ -566,15 +580,17 @@ object PythonRuntime {
                     try {
                         awaitCancellation()
                     } finally {
-                        if (process.isAlive) {
-                            process.destroyForcibly()
-                            runCatching { process.waitFor() }
-                        }
+                        killAll()
                     }
                 }
                 process.outputStream.close()
                 BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
                     var line = reader.readLine()
+                    // The bootstrap's first line: its pid (= its process group's id). Not output.
+                    if (line != null && line.startsWith("${CONTROL}pid ")) {
+                        line.substringAfter(' ').toIntOrNull()?.let { groupPid.set(it) }
+                        line = reader.readLine()
+                    }
                     while (line != null) {
                         onLine(line)
                         line = reader.readLine()
@@ -585,10 +601,20 @@ object PythonRuntime {
             }
             exitCode
         } finally {
-            if (process.isAlive) {
-                process.destroyForcibly()
-                runCatching { process.waitFor() }
-            }
+            if (process.isAlive) killAll()
         }
     }
+
+    /** Runs a script (argv[1]) the way `python script.py` would — as __main__, its folder first on
+     * sys.path, argv shifted to match — in a process group of its own, and first prints its pid
+     * after CONTROL, for [runDirect]. */
+    private val DIRECT_BOOTSTRAP = listOf(
+        "import os, sys, runpy",
+        "os.setpgid(0, 0)",
+        "sys.stdout.write('\\x01pid %d\\n' % os.getpid())",
+        "sys.stdout.flush()",
+        "sys.argv = sys.argv[1:]",
+        "sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[0])))",
+        "runpy.run_path(sys.argv[0], run_name='__main__')",
+    ).joinToString("\n")
 }
