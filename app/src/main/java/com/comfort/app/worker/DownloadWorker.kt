@@ -278,6 +278,16 @@ class DownloadWorker(
         // how many downloads are actually still using it, and explicitly cancel it once that count
         // hits zero — not tied to (or trusting) WorkManager's own foreground-service bookkeeping.
         DownloadNotifications.markForegroundStarted()
+        // Woken inside the schedule window, no scheduled download is waiting for the window any
+        // more, only for a slot: all of them go to QUEUED now. Each only changed when it got a
+        // slot (RUNNING), and Android wakes their jobs one at a time, so with the alarm off a big
+        // batch kept saying "waiting for the scheduled time window" long after it opened, then
+        // went to Running one by one (seen live with 8). Start now only moves this one.
+        if (DownloadDispatcher.isWithinScheduleWindow(applicationContext)) {
+            dao.releaseScheduled()
+        } else if (entity?.forceStart == true) {
+            dao.updateStatusIfIn(downloadId, DownloadStatus.QUEUED, listOf(DownloadStatus.SCHEDULED))
+        }
         val gateAcquired = AtomicBoolean(false)
         try {
             // Blocks here (not a hard failure) until a concurrency slot is actually free. Every
@@ -1091,6 +1101,9 @@ class DownloadWorker(
                 // (battery saver, a constraint change), it's still RUNNING — put it back to waiting.
                 requeueIfStillRunning(dao, downloadId)
                 DownloadNotifications.cancel(applicationContext, downloadId)
+                // Whatever stopped it, have the queue checked for a download left waiting without a
+                // live job (debounced, so a burst of these is one check).
+                DownloadDispatcher.requestQueueRepair(applicationContext)
                 throw e
             } catch (e: Exception) {
                 // Result.success() in both branches below, not failure() — same reasoning as the

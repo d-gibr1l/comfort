@@ -226,6 +226,11 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE status IN ('QUEUED', 'SCHEDULED')")
     suspend fun getQueuedOnce(): List<DownloadEntity>
 
+    /** Every download waiting for the schedule window, now waiting only for a slot: called once
+     * the window is open (see DownloadWorker). Their jobs start on their own, one by one. */
+    @Query("UPDATE downloads SET status = 'QUEUED' WHERE status = 'SCHEDULED'")
+    suspend fun releaseScheduled(): Int
+
     /** One-shot snapshot of everything still marked RUNNING — used at app startup to catch a
      * download whose WorkManager job died out from under it (process killed/frozen mid-download,
      * an OS out-of-memory kill, ...) without ever getting the chance to write a terminal status.
