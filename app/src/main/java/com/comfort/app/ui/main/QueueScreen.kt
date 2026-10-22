@@ -498,9 +498,18 @@ fun QueueScreen(
                         badge = {
                             if (count > 0) {
                                 Badge(
-                                    containerColor = if (selectedFilter == filter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                    containerColor = if (selectedFilter == filter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                                    // A long count grows leftward over the chip, not past its
+                                    // end: "1,234" on the last chip ran off the screen's edge.
+                                    modifier = Modifier.layout { measurable, constraints ->
+                                        val badge = measurable.measure(constraints)
+                                        val grow = (badge.width - 16.dp.roundToPx()).coerceAtLeast(0)
+                                        layout(badge.width, badge.height) { badge.place(-grow, 0) }
+                                    },
                                 ) {
-                                    Text(badgeCountText(count))
+                                    // The full count, not badgeCountText's "99+": a chip has room
+                                    // for it, unlike the icon badges that cap is for.
+                                    Text(java.text.NumberFormat.getIntegerInstance().format(count))
                                 }
                             }
                         }
