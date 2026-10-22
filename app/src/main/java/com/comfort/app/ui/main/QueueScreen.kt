@@ -477,9 +477,10 @@ fun QueueScreen(
                 // clipped mid-chip right at an inset boundary, which read as "cut off."
                 modifier = Modifier
                     .fillMaxWidth()
-                    // No top padding: it sits tight under the title. The count badges poking above
-                    // the chips still show, since a horizontal row only clips left/right.
-                    .padding(bottom = 8.dp),
+                    // No top padding under the title: the count badges poking above the chips
+                    // still show, since a horizontal row only clips left/right. Under the
+                    // selection TopAppBar they need room, or the bar (drawn over this) cuts them.
+                    .padding(top = if (selectionMode) 8.dp else 0.dp, bottom = 8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
