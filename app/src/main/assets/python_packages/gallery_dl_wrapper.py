@@ -252,7 +252,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     args = ["gallery-dl", "--directory", download_dir] + _reddit_client_args(cookies_path)
     if cookies_path:
         args.extend(["--cookies", cookies_path])
-    if filename_format:
+    if filename_format and filename_format.startswith("{poster_name|category}"):
+        # The default format (its "{poster_name|category}" start). A plain file link (gallery-dl's
+        # "directlink": no poster, no title) came out of it as "directlink [Example]
+        # [directlink].jpg", titled "directlink" in the Library; it's named after the file and its
+        # site instead: "Example [wikimedia.org].jpg". Set as extractor.filename, not --filename:
+        # that one sits at the top of gallery-dl's config and beats every per-site setting.
+        args.extend(["-o", f"extractor.filename={filename_format}",
+                     "-o", "extractor.directlink.filename={filename} [{subcategory}].{extension}"])
+    elif filename_format:
         args.extend(["--filename", filename_format])
     if limit_rate:
         args.extend(["--limit-rate", limit_rate])
