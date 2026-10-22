@@ -138,6 +138,7 @@ fun QueueScreen(
     // Modifier.animateItem() below already handles the smooth reflow/removal animation on its own,
     // so this only ever needs to gate the one-time entrance.
     val alreadyAnimatedIds = remember { mutableSetOf<String>() }
+    MarkShownAfterFirstFrame(alreadyAnimatedIds, queueItems) { it.id }
     // better-interface review: the entrance slide below (and the wavy progress indicator's wave
     // motion in QueueItemCard) animated unconditionally, with nothing checking the OS-level
     // reduce-motion setting.
