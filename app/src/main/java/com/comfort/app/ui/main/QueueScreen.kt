@@ -255,10 +255,12 @@ fun QueueScreen(
                 val selection = selectedIds
                 SelectionActionBar(
                     filter = selectedFilter,
-                    onPause = { selection.forEach { viewModel.pauseDownload(it) }; selectedIds = emptySet() },
-                    onCancel = { selection.forEach { viewModel.cancelDownload(it) }; selectedIds = emptySet() },
-                    onResume = { selection.forEach { viewModel.retryDownload(it) }; selectedIds = emptySet() },
-                    onRetry = { selection.forEach { viewModel.retryDownload(it) }; selectedIds = emptySet() },
+                    // One bulk action each, not one per selected download: those ran all at once, in
+                    // no particular order, and the cards moved a few at a time.
+                    onPause = { viewModel.pauseDownloads(selection); selectedIds = emptySet() },
+                    onCancel = { viewModel.cancelDownloads(selection); selectedIds = emptySet() },
+                    onResume = { viewModel.retryDownloads(selection); selectedIds = emptySet() },
+                    onRetry = { viewModel.retryDownloads(selection); selectedIds = emptySet() },
                     // Not cancelled first: the delete that runs once the Undo snackbar passes
                     // (DownloadDispatcher.deleteDownload) stops each one's job itself. Cancelling
                     // up front meant Undo brought running downloads back cancelled.

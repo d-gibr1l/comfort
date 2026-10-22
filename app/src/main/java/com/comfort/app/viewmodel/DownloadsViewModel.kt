@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -91,9 +93,74 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         if (deleting.isEmpty()) deleted else deleted.filterNot { it.id in deleting }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds) { queue, deleting ->
-        if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
+    /** A change the user just asked for, shown before the database has it: [apply] turns the row
+     * into what it will be, for as long as the row is still in status [from]. */
+    private class PendingMove(val from: DownloadStatus, val apply: (DownloadEntity) -> DownloadEntity)
+
+    // What a bulk action looks like from the moment it's tapped. Even in one pass, Retry All on 100
+    // downloads takes WorkManager a moment, and the Queue used to show it as it happened: cards
+    // leaving a few at a time, the list shuffling under them, the tab counts ticking over. With
+    // these, every card moves at once, in one animation, and the database catching up changes
+    // nothing on screen. An entry ends once its row has left [PendingMove.from] (see init) — the
+    // database has it now, or something else happened to the download — or when its action didn't
+    // apply to it, or after PENDING_MOVE_TIMEOUT_MS whatever happened.
+    private val _pendingMoves = MutableStateFlow<Map<String, PendingMove>>(emptyMap())
+
+    val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds, _pendingMoves) { queue, deleting, pending ->
+        val shown = if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
+        if (pending.isEmpty()) shown
+        else shown.map { item -> pending[item.id]?.takeIf { it.from == item.status }?.apply?.invoke(item) ?: item }
+            .sortedWith(QUEUE_ORDER)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        // Ends each pending move once its row has left the status it was made from. Only watches
+        // the queue while there are any.
+        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        viewModelScope.launch {
+            _pendingMoves
+                .flatMapLatest { pending -> if (pending.isEmpty()) emptyFlow() else rawQueueFlow }
+                .collect { queue ->
+                    val status = queue.associate { it.id to it.status }
+                    _pendingMoves.update { pending -> pending.filter { (id, move) -> status[id] == move.from } }
+                }
+        }
+    }
+
+    /** Shows [moves] on the Queue from now on, until they end (see [_pendingMoves]). */
+    private fun showPendingMoves(moves: Map<String, PendingMove>) {
+        if (moves.isEmpty()) return
+        _pendingMoves.update { it + moves }
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(PENDING_MOVE_TIMEOUT_MS)
+            endPendingMoves(moves)
+        }
+    }
+
+    /** Runs the bulk [action] behind [moves]; it returns the ids it changed, and the moves for the
+     * rest end there (all of them if it fails). The changed ones end once the Queue shows them. */
+    private suspend fun settlePendingMoves(moves: Map<String, PendingMove>, action: suspend () -> Set<String>) {
+        val changed = try {
+            action()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            android.util.Log.e("DownloadsViewModel", "Bulk action failed", e)
+            emptySet()
+        }
+        endPendingMoves(moves.filterKeys { it !in changed })
+    }
+
+    /** Ends these moves, unless a later action has already replaced one. */
+    private fun endPendingMoves(moves: Map<String, PendingMove>) {
+        if (moves.isEmpty()) return
+        _pendingMoves.update { pending -> pending.filterNot { (id, move) -> moves[id] === move } }
+    }
+
+    /** The downloads [ids] as the Queue shows them, in its order. */
+    private fun queuedRows(ids: Collection<String>): List<DownloadEntity> {
+        val wanted = ids.toSet()
+        return queueFlow.value.filter { it.id in wanted }
+    }
 
     private val globalPauseMutex = kotlinx.coroutines.sync.Mutex()
 
@@ -159,6 +226,14 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Pauses every currently running/queued download and holds any added afterwards until resumed. */
     fun pauseAll() {
+        // pauseAllLocked's frozen order too, so nothing moves again once the database has it.
+        val active = queueFlow.value.filter { it.status in PAUSABLE }
+        val frozen = frozenFront(active)
+        val front = frozen.withIndex().associate { (index, entity) -> entity.id to index - frozen.size }
+        showPendingMoves(pauseMoves(active).mapValues { (id, move) ->
+            val order = front[id] ?: return@mapValues move
+            PendingMove(move.from) { move.apply(it).copy(queueOrder = order) }
+        })
         viewModelScope.launch {
             // One at a time with resumeAll(): the FAB flips the instant the flag changes, so a quick
             // Pause→Resume used to run both loops interleaved — Resume re-enqueued the rows Pause
@@ -167,6 +242,12 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             globalPauseMutex.withLock { pauseAllLocked() }
         }
     }
+
+    /** The block of [active] (in queue order) that Pause All renumbers to the front: what's
+     * running, then the "Up next" ones — see pauseAllLocked. */
+    private fun frozenFront(active: List<DownloadEntity>): List<DownloadEntity> =
+        active.filter { it.status == DownloadStatus.RUNNING } +
+            active.filter { it.status != DownloadStatus.RUNNING && it.queueOrder < 0 }
 
     private suspend fun pauseAllLocked() {
         val context = getApplication<Application>()
@@ -186,12 +267,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         // only fixes the *order* — whether a row bypasses the schedule window is its separate
         // forceStart flag, which Pause All leaves alone, so a download that was running before the
         // pause still waits for the window on resume if it's closed by then.
-        val front = active.filter { it.status == DownloadStatus.RUNNING } +
-            active.filter { it.status != DownloadStatus.RUNNING && it.queueOrder < 0 }
+        val front = frozenFront(active)
         front.forEachIndexed { index, entity -> dao.setQueueOrder(entity.id, index - front.size) }
         // notify = false — a per-item "Paused" notification for every download in a large
         // queue would turn one "Pause All" tap into a stack of individual notifications.
-        active.forEach { entity -> DownloadDispatcher.pauseDownload(context, entity.id, notify = false) }
+        DownloadDispatcher.pauseDownloads(context, active.map { it.id }, notify = false)
     }
 
     /** Resumes everything held by pauseAll(), including downloads added while paused. */
@@ -201,48 +281,77 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 val context = getApplication<Application>()
                 _isGloballyPaused.value = false
                 GalleryDlPreferences.setGloballyPaused(context, false)
-                dao.getActiveInQueueOrderOnce()
+                val held = dao.getActiveInQueueOrderOnce()
                     .filter { it.status == DownloadStatus.PAUSED || (it.status == DownloadStatus.QUEUED && it.workRequestId == null) }
-                    .forEach { entity ->
-                        // One at a time, in queue order (see pauseAll's frozen order) — these used to be
-                        // launched concurrently, which appended them to WorkManager's per-slot chains in
-                        // whatever order the coroutines happened to finish, so downloads came back in a
-                        // shuffled order (reported live). A few ms per item is the whole cost.
-                        // enqueueWork() itself sets the correct QUEUED/SCHEDULED status once it knows
-                        // the actual delay — no need to guess QUEUED here first. Only an explicit
-                        // "Up next" (forceStart) skips the schedule window, same as
-                        // DownloadDispatcher.repairIfJobDead treats it.
-                        DownloadDispatcher.enqueueWork(
-                            context, entity.id, entity.url,
+                // In queue order (see pauseAll's frozen order) — these used to be launched
+                // concurrently, which appended them to WorkManager's per-slot chains in whatever
+                // order the coroutines happened to finish, so downloads came back in a shuffled
+                // order (reported live). enqueueWorkMany() sets the actual QUEUED/SCHEDULED status
+                // once it knows the delay. Only an explicit "Up next" (forceStart) skips the schedule
+                // window, same as DownloadDispatcher.repairIfJobDead treats it.
+                val moves = held.filter { it.status == DownloadStatus.PAUSED }.associate { entity ->
+                    val status = DownloadDispatcher.predictedDispatchStatus(context, forceImmediate = entity.forceStart)
+                    entity.id to PendingMove(entity.status) { it.copy(status = status) }
+                }
+                showPendingMoves(moves)
+                settlePendingMoves(moves) {
+                    DownloadDispatcher.enqueueWorkMany(context, held.map { entity ->
+                        DownloadDispatcher.Dispatch(
+                            entity.id, entity.url,
                             forceImmediate = entity.forceStart,
                             expectedStatus = setOf(DownloadStatus.PAUSED, DownloadStatus.QUEUED),
                         )
-                    }
+                    })
+                }
             }
         }
     }
 
-    fun pauseDownload(id: String) {
+    fun pauseDownload(id: String) = pauseDownloads(listOf(id))
+
+    /** A card's Pause, or the selection bar's for every selected download. */
+    fun pauseDownloads(ids: Collection<String>) {
+        val rows = queuedRows(ids)
+        val moves = pauseMoves(rows)
+        showPendingMoves(moves)
         viewModelScope.launch {
-            DownloadDispatcher.pauseDownload(getApplication(), id)
+            settlePendingMoves(moves) { DownloadDispatcher.pauseDownloads(getApplication(), rows.map { it.id }) }
         }
     }
 
-    fun cancelDownload(id: String) {
+    private fun pauseMoves(rows: List<DownloadEntity>): Map<String, PendingMove> =
+        rows.filter { it.status in PAUSABLE }
+            .associate { entity -> entity.id to PendingMove(entity.status) { it.copy(status = DownloadStatus.PAUSED, speedMbs = 0f) } }
+
+    fun cancelDownload(id: String) = cancelDownloads(listOf(id))
+
+    /** A card's Cancel, or the selection bar's for every selected download. */
+    fun cancelDownloads(ids: Collection<String>) {
+        val rows = queuedRows(ids)
+        val moves = rows.filter { it.status in PAUSABLE || it.status == DownloadStatus.PAUSED }
+            .associate { entity -> entity.id to PendingMove(entity.status) { it.copy(status = DownloadStatus.CANCELLED, speedMbs = 0f) } }
+        showPendingMoves(moves)
         viewModelScope.launch {
-            DownloadDispatcher.cancelDownload(getApplication(), id)
+            settlePendingMoves(moves) { DownloadDispatcher.cancelDownloads(getApplication(), rows.map { it.id }) }
         }
     }
 
-    fun retryDownload(id: String) {
+    /** A card's Retry/Continue, or "Download the missing items" on a finished one. */
+    fun retryDownload(id: String) = retryDownloads(listOf(id))
+
+    /** The selection bar's Retry/Resume: each selected card's own, as one dispatch in the order
+     * they're listed. A tap on these cards — starts them even while "Pause All" holds everything
+     * else. */
+    fun retryDownloads(ids: Collection<String>) {
+        val listed = queuedRows(ids)
+        val missing = ids.toSet() - listed.map { it.id }.toSet()
+        if (missing.isEmpty()) {
+            dispatchRetries(listed, userInitiated = true)
+            return
+        }
+        // A finished download ("Download the missing items") isn't on the Queue.
         viewModelScope.launch {
-            val context = getApplication<Application>()
-            val entity = dao.getById(id) ?: return@launch
-            // Retrying a failed download sends it to the back of the queue — listed last and run
-            // last (see DownloadDao.moveToQueueEnd). A paused/cancelled card's resume keeps its place.
-            if (entity.status == DownloadStatus.ERRORED) dao.moveToQueueEnd(entity.id, System.currentTimeMillis())
-            // A tap on this one card — starts it even while "Pause All" holds everything else.
-            DownloadDispatcher.enqueueWork(context, entity.id, entity.url, userInitiated = true)
+            dispatchRetries(listed + missing.mapNotNull { dao.getById(it) }, userInitiated = true)
         }
     }
 
@@ -256,17 +365,37 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** The "Retry All" FAB on the Queue screen's Errored/Cancelled filter tabs. */
     fun retryAll(status: DownloadStatus) {
+        dispatchRetries(queueFlow.value.filter { it.status == status }, userInitiated = false)
+    }
+
+    /** Retries/resumes [rows] as one dispatch, in this order. A retried failure goes to the back of
+     * the queue — listed last and run last (see DownloadDao.moveToQueueEnd) — keeping the order
+     * they're listed in relative to each other (1 ms apart). A paused/cancelled card's resume keeps
+     * its place. */
+    private fun dispatchRetries(rows: List<DownloadEntity>, userInitiated: Boolean) {
+        if (rows.isEmpty()) return
+        val context = getApplication<Application>()
+        val now = System.currentTimeMillis()
+        val status = DownloadDispatcher.predictedDispatchStatus(context, userInitiated = userInitiated)
+        val dispatches = rows.mapIndexed { index, entity ->
+            DownloadDispatcher.Dispatch(
+                entity.id, entity.url,
+                // Each as it was listed: one that has changed since (finished, failed again,
+                // deleted) is left as it is.
+                expectedStatus = setOf(entity.status),
+                moveToQueueEndAt = if (entity.status == DownloadStatus.ERRORED) now + index else null,
+            )
+        }
+        val moves = rows.zip(dispatches).associate { (entity, dispatch) ->
+            val queueEnd = dispatch.moveToQueueEndAt
+            entity.id to PendingMove(entity.status) { row ->
+                if (queueEnd == null) row.copy(status = status)
+                else row.copy(status = status, queueOrder = 0, forceStart = false, dateAdded = queueEnd)
+            }
+        }
+        showPendingMoves(moves)
         viewModelScope.launch {
-            val context = getApplication<Application>()
-            val now = System.currentTimeMillis()
-            queueFlow.value
-                .filter { it.status == status }
-                .forEachIndexed { index, entity ->
-                    // Errored retries go to the back of the queue, keeping the order they're listed
-                    // in relative to each other (1ms apart) — see retryDownload.
-                    if (status == DownloadStatus.ERRORED) dao.moveToQueueEnd(entity.id, now + index)
-                    DownloadDispatcher.enqueueWork(context, entity.id, entity.url, expectedStatus = setOf(status))
-                }
+            settlePendingMoves(moves) { DownloadDispatcher.enqueueWorkMany(context, dispatches, userInitiated) }
         }
     }
 
@@ -358,6 +487,18 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
 /** How often (at most) the Queue's and Library's lists update while their downloads change fast. */
 private const val LIST_UPDATE_MS = 150L
+
+private const val PENDING_MOVE_TIMEOUT_MS = 15_000L
+
+private val PAUSABLE = setOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
+
+/** DownloadDao.getQueueFlow's ORDER BY, for the Queue while pending moves change rows the database
+ * hasn't yet: failed downloads first, newest failure first; then queue order, then oldest added. */
+private val QUEUE_ORDER = compareBy<DownloadEntity>(
+    { if (it.status == DownloadStatus.ERRORED) 0 else 1 },
+    { if (it.status == DownloadStatus.ERRORED) -(it.erroredAt ?: it.dateAdded) else it.queueOrder.toLong() },
+    { it.dateAdded },
+)
 
 /** Each value at once if nothing came for [periodMs], else the latest one at the end of the period:
  * a burst of N values becomes about one per period, never delaying the first or dropping the last. */
