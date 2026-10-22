@@ -16,6 +16,9 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.border
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -246,7 +249,22 @@ fun QueueScreen(
         // MainScreen, not one of its tabs — see MainScreen's own showQueueScreen handling), so
         // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
         snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
+        floatingActionButtonPosition = if (selectionMode) FabPosition.Center else FabPosition.End,
         floatingActionButton = {
+            if (selectionMode) {
+                val selection = selectedIds
+                SelectionActionBar(
+                    filter = selectedFilter,
+                    onPause = { selection.forEach { viewModel.pauseDownload(it) }; selectedIds = emptySet() },
+                    onCancel = { selection.forEach { viewModel.cancelDownload(it) }; selectedIds = emptySet() },
+                    onResume = { selection.forEach { viewModel.retryDownload(it) }; selectedIds = emptySet() },
+                    onRetry = { selection.forEach { viewModel.retryDownload(it) }; selectedIds = emptySet() },
+                    // Not cancelled first: the delete that runs once the Undo snackbar passes
+                    // (DownloadDispatcher.deleteDownload) stops each one's job itself. Cancelling
+                    // up front meant Undo brought running downloads back cancelled.
+                    onDelete = { requestDelete(selection); selectedIds = emptySet() },
+                )
+            }
             if (!selectionMode) {
                 if (retryAllStatus != null && filteredItems.isNotEmpty()) {
                     ExtendedFloatingActionButton(
@@ -277,41 +295,57 @@ fun QueueScreen(
         topBar = {
             if (selectionMode) {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.x_selected, selectedIds.size), fontWeight = FontWeight.Bold) },
+                    // The count rolls up or down as cards are picked, rather than the text just
+                    // swapping.
+                    title = {
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = selectedIds.size,
+                            transitionSpec = {
+                                val up = targetState > initialState
+                                (androidx.compose.animation.slideInVertically(tween(180)) { if (up) it else -it } + fadeIn(tween(180)))
+                                    .togetherWith(androidx.compose.animation.slideOutVertically(tween(180)) { if (up) -it else it } + fadeOut(tween(120)))
+                            },
+                            label = "selected count",
+                        ) { count ->
+                            Text(stringResource(R.string.x_selected, count), fontWeight = FontWeight.Bold)
+                        }
+                    },
                     navigationIcon = {
-                        IconButton(onClick = { selectedIds = emptySet() }) {
+                        FilledTonalIconButton(
+                            onClick = { selectedIds = emptySet() },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) {
                             Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cancel_selection))
                         }
                     },
                     actions = {
                         val allSelected = filteredItems.isNotEmpty() && filteredItems.all { it.id in selectedIds }
-                        // A real labeled control instead of a bare icon whose meaning (select vs.
-                        // deselect *all*, as opposed to "select all" always adding to a partial
-                        // selection) isn't obvious from a glyph alone.
-                        TextButton(onClick = {
-                            selectedIds = if (allSelected) emptySet() else filteredItems.map { it.id }.toSet()
-                        }) {
-                            Icon(
-                                if (allSelected) Icons.Outlined.Cancel else Icons.Outlined.CheckBox,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(if (allSelected) stringResource(R.string.deselect_all) else stringResource(R.string.select_all))
+                        // A labelled pill with a three-state box (none, some, all) rather than a bare
+                        // glyph: what a tap does (select all, or clear) is in its words.
+                        val boxState = when {
+                            allSelected -> androidx.compose.ui.state.ToggleableState.On
+                            selectedIds.isEmpty() -> androidx.compose.ui.state.ToggleableState.Off
+                            else -> androidx.compose.ui.state.ToggleableState.Indeterminate
                         }
-                        Spacer(Modifier.width(4.dp))
-                        // Only ever appears once something's actually selected — the placeholder
-                        // "Clear Queue" trash icon this replaces used to sit here unconditionally
-                        // and did nothing (a dead TODO), so this is a real, scoped action instead.
-                        // Not cancelled here: the delete that runs once the Undo snackbar passes
-                        // (DownloadDispatcher.deleteDownload) stops each one's job itself.
-                        // Cancelling up front meant Undo brought running downloads back cancelled.
-                        IconButton(onClick = {
-                            requestDelete(selectedIds)
-                            selectedIds = emptySet()
-                        }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete_selected))
+                        Surface(
+                            onClick = { selectedIds = if (allSelected) emptySet() else filteredItems.map { it.id }.toSet() },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(end = 12.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(start = 4.dp, end = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TriStateCheckbox(state = boxState, onClick = null, modifier = Modifier.padding(8.dp).size(20.dp))
+                                Text(
+                                    if (allSelected) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
                         }
+                        // The actions are on the floating bar at the bottom (SelectionActionBar).
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
@@ -687,45 +721,100 @@ private fun QueueThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) 
     )
 }
 
-/** Renders a card's thumbnail with the selection-mode dimming/checkmark badge. Purely visual —
- * the actual long-press/tap-to-toggle gesture lives on the *whole* card (see StoppedRow's/
- * QueueItemCard's own outer combinedClickable), not just this thumbnail, so long-pressing
- * anywhere on a card works, not only its corner. */
+/** A card's thumbnail, which turns into a round checkbox while selecting (and back), like a mail
+ * app's avatar. Purely visual: the long-press/tap that selects lives on the whole card (StoppedRow's
+ * and QueueItemCard's own combinedClickable), not just here. It used to stay the thumbnail, dimmed,
+ * with a small check badge over its corner that muddied the status icon underneath. */
 @Composable
 private fun SelectableThumbnail(
     selectionMode: Boolean,
     selected: Boolean,
+    size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box(modifier = modifier) {
-        content()
-        if (selectionMode) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(Color.Black.copy(alpha = if (selected) 0.15f else 0.35f)),
+    androidx.compose.animation.AnimatedContent(
+        targetState = selectionMode,
+        transitionSpec = {
+            (fadeIn(tween(160)) + androidx.compose.animation.scaleIn(tween(160), initialScale = 0.6f))
+                .togetherWith(fadeOut(tween(120)) + androidx.compose.animation.scaleOut(tween(120), targetScale = 0.6f))
+        },
+        modifier = Modifier.size(size),
+        contentAlignment = Alignment.Center,
+        label = "selection checkbox",
+    ) { selecting ->
+        if (!selecting) {
+            Box(modifier = modifier, content = content)
+        } else {
+            Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+                SelectionCheck(selected)
+            }
+        }
+    }
+}
+
+/** The round checkbox: an outline, filled with a check once selected. */
+@Composable
+private fun SelectionCheck(selected: Boolean) {
+    val fill by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, label = "check fill",
+    )
+    Box(
+        modifier = Modifier
+            .size(26.dp)
+            .clip(CircleShape)
+            .background(fill)
+            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                Icons.Outlined.Check,
+                contentDescription = stringResource(R.string.selected),
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(18.dp),
             )
         }
-        if (selectionMode) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(4.dp)
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (selected) {
-                    Icon(
-                        Icons.Outlined.Check,
-                        contentDescription = stringResource(R.string.selected),
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(13.dp),
-                    )
+    }
+}
+
+/** While selecting: the actions that fit the tab, on a bar floating at the bottom. */
+@Composable
+private fun SelectionActionBar(
+    filter: String,
+    onPause: () -> Unit,
+    onCancel: () -> Unit,
+    onResume: () -> Unit,
+    onRetry: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            @Composable
+            fun action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, onClick: () -> Unit) {
+                TextButton(onClick = onClick, colors = ButtonDefaults.textButtonColors(contentColor = color)) {
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(label)
                 }
             }
+            val normal = MaterialTheme.colorScheme.onSurface
+            when (filter) {
+                "Running", "In Queue", "Scheduled" -> {
+                    action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), normal, onPause)
+                    action(Icons.Outlined.Close, stringResource(R.string.action_cancel), normal, onCancel)
+                }
+                "Paused", "Cancelled" -> action(Icons.Outlined.PlayArrow, stringResource(R.string.resume), normal, onResume)
+                "Errored" -> action(Icons.Outlined.Refresh, stringResource(R.string.retry), normal, onRetry)
+            }
+            action(Icons.Outlined.Delete, stringResource(R.string.delete), MaterialTheme.colorScheme.error, onDelete)
         }
     }
 }
@@ -752,7 +841,9 @@ private fun StoppedRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                // Selected: tinted and outlined, so the selection reads from the whole card.
+                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+                .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large) else Modifier)
                 // Always present, not just once selectionMode is already true — this is what
                 // actually *enters* selection mode via a long-press anywhere on the row (not just
                 // the thumbnail; reported live that only the thumbnail worked before this). Short
@@ -777,6 +868,7 @@ private fun StoppedRow(
             SelectableThumbnail(
                 selectionMode = selectionMode,
                 selected = selected,
+                size = 76.dp,
                 modifier = Modifier.size(76.dp).clip(thumbnailShape()).background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 if (hasThumbnail) {
@@ -858,7 +950,7 @@ private fun StoppedRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), enabled = !selectionMode)
+            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), onSelectionTap = if (selectionMode) onToggleSelect else null)
         }
 
             if (!selectionMode) {
@@ -925,9 +1017,11 @@ fun QueueItemCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
+        // Selected: tinted and outlined, so the selection reads from the whole card.
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer
         ),
+        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         Column(
             modifier = Modifier
@@ -964,6 +1058,7 @@ fun QueueItemCard(
                 SelectableThumbnail(
                     selectionMode = selectionMode,
                     selected = selected,
+                    size = 40.dp,
                     modifier = Modifier.size(40.dp).clip(thumbnailShape()).background(
                         if (isErrored) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
                     ),
@@ -1221,7 +1316,7 @@ fun QueueItemCard(
                         }
                     }
                     // The link this download came from, in the space the pills leave free (QueueLink).
-                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), enabled = !selectionMode)
+                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), onSelectionTap = if (selectionMode) onToggleSelect else null)
                     if (byteProgress != null && item.speedMbs > 0f) {
                         val remainingBytes = item.expectedBytes - (item.totalBytes + item.liveBytes)
                         val remainingSeconds = (remainingBytes / (item.speedMbs * 1024f * 1024f)).toInt()
@@ -1311,7 +1406,7 @@ fun QueueItemCard(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), enabled = !selectionMode)
+                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), onSelectionTap = if (selectionMode) onToggleSelect else null)
             }
 
             if (!selectionMode) {
@@ -1550,7 +1645,15 @@ internal fun scheduleTexts(context: android.content.Context): Pair<String, Strin
  * own handler, so a long-press here copies instead of starting the card's selection. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Boolean = true) {
+internal fun QueueLink(
+    url: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    // While its card is in selection mode: a tap or long-press here selects/deselects the card.
+    // The link used to be merely disabled then, which still swallowed the tap, so this strip was
+    // the one part of a card that didn't respond.
+    onSelectionTap: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -1558,7 +1661,11 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Bool
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.small)
-            .combinedClickable(
+            .then(
+                // While selecting, only this: the link's own handler, even disabled, still took the
+                // tap before it could reach the card.
+                if (onSelectionTap != null) Modifier.combinedClickable(onClick = onSelectionTap, onLongClick = onSelectionTap)
+                else Modifier.combinedClickable(
                 enabled = enabled,
                 onClickLabel = stringResource(R.string.open_link),
                 onLongClickLabel = stringResource(R.string.copy_link),
@@ -1571,7 +1678,7 @@ internal fun QueueLink(url: String, modifier: Modifier = Modifier, enabled: Bool
                         Toast.makeText(context, context.getString(R.string.link_copied), Toast.LENGTH_SHORT).show()
                     }
                 },
-            )
+            ))
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
