@@ -148,6 +148,7 @@ fun DownloadsHistoryScreen(
     // already handles the smooth reflow/removal animation on its own, so this only ever needs to
     // gate the one-time entrance.
     val alreadyAnimatedIds = remember { mutableSetOf<String>() }
+    MarkShownAfterFirstFrame(alreadyAnimatedIds, historyItems, deletedItems) { it.id }
     // better-interface review: the entrance slide below animated unconditionally, with nothing
     // checking the OS-level reduce-motion setting — same finding already fixed on QueueScreen.kt.
     val reducedMotion = rememberIsReducedMotionEnabled()
@@ -1307,6 +1308,21 @@ private fun LibraryHeaderActions(
     }
 }
 
+/** Marks every item of [lists] as already shown ([shown], the lists' "played its entrance" set)
+ * once a frame has gone by since they changed. The entrance is for an item that just arrived, so
+ * only the ones on screen in that frame play it. It used to play for any item the list hadn't drawn
+ * yet this session: after the app started, a fast fling brought in a whole screen of never-drawn
+ * cards, every one starting invisible, and the Library went blank mid-scroll (seen live). The
+ * Queue's cards use it too. */
+@Composable
+internal fun <T> MarkShownAfterFirstFrame(shown: MutableSet<String>, vararg lists: List<T>, id: (T) -> String) {
+    LaunchedEffect(*lists) {
+        // Two frames: the lazy list composes the items on screen in the frame after the change.
+        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+        lists.forEach { list -> list.forEach { shown.add(id(it)) } }
+    }
+}
+
 /** Shared swipe-to-delete wrapper for both HistoryRow's own list and DuplicatesList below —
  * [modifier] and [shape] describe the card's own footprint (edge-to-edge for HistoryRow's plain
  * rows, a margined rounded pill for Duplicates' cards) and are applied to the reveal background
@@ -1423,6 +1439,7 @@ private fun DuplicatesList(
     // alreadyAnimatedIds: a Lazy layout recycling this composable in and out of view shouldn't
     // replay the slide-in every time, same reasoning as that other map's own doc comment.
     val alreadyAnimatedIds = remember { mutableSetOf<String>() }
+    MarkShownAfterFirstFrame(alreadyAnimatedIds, attempts) { it.id }
     val reducedMotion = rememberIsReducedMotionEnabled()
     LazyColumn(contentPadding = contentPadding.let { PaddingValues(top = it.calculateTopPadding(), bottom = it.calculateBottomPadding(), start = 16.dp, end = 16.dp) }) {
         items(attempts, key = { it.id }) { attempt ->
@@ -2050,10 +2067,15 @@ private fun DownloadActionsMenu(
     // The real file: a song's thumbnailPath is its cover art, and mediaUri the song.
     val fileUri = (item.mediaUri ?: item.thumbnailPath)?.takeIf { it.isNotBlank() && !fileGone }
     // Compress is offered for a saved video only (not a song, a picture or a multi-file post's
-    // first file being an image).
+    // first file being an image). Asked of MediaStore the first time the menu opens (the menu's
+    // items are only built then), not as the card is: that query, on the main thread for every
+    // card scrolling into view, was two-thirds of building one (~3 ms each, traced), and a fast
+    // fling stuttered through the Library.
     val isVideo = remember(fileUri, item.isAudio) {
-        !item.isAudio && fileUri != null &&
-            runCatching { context.contentResolver.getType(Uri.parse(fileUri)) }.getOrNull()?.startsWith("video/") == true
+        lazy {
+            !item.isAudio && fileUri != null &&
+                runCatching { context.contentResolver.getType(Uri.parse(fileUri)) }.getOrNull()?.startsWith("video/") == true
+        }
     }
     var compressOpen by remember { mutableStateOf(false) }
     if (compressOpen && fileUri != null) {
@@ -2100,7 +2122,7 @@ private fun DownloadActionsMenu(
                     runCatching { context.startActivity(Intent.createChooser(intent, context.getString(R.string.share))) }
                 },
             )
-            if (isVideo) {
+            if (isVideo.value) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.compress_video)) },
                     leadingIcon = { Icon(Icons.Outlined.Compress, contentDescription = null) },
