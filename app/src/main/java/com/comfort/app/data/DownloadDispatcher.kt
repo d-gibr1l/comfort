@@ -108,9 +108,11 @@ object DownloadDispatcher {
     private val repairScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
     private var pendingRepair: kotlinx.coroutines.Job? = null
 
-    /** [repairOrphanedQueue] shortly after the last of a burst of calls. */
+    /** [repairOrphanedQueue] shortly after the last of a burst of calls. Also called by a
+     * DownloadWorker that was cancelled or stopped, so a download left QUEUED/SCHEDULED without a
+     * live job is started again right away rather than at the next app start. */
     @Synchronized
-    private fun requestQueueRepair(context: Context) {
+    fun requestQueueRepair(context: Context) {
         val appContext = context.applicationContext
         pendingRepair?.cancel()
         pendingRepair = repairScope.launch {
@@ -380,12 +382,18 @@ object DownloadDispatcher {
         // happened to be mid-transfer: it would come back SCHEDULED and start again on its own
         // once the window reopened, ignoring the pause the user just asked for.
         if (GalleryDlPreferences.isGloballyPaused(context)) return
-        val dao = AppDatabase.getDatabase(context).downloadDao()
-        val entity = dao.getById(id) ?: return
-        dao.resetSpeed(id)
-        DownloadNotifications.cancel(context, id)
-        enqueueWork(context, id, entity.url)
-        repairOrphanedQueue(context)
+        // NonCancellable: the caller is the download's own worker, and enqueueWork() starts by
+        // cancelling that worker's job — which cancelled this very call before it had submitted the
+        // new job. The download was left QUEUED with a dead job, waiting until the next app start
+        // (seen live: 5 downloads stuck in "In Queue" with nothing running).
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            val dao = AppDatabase.getDatabase(context).downloadDao()
+            val entity = dao.getById(id) ?: return@withContext
+            dao.resetSpeed(id)
+            DownloadNotifications.cancel(context, id)
+            enqueueWork(context, id, entity.url)
+            repairOrphanedQueue(context)
+        }
     }
 
     /** Cancels the in-flight WorkManager job (if any) and marks the entry paused — distinct from
@@ -679,7 +687,13 @@ object DownloadDispatcher {
         if (withinWindow) return 0L
 
         val minutesUntilStart = if (nowMin < startMin) startMin - nowMin else (24 * 60 - nowMin) + startMin
-        return TimeUnit.MINUTES.toMillis(minutesUntilStart.toLong())
+        // To the window's start exactly, not in whole minutes from now: the seconds already gone
+        // in this minute come off. Without that each download's job woke up to a minute after the
+        // window opened — at the seconds-past-the-minute it was queued at (seen live: queued at
+        // :04, :11, :19 past, they started at 16:28:04, :11, :19), so a batch trickled into
+        // Running instead of starting together.
+        val intoThisMinute = now.get(Calendar.SECOND) * 1000L + now.get(Calendar.MILLISECOND)
+        return (TimeUnit.MINUTES.toMillis(minutesUntilStart.toLong()) - intoThisMinute).coerceAtLeast(1L)
     }
 
     private const val SCHEDULE_ALARM_REQUEST_CODE = 1001
