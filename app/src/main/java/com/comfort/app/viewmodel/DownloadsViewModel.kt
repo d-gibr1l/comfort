@@ -1,5 +1,8 @@
 package com.comfort.app.viewmodel
 
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.transform
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,13 +36,20 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     private val shapeCache = ConcurrentHashMap<String, MediaShape>()
     private val isScanning = AtomicBoolean(false)
 
+    // Both lists at most every LIST_UPDATE_MS (the first change at once): a batch — 200 scheduled
+    // downloads let go when their window opens, a Retry All, many finishing together — is one
+    // status write per download, and each used to rebuild the Queue/Library and recount its tabs.
+    // Progress lines only arrive about once a second anyway.
     private val rawHistoryFlow: StateFlow<List<DownloadEntity>> = dao.getHistoryFlow()
+        .throttleLatest(LIST_UPDATE_MS)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val rawDeletedFlow: StateFlow<List<DownloadEntity>> = dao.getDeletedFlow()
+        .throttleLatest(LIST_UPDATE_MS) // a deleted-files scan or bulk delete is a burst too
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val rawQueueFlow: StateFlow<List<DownloadEntity>> = dao.getQueueFlow()
+        .throttleLatest(LIST_UPDATE_MS)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Optimistic-hide set shared by every screen's undoable delete (see hideForDeletion() below)
@@ -118,6 +128,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * actually are (a link that "Prevent duplicate downloads" recognized as already queued/
      * running/finished, so nothing was actually re-downloaded). */
     val duplicateAttemptsFlow: StateFlow<List<com.comfort.app.data.DuplicateAttempt>> = dao.getDuplicateAttemptsFlow()
+        .throttleLatest(LIST_UPDATE_MS) // a deleted-files scan or bulk delete is a burst too
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** The "Redownload" action on a Duplicates entry — same forceDuplicate escape hatch the share
@@ -344,3 +355,14 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 }
+
+/** How often (at most) the Queue's and Library's lists update while their downloads change fast. */
+private const val LIST_UPDATE_MS = 150L
+
+/** Each value at once if nothing came for [periodMs], else the latest one at the end of the period:
+ * a burst of N values becomes about one per period, never delaying the first or dropping the last. */
+private fun <T> kotlinx.coroutines.flow.Flow<T>.throttleLatest(periodMs: Long): kotlinx.coroutines.flow.Flow<T> =
+    conflate().transform {
+        emit(it)
+        kotlinx.coroutines.delay(periodMs)
+    }
