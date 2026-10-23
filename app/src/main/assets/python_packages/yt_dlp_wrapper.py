@@ -339,6 +339,61 @@ def _patch_movflags_for_non_mp4():
     Popen.run = classmethod(_run_without_bad_movflags)
 
 
+# A file's name, extension included, in bytes at most. Android's limit is 255, and yt-dlp's
+# temporary names add up to ~90 to the one it works out: ".f<format id>" for each format of a
+# merge, ".part", "-Frag<n>.part" for each fragment of a stream. A post captioned in Japanese
+# (3-4 bytes a character) came to a 212-byte name; its fragments' names, 257 bytes, couldn't be
+# created ("[Errno 36] File name too long", seen live), and the download failed as empty.
+_NAME_MAX_BYTES = 165
+
+# The " [id]" / " [site]" tags a name ends with (and a chapter's " - 001 title" after them): kept
+# whole, so a shortened name still ends like the others.
+_NAME_TAGS_RE = re.compile(r" \[[^\[\]]*\].*$")
+
+_NAME_LIMIT_PATCHED = False
+
+
+def _fit_name(name):
+    """[name] (a file's name, not its folder) shortened to _NAME_MAX_BYTES: the text before its
+    tags is cut, at a character, and ends with "…"; the tags and extension stay. A name with no
+    tags (or tags too long to keep) is cut at its end instead."""
+    if len(name.encode("utf-8")) <= _NAME_MAX_BYTES:
+        return name
+    stem, ext = os.path.splitext(name)
+    if len(ext) > 12:  # not a real extension ("… 2.5 hours"), part of the name
+        stem, ext = name, ""
+    match = _NAME_TAGS_RE.search(stem)
+    tail = match.group(0) if match and match.start() > 0 else ""
+    budget = _NAME_MAX_BYTES - len((tail + ext).encode("utf-8")) - len("…".encode("utf-8"))
+    if budget < 20:
+        tail, budget = "", _NAME_MAX_BYTES - len(ext.encode("utf-8")) - len("…".encode("utf-8"))
+    head = stem[:len(stem) - len(tail)] if tail else stem
+    head = head.encode("utf-8")[:budget].decode("utf-8", "ignore").rstrip(" -–—_.")
+    return f"{head}…{tail}{ext}"
+
+
+def _patch_filename_byte_limit():
+    """Every name yt-dlp works out (the download's, a chapter's, a thumbnail's or subtitle's,
+    which are built from it) goes through YoutubeDL._prepare_filename; its file's part is
+    shortened there (_fit_name). The caption alone was capped at 150 bytes before, which left
+    the poster's name, a custom format's fields and the temporary names' room out of the count."""
+    global _NAME_LIMIT_PATCHED
+    if _NAME_LIMIT_PATCHED:
+        return
+    _NAME_LIMIT_PATCHED = True
+
+    original = yt_dlp.YoutubeDL._prepare_filename
+
+    def _prepare_filename(self, *args, **kwargs):
+        filename = original(self, *args, **kwargs)
+        if not filename or filename == "-":
+            return filename
+        folder, name = os.path.split(filename)
+        return os.path.join(folder, _fit_name(name)) if folder else _fit_name(name)
+
+    yt_dlp.YoutubeDL._prepare_filename = _prepare_filename
+
+
 def _ffmpeg_env():
     """This process's environment minus LD_LIBRARY_PATH, for running ffmpeg. That variable points
     at the bundled Python's own libraries (libz, libcrypto, ...) so Python can start, and ffmpeg
@@ -1896,6 +1951,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 return
             _log_error(msg)
         logger.error = _error
+
+    _patch_filename_byte_limit()
 
     def _attempt(opts, reuse_info):
         with yt_dlp.YoutubeDL(opts) as ydl:
