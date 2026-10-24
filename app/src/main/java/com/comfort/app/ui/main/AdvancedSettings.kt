@@ -374,11 +374,14 @@ private fun ExtraArgsSheetField() {
     val setCount = listOf(bothArgs, ytDlpArgs, galleryDlArgs).count { it.isNotBlank() }
     val summary = when {
         setCount == 0 -> stringResource(R.string.none)
-        else -> listOfNotNull(
-            stringResource(R.string.extra_args_both_short).takeIf { bothArgs.isNotBlank() },
-            "yt-dlp".takeIf { ytDlpArgs.isNotBlank() },
-            "gallery-dl".takeIf { galleryDlArgs.isNotBlank() },
-        ).joinToString(", ", prefix = stringResource(R.string.set_for))
+        else -> stringResource(
+            R.string.set_for_x,
+            listOfNotNull(
+                stringResource(R.string.extra_args_both_short).takeIf { bothArgs.isNotBlank() },
+                "yt-dlp".takeIf { ytDlpArgs.isNotBlank() },
+                "gallery-dl".takeIf { galleryDlArgs.isNotBlank() },
+            ).joinToString(", "),
+        )
     }
     val summaryDescription = stringResource(R.string.extra_arguments_x, summary)
     OutlinedButton(

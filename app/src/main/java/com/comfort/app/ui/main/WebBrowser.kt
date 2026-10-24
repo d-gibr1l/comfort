@@ -748,8 +748,8 @@ private fun RecordingBar(bytes: Long, ended: Boolean, saving: Boolean, onStop: (
             Text(
                 when {
                     saving -> stringResource(R.string.saving_the_recording)
-                    ended -> stringResource(R.string.recorded_to_the_end) + android.text.format.Formatter.formatShortFileSize(context, bytes)
-                    bytes > 0 -> stringResource(R.string.recording) + android.text.format.Formatter.formatShortFileSize(context, bytes)
+                    ended -> stringResource(R.string.recorded_to_the_end_x, android.text.format.Formatter.formatShortFileSize(context, bytes))
+                    bytes > 0 -> stringResource(R.string.recording_x, android.text.format.Formatter.formatShortFileSize(context, bytes))
                     else -> stringResource(R.string.recording_play_the_video)
                 },
                 style = MaterialTheme.typography.labelLarge,
