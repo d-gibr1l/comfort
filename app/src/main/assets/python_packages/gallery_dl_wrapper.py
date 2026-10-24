@@ -8,6 +8,8 @@ from contextlib import redirect_stdout, redirect_stderr
 import gallery_dl
 import gallery_dl.job
 import gallery_dl.output
+import custom_names
+import gallery_dl.path
 import net_resilience
 from comfort_events import event
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
@@ -77,6 +79,18 @@ def _update_kwdict(self, kwdict):
 
 
 gallery_dl.job.Job.update_kwdict = _update_kwdict
+
+_original_build_filename = gallery_dl.path.PathFormat.build_filename
+
+
+def _build_filename(self, kwdict):
+    # Every file's name, the default format's or a custom one's, at most custom_names'
+    # NAME_MAX_BYTES (see there). The format caps the caption at 150 *characters*
+    # ("{content[:150]}"), up to ~600 bytes in Japanese or emoji, well past Android's 255.
+    return custom_names.fit_name(_original_build_filename(self, kwdict))
+
+
+gallery_dl.path.PathFormat.build_filename = _build_filename
 
 # gallery-dl's own internal yt-dlp delegation (downloader/ytdl.py, used for "ytdl:"-prefixed
 # URLs on sites like Instagram) names each pre-merge DASH stream "...fdash-<id>v.<ext>" (video)
