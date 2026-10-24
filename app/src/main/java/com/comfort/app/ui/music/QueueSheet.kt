@@ -1,5 +1,6 @@
 package com.comfort.app.ui.music
 
+import com.comfort.app.ui.main.swipeRemoveAction
 import androidx.compose.ui.res.stringResource
 import com.comfort.app.R
 import androidx.compose.animation.core.animateFloat
@@ -254,6 +255,7 @@ private fun QueueRowContent(
             .fillMaxWidth()
             .height(ROW_HEIGHT)
             .background(if (current) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
+            .swipeRemoveAction()
             .clickable(onClick = onClick)
             .padding(start = 16.dp, end = 4.dp)
             // Already played: faded, as in Auxio.

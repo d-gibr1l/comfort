@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.AnimatedContent
@@ -1402,7 +1403,9 @@ internal fun SwipeToDeleteCard(
         enableDismissFromStartToEnd = enabled,
         enableDismissFromEndToStart = enabled,
         backgroundContent = {
-            Box(
+            // Only while the card is slid: at rest it was drawn (and its icon built) under every
+            // card for nothing, its red showing at the card's rounded corners.
+            if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(shape)
@@ -1414,7 +1417,26 @@ internal fun SwipeToDeleteCard(
             }
         },
     ) {
-        content()
+        // The card's row takes the swipe as a TalkBack action (Modifier.swipeRemoveAction).
+        androidx.compose.runtime.CompositionLocalProvider(LocalSwipeRemove provides if (enabled) ({ latestOnDelete() }) else null) {
+            content()
+        }
+    }
+}
+
+/** What swiping the enclosing SwipeToDeleteCard away does, for [swipeRemoveAction]; null outside
+ * one, or where it doesn't swipe. */
+internal val LocalSwipeRemove = androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
+
+/** The enclosing SwipeToDeleteCard's swipe as a TalkBack "Remove" action, on the row a screen
+ * reader focuses — a swipe it can't make. On the row itself, not the card around it: TalkBack
+ * lands on the row (it's clickable), and an action on the card would never be offered. */
+@Composable
+internal fun Modifier.swipeRemoveAction(): Modifier {
+    val remove = LocalSwipeRemove.current ?: return this
+    val label = stringResource(R.string.sponsorblock_remove)
+    return semantics {
+        customActions = listOf(androidx.compose.ui.semantics.CustomAccessibilityAction(label) { remove(); true })
     }
 }
 
@@ -1890,6 +1912,7 @@ private fun HistoryRow(
             // not onPrimaryContainer) assumes a fully-opaque container guarantees — full-opacity
             // primaryContainer instead.
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+            .swipeRemoveAction()
             .then(
                 if (selectionMode) {
                     Modifier.semantics {
