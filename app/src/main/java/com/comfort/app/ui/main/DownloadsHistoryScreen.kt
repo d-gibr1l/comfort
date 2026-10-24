@@ -1869,6 +1869,18 @@ private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
     }
 }
 
+// One "Oct 9, 2026" formatter for every Library card: a remember in HistoryRow built a new one
+// for each card scrolling into view, which showed on a fast fling. Rebuilt only if the language
+// changes. SimpleDateFormat isn't thread-safe; it's shared only because it's used while
+// composing, on the main thread.
+private var historyDateFormatCache: Pair<Locale, SimpleDateFormat>? = null
+
+private fun historyDateFormat(): SimpleDateFormat {
+    val locale = Locale.getDefault()
+    historyDateFormatCache?.let { (cachedLocale, format) -> if (cachedLocale == locale) return format }
+    return SimpleDateFormat("MMM d, yyyy", locale).also { historyDateFormatCache = locale to it }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HistoryRow(
@@ -2040,8 +2052,7 @@ private fun HistoryRow(
             )
             Spacer(Modifier.height(6.dp))
 
-            val sdf = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
-            MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, sdf.format(Date(item.effectiveDate))))
+            MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, historyDateFormat().format(Date(item.effectiveDate))))
             Spacer(Modifier.height(2.dp))
             MetaRow(icon = Icons.Outlined.SdStorage, text = stringResource(R.string.size_x, formatFileSize(item.totalBytes)))
             if (item.missingItems > 0) {
