@@ -166,6 +166,7 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
 
     // Appearance
     SubpageSearchEntry(R.string.follow_system_theme, R.string.switch_between_your_light_and_dark, SettingsRoute.APPEARANCE),
+    SubpageSearchEntry(R.string.language, R.string.language_search_subtitle, SettingsRoute.APPEARANCE),
     SubpageSearchEntry(R.string.pure_black_dark_mode, R.string.use_true_black_backgrounds_in_dark, SettingsRoute.APPEARANCE),
     SubpageSearchEntry(R.string.light_theme, R.string.pick_this_app_s_light_mode, SettingsRoute.APPEARANCE),
     SubpageSearchEntry(R.string.dark_theme, R.string.pick_this_app_s_dark_mode, SettingsRoute.APPEARANCE),

@@ -15,6 +15,12 @@ import kotlinx.coroutines.launch
  * link — the worker can start the process on its own, without any screen — and, once, sorts
  * downloads saved under the old folders into Download/Comfort's and renames old-style names. */
 class ComfortApp : Application() {
+    // The app's own language before Android 13 (see AppLanguage), for text built from the
+    // application context: notifications, workers.
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(com.comfort.app.util.AppLanguage.wrap(base))
+    }
+
     /** The launcher shortcuts are all in res/xml/shortcuts.xml. An older build registered a
      * long-lived "Quick download" one at run time, which Android kept across updates — blank icon,
      * and it pushed one of the real four out of the launcher's four slots. Clears any such leftover. */

@@ -29,6 +29,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -259,6 +262,9 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
+            LanguageRow()
+
             Spacer(Modifier.height(navBarClearance()))
         }
         }
@@ -277,6 +283,68 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
                 .background(MaterialTheme.colorScheme.background)
                 .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
                 .windowInsetsPadding(WindowInsets.statusBars),
+        )
+    }
+}
+
+/** Settings › Appearance › Language: the app's own language, apart from the phone's (AppLanguage).
+ * Each language is listed in its own language, so it can be found whatever the app is set to. */
+@Composable
+private fun LanguageRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val current = remember { com.comfort.app.util.AppLanguage.current(context) }
+    var picking by remember { mutableStateOf(false) }
+    val systemDefault = stringResource(R.string.language_system_default)
+    fun label(tag: String) = if (tag.isEmpty()) systemDefault else com.comfort.app.util.AppLanguage.nativeName(tag)
+    val title = stringResource(R.string.language)
+    Surface(
+        onClick = { picking = true },
+        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Language, contentDescription = null)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    label(current),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    if (picking) {
+        AlertDialog(
+            onDismissRequest = { picking = false },
+            title = { Text(title) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    com.comfort.app.util.AppLanguage.SUPPORTED.forEach { tag ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    picking = false
+                                    if (tag != current) {
+                                        (context as? android.app.Activity)?.let { com.comfort.app.util.AppLanguage.set(it, tag) }
+                                    }
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = tag == current, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(label(tag), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { picking = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

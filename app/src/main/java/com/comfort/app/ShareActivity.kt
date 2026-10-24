@@ -118,6 +118,11 @@ class ShareActivity : ComponentActivity() {
         return urls
     }
 
+    // The app's own language before Android 13 (see AppLanguage).
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.comfort.app.util.AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Without this the window still defaults to decorFitsSystemWindows=true, meaning the
         // system reserves its own space for the nav bar regardless of this Activity's transparent

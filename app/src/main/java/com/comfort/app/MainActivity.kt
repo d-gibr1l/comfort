@@ -94,6 +94,11 @@ class MainActivity : ComponentActivity() {
     window.decorView.post { applySystemBarStyle?.invoke() }
   }
 
+  // The app's own language before Android 13 (see AppLanguage).
+  override fun attachBaseContext(newBase: android.content.Context) {
+    super.attachBaseContext(com.comfort.app.util.AppLanguage.wrap(newBase))
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Must be called before super.onCreate() — it reads the activity's theme (Theme.App.Starting,
     // set in the manifest) to know which splash to show, and installs the exit-animation hook
