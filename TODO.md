@@ -23,7 +23,8 @@
 - [ ] **Audio language picker:** the preview sheet lists a video's audio languages (Original + each dub, from the extraction it already does) and picks one; Settings gets "Preferred audio language" (Original by default, or the phone's language, or a set one). Songs and Spotify stay on the original. Today yt-dlp's ranking just takes the original.
 - [ ] **Subtitles:** default to the phone's language plus the video's original instead of always `en`; the preview sheet shows which languages exist (uploaded vs auto-generated) to pick from; an option for auto-generated captions and YouTube's auto-translation when nothing was uploaded (`writeautomaticsub` is never set today).
 - [ ] **Track switching in the viewer:** for files with several audio or subtitle tracks, the video viewer's ⋮ menu picks the audio track and shows subtitles (Media3 supports it; not wired up).
-- [ ] **Lyrics language tag:** `lyrics.py` writes every MP3's USLT frame as `lang="eng"`; use `und` (or a detected language). Translated/romanised lyrics would need another source than LRCLIB (left out for now).
+- [x] **Lyrics language tag:** *(done in 2bea8a2 — MP3 USLT frames now say `und`)* `lyrics.py` wrote every MP3's USLT frame as `lang="eng"`; use `und` (or a detected language).
+- [ ] **Translated/romanised lyrics:** would need another source than LRCLIB (left out for now).
 
 ## Other open items
 - [x] **Bundle yt-dlp-ejs 0.8.0** *(done in be583b3)* (works with QuickJS): without it YouTube's JS challenge is skipped ("[jsc] ... was skipped"), giving fewer formats or slow extraction.
