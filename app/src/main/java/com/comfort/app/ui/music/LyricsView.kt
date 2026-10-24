@@ -29,10 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -40,6 +36,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.comfort.app.music.Lyrics
+import com.comfort.app.ui.main.pinchToZoomText
+import com.comfort.app.ui.main.rememberTextZoom
 
 /**
  * The song's lyrics, in place of the cover. Synced ones follow the song: the line being sung is
@@ -50,13 +48,13 @@ import com.comfort.app.music.Lyrics
 @Composable
 internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
     val lines = lyrics.lines
-    val zoom = rememberLyricsZoom()
+    val zoom = rememberTextZoom("music_player", "lyrics_zoom", min = 0.7f, max = 1.8f)
     if (lines.isNullOrEmpty()) {
         val base = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
-        Box(modifier.pinchToZoom(zoom).verticalScroll(rememberScrollState())) {
+        Box(modifier.pinchToZoomText(zoom).verticalScroll(rememberScrollState())) {
             Text(
                 lyrics.plain.orEmpty(),
-                style = base.copy(fontSize = base.fontSize * zoom.floatValue, lineHeight = base.lineHeight * zoom.floatValue),
+                style = base.copy(fontSize = base.fontSize * zoom.factor, lineHeight = base.lineHeight * zoom.factor),
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White.copy(alpha = 0.9f),
                 modifier = Modifier.padding(vertical = 24.dp),
@@ -78,9 +76,9 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
 
     // Google Sans, as the app's titles (its bundled bold cut; other scripts fall back to the system font).
     val lineStyle = MaterialTheme.typography.headlineSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily).let { base ->
-        base.copy(fontSize = base.fontSize * zoom.floatValue, lineHeight = base.lineHeight * zoom.floatValue)
+        base.copy(fontSize = base.fontSize * zoom.factor, lineHeight = base.lineHeight * zoom.factor)
     }
-    BoxWithConstraints(modifier.pinchToZoom(zoom)) {
+    BoxWithConstraints(modifier.pinchToZoomText(zoom)) {
         val height = constraints.maxHeight
         // The line being sung sits a third of the way down.
         val anchor = height / 3
@@ -202,47 +200,3 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
         }
     }
 }
-
-/** The lyrics' text size, as a factor of the normal one: pinched bigger or smaller, and kept for
- * next time (the music player's own settings). */
-@Composable
-private fun rememberLyricsZoom(): androidx.compose.runtime.MutableFloatState {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    return remember {
-        androidx.compose.runtime.mutableFloatStateOf(
-            context.getSharedPreferences(ZOOM_PREFS, android.content.Context.MODE_PRIVATE).getFloat(ZOOM_KEY, 1f).coerceIn(MIN_ZOOM, MAX_ZOOM)
-        )
-    }
-}
-
-/** Two fingers pinch the lyrics bigger or smaller; one finger still scrolls them (only a
- * two-finger move is taken, before the list sees it). */
-@Composable
-private fun Modifier.pinchToZoom(zoom: androidx.compose.runtime.MutableFloatState): Modifier {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    return pointerInput(Unit) {
-        awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-            var pinched = false
-            do {
-                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                if (event.changes.count { it.pressed } >= 2) {
-                    val factor = event.calculateZoom()
-                    if (factor != 1f) {
-                        zoom.floatValue = (zoom.floatValue * factor).coerceIn(MIN_ZOOM, MAX_ZOOM)
-                        pinched = true
-                    }
-                    event.changes.forEach { it.consume() }
-                }
-            } while (event.changes.any { it.pressed })
-            if (pinched) {
-                context.getSharedPreferences(ZOOM_PREFS, android.content.Context.MODE_PRIVATE).edit().putFloat(ZOOM_KEY, zoom.floatValue).apply()
-            }
-        }
-    }
-}
-
-private const val ZOOM_PREFS = "music_player"
-private const val ZOOM_KEY = "lyrics_zoom"
-private const val MIN_ZOOM = 0.7f
-private const val MAX_ZOOM = 1.8f
