@@ -424,6 +424,13 @@ def _download_post(loader, post, from_cache, items, url, download_dir, cookies_p
             if name and name in used_names:
                 name = f"{name} [{key}]"
         name = _restricted(name or f"{safe_title} [{key}]")
+        # At most custom_names' NAME_MAX_BYTES with its extension (see there): the default name
+        # allows 90 characters and a custom format's caption 150, up to ~600 bytes in Japanese
+        # or emoji, past Android's 255.
+        ext = ".mp4" if is_video else ".jpg"
+        name = custom_names.fit_name(name + ext)[:-len(ext)]
+        if name in used_names:
+            name = custom_names.fit_name(f"{name} [{key}]{ext}")[:-len(ext)]
         used_names.add(name)
         return name
 
