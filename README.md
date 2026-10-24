@@ -43,6 +43,7 @@ straight from them with Obtainium:
 - Paste a link on Home, or share one in from any app. **Configure** opens the preview sheet,
   **Instant** starts downloading right away, and the Sharing mode setting picks one for you or
   asks each time
+- Search YouTube right from Home's link field, and download from the results
 - Automatic engine routing per URL — gallery-dl for image/gallery sites, yt-dlp for video hosts,
   Instaloader for Instagram — with a same-item fallback/supplement pass between them whenever one
   comes back empty (an Instagram carousel's embedded video that gallery-dl's own listing missed,
@@ -52,7 +53,11 @@ straight from them with Obtainium:
   song opens the preview sheet; a real multi-item gallery shows an item picker to choose which
   files to grab
 - Queue with pause/resume/cancel, configurable concurrent downloads, "Up next" to move a download to
-  the front of the line, and a scheduled download window (only download overnight, say)
+  the front of the line, and a scheduled download window (only download overnight, say) that
+  starts everything waiting the moment it opens
+- Select many downloads at once to retry, resume, pause, cancel or delete them together, or Retry
+  All on the Errored tab — a hundred cards move in one go
+- A download that saved some of its items and not others says so, and can fetch just the rest
 - Live speed and progress, a stall watchdog, and automatic retries on flaky connections
 - Resumable in-progress downloads survive process death — a killed app picks a download back up
   instead of restarting it
@@ -72,30 +77,46 @@ straight from them with Obtainium:
 - Real artist/album metadata is captured into the app's own library (not just embedded in the
   file) — Library has a dedicated Audio filter, and a track's card shows "Artist — Album" instead
   of just the source domain
-- A YouTube Music download's cover art is looked up against iTunes' public catalog and swapped in
-  for YouTube's own 16:9 video-frame thumbnail
+- A YouTube Music download's cover art is cropped square from its video thumbnail, not left 16:9
+- Synced lyrics from [LRCLIB](https://lrclib.net) saved inside each song
+- Save songs as MP3, M4A, Opus or FLAC (or the site's original audio), with an option to level
+  every song to the same loudness
+
+▶️ **Viewing and playing**
+- A built-in viewer for pictures and videos: swipe through the Library, see a photo's details,
+  share, or open in another app
+- A full music player, with Auxio's playback engine and look: a queue, shuffle, Now Playing with
+  synced lyrics, and a video with sound pauses the music, which plays on after
 
 🎛️ **Per-download options** (the preview sheet)
 - Video quality: Best / 4K / 1440p / 1080p / 720p / 480p / Audio-only, showing the size of the
   quality you pick before you download
 - Clip/section trimming — multi-segment, Set Start/Set End against the real video position
-- MP4 or MKV output
+- MP4 or MKV output; MP4 converts VP9/AV1-only videos to H.264 on the phone's hardware encoder
+- SponsorBlock (YouTube): mark sponsored segments as chapters, or cut them out
+- Split a video with chapters into one file per chapter
 - Save thumbnail, embed metadata/subtitles, write description/info.json sidecar files
 - Extra command-line arguments — one set for both engines plus separate yt-dlp and gallery-dl sets,
-  with a switch to turn them all off — and saved, reusable filename templates
+  with a switch to turn them all off — saved command templates, and one filename format for every
+  engine
 
 🛡️ **Sites & reliability**
 - Cookie import via an in-app login browser — logs in normally, then converts the session to a
   real Netscape `cookies.txt` automatically — with per-site management
 - Bot-detection bypass (`curl_cffi` browser impersonation) for TikTok, Reddit share links, and
   others
-- Proxy support, configurable network retries, and extractor arguments for site-specific
-  throttling workarounds
+- Proxy support (HTTP or SOCKS) that every engine's requests go through, configurable network
+  retries, and extractor arguments for site-specific throttling workarounds
+- File names that fit: a long caption in Japanese, Arabic or emoji is shortened to what Android
+  allows instead of failing the download
 - Readable errors — each engine's own error for a failed download, and a blocked request's raw
   HTML/CSS blob never reaches the UI as-is
 
 🎨 **App**
-- Library with search, filters, favorites, duplicates, and a grid/list view toggle
+- Library with search, filters, favorites, duplicates, and a grid/list view toggle; swipe a card
+  to remove it
+- Swipe sideways between Home, Library and Settings, and between the Queue's tabs
+- Backup & restore of your settings, command templates, Library history and logins
 - Light/dark/system theme, several named color themes, dynamic color, and a pure-black OLED option
 
 ## Screenshots
@@ -165,11 +186,17 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
 - [QuickJS](https://github.com/bellard/quickjs) (MIT) — JS-challenge solving for sites that require it
 - [TachiyomiJ2K](https://github.com/Jays2Kings/tachiyomiJ2K) (Apache-2.0) — the Appearance
   screen's theme-picker layout (light/dark preview card rows) is ported from its own Settings UI
+- [Auxio](https://github.com/OxygenCobalt/Auxio) (GPLv3) — the music player's playback engine
+  and look
+- [Photon Gallery](https://github.com/Bn5prS/Photon_Gallery) (GPLv3) — the built-in picture and
+  video viewer
+- [LRCLIB](https://lrclib.net) — synced lyrics
 
 ## License
 
 GPLv3 — see [`LICENSE`](LICENSE). Required by the GPL-licensed components this app bundles
-directly (gallery-dl, aria2, and the ytdlnis-packages Python/QuickJS binaries) — bundling
+directly (gallery-dl, aria2, the ytdlnis-packages Python/QuickJS binaries, and the code ported
+from Auxio and Photon Gallery) — bundling
 GPL code into a distributed app means the combined work has to be GPL-compatible too, with source
 available to anyone who gets the APK (this repo). The permissively-licensed pieces (yt-dlp,
 Instaloader, QuickJS, the ported TachiyomiJ2K UI) are all GPL-compatible on their own terms; see
