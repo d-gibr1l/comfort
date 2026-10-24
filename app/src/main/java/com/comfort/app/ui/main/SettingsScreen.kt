@@ -153,6 +153,7 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry(R.string.format_sort, R.string.custom_yt_dlp_format_selection_priority, SettingsRoute.ADVANCED),
     SubpageSearchEntry(R.string.custom_headers, R.string.extra_http_headers_sent_with_every, SettingsRoute.ADVANCED),
     SubpageSearchEntry(R.string.verbose_logging, R.string.logs_all_internal_yt_dlp_debug, SettingsRoute.ADVANCED),
+    SubpageSearchEntry(R.string.logs_title, R.string.export_logs_description, SettingsRoute.ADVANCED),
 
     // Cookies & Login
     SubpageSearchEntry(R.string.cookies, R.string.sign_in_to_sites_that_require, SettingsRoute.COOKIES),
