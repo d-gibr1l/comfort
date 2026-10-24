@@ -14,6 +14,19 @@ object SubscriptionChecks {
      * check slower. */
     const val FETCH_LIMIT = 30
 
+    /** How much of a playlist a check reads: all of it, within reason. A playlist lists its videos
+     * in its own order — usually oldest first, with new additions at the end — so its first
+     * [FETCH_LIMIT] entries are its oldest, and a long playlist's new videos were never reached. */
+    const val PLAYLIST_FETCH_LIMIT = 1000
+
+    /** A YouTube playlist's link (its `list=`), as opposed to a channel's. */
+    private val PLAYLIST_LINK = Regex("""[?&]list=[^&#]+""")
+
+    fun isPlaylist(url: String): Boolean = PLAYLIST_LINK.containsMatchIn(url) && !url.contains("/watch")
+
+    /** How many entries a check of [url] asks for. */
+    fun fetchLimit(url: String): Int = if (isPlaylist(url)) PLAYLIST_FETCH_LIMIT else FETCH_LIMIT
+
     /** The most downloads one check queues for one source. Anything a check sees for the first
      * time counts as new, and a channel that reorganises its uploads (re-ordering a playlist,
      * re-uploading, an old video made public again) can make a whole page of them look new at
@@ -34,12 +47,20 @@ object SubscriptionChecks {
      * downloaded ones included. */
     data class Plan(val toDownload: List<FeedEntry>, val toMarkSeen: List<String>)
 
-    /** [entries] newest first, as the feed lists them. A source's first successful check
-     * ([initialized] false) only records what's there: subscribing to a channel shouldn't
-     * download its whole back catalogue. After that, uploads not in [seen] are new: the newest
-     * [cap] are downloaded and the rest are only marked seen (see [MAX_NEW_PER_CHECK]). */
-    fun plan(entries: List<FeedEntry>, seen: Set<String>, initialized: Boolean, cap: Int = MAX_NEW_PER_CHECK): Plan {
-        val fresh = entries.distinctBy { it.id }.filter { it.id !in seen }
+    /** [entries] as the feed lists them: newest first for a channel, or in the playlist's own order
+     * ([newestLast]: a playlist adds its new videos at the end). A source's first successful check
+     * ([initialized] false) only records what's there: subscribing shouldn't download a whole back
+     * catalogue. After that, entries not in [seen] are new wherever they are in the list: the
+     * newest [cap] are downloaded and the rest are only marked seen (see [MAX_NEW_PER_CHECK]). */
+    fun plan(
+        entries: List<FeedEntry>,
+        seen: Set<String>,
+        initialized: Boolean,
+        cap: Int = MAX_NEW_PER_CHECK,
+        newestLast: Boolean = false,
+    ): Plan {
+        val newestFirst = if (newestLast) entries.reversed() else entries
+        val fresh = newestFirst.distinctBy { it.id }.filter { it.id !in seen }
         val ids = fresh.map { it.id }
         if (!initialized) return Plan(emptyList(), ids)
         return Plan(fresh.take(cap.coerceAtLeast(0)).reversed(), ids)

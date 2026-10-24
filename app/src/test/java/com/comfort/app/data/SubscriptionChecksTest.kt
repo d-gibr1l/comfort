@@ -21,6 +21,31 @@ class SubscriptionChecksTest {
         )
 
     @Test
+    fun playlist_newAdditionsAtTheEndAreFound_andQueuedInPlaylistOrder() {
+        // A 300-video playlist, oldest first, as YouTube lists it; the last two are new.
+        val playlist = (0 until 300).map { entry("p$it") }
+        val seen = playlist.take(298).map { it.id }.toSet()
+        val plan = SubscriptionChecks.plan(playlist, seen, initialized = true, newestLast = true)
+        assertEquals(listOf("p298", "p299"), plan.toDownload.map { it.id })
+    }
+
+    @Test
+    fun playlist_capKeepsTheNewest() {
+        val playlist = (0 until 50).map { entry("p$it") }
+        val plan = SubscriptionChecks.plan(playlist, emptySet(), initialized = true, cap = 3, newestLast = true)
+        assertEquals(listOf("p47", "p48", "p49"), plan.toDownload.map { it.id })
+        assertEquals(50, plan.toMarkSeen.size)
+    }
+
+    @Test
+    fun fetchLimit_playlistsWhole_channelsTheirNewest() {
+        assertEquals(SubscriptionChecks.PLAYLIST_FETCH_LIMIT, SubscriptionChecks.fetchLimit("https://www.youtube.com/playlist?list=PL123"))
+        assertEquals(SubscriptionChecks.FETCH_LIMIT, SubscriptionChecks.fetchLimit("https://www.youtube.com/@veritasium"))
+        // A video opened from a playlist is a video, not a playlist subscription.
+        assertFalse(SubscriptionChecks.isPlaylist("https://www.youtube.com/watch?v=abc&list=PL123"))
+    }
+
+    @Test
     fun firstCheck_recordsEverythingAndDownloadsNothing() {
         val plan = SubscriptionChecks.plan(entries(25), seen = emptySet(), initialized = false)
         assertTrue(plan.toDownload.isEmpty())
