@@ -179,7 +179,7 @@
     <string name="verbose_logging">Verbose logging</string>
     <string name="logs_all_internal_yt_dlp_debug">Logs all internal yt-dlp debug output for advanced troubleshooting.</string>
     <string name="export_logs">Export logs</string>
-    <string name="export_logs_description">Saves what your recent downloads did to a text file, to attach when you report a problem. It lists the links you downloaded; passwords, cookies and logins are blanked.</string>
+    <string name="logs_description">What your recent downloads did, step by step. View it here, or save it to a text file to attach when you report a problem; it shows the links you downloaded, but passwords, cookies and logins are blanked.</string>
     <string name="logs_exported">Logs saved.</string>
     <string name="view_logs">View logs</string>
     <string name="logs_title">Logs</string>
