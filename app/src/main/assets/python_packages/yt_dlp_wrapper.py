@@ -1134,6 +1134,124 @@ def search(query, count=20, proxy_url=None, page=1, cookies_path=None):
     return json.dumps({"results": results})
 
 
+# A YouTube channel's own address with no tab picked (or its "home"/"featured" tab): yt-dlp lists
+# that as the channel's tabs — Videos, Shorts, Live, each fully listed — not as its uploads.
+_YT_CHANNEL_HOME_RE = re.compile(
+    r"^(https?://(?:www\.|m\.)?youtube\.com/(?:@[^/?#]+|channel/UC[\w-]+|c/[^/?#]+|user/[^/?#]+))"
+    r"(?:/(?:featured|home))?/?(?:[?#].*)?$", re.I)
+
+
+def _short_error(e):
+    # yt-dlp's DownloadError reads "ERROR: [youtube:tab] @x: This channel does not exist." plus,
+    # sometimes, a line of advice; the app shows this to a person, so just the sentence itself.
+    msg = (str(e) or e.__class__.__name__).strip().splitlines()[0]
+    msg = re.sub(r"^ERROR:\s*", "", msg)
+    msg = re.sub(r"^\[[^\]]+\]\s*(?:[^\s:]+:\s+)?", "", msg)
+    return msg or "Couldn't read this link"
+
+
+def latest_entries(url, limit=30, proxy_url=None, cookies_path=None):
+    """What a channel or playlist has put up lately, for Subscriptions to compare against what it
+    saw at its last check. One JSON object: the source's name, uploader, picture and address, and
+    its first `limit` entries (id, watch link, title, date, length, thumbnail) in the order the page
+    itself lists them — newest first, for a channel's Videos tab. {"error": "..."} on failure.
+
+    It runs often and in the background, so it must be cheap: a flat listing that stops after
+    `limit` entries (yt-dlp fetches no further pages of the list, and no video page at all), the
+    same as search(). A bare YouTube channel address is pointed at its Videos tab first — left
+    alone, yt-dlp lists every tab of the channel in full, which took 17 s for one channel against 3
+    for its Videos tab, and mixes Shorts and streams in with the uploads.
+
+    Dates: a flat YouTube listing has no upload date, only "3 days ago"; the approximate_date
+    extractor arg turns that into a timestamp, so upload_date here is that day, not exact — fine
+    for "new since last time", which goes by id anyway."""
+    try:
+        limit = max(1, min(int(limit or 30), 200))
+    except ValueError:
+        limit = 30
+    home = _YT_CHANNEL_HOME_RE.match(url.strip())
+    if home:
+        url = home.group(1) + "/videos"
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "no_color": True,
+        # PythonRuntime merges stderr into the same stream the JSON line is read from, so even
+        # yt-dlp's own "ERROR: ..." line (which it prints before raising) stays out of it — the
+        # message reaches the app in the JSON instead.
+        "logger": _Logger(None),
+        "extract_flat": "in_playlist",
+        "skip_download": True,
+        "playlistend": limit,
+        "extractor_args": {"youtubetab": {"approximate_date": [""]}},
+    }
+    if proxy_url:
+        opts["proxy"] = proxy_url
+    if cookies_path:
+        opts["cookiefile"] = cookies_path
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as e:  # noqa: BLE001 - reported to the app as the subscription's error
+        return json.dumps({"error": _short_error(e)})
+    if not info:
+        return json.dumps({"error": "Nothing could be read from this link"})
+    entries = info.get("entries")
+    if entries is None:
+        return json.dumps({"error": "This link is a single item, not a channel or playlist"})
+    entries = list(entries)
+    # A channel address the rewrite above didn't recognise can still come back as its tabs
+    # (each one a nested, already-listed playlist): take the Videos tab's own entries.
+    tabs = [t for t in entries if t and t.get("_type") == "playlist" and t.get("entries") is not None]
+    if tabs and len(tabs) == len(entries):
+        videos = next((t for t in tabs if (t.get("webpage_url") or "").rstrip("/").endswith("/videos")), tabs[0])
+        entries = list(videos.get("entries") or [])
+
+    channel_id = info.get("channel_id")
+    is_channel = bool(channel_id) and info.get("id") == channel_id
+    # A channel tab is titled "<Channel> - Videos"; the app wants the channel's own name.
+    title = (info.get("channel") or info.get("uploader")) if is_channel else None
+    title = title or info.get("title") or info.get("id") or url
+    thumbs = [t for t in (info.get("thumbnails") or []) if t.get("url")]
+    # A channel's thumbnails are its banners and its avatar; the avatar is the one to show.
+    avatar = next((t for t in thumbs if t.get("id") == "avatar_uncropped"), None)
+    thumbnail = (avatar or (thumbs[-1] if thumbs else {})).get("url") or info.get("thumbnail")
+
+    out = []
+    for entry in entries:
+        if not entry or len(out) >= limit:
+            continue
+        ie_key = entry.get("ie_key")
+        video_id = entry.get("id")
+        if ie_key == "Youtube" and video_id:
+            entry_url = f"https://www.youtube.com/watch?v={video_id}"
+        elif ie_key and ie_key.startswith("Youtube"):
+            continue  # a playlist or channel listed inside a YouTube tab, not an upload
+        else:
+            entry_url = entry.get("webpage_url") or entry.get("url")
+        if not entry_url:
+            continue
+        upload_date = entry.get("upload_date")
+        if not upload_date and entry.get("timestamp"):
+            upload_date = time.strftime("%Y%m%d", time.gmtime(entry["timestamp"]))
+        entry_thumbs = [t for t in (entry.get("thumbnails") or []) if t.get("url")]
+        out.append({
+            "id": str(video_id or entry_url),
+            "url": entry_url,
+            "title": entry.get("title"),
+            "upload_date": upload_date,
+            "duration": entry.get("duration"),
+            "thumbnail": entry.get("thumbnail") or (entry_thumbs[-1]["url"] if entry_thumbs else None),
+        })
+    return json.dumps({
+        "title": title,
+        "uploader": info.get("uploader") or info.get("channel"),
+        "thumbnail": thumbnail,
+        "webpage_url": info.get("webpage_url") or url,
+        "entries": out,
+    })
+
+
 def probe(url):
     # "1" if yt-dlp has a real (non-generic) extractor for url, "0" otherwise (incl. on any
     # error). GenericIE.suitable() always returns True (it's yt-dlp's own catch-all fallback
@@ -2403,9 +2521,24 @@ if __name__ == "__main__":
     def _emit(line):
         print(line, flush=True)
 
-    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list", "probe", "search"):
-        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <5 positional args> | probe <url>", file=_sys.stderr)
+    if len(_sys.argv) < 2 or _sys.argv[1] not in ("download", "list", "probe", "search", "latest"):
+        print("Usage: yt_dlp_wrapper.py download <21 positional args> | list <5 positional args> | probe <url>"
+              " | search <query> <count> <proxy> <page> <cookies> | latest <url> <limit> <proxy> <cookies>", file=_sys.stderr)
         _sys.exit(2)
+
+    if _sys.argv[1] == "latest":
+        # latest <url> <limit> <proxy> <cookies>
+        a = _sys.argv[2:]
+        try:
+            if not a or not a[0].strip():
+                raise ValueError("No link given")
+            result = latest_entries(a[0], limit=_s(a[1]) if len(a) > 1 else None,
+                                    proxy_url=_s(a[2]) if len(a) > 2 else None,
+                                    cookies_path=_s(a[3]) if len(a) > 3 else None)
+        except Exception as e:  # noqa: BLE001 - the contract is one JSON line, never a traceback
+            result = json.dumps({"error": _short_error(e)})
+        print(result, flush=True)
+        _sys.exit(0)
 
     if _sys.argv[1] == "search":
         # search <query> <count> <proxy> <page> <cookies>
