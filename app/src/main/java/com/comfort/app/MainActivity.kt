@@ -194,6 +194,12 @@ class MainActivity : ComponentActivity() {
         DownloadDispatcher.rescheduleStagingCleanup(context)
       }
 
+      // Re-arms the subscriptions' hourly check (or cancels it when there are none) — see
+      // Subscriptions.reschedule.
+      LaunchedEffect(Unit) {
+        com.comfort.app.data.Subscriptions.reschedule(context)
+      }
+
       // Re-arms the Schedule window's exact-alarm backstop every cold start — an AlarmManager
       // alarm doesn't survive a reboot on its own, so this is what re-establishes it. See
       // DownloadDispatcher.scheduleWindowAlarm's own doc comment.

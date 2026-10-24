@@ -218,6 +218,13 @@ object VideoSiteRouter {
     // changes how the preview sheet renders, never which engine downloads the link.
     private val songHosts = setOf("music.youtube.com", "soundcloud.com")
 
+    /** youtube.com (any subdomain, music.youtube.com included) or youtu.be — the sites a
+     * subscription can watch (Settings › Subscriptions). */
+    fun isYouTube(url: String): Boolean {
+        val host = normalizedHost(url) ?: return false
+        return setOf("youtube.com", "youtu.be").matchesHost(host)
+    }
+
     fun isKnownSongHost(url: String): Boolean {
         val host = normalizedHost(url) ?: return false
         return songHosts.matchesHost(host)

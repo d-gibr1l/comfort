@@ -1028,4 +1028,11 @@
     <string name="backup_couldnt_open_file">Couldn\'t open the file</string>
     <string name="search_no_results_short">No results</string>
     <string name="gallery_dl_off_no_preview">gallery-dl is turned off (Settings › Updates and engines), and yt-dlp couldn\'t preview this link.</string>
+
+    <!-- Subscriptions -->
+    <plurals name="subscription_new_downloads">
+        <item quantity="one">%1$d new from %2$s</item>
+        <item quantity="other">%1$d new from %2$s</item>
+    </plurals>
+    <string name="subscription_new_downloads_text">Added to your downloads</string>
 </resources>
