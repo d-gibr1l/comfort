@@ -26,6 +26,17 @@ object AppImageLoader {
      * so most of them just queue behind the first 5 instead of loading in parallel. */
     fun install(context: Context) {
         val client = OkHttpClient.Builder()
+            // IPv4 addresses first. A network can hand out IPv6 addresses it can't route (the PC
+            // hotspot the phone was on: an IPv6 ping to i.ytimg.com lost every packet, IPv4 was
+            // fine), Android lists IPv6 first then, and OkHttp 4 tries each address in turn,
+            // waiting out a dead one's whole connect timeout: every YouTube thumbnail (search
+            // results, playlist and channel lists, the preview card) stayed blank. The Python
+            // side has had the same fix for its own requests (net_resilience.py). IPv6 stays in
+            // the list, so an IPv6-only network still works.
+            .dns(object : okhttp3.Dns {
+                override fun lookup(hostname: String) =
+                    okhttp3.Dns.SYSTEM.lookup(hostname).sortedBy { if (it is java.net.Inet4Address) 0 else 1 }
+            })
             .dispatcher(
                 Dispatcher().apply {
                     maxRequests = 32
