@@ -49,12 +49,14 @@
     <string name="command_template_save_as">Save as template</string>
     <!-- Settings > Backup & restore. -->
     <string name="backup_title">Backup &amp; restore</string>
-    <string name="backup_root_subtitle">Settings, history and cookies</string>
+    <string name="backup_root_subtitle">Settings, history, subscriptions and cookies</string>
     <string name="backup_section">Back up</string>
     <string name="backup_part_settings">Settings</string>
     <string name="backup_part_settings_subtitle">Everything you\'ve set in Settings, the theme and command templates. Download folders aren\'t included: they have to be picked again on each install.</string>
     <string name="backup_part_history">Library history</string>
     <string name="backup_part_history_subtitle">The list of finished downloads. The files themselves aren\'t in the backup.</string>
+    <string name="backup_part_subscriptions">Subscriptions</string>
+    <string name="backup_part_subscriptions_subtitle">The channels and playlists you follow, with what each has already downloaded, so nothing comes down twice.</string>
     <string name="backup_part_cookies">Cookies &amp; logins</string>
     <string name="backup_part_cookies_subtitle">Anyone with the backup file can use these logins, so keep it private.</string>
     <string name="backup_action">Back up to a file</string>
@@ -69,6 +71,10 @@
     <plurals name="backup_history_count">
         <item quantity="one">%d download</item>
         <item quantity="other">%d downloads</item>
+    </plurals>
+    <plurals name="backup_subscriptions_count">
+        <item quantity="one">%d subscription</item>
+        <item quantity="other">%d subscriptions</item>
     </plurals>
     <string name="restore_section">Restore</string>
     <string name="restore_description">Brings back what a backup holds. Downloads already in your Library stay as they are; settings in the backup replace yours.</string>
