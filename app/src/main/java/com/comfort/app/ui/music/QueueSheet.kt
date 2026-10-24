@@ -114,10 +114,7 @@ internal fun QueuePanel() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    buildString {
-                        append(stringResource(R.string.queue))
-                        if (state.shuffle) append(stringResource(R.string.shuffled))
-                    },
+                    stringResource(if (state.shuffle) R.string.queue_shuffled else R.string.queue),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
