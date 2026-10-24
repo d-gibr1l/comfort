@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import android.content.ClipData
@@ -1312,8 +1313,28 @@ private fun MainPreviewScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
+        // The list stops at the chips below it, and a row it cut in half sat flush against them
+        // (reported live). While there's more below, its last few dp fade out instead.
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val fadePx = with(androidx.compose.ui.platform.LocalDensity.current) { 24.dp.toPx() }
         LazyColumn(
-            modifier = Modifier.fillMaxWidth().let { if (isList) it.weight(1f) else it },
+            state = listState,
+            modifier = Modifier.fillMaxWidth().let { if (isList) it.weight(1f) else it }
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (listState.canScrollForward) {
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                listOf(Color.Black, Color.Transparent),
+                                startY = size.height - fadePx,
+                                endY = size.height,
+                            ),
+                            topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fadePx),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+                },
             contentPadding = PaddingValues(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1371,7 +1392,7 @@ private fun MainPreviewScreen(
         // alongside the top icon row and the Download button below. Bottom padding keeps it from
         // crowding the Download button now that both are fixed and always touching.
         Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // A video list (song.mode == SONG_LIST but showQualityRow is still true, since it's
