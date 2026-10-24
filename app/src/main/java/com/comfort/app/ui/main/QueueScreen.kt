@@ -1624,7 +1624,18 @@ internal fun shortWhen(context: android.content.Context, millis: Long): String {
     val sameDay = then.get(java.util.Calendar.YEAR) == today.get(java.util.Calendar.YEAR) &&
         then.get(java.util.Calendar.DAY_OF_YEAR) == today.get(java.util.Calendar.DAY_OF_YEAR)
     return if (sameDay) android.text.format.DateFormat.getTimeFormat(context).format(Date(millis))
-    else SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(millis))
+    else shortDateFormat().format(Date(millis))
+}
+
+// One "Oct 9" formatter for every queue card rather than a new one per card, rebuilt only if the
+// language changes. SimpleDateFormat isn't thread-safe; it's shared only because shortWhen is
+// called while composing, on the main thread.
+private var shortDateFormatCache: Pair<Locale, SimpleDateFormat>? = null
+
+private fun shortDateFormat(): SimpleDateFormat {
+    val locale = Locale.getDefault()
+    shortDateFormatCache?.let { (cachedLocale, format) -> if (cachedLocale == locale) return format }
+    return SimpleDateFormat("MMM d", locale).also { shortDateFormatCache = locale to it }
 }
 
 /** A scheduled download's two lines: "Starts at 1:00 AM · in 3 h 20 min" (or "Starting soon"
