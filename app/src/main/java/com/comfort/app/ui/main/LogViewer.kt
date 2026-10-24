@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -99,7 +98,7 @@ internal fun LogViewer(onDismiss: () -> Unit) {
     var lines by remember { mutableStateOf<List<LogLine>?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
     val expanded = remember { mutableStateMapOf<Int, Boolean>() }
-    val zoom = rememberLogZoom()
+    val zoom = rememberTextZoom("log_viewer", "zoom", min = 0.6f, max = 2f)
     LaunchedEffect(Unit) {
         lines = withContext(Dispatchers.IO) { latestDownloadFirst(DownloadLog.read(context).map(::parse)) }
     }
@@ -210,7 +209,7 @@ internal fun LogViewer(onDismiss: () -> Unit) {
                         LogRow(
                             line,
                             newDownload = line.kind == LogLine.Kind.START && index > 0,
-                            zoom = zoom.floatValue,
+                            zoom = zoom.factor,
                             expanded = expanded[index] == true,
                             onToggle = { expanded[index] = expanded[index] != true },
                         )
@@ -290,47 +289,3 @@ private fun Modifier.onTouchDown(onDown: () -> Unit): Modifier = pointerInput(Un
         onDown()
     }
 }
-
-/** The log's text size, as a factor of the normal one: pinched bigger or smaller, and kept for
- * next time. */
-@Composable
-private fun rememberLogZoom(): MutableFloatState {
-    val context = LocalContext.current
-    return remember {
-        mutableFloatStateOf(
-            context.getSharedPreferences(ZOOM_PREFS, android.content.Context.MODE_PRIVATE).getFloat(ZOOM_KEY, 1f).coerceIn(MIN_ZOOM, MAX_ZOOM)
-        )
-    }
-}
-
-/** Two fingers pinch the log bigger or smaller; one finger still scrolls it (only a two-finger
- * move is taken, before the list sees it). The same as the lyrics' (LyricsView). */
-@Composable
-private fun Modifier.pinchToZoomText(zoom: MutableFloatState): Modifier {
-    val context = LocalContext.current
-    return pointerInput(Unit) {
-        awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            var pinched = false
-            do {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                if (event.changes.count { it.pressed } >= 2) {
-                    val factor = event.calculateZoom()
-                    if (factor != 1f) {
-                        zoom.floatValue = (zoom.floatValue * factor).coerceIn(MIN_ZOOM, MAX_ZOOM)
-                        pinched = true
-                    }
-                    event.changes.forEach { it.consume() }
-                }
-            } while (event.changes.any { it.pressed })
-            if (pinched) {
-                context.getSharedPreferences(ZOOM_PREFS, android.content.Context.MODE_PRIVATE).edit().putFloat(ZOOM_KEY, zoom.floatValue).apply()
-            }
-        }
-    }
-}
-
-private const val ZOOM_PREFS = "log_viewer"
-private const val ZOOM_KEY = "zoom"
-private const val MIN_ZOOM = 0.6f
-private const val MAX_ZOOM = 2f
