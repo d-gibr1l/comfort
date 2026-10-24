@@ -21,6 +21,10 @@ android {
         // in step, so bump it anyway on principle.
         versionCode = 12
         versionName = "1.2.0"
+        // The on-phone UI tests (app/src/androidTest). Run them with the test APK installed and
+        // `adb shell am instrument -w com.comfort.app.test/androidx.test.runner.AndroidJUnitRunner`,
+        // not connectedAndroidTest: that uninstalls the app afterwards, and its data with it.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
