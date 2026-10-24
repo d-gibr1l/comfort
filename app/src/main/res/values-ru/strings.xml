@@ -1067,4 +1067,7 @@
     <string name="subscribed">Подписка оформлена. Будут скачиваться только новые видео.</string>
     <string name="already_subscribed_to_x">Вы уже подписаны на %1$s</string>
     <string name="subscribe_failed">Не удалось подписаться: %1$s</string>
+    <string name="language">Язык</string>
+    <string name="language_system_default">Язык телефона</string>
+    <string name="language_search_subtitle">Язык текстов приложения</string>
 </resources>

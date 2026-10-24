@@ -1027,4 +1027,7 @@
     <string name="subscribed">Suscrito. Solo se descargará lo nuevo.</string>
     <string name="already_subscribed_to_x">Ya estás suscrito a %1$s</string>
     <string name="subscribe_failed">No se pudo suscribir: %1$s</string>
+    <string name="language">Idioma</string>
+    <string name="language_system_default">Idioma del teléfono</string>
+    <string name="language_search_subtitle">El idioma de los textos de la app</string>
 </resources>
