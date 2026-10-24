@@ -109,6 +109,41 @@ private enum class PreviewScreen { MAIN, COMMANDS, TRIM, TEMPLATES, VIEW_TEMPLAT
  * computation for exactly how a URL/quality combination picks one of these. */
 private enum class PreviewMode { VIDEO, SONG_SINGLE, SONG_LIST }
 
+/** The end of a list that's only partly loaded (a channel's newest videos): load the next page,
+ * or everything. Everything can take most of a minute for a big channel, so it says so. */
+@Composable
+private fun LoadMoreRow(loading: Boolean, onLoadMore: (all: Boolean) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.loading_more),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { onLoadMore(false) }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.load_more_count, 50), maxLines = 1)
+                }
+                OutlinedButton(onClick = { onLoadMore(true) }, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.load_all), maxLines = 1)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.load_all_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 /** Everything MainPreviewScreen needs for the song-styled modes, bundled into one param instead
  * of eight so PreviewSheetOverlayHost/MainPreviewScreen's own already-long signatures don't grow
  * by one new parameter per song field. [mode] drives which card/chip layout renders; the rest are
@@ -128,6 +163,10 @@ private data class SongPreviewState(
     val selectedNums: Set<Int>,
     val onToggleNum: (Int) -> Unit,
     val onToggleAll: () -> Unit,
+    /** More of the list can be loaded (a channel, see PreviewSheetViewModel.loadMore). */
+    val hasMore: Boolean = false,
+    val loadingMore: Boolean = false,
+    val onLoadMore: (all: Boolean) -> Unit = {},
     /** Editable title/artist for SONG_SINGLE's own card — null while the preview is still loading
      * (no source value to seed from yet). Not used in SONG_LIST or VIDEO; the per-track checklist
      * doesn't get individually-editable rows. */
@@ -414,6 +453,7 @@ fun DownloadPreviewSheet(
     val previewStatus by sheet.status.collectAsState()
     val isDuplicate by sheet.isDuplicate.collectAsState()
     val selectedNums by sheet.selectedNums.collectAsState()
+    val loadingMore by sheet.loadingMore.collectAsState()
     val itemFilter by sheet.itemFilter.collectAsState()
     val editedTitle by sheet.editedTitle.collectAsState()
     val editedArtist by sheet.editedArtist.collectAsState()
@@ -578,6 +618,9 @@ fun DownloadPreviewSheet(
                 selectedNums = selectedNums,
                 onToggleNum = { num -> sheet.toggleItem(num) },
                 onToggleAll = { sheet.toggleAll() },
+                hasMore = preview?.hasMore == true,
+                loadingMore = loadingMore,
+                onLoadMore = { all -> sheet.loadMore(all) },
                 editedTitle = editedTitle,
                 editedArtist = editedArtist,
                 onEditedTitleChange = { sheet.setEditedTitle(it) },
@@ -1382,6 +1425,11 @@ private fun MainPreviewScreen(
                         onToggle = { song.onToggleNum(track.num) },
                         squareArt = !song.showQualityRow,
                     )
+                }
+                if (song.hasMore) {
+                    item(key = "load-more") {
+                        LoadMoreRow(loading = song.loadingMore, onLoadMore = song.onLoadMore)
+                    }
                 }
             }
         }

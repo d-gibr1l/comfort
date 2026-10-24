@@ -55,6 +55,10 @@
     <string name="backup_part_settings_subtitle">Everything you\'ve set in Settings, the theme and command templates. Download folders aren\'t included: they have to be picked again on each install.</string>
     <string name="backup_part_history">Library history</string>
     <string name="backup_part_history_subtitle">The list of finished downloads. The files themselves aren\'t in the backup.</string>
+    <string name="load_more_count">Load %1$d more</string>
+    <string name="load_all">Load all</string>
+    <string name="load_all_hint">Loading a whole channel can take up to a minute.</string>
+    <string name="loading_more">Loading more…</string>
     <string name="backup_part_subscriptions">Subscriptions</string>
     <string name="backup_part_subscriptions_subtitle">The channels and playlists you follow, with what each has already downloaded, so nothing comes down twice.</string>
     <string name="backup_part_cookies">Cookies &amp; logins</string>

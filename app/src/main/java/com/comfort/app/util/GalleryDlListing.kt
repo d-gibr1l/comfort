@@ -68,6 +68,8 @@ data class PreviewInfo(
     val collectionTitle: String? = null,
     val collectionArtist: String? = null,
     val collectionThumbnail: String? = null,
+    /** The listing stopped at the limit it was asked for: there's more of it to load. */
+    val hasMore: Boolean = false,
 )
 
 /** One track of a multi-item song listing (Spotify album/playlist today — see [PreviewInfo.tracks]
@@ -286,6 +288,7 @@ object GalleryDlListing {
             )
 
     private const val SHEET_LISTING_CAP_MS = 20_000L
+    private const val CHANNEL_ROUTING_PAGE = 50
 
     private fun ytDlpOn(context: Context) = GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.YT_DLP)
 
@@ -529,7 +532,9 @@ object GalleryDlListing {
         // silent whole-gallery-download fallback (reproduced live: an expired-cookie listing failed
         // this way and the picker sheet just flashed and vanished into a download doomed to fail
         // the same way a moment later).
-        val info = runYtDlpListInfo(context, url)
+        // A channel only needs its first page to be routed to the preview sheet, which lists the
+        // rest on request (PreviewSheetViewModel); listed whole, it ran past the 20 s cap here.
+        val info = runYtDlpListInfo(context, url, limit = if (VideoSiteRouter.isYouTubeChannel(url)) CHANNEL_ROUTING_PAGE else null)
             ?: return ListingResult(emptyList(), errorMessage = context.getString(com.comfort.app.R.string.listing_couldnt_check))
         val entries = info.optJSONArray("entries")
         if (entries != null) {
@@ -702,6 +707,8 @@ object GalleryDlListing {
         url: String,
         onStatus: ((String) -> Unit)? = null,
         ytDlpOnly: Boolean = false,
+        /** List only a playlist's first this-many entries (see [PreviewInfo.hasMore]); null for all. */
+        limit: Int? = null,
     ): PreviewInfo? = withContext(Dispatchers.IO) {
         // GALLERY_DL is the real download engine for a multi-item Instagram/TikTok *post* (not a
         // reel — see VideoSiteRouter.classify), so its checklist has to come from gallery-dl's own
@@ -723,7 +730,7 @@ object GalleryDlListing {
         if (!ytDlpOn(context) || VideoSiteRouter.isGalleryDlOnly(url)) return@withContext null
         val json = when (VideoSiteRouter.classify(url)) {
             DownloadEngine.SPOTIFY -> runSpotifyListInfo(context, url, onStatus)
-            else -> runYtDlpListInfo(context, url, onStatus)
+            else -> runYtDlpListInfo(context, url, onStatus, limit)
         } ?: return@withContext null
         // A multi-item source comes back as {"entries": [...]} — the sheet previews one download,
         // so the first entry that actually resolved stands in for it.
@@ -782,6 +789,7 @@ object GalleryDlListing {
             collectionTitle = json.optString("collection_title").blankToNull(),
             collectionArtist = json.optString("collection_artist").blankToNull(),
             collectionThumbnail = collectionThumbnail,
+            hasMore = json.optBoolean("has_more", false),
         )
     }
 
@@ -820,7 +828,7 @@ object GalleryDlListing {
         )
     }
 
-    private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null): JSONObject? {
+    private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null, limit: Int? = null): JSONObject? {
         val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.YT_DLP)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
@@ -856,7 +864,7 @@ object GalleryDlListing {
             val lastLine = runCatching {
                 PythonRuntime.run(
                     context, "yt_dlp_wrapper.py",
-                    listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg, ytDlpInfoCacheFile(context, url).absolutePath),
+                    listOf("list", url, cookiesArg, extraArgs, jsRuntimeArg, impersonateArg, ytDlpInfoCacheFile(context, url).absolutePath, limit?.toString() ?: ""),
                 ) { line ->
                     lines.add(line)
                     (com.comfort.app.worker.EngineEventParser.parse(line) as? com.comfort.app.worker.EngineEvent.Status)?.let { onStatus?.invoke(it.message) }
