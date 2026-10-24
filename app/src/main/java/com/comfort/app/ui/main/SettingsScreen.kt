@@ -41,7 +41,7 @@ import androidx.compose.material.icons.outlined.*
 
 // Settings: the root list, its search, and the route each subpage is reached by.
 
-enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, BACKUP, ABOUT }
+enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, BACKUP, SUBSCRIPTIONS, ABOUT }
 
 /** The page's name, as a string resource. */
 @androidx.annotation.StringRes
@@ -55,6 +55,7 @@ private fun SettingsRoute.displayName(): Int = when (this) {
     SettingsRoute.COOKIES -> R.string.cookies_login
     SettingsRoute.UPDATES -> R.string.updates_and_engines
     SettingsRoute.BACKUP -> R.string.backup_title
+    SettingsRoute.SUBSCRIPTIONS -> R.string.subscriptions_title
     SettingsRoute.ABOUT -> R.string.about
 }
 
@@ -68,6 +69,7 @@ private fun SettingsRoute.icon(): ImageVector = when (this) {
     SettingsRoute.COOKIES -> Icons.Outlined.Lock
     SettingsRoute.UPDATES -> Icons.Outlined.Update
     SettingsRoute.BACKUP -> Icons.Outlined.SettingsBackupRestore
+    SettingsRoute.SUBSCRIPTIONS -> Icons.Outlined.Subscriptions
     SettingsRoute.ABOUT -> Icons.Outlined.Info
 }
 
@@ -155,6 +157,9 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry(R.string.verbose_logging, R.string.logs_all_internal_yt_dlp_debug, SettingsRoute.ADVANCED),
     SubpageSearchEntry(R.string.logs_title, R.string.export_logs_description, SettingsRoute.ADVANCED),
 
+    // Subscriptions
+    SubpageSearchEntry(R.string.subscriptions_title, R.string.subscriptions_search_subtitle, SettingsRoute.SUBSCRIPTIONS),
+
     // Cookies & Login
     SubpageSearchEntry(R.string.cookies, R.string.sign_in_to_sites_that_require, SettingsRoute.COOKIES),
     SubpageSearchEntry(R.string.saved_cookies, R.string.sites_you_ve_already_signed_in, SettingsRoute.COOKIES),
@@ -220,6 +225,7 @@ fun MoreScreen(
                 SettingsRoute.COOKIES -> CookiesSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.UPDATES -> UpdatesSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.BACKUP -> BackupSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.SUBSCRIPTIONS -> SubscriptionsSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.ABOUT -> AboutScreen(onBack = onBack, highlightKey = highlightKey)
             }
         }
@@ -289,6 +295,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
             SettingsItemSpec(Icons.Outlined.Lock, stringResource(R.string.cookies_login), if (hasCookies) stringResource(R.string.configured) else stringResource(R.string.not_set), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.COOKIES, null) },
             SettingsItemSpec(Icons.Outlined.Update, stringResource(R.string.updates_and_engines), stringResource(R.string.app_yt_dlp_gallery_dl_instaloader), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.UPDATES, null) },
             SettingsItemSpec(Icons.Outlined.SettingsBackupRestore, backupTitle, backupSubtitle, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.BACKUP, null) },
+            SettingsItemSpec(Icons.Outlined.Subscriptions, stringResource(R.string.subscriptions_title), stringResource(R.string.subscriptions_root_subtitle), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.SUBSCRIPTIONS, null) },
         )
     }
     val aboutItems = run {
