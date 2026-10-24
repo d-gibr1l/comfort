@@ -355,6 +355,21 @@ object DownloadNotifications {
         notifySafe(context, downloadId, notification)
     }
 
+    /** "3 new from <channel>" after a subscription check queued downloads (Settings ›
+     * Subscriptions). One per source, replaced by its next check's, and opens the queue where
+     * those downloads are. */
+    fun notifySubscriptionDownloads(context: Context, subscriptionId: String, sourceTitle: String, count: Int) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notif_logo)
+            .setContentTitle(context.resources.getQuantityString(R.plurals.subscription_new_downloads, count, count, sourceTitle))
+            .setContentText(context.getString(R.string.subscription_new_downloads_text))
+            .setContentIntent(openQueuePendingIntent(context))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        notifySafe(context, "subscription:$subscriptionId", notification)
+    }
+
     fun cancel(context: Context, downloadId: String) {
         runCatching {
             NotificationManagerCompat.from(context).cancel(notificationId(downloadId))

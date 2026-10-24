@@ -434,6 +434,41 @@ fun DownloadPreviewSheet(
         else -> PreviewMode.VIDEO
     }
 
+    // Subscribe (Settings › Subscriptions) is offered for a YouTube link that listed as several
+    // items — a channel or a playlist — the same non-empty [tracks] that gives it the checklist.
+    val canSubscribe = tracks.isNotEmpty() && remember(url) { VideoSiteRouter.isYouTube(url) }
+    var subscribing by remember { mutableStateOf(false) }
+    val onSubscribe: (com.comfort.app.data.SubscriptionOptions) -> Unit = { options ->
+        if (!subscribing) {
+            subscribing = true
+            scope.launch {
+                // A yt-dlp playlist's listing carries no title of its own (preview.title is its
+                // first video's), so the link stands in until the first check, moments later,
+                // saves the real channel/playlist name and picture.
+                val result = try {
+                    com.comfort.app.data.Subscriptions.subscribe(
+                        context, url, preview?.collectionTitle ?: url, preview?.collectionThumbnail, options,
+                    )
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Toast.makeText(context, context.getString(R.string.subscribe_failed, e.message ?: e.javaClass.simpleName), Toast.LENGTH_LONG).show()
+                    null
+                }
+                subscribing = false
+                when (result) {
+                    is com.comfort.app.data.Subscriptions.SubscribeResult.Added -> {
+                        Toast.makeText(context, context.getString(R.string.subscribed), Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    }
+                    // Left open: the link can still be downloaded from here.
+                    is com.comfort.app.data.Subscriptions.SubscribeResult.AlreadySubscribed ->
+                        Toast.makeText(context, context.getString(R.string.already_subscribed_to_x, result.subscription.title), Toast.LENGTH_SHORT).show()
+                    null -> Unit
+                }
+            }
+        }
+    }
+
     // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
     // the whole sheet, matching the forward navigation — and, like every other non-Done way out,
     // discards whatever this visit changed rather than leaving it silently applied.
@@ -581,6 +616,7 @@ fun DownloadPreviewSheet(
             selectedTrackCount = selectedNums.size,
             onDismiss = onDismiss,
             onDownload = onDownload,
+            onSubscribe = if (canSubscribe) onSubscribe else null,
         )
     }
 }
@@ -630,6 +666,8 @@ private fun PreviewSheetOverlayHost(
     selectedTrackCount: Int,
     onDismiss: () -> Unit,
     onDownload: (DownloadOptions) -> Unit,
+    // Null hides Subscribe: the link isn't a YouTube channel or playlist.
+    onSubscribe: ((com.comfort.app.data.SubscriptionOptions) -> Unit)?,
 ) {
     val overlayOpen = screen != PreviewScreen.MAIN
 
@@ -752,6 +790,23 @@ private fun PreviewSheetOverlayHost(
                         audioFormat = audioFormat,
                     ),
                 )
+            },
+            // The choices that make sense for every future upload: not the trim, the item
+            // selection or an edited title, which belong to this listing only.
+            onSubscribe = onSubscribe?.let { subscribe ->
+                {
+                    subscribe(
+                        com.comfort.app.data.SubscriptionOptions(
+                            // Same forcing as the download above for a known song host.
+                            videoQuality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
+                            outputFormat = outputFormat,
+                            audioFormat = audioFormat,
+                            saveThumbnail = saveThumbnail,
+                            extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
+                            filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
             },
         )
 
@@ -1184,6 +1239,8 @@ private fun MainPreviewScreen(
     onOpenTrim: () -> Unit,
     onOpenTemplates: () -> Unit,
     onDownload: () -> Unit,
+    /** Shown as a Subscribe button beside Download when non-null — a YouTube channel/playlist. */
+    onSubscribe: (() -> Unit)? = null,
 ) {
     // A plain LazyColumn cannot nest inside a verticalScroll parent (unbounded height), which is
     // exactly what SONG_LIST's track list needs to host efficiently. The top icon row and the
@@ -1480,22 +1537,46 @@ private fun MainPreviewScreen(
         val countSuffix = if (song.mode == PreviewMode.SONG_LIST) {
             " ${song.selectedNums.size}" + (selectedSize?.let { " · ${formatFilesize(it)}" } ?: "")
         } else ""
-        Button(
-            onClick = onDownload,
-            enabled = downloadEnabled,
-            // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin
-            // (navBarPill's own Box uses padding(horizontal = 24.dp)) — kept consistent so
-            // this button reads the same width as that pill rather than running edge-to-edge.
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp).height(56.dp),
-            shape = MaterialTheme.shapes.extraLarge,
+        // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin
+        // (navBarPill's own Box uses padding(horizontal = 24.dp)) — kept consistent so
+        // this button reads the same width as that pill rather than running edge-to-edge.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
-            // only after tapping — replaces the old flow where this always said "Download" and a
-            // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
-            // action to confirm.
-            Text(stringResource(if (isDuplicate) R.string.redownload else R.string.download_action) + countSuffix)
+            // Subscribing saves the channel/playlist with the choices above and downloads nothing
+            // now (see Subscriptions.subscribe), so it sits beside Download as its own action. Not
+            // gated on the selection: a subscription is about future uploads.
+            if (onSubscribe != null) {
+                OutlinedButton(
+                    onClick = onSubscribe,
+                    modifier = Modifier.height(56.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) {
+                    Icon(Icons.Outlined.Subscriptions, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.subscribe))
+                }
+            }
+            Button(
+                onClick = onDownload,
+                enabled = downloadEnabled,
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
+                // only after tapping — replaces the old flow where this always said "Download" and a
+                // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
+                // action to confirm.
+                Text(
+                    stringResource(if (isDuplicate) R.string.redownload else R.string.download_action) + countSuffix,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

@@ -1028,4 +1028,34 @@
     <string name="backup_couldnt_open_file">Couldn\'t open the file</string>
     <string name="search_no_results_short">No results</string>
     <string name="gallery_dl_off_no_preview">gallery-dl is turned off (Settings › Updates and engines), and yt-dlp couldn\'t preview this link.</string>
+
+    <!-- Subscriptions -->
+    <plurals name="subscription_new_downloads">
+        <item quantity="one">%1$d new from %2$s</item>
+        <item quantity="other">%1$d new from %2$s</item>
+    </plurals>
+    <string name="subscription_new_downloads_text">Added to your downloads</string>
+    <string name="subscriptions_title">Subscriptions</string>
+    <string name="subscriptions_root_subtitle">Download new uploads from channels and playlists</string>
+    <string name="subscriptions_search_subtitle">Watch a YouTube channel or playlist and download its new uploads automatically</string>
+    <string name="subscriptions_how_section">How to subscribe</string>
+    <string name="subscriptions_empty">You haven\'t subscribed to anything yet. Open a YouTube channel or playlist link in Comfort, and tap Subscribe in its download sheet. Its new uploads will then download on their own, with the choices you made in that sheet. What\'s already there isn\'t downloaded.</string>
+    <string name="subscriptions_sources_section">Sources</string>
+    <string name="subscriptions_description">New uploads are added to your downloads, up to 10 per check. To add another source, open a channel or playlist link and tap Subscribe.</string>
+    <string name="subscriptions_check_every">Check every</string>
+    <string name="subscriptions_hours">%1$d h</string>
+    <string name="subscriptions_check_now">Check now</string>
+    <string name="subscriptions_pause">Pause</string>
+    <string name="subscriptions_resume">Resume</string>
+    <string name="subscriptions_remove">Remove</string>
+    <string name="subscriptions_checking">Checking…</string>
+    <string name="subscriptions_last_checked">Checked %1$s</string>
+    <string name="subscriptions_last_error">Last check failed: %1$s</string>
+    <string name="subscriptions_not_checked">Not checked yet</string>
+    <string name="subscriptions_paused_prefix">Paused · %1$s</string>
+    <string name="subscriptions_remove_message">It won\'t be checked any more. Downloads it already added stay where they are.</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="subscribed">Subscribed. Only new uploads will download.</string>
+    <string name="already_subscribed_to_x">Already subscribed to %1$s</string>
+    <string name="subscribe_failed">Couldn\'t subscribe: %1$s</string>
 </resources>

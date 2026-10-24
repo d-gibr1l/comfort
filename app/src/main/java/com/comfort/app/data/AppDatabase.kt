@@ -198,13 +198,38 @@ private val MIGRATION_24_25 = object : Migration(24, 25) {
     }
 }
 
+// Adds subscriptions and subscription_seen (Subscription.kt): watched channels/playlists and the
+// uploads each has already seen. Column types, NOT NULLs and defaults mirror the entities exactly,
+// so Room's schema check at startup matches what it expects.
+private val MIGRATION_25_26 = object : Migration(25, 26) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS subscriptions (" +
+                "id TEXT NOT NULL PRIMARY KEY, url TEXT NOT NULL, title TEXT NOT NULL, thumbnail TEXT, " +
+                "intervalHours INTEGER NOT NULL, paused INTEGER NOT NULL, videoQuality TEXT, " +
+                "outputFormat TEXT, audioFormat TEXT, saveThumbnail INTEGER, extraCommands TEXT, " +
+                "filenameTemplate TEXT, createdAt INTEGER NOT NULL, lastCheckedAt INTEGER, " +
+                "lastError TEXT, initialized INTEGER NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS subscription_seen (" +
+                "subscriptionId TEXT NOT NULL, entryId TEXT NOT NULL, " +
+                "PRIMARY KEY(subscriptionId, entryId))"
+        )
+    }
+}
+
 @Database(
-    entities = [DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class, SavedFile::class],
-    version = 25,
+    entities = [
+        DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class, SavedFile::class,
+        Subscription::class, SubscriptionSeenEntry::class,
+    ],
+    version = 26,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
+    abstract fun subscriptionDao(): SubscriptionDao
 
     companion object {
         @Volatile
@@ -218,7 +243,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14,
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
-                        MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+                        MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration
