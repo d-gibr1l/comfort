@@ -308,7 +308,7 @@ private fun ExportLogsRow() {
         Text(heading, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            stringResource(R.string.export_logs_description),
+            stringResource(R.string.logs_description),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
