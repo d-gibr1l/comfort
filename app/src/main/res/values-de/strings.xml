@@ -1010,4 +1010,7 @@
     <string name="subscribed">Abonniert. Nur neue Uploads werden geladen.</string>
     <string name="already_subscribed_to_x">%1$s ist bereits abonniert</string>
     <string name="subscribe_failed">Abonnieren fehlgeschlagen: %1$s</string>
+    <string name="language">Sprache</string>
+    <string name="language_system_default">Sprache des Telefons</string>
+    <string name="language_search_subtitle">Die Sprache der App-Texte</string>
 </resources>

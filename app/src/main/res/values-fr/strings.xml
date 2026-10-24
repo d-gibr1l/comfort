@@ -1035,4 +1035,7 @@
     <string name="subscribed">Abonné. Seules les nouvelles vidéos seront téléchargées.</string>
     <string name="already_subscribed_to_x">Déjà abonné à %1$s</string>
     <string name="subscribe_failed">Impossible de s\'abonner\u00A0: %1$s</string>
+    <string name="language">Langue</string>
+    <string name="language_system_default">Langue du téléphone</string>
+    <string name="language_search_subtitle">La langue des textes de l\'app</string>
 </resources>

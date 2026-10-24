@@ -984,4 +984,7 @@
     <string name="subscribed">Berlangganan. Hanya unggahan baru yang akan diunduh.</string>
     <string name="already_subscribed_to_x">Sudah berlangganan %1$s</string>
     <string name="subscribe_failed">Tidak bisa berlangganan: %1$s</string>
+    <string name="language">Bahasa</string>
+    <string name="language_system_default">Bahasa ponsel</string>
+    <string name="language_search_subtitle">Bahasa teks aplikasi</string>
 </resources>

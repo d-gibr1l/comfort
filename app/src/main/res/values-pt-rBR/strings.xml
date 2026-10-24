@@ -1039,4 +1039,7 @@
     <string name="subscribed">Inscrito. Só os novos envios vão ser baixados.</string>
     <string name="already_subscribed_to_x">Você já está inscrito em %1$s</string>
     <string name="subscribe_failed">Não foi possível se inscrever: %1$s</string>
+    <string name="language">Idioma</string>
+    <string name="language_system_default">Idioma do celular</string>
+    <string name="language_search_subtitle">O idioma dos textos do app</string>
 </resources>
