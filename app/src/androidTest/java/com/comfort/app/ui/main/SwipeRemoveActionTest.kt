@@ -39,10 +39,9 @@ class SwipeRemoveActionTest {
         row.assert(SemanticsMatcher("has a Remove action") { node ->
             node.config.getOrNull(SemanticsActions.CustomActions)?.any { it.label == "Remove" } == true
         })
-        compose.runOnUiThread {
-            val action = row.fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Remove" }
-            assertTrue(action.action())
-        }
+        // What TalkBack does when "Remove" is picked from its actions menu.
+        val action = row.fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == "Remove" }
+        compose.runOnUiThread { assertTrue(action.action()) }
         compose.waitForIdle()
         assertEquals(1, removed)
     }
