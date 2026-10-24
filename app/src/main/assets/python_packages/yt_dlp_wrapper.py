@@ -2354,7 +2354,8 @@ def _sizes_by_quality(info):
     return sizes or None
 
 
-def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, impersonate=False, info_cache_path=None):
+def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, impersonate=False, info_cache_path=None,
+              limit=None):
     """Extracts metadata only (no download) via yt-dlp's own extractor — used for the share-sheet
     item picker's preview, specifically to get a *real*, directly fetchable thumbnail image URL
     for video items. gallery-dl's own listing gives every video item an internal "ytdl:"-prefixed
@@ -2370,8 +2371,16 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
     Kotlin side correlates the two listings by that shared ordering, not by id (the two engines
     don't share an item-numbering scheme). {"error": "..."} on failure — callers fall back to
     treating this the same as "nothing usable came back" rather than crashing the whole listing
-    over a preview-only enrichment step."""
+    over a preview-only enrichment step.
+
+    [limit] lists only a playlist's first that-many entries (a channel's newest), with "has_more"
+    true when it stopped there — the preview sheet loads the rest on request. A channel lists
+    hundreds of videos and took ~45 s whole on the phone, to then have one checked."""
     url = _channel_videos_url(url)
+    try:
+        limit = int(limit) if limit else None
+    except ValueError:
+        limit = None
     ydl_opts = {
         "quiet": True,
         # "quiet" alone only suppresses yt-dlp's normal progress/info output — WARNING/ERROR lines
@@ -2426,6 +2435,8 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         # all, on any host, regardless of the toggle. This makes the preview honor the same global
         # setting the real download already does, rather than reviving a Reddit-only special case.
         ydl_opts["impersonate"] = ImpersonateTarget()
+    if limit and limit > 0:
+        ydl_opts["playlistend"] = limit
     _apply_extra_args(ydl_opts, extra_args)
 
     def _pick(entry):
@@ -2506,8 +2517,14 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         return json.dumps({"error": "no info extracted"})
     entries = info.get("entries")
     if entries is not None:
+        entries = list(entries)
         print(event("status", message=f"Found {len(entries)} tracks…"), flush=True)
-        return json.dumps({"entries": [_pick(e) for e in entries]})
+        result = {"entries": [_pick(e) for e in entries]}
+        if limit and limit > 0:
+            # Exactly as many as asked for: there may be more (a channel with exactly that many
+            # just shows a "load more" that finds nothing new).
+            result["has_more"] = len(entries) >= limit
+        return json.dumps(result)
     picked = _pick(info)
     if picked:
         sizes = _sizes_by_quality(info)
@@ -2569,6 +2586,7 @@ if __name__ == "__main__":
             url=a[0], cookies_path=_s(a[1]), extra_args=_s(a[2]), js_runtime_path=_s(a[3]),
             impersonate=_b(a[4]) if len(a) > 4 else False,
             info_cache_path=_s(a[5]) if len(a) > 5 else None,
+            limit=_s(a[6]) if len(a) > 6 else None,
         ), flush=True)
         _sys.exit(0)
 

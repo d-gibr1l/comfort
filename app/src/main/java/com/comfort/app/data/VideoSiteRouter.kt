@@ -225,6 +225,17 @@ object VideoSiteRouter {
         return setOf("youtube.com", "youtu.be").matchesHost(host)
     }
 
+    // A channel's own address (its home or Videos tab), not a video, playlist or other tab — the
+    // same addresses yt_dlp_wrapper's _channel_videos_url points at the Videos tab.
+    private val youTubeChannel = Regex(
+        """^https?://(?:www\.|m\.)?youtube\.com/(?:@[^/?#]+|channel/UC[\w-]+|c/[^/?#]+|user/[^/?#]+)(?:/(?:featured|home|videos))?/?(?:[?#].*)?$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** A YouTube channel link: its preview lists the newest videos first, a page at a time
+     * (PreviewSheetViewModel), since a channel can have thousands. */
+    fun isYouTubeChannel(url: String): Boolean = youTubeChannel.matches(url.trim())
+
     fun isKnownSongHost(url: String): Boolean {
         val host = normalizedHost(url) ?: return false
         return songHosts.matchesHost(host)

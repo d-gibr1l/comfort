@@ -48,11 +48,20 @@ class PreviewSheetViewModel(
     private val _selectedNums = MutableStateFlow<Set<Int>>(emptySet())
     val selectedNums: StateFlow<Set<Int>> = _selectedNums.asStateFlow()
 
+    /** A YouTube channel: listed a page at a time, newest first, with nothing checked to start —
+     * a channel has hundreds of videos, and one tap on Download queued all of them. */
+    val isChannel: Boolean = com.comfort.app.data.VideoSiteRouter.isYouTubeChannel(url)
+
+    private val _loadingMore = MutableStateFlow(false)
+    val loadingMore: StateFlow<Boolean> = _loadingMore.asStateFlow()
+
     /** "num in {1,3,4}" (the app-wide item-filter syntax), or null for "everything" — no list, or
-     * nothing deselected. */
+     * nothing deselected. Never "everything" for a channel: only part of it is listed, and
+     * "everything" would download the whole channel, not the checked videos. */
     val itemFilter: StateFlow<String?> = combine(_preview, _selectedNums) { preview, selected ->
         val tracks = preview?.tracks.orEmpty()
-        if (tracks.isEmpty() || selected.size == tracks.size) null else "num in {${selected.sorted().joinToString(",")}}"
+        if (tracks.isEmpty() || (!isChannel && selected.size == tracks.size)) null
+        else "num in {${selected.sorted().joinToString(",")}}"
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** Whether this link — with the current selection — is already queued, running or finished:
@@ -71,9 +80,14 @@ class PreviewSheetViewModel(
     init {
         viewModelScope.launch {
             try {
-                val result = preloaded ?: GalleryDlListing.fetchPreviewInfo(context, url, onStatus = { _status.value = it })
+                val result = preloaded ?: GalleryDlListing.fetchPreviewInfo(
+                    context, url, onStatus = { _status.value = it },
+                    limit = if (isChannel) CHANNEL_PAGE else null,
+                )
                 _preview.value = result
-                result?.tracks?.takeIf { it.isNotEmpty() }?.let { tracks -> _selectedNums.value = tracks.map { it.num }.toSet() }
+                if (!isChannel) {
+                    result?.tracks?.takeIf { it.isNotEmpty() }?.let { tracks -> _selectedNums.value = tracks.map { it.num }.toSet() }
+                }
                 if (_editedTitle.value == null) result?.title?.let { _editedTitle.value = cleanTrackTitle(it).trim() }
                 if (_editedArtist.value == null) result?.artist?.let { _editedArtist.value = cleanArtistName(it).trim() }
             } catch (e: Exception) {
@@ -95,6 +109,31 @@ class PreviewSheetViewModel(
         }
     }
 
+    /** The next [CHANNEL_PAGE] of a channel's videos, or all the rest ([all]). The list is fetched
+     * again from the top (a flat listing, so mostly paging through YouTube's list); entries keep
+     * their numbers, so what's checked stays checked, and the new ones come in unchecked. */
+    fun loadMore(all: Boolean) {
+        val current = _preview.value ?: return
+        if (_loadingMore.value || !current.hasMore) return
+        _loadingMore.value = true
+        viewModelScope.launch {
+            try {
+                val more = GalleryDlListing.fetchPreviewInfo(
+                    context, url,
+                    limit = if (all) null else current.tracks.size + CHANNEL_PAGE,
+                )
+                // A failed fetch keeps what's shown (and the button, to try again).
+                if (more != null && more.tracks.size >= current.tracks.size) {
+                    _preview.value = more.copy(hasMore = if (all) false else more.hasMore && more.tracks.size > current.tracks.size)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+            } finally {
+                _loadingMore.value = false
+            }
+        }
+    }
+
     fun toggleItem(num: Int) {
         if (num <= 0) return
         _selectedNums.update { current -> if (num in current) current - num else current + num }
@@ -103,6 +142,11 @@ class PreviewSheetViewModel(
     fun toggleAll() {
         val tracks = _preview.value?.tracks.orEmpty()
         _selectedNums.update { current -> if (current.size == tracks.size) emptySet() else tracks.map { it.num }.toSet() }
+    }
+
+    private companion object {
+        /** How many of a channel's videos a page lists. */
+        const val CHANNEL_PAGE = 50
     }
 
     fun setEditedTitle(title: String) { _editedTitle.value = title }
