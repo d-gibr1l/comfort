@@ -1141,6 +1141,16 @@ _YT_CHANNEL_HOME_RE = re.compile(
     r"(?:/(?:featured|home))?/?(?:[?#].*)?$", re.I)
 
 
+def _channel_videos_url(url):
+    """A bare YouTube channel address pointed at its Videos tab; anything else as it is. Left
+    alone, yt-dlp lists the channel's tabs (Videos, Shorts, Live) rather than its videos, so the
+    download sheet showed two rows called "Videos" and "Shorts" and downloaded those whole. The
+    preview listing and the download both go through this, as the items picked in the one are
+    matched to the other by their place in the list."""
+    home = _YT_CHANNEL_HOME_RE.match((url or "").strip())
+    return home.group(1) + "/videos" if home else url
+
+
 def _short_error(e):
     # yt-dlp's DownloadError reads "ERROR: [youtube:tab] @x: This channel does not exist." plus,
     # sometimes, a line of advice; the app shows this to a person, so just the sentence itself.
@@ -1171,9 +1181,7 @@ def latest_entries(url, limit=30, proxy_url=None, cookies_path=None):
         limit = max(1, min(int(limit or 30), 1000))
     except ValueError:
         limit = 30
-    home = _YT_CHANNEL_HOME_RE.match(url.strip())
-    if home:
-        url = home.group(1) + "/videos"
+    url = _channel_videos_url(url)
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -1354,6 +1362,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     dict and reports progress through callbacks, so it's self-contained per call. Every finished
     file's absolute path is sent to `callback`, matching how DownloadWorker's actualCallback
     already expects one path per line from gallery_dl_wrapper.download()."""
+    url = _channel_videos_url(url)
     # DownloadWorker throttles nothing on its own end, so a raw per-chunk progress_hook (which
     # fires dozens of times a second) would otherwise flood the DB with writes — this closure
     # state caps real updates to twice a second. QueueScreen's own progress bar eases toward each
@@ -2362,6 +2371,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
     don't share an item-numbering scheme). {"error": "..."} on failure — callers fall back to
     treating this the same as "nothing usable came back" rather than crashing the whole listing
     over a preview-only enrichment step."""
+    url = _channel_videos_url(url)
     ydl_opts = {
         "quiet": True,
         # "quiet" alone only suppresses yt-dlp's normal progress/info output — WARNING/ERROR lines
