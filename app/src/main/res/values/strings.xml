@@ -55,6 +55,9 @@
     <string name="backup_part_settings_subtitle">Everything you\'ve set in Settings, the theme and command templates. Download folders aren\'t included: they have to be picked again on each install.</string>
     <string name="backup_part_history">Library history</string>
     <string name="backup_part_history_subtitle">The list of finished downloads. The files themselves aren\'t in the backup.</string>
+    <string name="language">Language</string>
+    <string name="language_system_default">Phone\'s language</string>
+    <string name="language_search_subtitle">The language the app\'s text is in</string>
     <string name="load_more_count">Load %1$d more</string>
     <string name="load_all">Load all</string>
     <string name="load_all_hint">Loading a whole channel can take up to a minute.</string>
