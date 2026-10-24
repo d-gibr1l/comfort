@@ -936,10 +936,17 @@ fun HomeScreen(
                                 Icon(if (search) Icons.Outlined.Search else Icons.Outlined.Link, contentDescription = null)
                             }
                         },
+                        // One action whatever's typed. It used to switch from Done to Search as the
+                        // first letter made the text a search, and changing it restarts the
+                        // keyboard's connection to the field mid-word: Samsung's keyboard kept
+                        // typing into the old one, so after "h" nothing more arrived (reproduced).
+                        // Its key searches a search; for a link it just closes the keyboard.
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            imeAction = if (isSearch) androidx.compose.ui.text.input.ImeAction.Search else androidx.compose.ui.text.input.ImeAction.Default,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Search,
                         ),
-                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { openSearch() }),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = {
+                            if (isSearch) openSearch() else defaultKeyboardAction(androidx.compose.ui.text.input.ImeAction.Done)
+                        }),
                         trailingIcon = {
                             if (url.isNotEmpty()) {
                                 IconButton(onClick = { url = "" }) {
