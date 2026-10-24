@@ -17,6 +17,7 @@ import com.comfort.app.data.DownloadedFileRecord
 import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoQuality
 import com.comfort.app.data.VideoSiteRouter
+import com.comfort.app.util.DownloadLog
 import com.comfort.app.util.EngineProbe
 import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.ImageConverter
@@ -230,6 +231,7 @@ class DownloadWorker(
         val dao = AppDatabase.getDatabase(applicationContext).downloadDao()
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
+        DownloadLog.line(applicationContext, downloadId, "start $url")
         // The song preview sheet's own editable title/artist (SongPreviewCard) — see
         // DownloadEntity.overrideTitle/overrideArtist's own doc comment. Empty string (not null)
         // is this argv's own "not set" sentinel, same convention every other optional string arg
@@ -690,6 +692,7 @@ class DownloadWorker(
 
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     android.util.Log.d("DownloadEngine", "Python output: $line")
+                    DownloadLog.line(applicationContext, downloadId, line)
 
                     if (!scheduleClosedPauseRequested.get() && !startedViaStartNow) {
                         val now = System.currentTimeMillis()
@@ -1059,6 +1062,7 @@ class DownloadWorker(
                     val errorMsg = GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this), applicationContext.resources)
                         ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this)
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
+                    DownloadLog.line(applicationContext, downloadId, "failed: $errorMsg")
                     dao.setErrorDetails(downloadId, errorDetailsJson())
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
                     DownloadDispatcher.forgetLock(downloadId)
@@ -1080,6 +1084,7 @@ class DownloadWorker(
                 val incompleteMessage = if (missingItems > 0) {
                     applicationContext.resources.getQuantityString(R.plurals.items_couldnt_be_downloaded, missingItems, missingItems, totalItems)
                 } else null
+                DownloadLog.line(applicationContext, downloadId, "finished: ${savedCount.get()} saved" + (incompleteMessage?.let { ", $it" } ?: ""))
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
                 DownloadNotifications.notifyFinished(applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail, missingItems)
                 if (entity?.incognito == true) {
@@ -1099,6 +1104,7 @@ class DownloadWorker(
                 // A paused/cancelled download: leave whatever status pauseDownload()/cancelDownload()
                 // already set instead of overwriting it with an error. Stopped by the system instead
                 // (battery saver, a constraint change), it's still RUNNING — put it back to waiting.
+                DownloadLog.line(applicationContext, downloadId, "stopped (paused, cancelled or by the system)")
                 requeueIfStillRunning(dao, downloadId)
                 DownloadNotifications.cancel(applicationContext, downloadId)
                 // Whatever stopped it, have the queue checked for a download left waiting without a
@@ -1117,6 +1123,9 @@ class DownloadWorker(
                     Result.success()
                 } else {
                     val sanitized = e.localizedMessage?.let { GalleryDlListing.sanitizeErrorMessage(it, applicationContext.resources) }
+                    // The whole exception here, not just its message: this is the app failing,
+                    // and the stack is what says where.
+                    DownloadLog.line(applicationContext, downloadId, "failed in the app: ${android.util.Log.getStackTraceString(e)}")
                     dao.updateError(downloadId, DownloadStatus.ERRORED, sanitized)
                     // Not an engine's error (the app itself failed), and the per-engine record is out
                     // of scope here: clear any older details so the sheet shows this message.

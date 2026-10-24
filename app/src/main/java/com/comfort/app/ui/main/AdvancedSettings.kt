@@ -17,6 +17,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.comfort.app.data.GalleryDlPreferences
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
@@ -274,6 +275,73 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     GalleryDlPreferences.setVerboseLogging(context, it)
                 },
             )
+            Spacer(Modifier.height(16.dp))
+            ExportLogsRow()
+        }
+    }
+}
+
+/** Advanced > Debugging > Export logs: saves the downloads' log (DownloadLog) to a file the user
+ * picks, to attach to a bug report. */
+@Composable
+private fun ExportLogsRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busy = true
+        scope.launch {
+            message = runCatching {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.comfort.app.util.DownloadLog.export(context, uri) }
+                context.getString(R.string.logs_exported)
+            }.getOrElse { context.getString(R.string.logs_export_failed, it.message ?: it.javaClass.simpleName) }
+            busy = false
+        }
+    }
+    val title = stringResource(R.string.export_logs)
+    val heading = stringResource(R.string.logs_title)
+    Column(modifier = highlightRowModifier(heading)) {
+        Text(heading, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.export_logs_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        var viewing by remember { mutableStateOf(false) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(
+                onClick = { viewing = true },
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.view_logs), maxLines = 1)
+            }
+            OutlinedButton(
+                onClick = {
+                    val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.US).format(java.util.Date())
+                    launcher.launch("comfort-logs-$stamp.txt")
+                },
+                enabled = !busy,
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Icon(Icons.Outlined.Description, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(title, maxLines = 1)
+            }
+        }
+        if (viewing) LogViewer(onDismiss = { viewing = false })
+        message?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
