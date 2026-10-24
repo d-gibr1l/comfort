@@ -26,9 +26,9 @@
 - [ ] **Lyrics language tag:** `lyrics.py` writes every MP3's USLT frame as `lang="eng"`; use `und` (or a detected language). Translated/romanised lyrics would need another source than LRCLIB (left out for now).
 
 ## Other open items
-- [ ] **Bundle yt-dlp-ejs 0.8.0** (works with QuickJS): without it YouTube's JS challenge is skipped ("[jsc] ... was skipped"), giving fewer formats or slow extraction.
+- [x] **Bundle yt-dlp-ejs 0.8.0** *(done in be583b3)* (works with QuickJS): without it YouTube's JS challenge is skipped ("[jsc] ... was skipped"), giving fewer formats or slow extraction.
 - [ ] **Channel/playlist subscriptions:** watch a source and download new uploads (YTDLnis's "Observe sources").
-- [ ] **Test SponsorBlock and split-by-chapters on the phone** (only tested on the PC with the same wrapper), including how a split download shows in the Library.
+- [x] **Test SponsorBlock and split-by-chapters on the phone** *(done in 5eb704c — both failed there without ffprobe, and Opus splits on the cover picture; fixed with an ffmpeg-based probe and an audio-only split that copies the cover onto each part)* (only tested on the PC with the same wrapper), including how a split download shows in the Library.
 - [ ] **Unverified:** the Library Undo red-flash fix, the home-screen music widget, resuming from headphones/Bluetooth.
 - [ ] **Lyrics from `.lrc` files:** songs whose lyrics only exist as a sidecar `.lrc` (the `.webm` Spotify downloads that can't hold tags) don't show lyrics in Now Playing.
 - [ ] **Pinch-to-zoom lyrics:** couldn't be tested over adb (no two-finger input); check by hand.
