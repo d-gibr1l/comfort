@@ -181,7 +181,7 @@
     <string name="use_extra_arguments">Use extra arguments</string>
     <string name="off_keeps_them_saved_but_adds">Off keeps them saved but adds none to downloads.</string>
     <string name="none">None</string>
-    <string name="set_for">Set for </string>
+    <string name="set_for_x">Set for %1$s</string>
     <string name="extra_arguments_x">Extra arguments: %1$s</string>
     <string name="real_command_line_flags_each_engine">Real command-line flags. Each engine gets the \"Both\" set plus its own.</string>
     <string name="both">Both</string>
@@ -536,7 +536,7 @@
     <string name="downloading">Downloading</string>
     <string name="fetching_info">Fetching info...</string>
     <string name="no_internet_connection">No internet connection</string>
-    <string name="speed">Speed: </string>
+    <string name="speed_x">Speed: %1$s</string>
     <string name="waiting_to_start">Waiting to start…</string>
     <string name="waiting_for_a_network_connection_2">Waiting for a network connection…</string>
     <string name="x_up_next_starts_it_now">%1$s · Up next starts it now</string>
@@ -708,8 +708,8 @@
     <string name="this_player_builds_its_video_from">This player builds its video from pieces. Comfort can record them while it plays: the page reloads, you play the video to the end, then tap Stop and save.</string>
     <string name="record_while_it_plays">Record while it plays</string>
     <string name="saving_the_recording">Saving the recording…</string>
-    <string name="recorded_to_the_end">Recorded to the end · </string>
-    <string name="recording">Recording · </string>
+    <string name="recorded_to_the_end_x">Recorded to the end · %1$s</string>
+    <string name="recording_x">Recording · %1$s</string>
     <string name="recording_play_the_video">Recording · play the video</string>
     <string name="stop_and_save">Stop and save</string>
     <string name="close_browser">Close browser</string>
@@ -815,7 +815,7 @@
     <string name="shuffle_off">Shuffle off</string>
     <string name="on">On</string>
     <!-- QueueSheet.kt -->
-    <string name="shuffled"> · shuffled</string>
+    <string name="queue_shuffled">Queue · shuffled</string>
     <string name="drag_to_reorder">Drag to reorder</string>
     <!-- Filmstrip.kt -->
     <string name="item_x_2">Item %1$s</string>

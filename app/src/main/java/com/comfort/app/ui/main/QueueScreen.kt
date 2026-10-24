@@ -1269,7 +1269,7 @@ fun QueueItemCard(
                         else -> String.format(Locale.getDefault(), "%.2f MB/s", item.speedMbs)
                     }
                     Text(
-                        text = note ?: (stringResource(R.string.speed) + speedStr),
+                        text = note ?: stringResource(R.string.speed_x, speedStr),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
