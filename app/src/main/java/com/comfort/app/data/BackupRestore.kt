@@ -11,10 +11,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Settings > Backup & restore: the app's settings, its cookies and the Library's history, saved
- * to one JSON file the user picks, and read back from one.
+ * Settings > Backup & restore: the app's settings, its cookies, the Library's history and the
+ * subscriptions, saved to one JSON file the user picks, and read back from one.
  *
- * History rows are copied column by column (whatever the table has), so a backup from an older
+ * History and subscription rows are copied column by column (whatever the table has), so a backup from an older
  * or newer version still restores: columns this version doesn't have are skipped, and ones the
  * backup lacks take their defaults. Restoring adds to what's there; a download already in the
  * Library is kept as it is.
@@ -38,10 +38,10 @@ object BackupRestore {
     private const val HISTORY_WHERE = "status IN ('FINISHED', 'SAVED')"
 
     /** What a backup holds, or what was restored from one. */
-    data class Contents(val settings: Int, val hasCookies: Boolean, val history: Int)
+    data class Contents(val settings: Int, val hasCookies: Boolean, val history: Int, val subscriptions: Int = 0)
 
     /** Which parts to save or restore. */
-    data class Parts(val settings: Boolean, val cookies: Boolean, val history: Boolean)
+    data class Parts(val settings: Boolean, val cookies: Boolean, val history: Boolean, val subscriptions: Boolean = false)
 
     suspend fun export(context: Context, uri: Uri, parts: Parts): Contents = withContext(Dispatchers.IO) {
         val root = JSONObject()
@@ -71,9 +71,19 @@ object BackupRestore {
             historyCount = downloads.length()
             root.put("history", JSONObject().put("downloads", downloads).put("saved_files", files))
         }
+        var subscriptionCount = 0
+        if (parts.subscriptions) {
+            val db = AppDatabase.getDatabase(context).openHelper.readableDatabase
+            // With what each has already seen: restored, a subscription carries on from where it
+            // was, instead of treating its whole list as new or starting over.
+            val subscriptions = rows(db.query("SELECT * FROM subscriptions"))
+            val seen = rows(db.query("SELECT * FROM subscription_seen"))
+            subscriptionCount = subscriptions.length()
+            if (subscriptionCount > 0) root.put("subscriptions", JSONObject().put("sources", subscriptions).put("seen", seen))
+        }
         val out = context.contentResolver.openOutputStream(uri, "wt") ?: error(context.getString(com.comfort.app.R.string.backup_couldnt_open_file))
         out.use { it.write(root.toString().toByteArray(Charsets.UTF_8)) }
-        Contents(settingsCount, cookies.isNotBlank(), historyCount)
+        Contents(settingsCount, cookies.isNotBlank(), historyCount, subscriptionCount)
     }
 
     /** A backup file, read and checked, ready to [restore]. */
@@ -83,6 +93,7 @@ object BackupRestore {
                 settings = root.optJSONObject("settings")?.let { s -> s.keys().asSequence().sumOf { s.optJSONObject(it)?.length() ?: 0 } } ?: 0,
                 hasCookies = root.optString("cookies").isNotBlank(),
                 history = root.optJSONObject("history")?.optJSONArray("downloads")?.length() ?: 0,
+                subscriptions = root.optJSONObject("subscriptions")?.optJSONArray("sources")?.length() ?: 0,
             )
     }
 
@@ -124,7 +135,19 @@ object BackupRestore {
                 insertRows(db, "saved_files", history.optJSONArray("saved_files"))
             }
         }
-        Contents(settingsCount, restoreCookies, historyCount)
+        var subscriptionCount = 0
+        val subscriptions = root.optJSONObject("subscriptions")
+        if (parts.subscriptions && subscriptions != null) {
+            val room = AppDatabase.getDatabase(context)
+            room.runInTransaction {
+                val db = room.openHelper.writableDatabase
+                subscriptionCount = insertRows(db, "subscriptions", subscriptions.optJSONArray("sources"))
+                insertRows(db, "subscription_seen", subscriptions.optJSONArray("seen"))
+            }
+            // The hourly check only runs while there's something to check.
+            if (subscriptionCount > 0) Subscriptions.reschedule(context)
+        }
+        Contents(settingsCount, restoreCookies, historyCount, subscriptionCount)
     }
 
     private fun encodeSetting(value: Any?): JSONObject? = when (value) {

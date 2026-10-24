@@ -28,6 +28,7 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
     val scope = rememberCoroutineScope()
     var includeSettings by remember { mutableStateOf(true) }
     var includeHistory by remember { mutableStateOf(true) }
+    var includeSubscriptions by remember { mutableStateOf(true) }
     // Off by default: cookies are logins, and a backup file is easy to share by mistake.
     var includeCookies by remember { mutableStateOf(false) }
     // The last result, shown under the buttons.
@@ -43,6 +44,7 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         res.getQuantityString(R.plurals.backup_settings_count, c.settings, c.settings).takeIf { c.settings > 0 },
         res.getString(R.string.backup_cookies_included).takeIf { c.hasCookies },
         res.getQuantityString(R.plurals.backup_history_count, c.history, c.history).takeIf { c.history > 0 },
+        res.getQuantityString(R.plurals.backup_subscriptions_count, c.subscriptions, c.subscriptions).takeIf { c.subscriptions > 0 },
     ).joinToString(", ").ifEmpty { res.getString(R.string.backup_nothing) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
@@ -50,7 +52,7 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         busy = true
         scope.launch {
             message = runCatching {
-                val saved = BackupRestore.export(context, uri, BackupRestore.Parts(includeSettings, includeCookies, includeHistory))
+                val saved = BackupRestore.export(context, uri, BackupRestore.Parts(includeSettings, includeCookies, includeHistory, includeSubscriptions))
                 res.getString(R.string.backup_saved, describe(saved))
             }.getOrElse { res.getString(R.string.backup_failed, it.message ?: it.javaClass.simpleName) }
             busy = false
@@ -91,6 +93,14 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
             )
             Spacer(Modifier.height(16.dp))
             IconToggleRow(
+                icon = Icons.Outlined.Subscriptions,
+                title = stringResource(R.string.backup_part_subscriptions),
+                subtitle = stringResource(R.string.backup_part_subscriptions_subtitle),
+                checked = includeSubscriptions,
+                onCheckedChange = { includeSubscriptions = it },
+            )
+            Spacer(Modifier.height(16.dp))
+            IconToggleRow(
                 icon = Icons.Outlined.Lock,
                 title = stringResource(R.string.backup_part_cookies),
                 subtitle = stringResource(R.string.backup_part_cookies_subtitle),
@@ -103,7 +113,7 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                     val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                     exportLauncher.launch("comfort-backup-$date.json")
                 },
-                enabled = !busy && (includeSettings || includeHistory || includeCookies),
+                enabled = !busy && (includeSettings || includeHistory || includeSubscriptions || includeCookies),
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
             ) {
@@ -141,6 +151,7 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         val contents = backup.contents
         var takeSettings by remember(backup) { mutableStateOf(contents.settings > 0) }
         var takeHistory by remember(backup) { mutableStateOf(contents.history > 0) }
+        var takeSubscriptions by remember(backup) { mutableStateOf(contents.subscriptions > 0) }
         var takeCookies by remember(backup) { mutableStateOf(contents.hasCookies) }
         AlertDialog(
             onDismissRequest = { pending = null },
@@ -151,18 +162,19 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                     Spacer(Modifier.height(4.dp))
                     if (contents.settings > 0) RestoreChoice(stringResource(R.string.backup_part_settings), takeSettings) { takeSettings = it }
                     if (contents.history > 0) RestoreChoice(stringResource(R.string.backup_part_history), takeHistory) { takeHistory = it }
+                    if (contents.subscriptions > 0) RestoreChoice(stringResource(R.string.backup_part_subscriptions), takeSubscriptions) { takeSubscriptions = it }
                     if (contents.hasCookies) RestoreChoice(stringResource(R.string.restore_cookies_replace), takeCookies) { takeCookies = it }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = takeSettings || takeHistory || takeCookies,
+                    enabled = takeSettings || takeHistory || takeSubscriptions || takeCookies,
                     onClick = {
                         pending = null
                         busy = true
                         scope.launch {
                             message = runCatching {
-                                val restored = BackupRestore.restore(context, backup, BackupRestore.Parts(takeSettings, takeCookies, takeHistory))
+                                val restored = BackupRestore.restore(context, backup, BackupRestore.Parts(takeSettings, takeCookies, takeHistory, takeSubscriptions))
                                 if (restored.settings > 0) askRestart = true
                                 res.getString(R.string.restore_done, describe(restored))
                             }.getOrElse { res.getString(R.string.restore_failed, it.message ?: it.javaClass.simpleName) }
