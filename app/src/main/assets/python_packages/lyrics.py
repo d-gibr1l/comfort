@@ -106,7 +106,8 @@ def _embed(path, text):
         except ID3NoHeaderError:
             tags = ID3()
         tags.delall("USLT")
-        tags.add(USLT(encoding=3, lang="eng", desc="", text=text))
+        # "und" (undetermined): LRCLIB doesn't say what language the lyrics are in.
+        tags.add(USLT(encoding=3, lang="und", desc="", text=text))
         tags.save(path)
     else:
         # FLAC, Ogg/Opus and the like: Vorbis comments, where players read LYRICS.
