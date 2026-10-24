@@ -147,12 +147,15 @@ object Subscriptions {
         val subscription = dao.getById(id) ?: return@withLock null
         _checking.update { it + id }
         try {
-            val feed = SubscriptionFeed.fetch(context, subscription.url, SubscriptionChecks.FETCH_LIMIT).getOrElse { error ->
+            val feed = SubscriptionFeed.fetch(context, subscription.url, SubscriptionChecks.fetchLimit(subscription.url)).getOrElse { error ->
                 if (error is CancellationException) throw error
                 dao.setCheckResult(id, System.currentTimeMillis(), error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName)
                 return@withLock null
             }
-            val plan = SubscriptionChecks.plan(feed.entries, dao.getSeenIds(id).toSet(), subscription.initialized)
+            val plan = SubscriptionChecks.plan(
+                feed.entries, dao.getSeenIds(id).toSet(), subscription.initialized,
+                newestLast = SubscriptionChecks.isPlaylist(subscription.url),
+            )
             var queued = 0
             for (entry in plan.toDownload) {
                 val result = DownloadDispatcher.enqueueDownload(

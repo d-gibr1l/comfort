@@ -1165,8 +1165,10 @@ def latest_entries(url, limit=30, proxy_url=None, cookies_path=None):
     Dates: a flat YouTube listing has no upload date, only "3 days ago"; the approximate_date
     extractor arg turns that into a timestamp, so upload_date here is that day, not exact — fine
     for "new since last time", which goes by id anyway."""
+    # Up to 1000: a playlist is listed whole (Subscriptions can't rely on its first entries being
+    # its newest), and a flat listing pages through YouTube's 100-a-page list quickly.
     try:
-        limit = max(1, min(int(limit or 30), 200))
+        limit = max(1, min(int(limit or 30), 1000))
     except ValueError:
         limit = 30
     home = _YT_CHANNEL_HOME_RE.match(url.strip())
