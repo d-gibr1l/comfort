@@ -469,17 +469,15 @@ internal fun SettingsSubScaffold(
 internal fun ConfirmDeleteSheet(title: String, message: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    Icons.Outlined.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(22.dp).padding(top = 2.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(10.dp))
+            SheetHeader(
+                icon = Icons.Outlined.Warning,
+                title = title,
+                subtitle = null,
+                tileColor = MaterialTheme.colorScheme.errorContainer,
+                iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Spacer(Modifier.height(16.dp))
             Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -732,7 +730,7 @@ internal fun SizeSheetField(
         }
         ModalBottomSheet(onDismissRequest = { showSheet = false }) {
             Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-                Text(label, style = MaterialTheme.typography.titleMedium)
+                SheetHeader(icon = Icons.Outlined.Tune, title = label, subtitle = null, modifier = Modifier.padding(top = 8.dp))
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = numberText,

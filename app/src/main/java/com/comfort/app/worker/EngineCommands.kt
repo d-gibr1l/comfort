@@ -31,6 +31,8 @@ internal class EngineCommands(
     private val cookiesArg: String,
     private val overrideTitle: String,
     private val overrideArtist: String,
+    // Only shown (the preview sheet, Settings' current command): nothing is created or unzipped.
+    private val previewOnly: Boolean = false,
 ) {
     // Each of these prefers what the download preview sheet recorded for this one download over
     // the global Settings default — see DownloadEntity's own comment on why they're nullable. A
@@ -58,10 +60,10 @@ internal class EngineCommands(
     // Already-fetched item IDs across retries, so a paused/retried download resumes where it left
     // off. One file per engine: gallery-dl's archive is sqlite, yt-dlp's and Instaloader's are text.
     private fun archive(name: String) = File(context.filesDir, "archives/$downloadId.$name")
-        .apply { parentFile?.mkdirs() }.absolutePath
-    private val galleryArchivePath = archive("sqlite3")
-    private val ytDlpArchivePath = archive("ytdlp.txt")
-    private val instaloaderArchivePath = archive("instaloader.txt")
+        .apply { if (!previewOnly) parentFile?.mkdirs() }.absolutePath
+    private val galleryArchivePath by lazy { archive("sqlite3") }
+    private val ytDlpArchivePath by lazy { archive("ytdlp.txt") }
+    private val instaloaderArchivePath by lazy { archive("instaloader.txt") }
 
     private val limitRate = GalleryDlPreferences.getEffectiveSpeedLimit(context)
     private val networkRetries = GalleryDlPreferences.getEffectiveNetworkRetries(context)
@@ -78,7 +80,7 @@ internal class EngineCommands(
     private val ffmpegPath = FfmpegRuntime.getExecutablePath(context).orEmpty()
     // Always empty now (no ABI's ffmpeg has libraries of its own); the call also clears the old
     // armeabi-v7a bundle's leftover folder. Still passed: the wrappers' argument positions.
-    private val ffmpegLibDir = FfmpegRuntime.ensureProvisioned(context)?.absolutePath.orEmpty()
+    private val ffmpegLibDir by lazy { if (previewOnly) "" else FfmpegRuntime.ensureProvisioned(context)?.absolutePath.orEmpty() }
     // A per-download pick (the Configure sheet) wins over the Settings default.
     private val audioFormat = entity?.audioFormat?.let { stored -> runCatching { AudioFormat.valueOf(stored) }.getOrNull() }
         ?: GalleryDlPreferences.getAudioFormat(context)
@@ -140,9 +142,7 @@ internal class EngineCommands(
     private val impersonate = GalleryDlPreferences.isImpersonateEnabled(context)
     private val aria2Enabled = GalleryDlPreferences.isAria2Enabled(context)
     private val aria2Path = if (aria2Enabled) Aria2Runtime.getExecutablePath(context).orEmpty() else ""
-    private val aria2LibDir = if (aria2Enabled) Aria2Runtime.ensureProvisioned(context)?.absolutePath.orEmpty() else ""
-
-    private fun flag(on: Boolean) = if (on) "1" else "0"
+    private val aria2LibDir by lazy { if (aria2Enabled && !previewOnly) Aria2Runtime.ensureProvisioned(context)?.absolutePath.orEmpty() else "" }
 
     fun forEngine(engine: DownloadEngine, excludeVideo: Boolean = false): EngineCommand = when (engine) {
         DownloadEngine.GALLERY_DL -> galleryDl(excludeVideo)
@@ -151,112 +151,100 @@ internal class EngineCommands(
         DownloadEngine.INSTALOADER -> instaloader()
     }
 
-    fun galleryDl(excludeVideo: Boolean) = EngineCommand(
-        "gallery-dl", "gallery_dl_wrapper.py",
-        listOf(
-            "download", url, stagingDir.absolutePath, cookiesArg,
-            filenameFormat, galleryDlExtraArgs, galleryArchivePath, limitRate,
-            entity?.itemFilter.orEmpty(), flag(excludeVideo),
-            networkRetries, maxFilesize, flag(writeInfoFiles), proxyUrl,
-            socketTimeoutSeconds,
-            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
-            flag(restrictFilenames), flag(forceIpv4), flag(noCheckCertificates),
-        ),
+    fun galleryDl(excludeVideo: Boolean) = EngineCommand("gallery-dl", "gallery_dl_wrapper.py", galleryDlArgs(excludeVideo).toArgs())
+
+    fun galleryDlArgs(excludeVideo: Boolean) = GalleryDlArgs(
+        url = url, downloadDir = stagingDir.absolutePath, cookies = cookiesArg,
+        filenameFormat = filenameFormat, extraArgs = galleryDlExtraArgs, archive = galleryArchivePath, limitRate = limitRate,
+        itemFilter = entity?.itemFilter.orEmpty(), excludeVideo = excludeVideo,
+        retries = networkRetries, maxFilesize = maxFilesize, writeInfoFiles = writeInfoFiles, proxy = proxyUrl,
+        socketTimeout = socketTimeoutSeconds,
+        sleepInterval = if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+        restrictFilenames = restrictFilenames, forceIpv4 = forceIpv4, noCheckCertificates = noCheckCertificates,
     )
 
     // A custom filename format (gallery-dl's syntax) is filled in by the wrapper itself.
-    fun ytDlp() = EngineCommand(
-        "yt-dlp", "yt_dlp_wrapper.py",
-        listOf(
-            "download", url, stagingDir.absolutePath, cookiesArg,
-            customFilenameFormat, ytDlpExtraArgs, ytDlpArchivePath, limitRate, formatIdOverride,
-            jsRuntimePath, ffmpegPath,
-            flag(audioOnly), flag(downloadSubtitles), subtitleLangs,
-            flag(embedThumbnail), flag(embedMetadata), flag(noPlaylist),
-            videoQuality.resolutionCap()?.toString().orEmpty(),
-            outputFormat.extension, networkRetries, ytDlpPlaylistItems, maxFilesize,
-            flag(writeInfoFiles), clipRange, proxyUrl,
-            flag(liveFromStart), extractorArgs,
-            flag(saveThumbnail),
-            flag(forceIpv4),
-            if (concurrentFragments > 1) concurrentFragments.toString() else "",
-            flag(noCheckCertificates),
-            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
-            customHeaders,
-            formatSort,
-            flag(verboseLogging),
-            flag(embedChapters),
-            flag(saveSubtitleFiles),
-            flag(restrictFilenames),
-            flag(trimFilenames),
-            fragmentRetries,
-            socketTimeoutSeconds,
-            bufferSizeKb,
-            flag(youtubeClientRotation),
-            flag(impersonate),
-            aria2Path,
-            aria2LibDir,
-            ffmpegLibDir,
-            overrideTitle,
-            overrideArtist,
-            // The preview sheet's saved extraction of this same URL, if any — reused instead of
-            // extracting again (see yt_dlp_wrapper.download).
-            GalleryDlListing.ytDlpInfoCacheFile(context, url).absolutePath,
-            audioFormat.codec,
-            flag(normalizeAudio),
-            if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_REMOVE) sponsorBlockCategories else "",
-            if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_MARK) sponsorBlockCategories else "",
-            flag(splitChapters),
-            audioLanguage,
-        ),
+    fun ytDlp() = EngineCommand("yt-dlp", "yt_dlp_wrapper.py", ytDlpArgs().toArgs())
+
+    fun ytDlpArgs() = YtDlpArgs(
+        url = url, downloadDir = stagingDir.absolutePath, cookies = cookiesArg,
+        filenameFormat = customFilenameFormat, extraArgs = ytDlpExtraArgs, archive = ytDlpArchivePath,
+        limitRate = limitRate, formatOverride = formatIdOverride,
+        jsRuntime = jsRuntimePath, ffmpeg = ffmpegPath,
+        audioOnly = audioOnly, downloadSubtitles = downloadSubtitles, subtitleLangs = subtitleLangs,
+        embedThumbnail = embedThumbnail, embedMetadata = embedMetadata, noPlaylist = noPlaylist,
+        resolutionCap = videoQuality.resolutionCap()?.toString().orEmpty(),
+        outputFormat = outputFormat.extension, retries = networkRetries, playlistItems = ytDlpPlaylistItems,
+        maxFilesize = maxFilesize, writeInfoFiles = writeInfoFiles, clipRange = clipRange, proxy = proxyUrl,
+        liveFromStart = liveFromStart, extractorArgs = extractorArgs, saveThumbnail = saveThumbnail,
+        forceIpv4 = forceIpv4,
+        concurrentFragments = if (concurrentFragments > 1) concurrentFragments.toString() else "",
+        noCheckCertificates = noCheckCertificates,
+        sleepInterval = if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+        customHeaders = customHeaders, formatSort = formatSort, verbose = verboseLogging,
+        embedChapters = embedChapters, saveSubtitleFiles = saveSubtitleFiles,
+        restrictFilenames = restrictFilenames, trimFilenames = trimFilenames,
+        fragmentRetries = fragmentRetries, socketTimeout = socketTimeoutSeconds, bufferSizeKb = bufferSizeKb,
+        youtubeClientRotation = youtubeClientRotation, impersonate = impersonate,
+        aria2 = aria2Path, aria2LibDir = aria2LibDir, ffmpegLibDir = ffmpegLibDir,
+        overrideTitle = overrideTitle, overrideArtist = overrideArtist,
+        // The preview sheet's saved extraction of this same URL, if any — reused instead of
+        // extracting again (see yt_dlp_wrapper.download).
+        infoCache = GalleryDlListing.ytDlpInfoCacheFile(context, url).absolutePath,
+        audioFormat = audioFormat.codec, normalizeAudio = normalizeAudio,
+        sponsorBlockRemove = if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_REMOVE) sponsorBlockCategories else "",
+        sponsorBlockMark = if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_MARK) sponsorBlockCategories else "",
+        splitChapters = splitChapters,
+        audioLanguage = audioLanguage,
     )
 
     // Always audio-only — spotify_wrapper.py hands each matched track to yt_dlp_wrapper's own
     // download(), which is where ffmpeg/aria2c/the JS runtime are used. A custom filename format is
     // filled in there (it used to reach yt-dlp raw: a literal, unsubstituted name ffmpeg rejected).
-    fun spotify() = EngineCommand(
-        "Spotify", "spotify_wrapper.py",
-        listOf(
-            "download", url, stagingDir.absolutePath, cookiesArg,
-            customFilenameFormat, ytDlpArchivePath, jsRuntimePath,
-            ffmpegPath, ffmpegLibDir, aria2Path, aria2LibDir,
-            flag(restrictFilenames),
-            flag(trimFilenames),
-            flag(verboseLogging),
-            flag(saveThumbnail),
-            ytDlpPlaylistItems,
-            overrideTitle,
-            overrideArtist,
-            // The matched YouTube video is downloaded like any YouTube link: same impersonation,
-            // client rotation, extractor args, proxy, timeout and retries.
-            flag(impersonate),
-            flag(youtubeClientRotation),
-            extractorArgs,
-            proxyUrl,
-            socketTimeoutSeconds,
-            networkRetries,
-            audioFormat.codec,
-            flag(normalizeAudio),
-        ),
+    fun spotify() = EngineCommand("Spotify", "spotify_wrapper.py", spotifyArgs().toArgs())
+
+    fun spotifyArgs() = SpotifyArgs(
+        url = url, downloadDir = stagingDir.absolutePath, cookies = cookiesArg,
+        filenameFormat = customFilenameFormat, archive = ytDlpArchivePath, jsRuntime = jsRuntimePath,
+        ffmpeg = ffmpegPath, ffmpegLibDir = ffmpegLibDir, aria2 = aria2Path, aria2LibDir = aria2LibDir,
+        restrictFilenames = restrictFilenames, trimFilenames = trimFilenames, verbose = verboseLogging,
+        saveThumbnail = saveThumbnail, playlistItems = ytDlpPlaylistItems,
+        overrideTitle = overrideTitle, overrideArtist = overrideArtist,
+        // The matched YouTube video is downloaded like any YouTube link: same impersonation,
+        // client rotation, extractor args, proxy, timeout and retries.
+        impersonate = impersonate, youtubeClientRotation = youtubeClientRotation,
+        extractorArgs = extractorArgs, proxy = proxyUrl, socketTimeout = socketTimeoutSeconds,
+        retries = networkRetries, audioFormat = audioFormat.codec, normalizeAudio = normalizeAudio,
     )
 
     // Instagram posts/reels (VideoSiteRouter.resolveEngine). The picker's itemFilter passes
     // straight through: its "num"s are the same 1-based carousel positions.
-    fun instaloader() = EngineCommand(
-        "Instaloader", "instaloader_wrapper.py",
-        listOf(
-            "download", url, stagingDir.absolutePath, cookiesArg,
-            entity?.itemFilter.orEmpty(), instaloaderArchivePath,
-            flag(writeInfoFiles), proxyUrl, socketTimeoutSeconds,
-            // The preview's saved post, reused instead of fetching it again.
-            GalleryDlListing.instaloaderInfoCacheFile(context, url).absolutePath,
-            customFilenameFormat,
-            if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
-            // The Settings > Downloads options every engine honours.
-            limitRate, networkRetries, maxFilesize,
-            flag(restrictFilenames), flag(forceIpv4), flag(noCheckCertificates),
-        ),
+    fun instaloader() = EngineCommand("Instaloader", "instaloader_wrapper.py", instaloaderArgs().toArgs())
+
+    fun instaloaderArgs() = InstaloaderArgs(
+        url = url, downloadDir = stagingDir.absolutePath, cookies = cookiesArg,
+        itemFilter = entity?.itemFilter.orEmpty(), archive = instaloaderArchivePath,
+        writeInfoFiles = writeInfoFiles, proxy = proxyUrl, socketTimeout = socketTimeoutSeconds,
+        // The preview's saved post, reused instead of fetching it again.
+        infoCache = GalleryDlListing.instaloaderInfoCacheFile(context, url).absolutePath,
+        filenameFormat = customFilenameFormat,
+        sleepInterval = if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
+        // The Settings > Downloads options every engine honours.
+        limitRate = limitRate, retries = networkRetries, maxFilesize = maxFilesize,
+        restrictFilenames = restrictFilenames, forceIpv4 = forceIpv4, noCheckCertificates = noCheckCertificates,
     )
+
+    // curl_cffi, yt-dlp's only impersonation backend, is only in the arm64-v8a Python runtime
+    // (yt_dlp_wrapper's _IMPERSONATE_AVAILABLE), and the runtime follows the primary ABI.
+    private val impersonateAvailable get() = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "arm64-v8a"
+
+    /** The command [engine] would run with, as the preview sheet and Settings show it. */
+    fun preview(engine: DownloadEngine, excludeVideo: Boolean = false): CommandPreview.Block = when (engine) {
+        DownloadEngine.GALLERY_DL -> CommandPreview.galleryDl(galleryDlArgs(excludeVideo))
+        DownloadEngine.YT_DLP -> CommandPreview.ytDlp(ytDlpArgs(), impersonateAvailable = impersonateAvailable)
+        DownloadEngine.SPOTIFY -> CommandPreview.spotify(spotifyArgs(), impersonateAvailable = impersonateAvailable)
+        DownloadEngine.INSTALOADER -> CommandPreview.instaloader(instaloaderArgs())
+    }
 
     private companion object {
         // The comma-separated item numbers in SharePickerScreen's gallery-dl --filter ("num in {1,3,4}").

@@ -583,17 +583,15 @@ private fun CaughtMediaSheet(
     val context = LocalContext.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
-            Text(stringResource(R.string.media_on_this_page), style = MaterialTheme.typography.titleLarge)
-            Text(
-                when (shown.size) {
-                    0 -> stringResource(R.string.nothing_found_yet)
-                    else -> pluralStringResource(R.plurals.media_found_best_first, shown.size, shown.size)
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        SheetHeader(
+            icon = Icons.Outlined.PermMedia,
+            title = stringResource(R.string.media_on_this_page),
+            subtitle = when (shown.size) {
+                0 -> stringResource(R.string.nothing_found_yet)
+                else -> pluralStringResource(R.plurals.media_found_best_first, shown.size, shown.size)
+            },
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 8.dp),
+        )
         if (shown.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 32.dp),

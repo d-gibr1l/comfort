@@ -274,24 +274,12 @@ private fun SitesSection() {
                 .verticalScroll(androidx.compose.foundation.rememberScrollState()),
         ) {
             // Header
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Outlined.Public, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(stringResource(R.string.sites), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        stringResource(R.string.choose_which_engine_a_site_s),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            SheetHeader(
+                icon = Icons.Outlined.Public,
+                title = stringResource(R.string.sites),
+                subtitle = stringResource(R.string.choose_which_engine_a_site_s),
+                modifier = Modifier.padding(top = 8.dp),
+            )
 
             // Add or move a site
             Spacer(Modifier.height(20.dp))
@@ -492,23 +480,17 @@ private fun SiteListSheet(
         val haptics = LocalHapticFeedback.current
         // Full height whatever the search leaves, so the sheet doesn't jump as results shrink.
         Column(modifier = Modifier.fillMaxHeight(0.92f).padding(horizontal = 20.dp).imePadding()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(siteRouteIcon(route), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(siteRouteTitle(route), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(
-                        stringResource(
-                            R.string.site_count_and_meaning,
-                            if (query.isNotBlank()) pluralStringResource(R.plurals.sites_shown_of, sites.size, "%,d".format(shown.size), "%,d".format(sites.size))
-                            else pluralStringResource(R.plurals.site_count_grouped, sites.size, "%,d".format(sites.size)),
-                            siteRouteMeaning(route),
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            SheetHeader(
+                icon = siteRouteIcon(route),
+                title = siteRouteTitle(route),
+                subtitle = stringResource(
+                    R.string.site_count_and_meaning,
+                    if (query.isNotBlank()) pluralStringResource(R.plurals.sites_shown_of, sites.size, "%,d".format(shown.size), "%,d".format(sites.size))
+                    else pluralStringResource(R.plurals.site_count_grouped, sites.size, "%,d".format(sites.size)),
+                    siteRouteMeaning(route),
+                ),
+                modifier = Modifier.padding(top = 8.dp),
+            )
             Spacer(Modifier.height(12.dp))
             val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
             OutlinedTextField(

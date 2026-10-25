@@ -76,7 +76,9 @@ import com.comfort.app.util.TrackPreview
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /** One cut of the source video. Several of these download as one concatenated file — see
@@ -775,6 +777,34 @@ private fun PreviewSheetOverlayHost(
         }
     }
 
+    // What Download adds — the Commands screen shows the command for this same value, so the
+    // preview can't differ from the download.
+    fun currentOptions() = DownloadOptions(
+        // Spotify ignores quality entirely, but music.youtube.com/soundcloud.com
+        // go through the normal yt-dlp/gallery-dl path and would otherwise
+        // download video despite the sheet showing song styling — !showQualityRow
+        // means the song-ness came from the URL itself, not just a manual "Audio"
+        // pick, so this is the one case that needs forcing rather than trusting
+        // whatever quality happens to be selected.
+        quality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
+        outputFormat = outputFormat,
+        saveThumbnail = saveThumbnail,
+        extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
+        clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
+        filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
+        itemFilter = itemFilter,
+        totalItems = if (itemFilter != null) selectedTrackCount else 0,
+        // Only SONG_SINGLE has editable title/artist at all (SONG_LIST's own
+        // per-track rows aren't individually editable, and VIDEO never shows
+        // these fields) — null here means "use the source's own title/artist",
+        // same as if this sheet had never had an editable field to begin with.
+        overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
+        overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
+        engine = engineOverride,
+        audioFormat = audioFormat,
+        audioLanguage = audioTrack?.let { if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
+    )
+
     Box(modifier = Modifier.fillMaxWidth()) {
         MainPreviewScreen(
             url = url,
@@ -823,35 +853,7 @@ private fun PreviewSheetOverlayHost(
                 }
             },
             onOpenTemplates = { onOpenOverlay(PreviewScreen.TEMPLATES) },
-            onDownload = {
-                onDownload(
-                    DownloadOptions(
-                        // Spotify ignores quality entirely, but music.youtube.com/soundcloud.com
-                        // go through the normal yt-dlp/gallery-dl path and would otherwise
-                        // download video despite the sheet showing song styling — !showQualityRow
-                        // means the song-ness came from the URL itself, not just a manual "Audio"
-                        // pick, so this is the one case that needs forcing rather than trusting
-                        // whatever quality happens to be selected.
-                        quality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
-                        outputFormat = outputFormat,
-                        saveThumbnail = saveThumbnail,
-                        extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
-                        clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
-                        filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
-                        itemFilter = itemFilter,
-                        totalItems = if (itemFilter != null) selectedTrackCount else 0,
-                        // Only SONG_SINGLE has editable title/artist at all (SONG_LIST's own
-                        // per-track rows aren't individually editable, and VIDEO never shows
-                        // these fields) — null here means "use the source's own title/artist",
-                        // same as if this sheet had never had an editable field to begin with.
-                        overrideTitle = song.editedTitle?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
-                        overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
-                        engine = engineOverride,
-                        audioFormat = audioFormat,
-                        audioLanguage = audioTrack?.let { if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
-                    ),
-                )
-            },
+            onDownload = { onDownload(currentOptions()) },
             // The choices that make sense for every future upload: not the trim, the item
             // selection or an edited title, which belong to this listing only.
             onSubscribe = onSubscribe?.let { subscribe ->
@@ -979,32 +981,14 @@ private fun PreviewSheetOverlayHost(
                             when (current) {
                                 PreviewScreen.COMMANDS -> ExtraCommandsScreen(
                                     url = url,
-                                    quality = quality,
-                                    outputFormat = outputFormat,
-                                    saveThumbnail = saveThumbnail,
-                                    // Same gate as the real download's clipRange below — showing a
-                                    // --download-sections flag here for a trim that was never
-                                    // actually confirmed would be a command that doesn't match what
-                                    // downloading for real actually does.
-                                    segments = if (segmentsEdited) segments else emptyList(),
-                                    durationMs = previewDurationMs,
-                                    filenameTemplate = filenameTemplate,
+                                    // The same options Download would add, so the command shown
+                                    // is the one the download runs.
+                                    options = currentOptions(),
                                     commands = commands,
                                     onCommandsChange = onCommandsChange,
-                                    onCopy = {
-                                        val fullCmd = buildPreviewCommand(
-                                            context = context,
-                                            url = url,
-                                            quality = quality,
-                                            outputFormat = outputFormat,
-                                            saveThumbnail = saveThumbnail,
-                                            segments = if (segmentsEdited) segments else emptyList(),
-                                            durationMs = previewDurationMs,
-                                            filenameTemplate = filenameTemplate,
-                                            extraCommands = commands,
-                                        )
+                                    onCopy = { fullCmd ->
                                         scope.launch {
-                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(context.getString(R.string.yt_dlp_command), fullCmd)))
+                                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(context.getString(R.string.current_command), fullCmd)))
                                             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                                                 Toast.makeText(context, context.getString(R.string.command_copied), Toast.LENGTH_SHORT).show()
                                             }
@@ -2177,125 +2161,13 @@ private fun TrackRow(track: TrackPreview, url: String, selected: Boolean, onTogg
     }
 }
 
-/** Assembles a human-readable shell-style yt-dlp command from the current sheet state plus global
- *  preferences — mirrors what DownloadWorker actually passes to yt_dlp_wrapper.py. */
-private fun buildPreviewCommand(
-    context: android.content.Context,
-    url: String,
-    quality: VideoQuality,
-    outputFormat: OutputFormat,
-    saveThumbnail: Boolean,
-    segments: List<TrimSegment>,
-    durationMs: Long?,
-    filenameTemplate: String?,
-    extraCommands: List<String>,
-): String {
-    val parts = mutableListOf("yt-dlp")
-
-    // ── Quality ──────────────────────────────────────────────────────────────
-    when (quality) {
-        VideoQuality.AUDIO_ONLY -> parts += "-f bestaudio"
-        VideoQuality.BEST      -> {} // yt-dlp default, no flag needed
-        else -> {
-            val h = quality.resolutionCap()
-            parts += "-f \"bestvideo[height<=$h]+bestaudio\""
-        }
-    }
-
-    // ── Output container ─────────────────────────────────────────────────────
-    parts += "--merge-output-format ${outputFormat.extension}"
-
-    // ── Thumbnail ─────────────────────────────────────────────────────────────
-    if (GalleryDlPreferences.isEmbedThumbnail(context)) parts += "--embed-thumbnail"
-    if (saveThumbnail) parts += "--write-thumbnail"
-
-    // ── Metadata ──────────────────────────────────────────────────────────────
-    if (GalleryDlPreferences.isEmbedMetadata(context)) parts += "--embed-metadata"
-    if (GalleryDlPreferences.isWriteInfoFiles(context)) parts += "--write-info-json"
-
-    // ── Subtitles ─────────────────────────────────────────────────────────────
-    if (GalleryDlPreferences.isDownloadSubtitles(context)) {
-        parts += "--write-subs"
-        val langs = GalleryDlPreferences.getSubtitleLanguages(context)
-        if (langs.isNotBlank()) parts += "--sub-langs $langs"
-    }
-
-    // ── Playlist ──────────────────────────────────────────────────────────────
-    if (GalleryDlPreferences.isNoPlaylist(context)) parts += "--no-playlist"
-
-    // ── Live streams ──────────────────────────────────────────────────────────
-    if (GalleryDlPreferences.isLiveFromStart(context)) parts += "--live-from-start"
-
-    // ── Rate / size limits ────────────────────────────────────────────────────
-    val limitRate = GalleryDlPreferences.getSpeedLimit(context)
-    if (limitRate.isNotBlank()) parts += "-r $limitRate"
-
-    val maxFilesize = GalleryDlPreferences.getEffectiveMaxFilesize(context).orEmpty()
-    if (maxFilesize.isNotBlank()) parts += "--max-filesize $maxFilesize"
-
-    // ── Network ───────────────────────────────────────────────────────────────
-    val retries = GalleryDlPreferences.getNetworkRetries(context)
-    parts += "--retries $retries"
-
-    // ── Proxy ─────────────────────────────────────────────────────────────────
-    val proxy = GalleryDlPreferences.getProxyUrl(context)
-    if (proxy.isNotBlank()) parts += "--proxy \"$proxy\""
-
-    // ── Extractor args ────────────────────────────────────────────────────────
-    val extractorArgs = GalleryDlPreferences.getExtractorArgs(context)
-    if (extractorArgs.isNotBlank()) parts += "--extractor-args \"$extractorArgs\""
-
-    // ── Trim ──────────────────────────────────────────────────────────────────
-    // The actual download path doesn't go through this flag at all — DownloadOptions.clipRange
-    // is built by the same toClipRange()/formatTimestamp() this reuses, then handed to
-    // yt_dlp_wrapper.py's _parse_clip_range, which installs a download_ranges callable on
-    // ydl_opts directly (yt-dlp's Python API), never a CLI arg. --download-sections is yt-dlp's
-    // own CLI-equivalent of that same callable, so shown here it's still a command a user could
-    // actually run to get the identical result — just reusing the real formatter now instead of a
-    // separate H:MM:SS one that silently rounded away everything sub-second.
-    val clipRange = segments.toClipRange(durationMs)
-    clipRange?.let { clip -> parts += "--download-sections \"*$clip\"" }
-
-    // ── Chapters & SponsorBlock ───────────────────────────────────────────────
-    // Left out of a trimmed download, as the download itself leaves them out (the wrapper).
-    if (clipRange == null) {
-        val categories = GalleryDlPreferences.getSponsorBlockCategories(context).joinToString(",")
-        when (GalleryDlPreferences.getSponsorBlockMode(context)) {
-            GalleryDlPreferences.SPONSORBLOCK_REMOVE -> if (categories.isNotEmpty()) parts += "--sponsorblock-remove $categories"
-            GalleryDlPreferences.SPONSORBLOCK_MARK -> if (categories.isNotEmpty()) parts += "--sponsorblock-mark $categories"
-        }
-        if (GalleryDlPreferences.isSplitChapters(context)) parts += "--split-chapters"
-    }
-    if (GalleryDlPreferences.isEmbedChapters(context)) parts += "--embed-chapters"
-
-    // ── Filename template ─────────────────────────────────────────────────────
-    filenameTemplate?.takeIf { it.isNotBlank() }?.let { parts += "-o \"$it\"" }
-
-    // ── Global extra args (Settings > Advanced) ───────────────────────────────
-    val globalExtra = GalleryDlPreferences.getExtraArgsFor(context, com.comfort.app.data.DownloadEngine.YT_DLP)
-    if (globalExtra.isNotBlank()) parts += globalExtra
-
-    // ── Per-download extra commands ───────────────────────────────────────────
-    extraCommands.forEach { parts += it }
-
-    // ── URL ───────────────────────────────────────────────────────────────────
-    parts += "\"$url\""
-
-    return parts.joinToString(" \\\n  ")
-}
-
 @Composable
 private fun ExtraCommandsScreen(
     url: String,
-    quality: VideoQuality,
-    outputFormat: OutputFormat,
-    saveThumbnail: Boolean,
-    segments: List<TrimSegment>,
-    durationMs: Long?,
-    filenameTemplate: String?,
+    options: DownloadOptions,
     commands: List<String>,
     onCommandsChange: (List<String>) -> Unit,
-    onCopy: () -> Unit,
+    onCopy: (String) -> Unit,
     onCancel: () -> Unit,
     onDone: () -> Unit,
 ) {
@@ -2320,58 +2192,29 @@ private fun ExtraCommandsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         val context = androidx.compose.ui.platform.LocalContext.current
-        val fullCommand = remember(url, quality, outputFormat, saveThumbnail, segments, durationMs, filenameTemplate, commands) {
-            buildPreviewCommand(
-                context = context,
-                url = url,
-                quality = quality,
-                outputFormat = outputFormat,
-                saveThumbnail = saveThumbnail,
-                segments = segments,
-                durationMs = durationMs,
-                filenameTemplate = filenameTemplate,
-                extraCommands = commands,
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(R.string.current_command),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            FilledTonalIconButton(
-                onClick = onCopy,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_current_command))
-            }
-        }
-
-        Surface(
-            modifier = Modifier.fillMaxWidth().height(220.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            ) {
-                Text(
-                    fullCommand,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    ),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+        // Off the main thread: it reads the preferences and the cookie file. Keyed on everything
+        // the sheet can change, so it follows each pick; the last command stays up meanwhile.
+        val shownCommands by produceState(emptyList<com.comfort.app.worker.CurrentCommand.Shown>(), url, options) {
+            value = withContext(Dispatchers.IO) {
+                val entity = com.comfort.app.worker.CurrentCommand.sheetEntity(
+                    url = url.trim(), videoQuality = options.quality, outputFormat = options.outputFormat.name,
+                    saveThumbnail = options.saveThumbnail, clipRange = options.clipRange,
+                    extraCommands = options.extraCommands, filenameTemplate = options.filenameTemplate,
+                    itemFilter = options.itemFilter, engineOverride = options.engine,
+                    audioFormat = options.audioFormat?.name, audioLanguage = options.audioLanguage,
+                    overrideTitle = options.overrideTitle, overrideArtist = options.overrideArtist,
                 )
+                com.comfort.app.worker.CurrentCommand.forDownload(context, url.trim(), entity)
             }
         }
+
+        CommandCodePanel(
+            commands = shownCommands,
+            subtitle = stringResource(R.string.current_command_download_subtitle),
+            onCopy = onCopy,
+            // More room under the drag handle.
+            modifier = Modifier.padding(top = 8.dp),
+        )
 
         if (commands.isNotEmpty()) {
             Row(
@@ -2441,16 +2284,21 @@ private fun ExtraCommandsScreen(
         OutlinedTextField(
             value = input,
             onValueChange = { input = it },
-            modifier = Modifier.fillMaxWidth().height(50.dp).clearFocusOnKeyboardDismiss(),
+            modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
             placeholder = { Text(stringResource(R.string.add_command)) },
             leadingIcon = { Icon(Icons.Outlined.Terminal, contentDescription = null) },
             trailingIcon = {
-                Box(modifier = Modifier.padding(end = 8.dp)) {
-                    PreviewChip(label = stringResource(R.string.add), onClick = { add() })
+                FilledTonalIconButton(
+                    onClick = { add() },
+                    enabled = input.isNotBlank(),
+                    modifier = Modifier.padding(end = 6.dp).size(40.dp),
+                ) {
+                    Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.add))
                 }
             },
             singleLine = true,
-            shape = MaterialTheme.shapes.medium,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+            shape = androidx.compose.foundation.shape.CircleShape,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { add() }),
         )
@@ -2460,8 +2308,12 @@ private fun ExtraCommandsScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = stringResource(R.string.action_cancel), onClick = onCancel)
-            PreviewChip(label = stringResource(R.string.done), selected = true, onClick = onDone)
+            ConfirmCancelSplitButton(
+                label = stringResource(R.string.done),
+                icon = Icons.Outlined.Check,
+                onConfirm = onDone,
+                onCancel = onCancel,
+            )
         }
     }
 }
@@ -2583,10 +2435,11 @@ private fun TrimVideoScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            stringResource(R.string.trim_video_2),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(start = 16.dp),
+        SheetHeader(
+            icon = Icons.Outlined.ContentCut,
+            title = stringResource(R.string.trim_video_2),
+            subtitle = stringResource(R.string.trim_subtitle),
+            modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
         )
 
         val realDurationMs = durationMs?.takeIf { it > 0L }
@@ -2880,8 +2733,12 @@ private fun TrimVideoScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = stringResource(R.string.action_cancel), onClick = onCancel)
-            PreviewChip(label = stringResource(R.string.done), selected = true, onClick = onDone)
+            ConfirmCancelSplitButton(
+                label = stringResource(R.string.done),
+                icon = Icons.Outlined.Check,
+                onConfirm = onDone,
+                onCancel = onCancel,
+            )
         }
     }
 }
@@ -2905,6 +2762,12 @@ private fun FilenameTemplatesScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        SheetHeader(
+            icon = Icons.Outlined.Tag,
+            title = stringResource(R.string.filename_templates),
+            subtitle = stringResource(R.string.filename_templates_subtitle),
+            modifier = Modifier.padding(top = 8.dp),
+        )
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
@@ -2964,8 +2827,12 @@ private fun FilenameTemplatesScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PreviewChip(label = stringResource(R.string.action_cancel), onClick = onCancel)
-            PreviewChip(label = stringResource(R.string.done), selected = true, onClick = onDone)
+            ConfirmCancelSplitButton(
+                label = stringResource(R.string.done),
+                icon = Icons.Outlined.Check,
+                onConfirm = onDone,
+                onCancel = onCancel,
+            )
         }
     }
 }
@@ -2985,16 +2852,17 @@ private fun ViewTemplatesScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilledTonalIconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
-            }
-            Text(stringResource(R.string.saved_templates), style = MaterialTheme.typography.titleMedium)
-        }
+        SheetHeader(
+            icon = Icons.Outlined.Bookmarks,
+            title = stringResource(R.string.saved_templates),
+            subtitle = stringResource(R.string.saved_templates_subtitle),
+            modifier = Modifier.padding(top = 8.dp),
+            leading = {
+                FilledTonalIconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                }
+            },
+        )
 
         if (templates.isEmpty()) {
             Surface(

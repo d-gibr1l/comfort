@@ -423,12 +423,11 @@ private fun ExtraArgsSheetField() {
                     .padding(bottom = 24.dp)
                     .verticalScroll(rememberScrollState()),
             ) {
-                Text(stringResource(R.string.extra_arguments), style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.real_command_line_flags_each_engine),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                SheetHeader(
+                    icon = Icons.Outlined.Terminal,
+                    title = stringResource(R.string.extra_arguments),
+                    subtitle = stringResource(R.string.real_command_line_flags_each_engine),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                 )
                 ExtraArgsSection(
                     title = stringResource(R.string.both),

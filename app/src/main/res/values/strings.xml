@@ -45,6 +45,25 @@
     <string name="command_template_args">Arguments</string>
     <string name="command_template_args_hint">e.g. --sponsorblock-remove all</string>
     <string name="command_template_args_help">Real command-line flags, as on a download\'s Commands screen.</string>
+    <string name="command_note_then">Then, if needed:</string>
+    <string name="command_note_app">%1$s (done by the app)</string>
+    <string name="command_note_filename">Filename pattern, filled in by the app: %1$s</string>
+    <string name="command_note_mp4">If the streams don\'t fit in an MP4, the app re-encodes them to MP4</string>
+    <string name="command_note_aria2_off">aria2c isn\'t used while Impersonate a browser is on</string>
+    <string name="command_note_youtube_403">If YouTube refuses the signed-in session, it\'s retried once without cookies</string>
+    <string name="command_note_audio_tag">Audio track tagged as %1$s</string>
+    <string name="command_note_title">Title tag: %1$s</string>
+    <string name="command_note_artist">Artist tag: %1$s</string>
+    <string name="command_note_spotify">Each track is found on YouTube, then downloaded with this:</string>
+    <string name="command_note_tracks">Only tracks %1$s</string>
+    <string name="command_note_impersonate_unavailable">Impersonate a browser is on, but this device\'s engine can\'t do it, so it\'s skipped</string>
+    <string name="command_note_trim">Captions in filenames are cut to 150 characters</string>
+    <string name="current_command_download_subtitle">Everything this download runs with</string>
+    <string name="current_command_settings_subtitle">What every download starts from, before its own choices</string>
+    <string name="trim_subtitle">Keep only the parts you want</string>
+    <string name="filename_templates_subtitle">How this download\'s files are named</string>
+    <string name="saved_templates_subtitle">Tap one to use it</string>
+    <string name="logs_subtitle">What your recent downloads did, step by step</string>
     <string name="command_template_unclosed_quotes">Unclosed quotation marks</string>
     <string name="command_template_save_as">Save as template</string>
     <!-- Settings > Backup & restore. -->

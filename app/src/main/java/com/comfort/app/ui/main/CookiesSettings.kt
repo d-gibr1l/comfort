@@ -471,15 +471,15 @@ private fun SiteCookiesSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).imePadding()) {
-            Text(site.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                stringResource(
+            SheetHeader(
+                icon = Icons.Outlined.Cookie,
+                title = site.label,
+                subtitle = stringResource(
                     R.string.cookie_count_and_expiry,
                     pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
                     formatCookieExpiry(context, site.soonestExpiryEpochSeconds),
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
             )
             Spacer(Modifier.height(12.dp))
             Column(
