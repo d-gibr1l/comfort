@@ -9,8 +9,9 @@ import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.common import PostProcessor
 from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcessor, FFmpegSplitChaptersPP
-from yt_dlp.utils import PostProcessingError
+from yt_dlp.utils import ISO639Utils, PostProcessingError, prepend_extension
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
+from yt_dlp.postprocessor.modify_chapters import ModifyChaptersPP
 import net_resilience
 import custom_names
 from comfort_events import event, parse
@@ -585,6 +586,49 @@ class _SafeEmbedSubtitlePP(FFmpegEmbedSubtitlePP):
         except PostProcessingError as e:
             self.report_warning(f"Couldn't embed subtitles, keeping the video without them: {e}")
             return [], info
+
+
+class _VideoOnlyModifyChaptersPP(ModifyChaptersPP):
+    """ModifyChapters (SponsorBlock's cuts) on the video only. The stock step cuts each subtitle
+    file too, through ffmpeg, and the app's ffmpeg is built without any subtitle formats: a .vtt
+    failed the whole download after the video had downloaded and merged fine (reproduced live,
+    SponsorBlock remove + subtitles on). Swapped in for the stock instance in download()."""
+
+    @classmethod
+    def pp_key(cls):
+        return "ModifyChapters"
+
+    def run(self, info):
+        subtitles = info.get("requested_subtitles")
+        if not subtitles:
+            return super().run(info)
+        # Left uncut: a kept subtitle file runs ahead of the video after each removed segment.
+        files, info = super().run({**info, "requested_subtitles": None})
+        info["requested_subtitles"] = subtitles
+        return files, info
+
+
+class _AudioLanguageTagPP(FFmpegPostProcessor):
+    """Tags the audio with the language of the track that was downloaded. YouTube's dubbed tracks
+    say "eng" in the file itself whatever they're in (seen: the German dub of a MrBeast Short), so
+    a German download played as "English". A copy, no re-encode; failing only costs the tag."""
+
+    def run(self, info):
+        path = info.get("filepath")
+        audio = next((f for f in info.get("requested_formats") or [] if f.get("acodec") not in (None, "none")), info)
+        language = audio.get("language")
+        if not path or not language or not os.path.isfile(path):
+            return [], info
+        code = ISO639Utils.short2long(language.split("-")[0]) or language
+        temp = prepend_extension(path, "temp")
+        try:
+            self.run_ffmpeg(path, temp, ["-map", "0", "-c", "copy", "-metadata:s:a:0", f"language={code}"])
+            os.replace(temp, path)
+        except Exception as e:  # noqa: BLE001
+            self.report_warning(f"Couldn't tag the audio language: {e}")
+            if os.path.exists(temp):
+                os.remove(temp)
+        return [], info
 
 
 _STREAM_RE = re.compile(r"Stream #\d+:\d+[^:]*: (Video|Audio): ([^\n]+)")
@@ -1373,7 +1417,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              impersonate=False, aria2_path=None, aria2_lib_dir=None, ffmpeg_lib_dir=None,
              override_title=None, override_artist=None, info_json_path=None,
              audio_format=None, normalize_audio=False, site=None,
-             sponsorblock_remove=None, sponsorblock_mark=None, split_chapters=False):
+             sponsorblock_remove=None, sponsorblock_mark=None, split_chapters=False,
+             audio_language=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1661,6 +1706,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     else:
         audio_selector = "bestaudio[ext=m4a]/bestaudio/best"
     chosen_format = audio_selector if audio_only else (format_selector or default_format)
+    # A dub instead of the original audio (the preview sheet's audio language, or Settings').
+    chosen_format = _with_audio_language(chosen_format, audio_language)
     # Poster name, then caption; DownloadWorker derives the entity's own display title from this
     # same "name - caption [id]" shape (see its own comment on that), so the two need to keep
     # matching. Only this *default* template; a caller-supplied filename_format (a saved template,
@@ -2087,6 +2134,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # stage runs in list order; ydl_opts' own (ExtractAudio, Metadata, EmbedThumbnail)
                 # are already in it, and add_post_processor appends after them.
                 post = ydl._pps["post_process"]
+                for pp in post:
+                    if type(pp) is ModifyChaptersPP:
+                        pp.__class__ = _VideoOnlyModifyChaptersPP
+                if audio_language:
+                    # First, on the merged file, so every later step carries the tag.
+                    post.insert(0, _AudioLanguageTagPP(ydl))
                 if audio_only and (clip_ranges or normalize_audio):
                     # Straight after ExtractAudio, before tags and cover art (see _LocalTrimPP).
                     after_extract = next((i + 1 for i, pp in enumerate(post) if pp.pp_key() == "ExtractAudio"), 0)
@@ -2332,6 +2385,40 @@ _QUALITY_CAPS = (("BEST", None), ("P2160", 2160), ("P1440", 1440), ("P1080", 108
                  ("AUDIO_ONLY", "audio"))
 
 
+_AUDIO_SELECTOR_RE = re.compile(r"\b(bestaudio\*?|ba\*?)(?=[\[+/]|$)")
+
+
+def _with_audio_language(fmt, language):
+    """[fmt] asking for the audio track in [language] (a dub's code, "es", or a prefix of one,
+    "de" for "de-DE") wherever it picks the best audio, and [fmt] as it was after that — a video
+    without that dub gets its original audio. yt-dlp can't be told a language through
+    format_sort (its "lang" field is the site's own preference, the original's on YouTube), so
+    it's a filter: "bestvideo+bestaudio/best" becomes
+    "bestvideo+bestaudio[language^=es]/bestvideo+bestaudio/best". Alternatives without a
+    bestaudio ("best", a fixed format id) are left to the fallback."""
+    if not language or not fmt:
+        return fmt
+    tagged = [_AUDIO_SELECTOR_RE.sub(lambda m: f"{m.group(1)}[language^={language}]", alt)
+              for alt in fmt.split("/") if _AUDIO_SELECTOR_RE.search(alt)]
+    return "/".join(tagged + [fmt]) if tagged else fmt
+
+
+def _audio_languages(info):
+    """A video's audio tracks by language (its original and each dub), for the preview sheet's
+    audio language picker: [{"code": "en-US", "original": true}, {"code": "es", ...}], original
+    first. Empty when there's only one, which is most videos."""
+    found = {}
+    for f in info.get("formats") or []:
+        language = f.get("language")
+        if not language or f.get("acodec") in (None, "none"):
+            continue
+        original = (f.get("language_preference") or 0) >= 10 or "original" in (f.get("format_note") or "")
+        found[language] = found.get(language, False) or original
+    if len(found) < 2:
+        return []
+    return [{"code": c, "original": o} for c, o in sorted(found.items(), key=lambda kv: (not kv[1], kv[0]))]
+
+
 def _sizes_by_quality(info):
     """What each quality chip would actually download, in bytes, keyed "P720|mkv" etc. — so the
     preview sheet can show the size of the chip that's selected instead of always the best format's
@@ -2550,6 +2637,9 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         sizes = _sizes_by_quality(info)
         if sizes:
             picked["sizes_by_quality"] = sizes
+        languages = _audio_languages(info)
+        if languages:
+            picked["audio_languages"] = languages
     return json.dumps(picked or {"error": errors.message or "no info extracted"})
 
 
@@ -2659,5 +2749,6 @@ if __name__ == "__main__":
         sponsorblock_remove=(_s(a[51]) if len(a) > 51 else None),
         sponsorblock_mark=(_s(a[52]) if len(a) > 52 else None),
         split_chapters=_b(a[53]) if len(a) > 53 else False,
+        audio_language=(_s(a[54]) if len(a) > 54 else None),
     )
     print(event("exit", status=status), flush=True)

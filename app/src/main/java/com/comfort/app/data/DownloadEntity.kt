@@ -167,6 +167,9 @@ data class DownloadEntity(
     /** The format an audio download is saved in (an AudioFormat name), picked in the Configure
      * sheet; null follows Settings > Processing > Audio format. */
     val audioFormat: String? = null,
+    /** The audio track asked for (AudioLanguage: "" the original, or a dub's language code), picked
+     * in the preview sheet; null follows Settings > Processing > Audio language. */
+    val audioLanguage: String? = null,
     /** Each engine's own error when this download failed, as a JSON array of
      * {"engine": ..., "message": ...} in the order the engines ran — shown by the errored card's
      * info sheet. [errorMessage] stays the one-line summary. Null for failures from before this

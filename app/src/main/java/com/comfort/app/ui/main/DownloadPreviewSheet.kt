@@ -218,6 +218,8 @@ data class DownloadOptions(
     val engine: com.comfort.app.data.DownloadEngine? = null,
     /** The format an audio download is saved in — see DownloadEntity.audioFormat. */
     val audioFormat: AudioFormat? = null,
+    /** The audio track picked — see DownloadEntity.audioLanguage; null follows Settings. */
+    val audioLanguage: String? = null,
 )
 
 /** The engines the Configure sheet offers for [url]: only links more than one engine can download
@@ -326,6 +328,8 @@ fun DownloadPreviewSheet(
     var quality by remember { mutableStateOf(GalleryDlPreferences.getVideoQuality(context)) }
     var outputFormat by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
     var audioFormat by remember { mutableStateOf(GalleryDlPreferences.getAudioFormat(context)) }
+    // The audio track (a dub instead of the original); null follows Settings until one is picked.
+    var audioLanguage by remember { mutableStateOf<String?>(null) }
     var saveThumbnail by remember { mutableStateOf(false) }
     // Per-download engine (null = Auto) and the engines the link can use.
     var engineOverride by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
@@ -643,6 +647,12 @@ fun DownloadPreviewSheet(
             },
             audioFormat = audioFormat,
             onAudioFormatChange = { audioFormat = it },
+            audioTracks = preview?.audioTracks.orEmpty(),
+            // Shown only for a video with dubs: the track Settings (or this sheet's pick) gets.
+            audioTrack = preview?.audioTracks?.takeIf { it.size > 1 }?.let { tracks ->
+                com.comfort.app.data.AudioLanguage.pick(tracks, audioLanguage ?: GalleryDlPreferences.getAudioLanguage(context))
+            },
+            onAudioLanguageChange = { audioLanguage = if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
             engineOptions = engineOptions,
@@ -693,6 +703,9 @@ private fun PreviewSheetOverlayHost(
     onToggleFormat: () -> Unit,
     audioFormat: AudioFormat,
     onAudioFormatChange: (AudioFormat) -> Unit,
+    audioTracks: List<com.comfort.app.data.AudioTrack>,
+    audioTrack: com.comfort.app.data.AudioTrack?,
+    onAudioLanguageChange: (com.comfort.app.data.AudioTrack) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
@@ -779,6 +792,9 @@ private fun PreviewSheetOverlayHost(
             onToggleFormat = onToggleFormat,
             audioFormat = audioFormat,
             onAudioFormatChange = onAudioFormatChange,
+            audioTracks = audioTracks,
+            audioTrack = audioTrack,
+            onAudioLanguageChange = onAudioLanguageChange,
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = onToggleSaveThumbnail,
             engineOptions = engineOptions,
@@ -832,6 +848,7 @@ private fun PreviewSheetOverlayHost(
                         overrideArtist = song.editedArtist?.takeIf { song.mode == PreviewMode.SONG_SINGLE && it.isNotBlank() },
                         engine = engineOverride,
                         audioFormat = audioFormat,
+                        audioLanguage = audioTrack?.let { if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
                     ),
                 )
             },
@@ -1126,6 +1143,85 @@ private fun AudioFormatChip(
     }
 }
 
+/** The audio track of a video with dubs: a chip naming the one that downloads, opening a panel of
+ * them all with the original marked. Same panel shape as [AudioFormatChip]. */
+@Composable
+private fun AudioLanguageChip(
+    track: com.comfort.app.data.AudioTrack,
+    tracks: List<com.comfort.app.data.AudioTrack>,
+    shape: androidx.compose.ui.graphics.Shape,
+    onChange: (com.comfort.app.data.AudioTrack) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        PreviewChip(
+            label = java.util.Locale.forLanguageTag(track.code).let { it.getDisplayLanguage(java.util.Locale.getDefault()).ifBlank { track.code } }
+                .replaceFirstChar { it.titlecase(java.util.Locale.getDefault()) },
+            icon = Icons.Outlined.Language,
+            shape = shape,
+            onClick = { open = true },
+        )
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            shadowElevation = 3.dp,
+            modifier = Modifier.width(264.dp).heightIn(max = 420.dp),
+        ) {
+            Text(
+                stringResource(R.string.audio_track),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 6.dp),
+            )
+            tracks.forEach { option ->
+                val selected = option == track
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        .selectable(selected = selected, role = Role.RadioButton) {
+                            onChange(option)
+                            open = false
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            com.comfort.app.data.AudioLanguage.displayName(option.code),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (option.original) {
+                            Text(
+                                stringResource(R.string.audio_track_original),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (selected) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
 @Composable
 private fun audioFormatHint(format: AudioFormat): String = when (format) {
     AudioFormat.ORIGINAL -> stringResource(R.string.as_the_site_sends_it_not)
@@ -1269,6 +1365,9 @@ private fun MainPreviewScreen(
     onToggleFormat: () -> Unit,
     audioFormat: AudioFormat,
     onAudioFormatChange: (AudioFormat) -> Unit,
+    audioTracks: List<com.comfort.app.data.AudioTrack>,
+    audioTrack: com.comfort.app.data.AudioTrack?,
+    onAudioLanguageChange: (com.comfort.app.data.AudioTrack) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
@@ -1541,6 +1640,10 @@ private fun MainPreviewScreen(
                                 shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
                                 onClick = onToggleFormat,
                             )
+                        }
+                        // Only for a video with dubbed audio tracks.
+                        audioTrack?.let { track ->
+                            AudioLanguageChip(track = track, tracks = audioTracks, shape = MIDDLE_CHIP_SHAPE, onChange = onAudioLanguageChange)
                         }
                         PreviewChip(
                             label = stringResource(R.string.filename_templates),

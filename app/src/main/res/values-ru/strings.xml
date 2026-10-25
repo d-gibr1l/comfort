@@ -1088,4 +1088,9 @@
     <string name="engine_error_unsupported">Этот сайт или ссылка не поддерживается.</string>
     <string name="engine_error_no_media">По этой ссылке нечего скачать.</string>
     <string name="engine_error_network">Не удалось связаться с сайтом. Проверьте подключение и попробуйте снова.</string>
+    <string name="audio_track">Звуковая дорожка</string>
+    <string name="audio_track_original">Оригинал</string>
+    <string name="audio_language">Язык аудио</string>
+    <string name="audio_language_app_x">Язык приложения (%1$s)</string>
+    <string name="audio_language_subtitle">Для видео с дубляжом, как многие на YouTube. Видео без этого языка скачиваются в оригинале. Песни всегда остаются в оригинале.</string>
 </resources>

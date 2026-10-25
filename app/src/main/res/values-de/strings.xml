@@ -1031,4 +1031,9 @@
     <string name="engine_error_unsupported">Diese Seite bzw. dieser Link wird nicht unterstützt.</string>
     <string name="engine_error_no_media">Unter diesem Link gibt es nichts herunterzuladen.</string>
     <string name="engine_error_network">Die Seite ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="audio_track">Tonspur</string>
+    <string name="audio_track_original">Original</string>
+    <string name="audio_language">Audiosprache</string>
+    <string name="audio_language_app_x">App-Sprache (%1$s)</string>
+    <string name="audio_language_subtitle">Für Videos mit synchronisiertem Ton, wie viele auf YouTube. Videos ohne diese Sprache werden im Original geladen. Songs behalten immer ihren.</string>
 </resources>

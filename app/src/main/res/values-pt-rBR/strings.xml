@@ -1060,4 +1060,9 @@
     <string name="engine_error_unsupported">Este site ou link não é compatível.</string>
     <string name="engine_error_no_media">Não há nada para baixar neste link.</string>
     <string name="engine_error_network">Não foi possível acessar o site. Verifique sua conexão e tente de novo.</string>
+    <string name="audio_track">Faixa de áudio</string>
+    <string name="audio_track_original">Original</string>
+    <string name="audio_language">Idioma do áudio</string>
+    <string name="audio_language_app_x">Idioma do app (%1$s)</string>
+    <string name="audio_language_subtitle">Para vídeos com áudio dublado, como muitos do YouTube. Os que não têm este idioma são baixados no original. Músicas sempre mantêm o seu.</string>
 </resources>

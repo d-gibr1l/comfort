@@ -1005,4 +1005,9 @@
     <string name="engine_error_unsupported">Situs atau tautan ini tidak didukung.</string>
     <string name="engine_error_no_media">Tidak ada yang bisa diunduh di tautan ini.</string>
     <string name="engine_error_network">Tidak bisa menjangkau situs. Periksa koneksimu lalu coba lagi.</string>
+    <string name="audio_track">Trek audio</string>
+    <string name="audio_track_original">Asli</string>
+    <string name="audio_language">Bahasa audio</string>
+    <string name="audio_language_app_x">Bahasa aplikasi (%1$s)</string>
+    <string name="audio_language_subtitle">Untuk video dengan audio sulih suara, seperti banyak video di YouTube. Video tanpa bahasa ini diunduh dalam bahasa aslinya. Lagu selalu memakai aslinya.</string>
 </resources>

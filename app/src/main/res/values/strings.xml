@@ -1090,4 +1090,10 @@
     <string name="engine_error_unsupported">This site or link isn\'t supported.</string>
     <string name="engine_error_no_media">There\'s nothing to download at this link.</string>
     <string name="engine_error_network">Couldn\'t reach the site. Check your connection and try again.</string>
+    <!-- Audio language: dubbed audio tracks (data/AudioLanguage.kt). -->
+    <string name="audio_track">Audio track</string>
+    <string name="audio_track_original">Original</string>
+    <string name="audio_language">Audio language</string>
+    <string name="audio_language_app_x">App\'s language (%1$s)</string>
+    <string name="audio_language_subtitle">For videos with dubbed audio, like many on YouTube. Ones without this language download in their original. Songs always keep theirs.</string>
 </resources>

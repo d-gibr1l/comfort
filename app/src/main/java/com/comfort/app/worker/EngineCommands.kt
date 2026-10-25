@@ -83,6 +83,9 @@ internal class EngineCommands(
     private val audioFormat = entity?.audioFormat?.let { stored -> runCatching { AudioFormat.valueOf(stored) }.getOrNull() }
         ?: GalleryDlPreferences.getAudioFormat(context)
     private val normalizeAudio = GalleryDlPreferences.isNormalizeAudio(context)
+    // A song keeps its original audio; a video gets the dub asked for, when it has one.
+    private val audioLanguage = if (com.comfort.app.data.VideoSiteRouter.isSongSource(url)) "" else
+        com.comfort.app.data.AudioLanguage.requested(entity?.audioLanguage ?: GalleryDlPreferences.getAudioLanguage(context))
 
     // A per-download quality the sheet set wins over the Settings default.
     private val videoQuality = entity?.videoQuality?.let { stored -> runCatching { VideoQuality.valueOf(stored) }.getOrNull() }
@@ -204,6 +207,7 @@ internal class EngineCommands(
             if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_REMOVE) sponsorBlockCategories else "",
             if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_MARK) sponsorBlockCategories else "",
             flag(splitChapters),
+            audioLanguage,
         ),
     )
 
