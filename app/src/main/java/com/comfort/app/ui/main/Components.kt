@@ -1,6 +1,8 @@
 package com.comfort.app.ui.main
 
 import androidx.compose.ui.res.stringResource
+import android.icu.util.MeasureUnit
+import com.comfort.app.util.LocalFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -310,15 +312,14 @@ fun DownloadEventSnackbars(
 }
 
 fun formatFileSize(bytes: Long): String {
-    if (bytes <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB")
-    var value = bytes.toDouble()
+    val units = arrayOf(MeasureUnit.BYTE, MeasureUnit.KILOBYTE, MeasureUnit.MEGABYTE, MeasureUnit.GIGABYTE)
+    var value = bytes.coerceAtLeast(0).toDouble()
     var unitIndex = 0
     while (value >= 1024 && unitIndex < units.lastIndex) {
         value /= 1024
         unitIndex++
     }
-    return if (unitIndex == 0) "${value.toInt()} ${units[unitIndex]}" else "%.1f %s".format(value, units[unitIndex])
+    return LocalFormat.measure(value, units[unitIndex], decimals = if (unitIndex == 0) 0 else 1)
 }
 
 /** A rough ETA from remaining bytes ÷ current speed — same "estimate, not a promise" spirit as

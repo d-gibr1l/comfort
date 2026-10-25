@@ -1267,11 +1267,11 @@ suspend fun extractExif(context: android.content.Context, uri: Uri): ExifData = 
 }
 
 fun formatExifDate(timestamp: Long): String {
-    return java.text.SimpleDateFormat("dd-MM-yyyy, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
+    return com.comfort.app.util.LocalFormat.date(timestamp, "yMMddHHmm")
 }
 
 fun formatSizeToMB(sizeBytes: Long): String {
-    return String.format(java.util.Locale.US, "%.2f MB", sizeBytes / (1024.0 * 1024.0))
+    return com.comfort.app.util.LocalFormat.measure(sizeBytes / (1024.0 * 1024.0), android.icu.util.MeasureUnit.MEGABYTE, 2)
 }
 
 @Composable

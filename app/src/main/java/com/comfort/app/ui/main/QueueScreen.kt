@@ -1263,10 +1263,8 @@ fun QueueItemCard(
                     // which would otherwise sit at 0 KB/s with no explanation — see DownloadNotes.
                     val note = com.comfort.app.data.DownloadNotes.notes.collectAsStateWithLifecycle().value[item.id]
                     val speedStr = when {
-                        !isNetworkAvailable -> "0.00 KB/s"
-                        item.speedMbs == 0f -> "0.00 KB/s"
-                        item.speedMbs < 1f -> String.format(Locale.getDefault(), "%.2f KB/s", item.speedMbs * 1024)
-                        else -> String.format(Locale.getDefault(), "%.2f MB/s", item.speedMbs)
+                        !isNetworkAvailable -> com.comfort.app.util.LocalFormat.speed(0f, 2)
+                        else -> com.comfort.app.util.LocalFormat.speed(item.speedMbs, 2)
                     }
                     Text(
                         text = note ?: stringResource(R.string.speed_x, speedStr),
@@ -1635,7 +1633,7 @@ private var shortDateFormatCache: Pair<Locale, SimpleDateFormat>? = null
 private fun shortDateFormat(): SimpleDateFormat {
     val locale = Locale.getDefault()
     shortDateFormatCache?.let { (cachedLocale, format) -> if (cachedLocale == locale) return format }
-    return SimpleDateFormat("MMM d", locale).also { shortDateFormatCache = locale to it }
+    return SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).also { shortDateFormatCache = locale to it }
 }
 
 /** A scheduled download's two lines: "Starts at 1:00 AM · in 3 h 20 min" (or "Starting soon"
