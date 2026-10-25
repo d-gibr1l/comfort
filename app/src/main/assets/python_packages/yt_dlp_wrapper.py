@@ -1087,6 +1087,24 @@ class _Logger:
         if self.callback:
             self.callback(event("error", message=msg))
 
+class _LastError:
+    """yt-dlp's last error, kept for list_info's answer. With ignoreerrors on, a failed extraction
+    returns None and only reports why (the preview sheet showed "no info extracted" for a deleted
+    video instead of yt-dlp's "Video unavailable"); this keeps that reason, and keeps it out of
+    stdout, where only the JSON line belongs."""
+    def __init__(self):
+        self.message = None
+
+    def debug(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        self.message = msg
+
+
 def search(query, count=20, proxy_url=None, page=1, cookies_path=None):
     """YouTube search for the app's search screen: one JSON object, {"results": [...]}, each a
     video's link, title, channel, length and thumbnail. A flat listing — the search page only, no
@@ -2381,6 +2399,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         limit = int(limit) if limit else None
     except ValueError:
         limit = None
+    errors = _LastError()
     ydl_opts = {
         "quiet": True,
         # "quiet" alone only suppresses yt-dlp's normal progress/info output — WARNING/ERROR lines
@@ -2393,6 +2412,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         "no_warnings": True,
         "no_color": True,
         "skip_download": True,
+        "logger": errors,
         # Same reasoning as download()'s own use of this: one bad item (a carousel's non-video
         # photo entries, which yt-dlp can't extract at all) shouldn't abort metadata extraction
         # for the whole post — those entries just come back as None in "entries" below instead.
@@ -2514,7 +2534,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         return json.dumps({"error": str(e)})
 
     if info is None:
-        return json.dumps({"error": "no info extracted"})
+        return json.dumps({"error": errors.message or "no info extracted"})
     entries = info.get("entries")
     if entries is not None:
         entries = list(entries)
@@ -2530,7 +2550,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         sizes = _sizes_by_quality(info)
         if sizes:
             picked["sizes_by_quality"] = sizes
-    return json.dumps(picked or {"error": "no info extracted"})
+    return json.dumps(picked or {"error": errors.message or "no info extracted"})
 
 
 # CLI entry point for PythonRuntime.kt (subprocess model, replacing Chaquopy's direct callAttr()).

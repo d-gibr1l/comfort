@@ -249,8 +249,9 @@ object GalleryDlListing {
     private val listingCache = java.util.concurrent.ConcurrentHashMap<String, CachedListing>()
     private const val LISTING_CACHE_MS = 20 * 60 * 1000L
 
-    /** [resources]: the language its generic "not usable" line is in; without, English (enough
-     * for callers that only check whether the message changed). */
+    /** [resources]: the language its explanations (EngineErrors) and generic "not usable" line are
+     * in; without, the engine's own text or English (enough for callers that only check whether
+     * the message changed). */
     fun sanitizeErrorMessage(raw: String, resources: android.content.res.Resources? = null): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
@@ -263,6 +264,8 @@ object GalleryDlListing {
         // verbose "please file an issue"/"confirm you're on the latest version" boilerplate) —
         // full replacement threw away the one actually-informative sentence at the front of it.
         // Truncating instead keeps that sentence and only drops the boilerplate tail.
+        // A known engine error gets the app's own explanation, in the app's language.
+        resources?.let { EngineErrors.explain(trimmed, it) }?.let { return it }
         if (MARKUP_LIKE_REGEX.containsMatchIn(trimmed.take(200))) {
             return resources?.getString(com.comfort.app.R.string.listing_no_usable_response)
                 ?: "This site didn't return a usable response for this link — it may require login, or this URL might not be supported."
@@ -387,7 +390,7 @@ object GalleryDlListing {
                 // interpreter printed to stderr first (merged into this stream) isn't the JSON.
                 lines.lastOrNull { it.isNotBlank() }
             }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return ListingResult(emptyList())
-            return parseGalleryDlItems(lastLine, url)
+            return parseGalleryDlItems(lastLine, url, context.resources)
         } finally {
             tempCookieFile?.delete()
         }
@@ -439,7 +442,7 @@ object GalleryDlListing {
                 jsonText = rawText
             }
     
-            val parsed = parseGalleryDlItems(jsonText, url)
+            val parsed = parseGalleryDlItems(jsonText, url, context.resources)
             // A share link (Reddit's /s/<code>, ...) lists nothing itself: gallery-dl answers with
             // a redirect to the real post (a Message.Queue entry) and only follows it when actually
             // downloading. Listed as-is, the preview fell back to yt-dlp — no images, no author, no
@@ -461,7 +464,7 @@ object GalleryDlListing {
             ?.optString(1)?.takeIf { it.startsWith("http") }
     }.getOrNull()
 
-    private fun parseGalleryDlItems(jsonText: String, url: String): ListingResult {
+    private fun parseGalleryDlItems(jsonText: String, url: String, resources: android.content.res.Resources): ListingResult {
         val trimmed = jsonText.trim()
         if (trimmed.isEmpty()) return ListingResult(emptyList())
 
@@ -508,7 +511,7 @@ object GalleryDlListing {
             if (items.isEmpty() && errorMessage != null) {
                 android.util.Log.w("GalleryDlListing", "gallery-dl Message.Error while listing $url:\n$errorMessage")
             }
-            ListingResult(items, errorMessage = errorMessage?.takeIf { items.isEmpty() }?.let(::sanitizeErrorMessage))
+            ListingResult(items, errorMessage = errorMessage?.takeIf { items.isEmpty() }?.let { sanitizeErrorMessage(it, resources) })
         }.getOrElse {
             // A JSON parse failure here means gallery-dl's own --dump-json output wasn't valid
             // JSON at all — worth seeing what it actually was (the raw text this app's own error

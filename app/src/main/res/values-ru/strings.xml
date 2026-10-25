@@ -1070,4 +1070,22 @@
     <string name="language">Язык</string>
     <string name="language_system_default">Язык телефона</string>
     <string name="language_search_subtitle">Язык текстов приложения</string>
+    <string name="engine_error_no_space">В памяти телефона не осталось места. Освободите место и попробуйте снова.</string>
+    <string name="engine_error_socks_proxy">Instaloader не работает с SOCKS-прокси. Используйте прокси http:// или отключите Instaloader в настройках.</string>
+    <string name="engine_error_drm">Этот контент защищён DRM, его нельзя скачать.</string>
+    <string name="engine_error_bot_check">YouTube хочет убедиться, что вы не бот. Попробуйте позже или добавьте cookie YouTube в разделе Настройки &gt; Cookie и вход.</string>
+    <string name="engine_error_age">У этого контента возрастное ограничение. Добавьте cookie аккаунта, в который выполнен вход, в разделе Настройки &gt; Cookie и вход.</string>
+    <string name="engine_error_members_only">Доступно только спонсорам канала. Добавьте cookie аккаунта спонсора в разделе Настройки &gt; Cookie и вход.</string>
+    <string name="engine_error_instagram_missing">Instagram не отдал эту публикацию. Возможно, она закрыта, имеет возрастное ограничение или нужен вход в аккаунт (Настройки &gt; Cookie и вход).</string>
+    <string name="engine_error_private">Это закрытый контент. Если ваш аккаунт может его видеть, добавьте его cookie в разделе Настройки &gt; Cookie и вход.</string>
+    <string name="engine_error_geo">Недоступно в вашей стране.</string>
+    <string name="engine_error_not_started">Эта трансляция или премьера ещё не началась.</string>
+    <string name="engine_error_format">Выбранное качество или формат недоступны для этого контента.</string>
+    <string name="engine_error_rate_limited">Сайт сейчас ограничивает запросы. Попробуйте снова через несколько минут.</string>
+    <string name="engine_error_login">Нужен вход в аккаунт. Добавьте cookie этого сайта в разделе Настройки &gt; Cookie и вход.</string>
+    <string name="engine_error_forbidden">Сайт отклонил загрузку. Попробуйте позже или добавьте его cookie в разделе Настройки &gt; Cookie и вход.</string>
+    <string name="engine_error_unavailable">Недоступно. Возможно, контент удалён.</string>
+    <string name="engine_error_unsupported">Этот сайт или ссылка не поддерживается.</string>
+    <string name="engine_error_no_media">По этой ссылке нечего скачать.</string>
+    <string name="engine_error_network">Не удалось связаться с сайтом. Проверьте подключение и попробуйте снова.</string>
 </resources>

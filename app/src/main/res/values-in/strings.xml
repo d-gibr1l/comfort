@@ -987,4 +987,22 @@
     <string name="language">Bahasa</string>
     <string name="language_system_default">Bahasa ponsel</string>
     <string name="language_search_subtitle">Bahasa teks aplikasi</string>
+    <string name="engine_error_no_space">Penyimpanan ponsel penuh. Kosongkan ruang lalu coba lagi.</string>
+    <string name="engine_error_socks_proxy">Instaloader tidak bisa memakai proxy SOCKS. Gunakan proxy http://, atau matikan Instaloader di Setelan.</string>
+    <string name="engine_error_drm">Konten ini dilindungi DRM, jadi tidak bisa diunduh.</string>
+    <string name="engine_error_bot_check">YouTube ingin memastikan kamu bukan bot. Coba lagi nanti, atau tambahkan cookie YouTube di Setelan &gt; Cookie &amp; Login.</string>
+    <string name="engine_error_age">Konten ini dibatasi usia. Tambahkan cookie dari akun yang sudah masuk di Setelan &gt; Cookie &amp; Login.</string>
+    <string name="engine_error_members_only">Hanya untuk anggota channel. Tambahkan cookie dari akun anggota di Setelan &gt; Cookie &amp; Login.</string>
+    <string name="engine_error_instagram_missing">Instagram tidak mengembalikan postingan ini. Mungkin postingan ini privat, dibatasi usia, atau perlu akun yang sudah masuk (Setelan &gt; Cookie &amp; Login).</string>
+    <string name="engine_error_private">Konten ini privat. Jika akunmu bisa melihatnya, tambahkan cookie-nya di Setelan &gt; Cookie &amp; Login.</string>
+    <string name="engine_error_geo">Tidak tersedia di negaramu.</string>
+    <string name="engine_error_not_started">Siaran langsung atau tayang perdana ini belum dimulai.</string>
+    <string name="engine_error_format">Kualitas atau format yang dipilih tidak tersedia untuk konten ini.</string>
+    <string name="engine_error_rate_limited">Situs sedang membatasi permintaan. Coba lagi dalam beberapa menit.</string>
+    <string name="engine_error_login">Perlu akun yang sudah masuk. Tambahkan cookie untuk situs ini di Setelan &gt; Cookie &amp; Login.</string>
+    <string name="engine_error_forbidden">Situs menolak unduhan. Coba lagi nanti, atau tambahkan cookie-nya di Setelan &gt; Cookie &amp; Login.</string>
+    <string name="engine_error_unavailable">Tidak tersedia. Mungkin sudah dihapus.</string>
+    <string name="engine_error_unsupported">Situs atau tautan ini tidak didukung.</string>
+    <string name="engine_error_no_media">Tidak ada yang bisa diunduh di tautan ini.</string>
+    <string name="engine_error_network">Tidak bisa menjangkau situs. Periksa koneksimu lalu coba lagi.</string>
 </resources>

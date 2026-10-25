@@ -1030,4 +1030,22 @@
     <string name="language">Idioma</string>
     <string name="language_system_default">Idioma del teléfono</string>
     <string name="language_search_subtitle">El idioma de los textos de la app</string>
+    <string name="engine_error_no_space">El teléfono no tiene espacio de almacenamiento. Libera espacio y vuelve a intentarlo.</string>
+    <string name="engine_error_socks_proxy">Instaloader no puede usar un proxy SOCKS. Usa un proxy http:// o desactiva Instaloader en Ajustes.</string>
+    <string name="engine_error_drm">Está protegido con DRM, así que no se puede descargar.</string>
+    <string name="engine_error_bot_check">YouTube quiere comprobar que no eres un bot. Inténtalo más tarde o añade cookies de YouTube en Ajustes &gt; Cookies e inicio de sesión.</string>
+    <string name="engine_error_age">Tiene restricción de edad. Añade cookies de una cuenta con sesión iniciada en Ajustes &gt; Cookies e inicio de sesión.</string>
+    <string name="engine_error_members_only">Solo está disponible para miembros del canal. Añade cookies de una cuenta de miembro en Ajustes &gt; Cookies e inicio de sesión.</string>
+    <string name="engine_error_instagram_missing">Instagram no devolvió esta publicación. Puede ser privada, tener restricción de edad o requerir una cuenta con sesión iniciada (Ajustes &gt; Cookies e inicio de sesión).</string>
+    <string name="engine_error_private">Es privado. Si tu cuenta puede verlo, añade sus cookies en Ajustes &gt; Cookies e inicio de sesión.</string>
+    <string name="engine_error_geo">No está disponible en tu país.</string>
+    <string name="engine_error_not_started">Esta transmisión en directo o estreno aún no ha empezado.</string>
+    <string name="engine_error_format">La calidad o el formato elegido no está disponible para este contenido.</string>
+    <string name="engine_error_rate_limited">El sitio está limitando las solicitudes ahora mismo. Inténtalo de nuevo en unos minutos.</string>
+    <string name="engine_error_login">Requiere una cuenta con sesión iniciada. Añade cookies de este sitio en Ajustes &gt; Cookies e inicio de sesión.</string>
+    <string name="engine_error_forbidden">El sitio rechazó la descarga. Inténtalo más tarde o añade sus cookies en Ajustes &gt; Cookies e inicio de sesión.</string>
+    <string name="engine_error_unavailable">No está disponible. Puede que se haya eliminado.</string>
+    <string name="engine_error_unsupported">Este sitio o enlace no es compatible.</string>
+    <string name="engine_error_no_media">No hay nada que descargar en este enlace.</string>
+    <string name="engine_error_network">No se pudo conectar con el sitio. Revisa tu conexión y vuelve a intentarlo.</string>
 </resources>

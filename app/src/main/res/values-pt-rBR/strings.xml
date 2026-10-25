@@ -1042,4 +1042,22 @@
     <string name="language">Idioma</string>
     <string name="language_system_default">Idioma do celular</string>
     <string name="language_search_subtitle">O idioma dos textos do app</string>
+    <string name="engine_error_no_space">O celular está sem espaço de armazenamento. Libere espaço e tente de novo.</string>
+    <string name="engine_error_socks_proxy">O Instaloader não funciona com proxy SOCKS. Use um proxy http:// ou desative o Instaloader nas Configurações.</string>
+    <string name="engine_error_drm">Este conteúdo tem proteção DRM e não pode ser baixado.</string>
+    <string name="engine_error_bot_check">O YouTube quer confirmar que você não é um robô. Tente mais tarde ou adicione cookies do YouTube em Configurações &gt; Cookies e login.</string>
+    <string name="engine_error_age">Este conteúdo tem restrição de idade. Adicione cookies de uma conta conectada em Configurações &gt; Cookies e login.</string>
+    <string name="engine_error_members_only">Disponível só para membros do canal. Adicione cookies de uma conta de membro em Configurações &gt; Cookies e login.</string>
+    <string name="engine_error_instagram_missing">O Instagram não retornou esta publicação. Ela pode ser privada, ter restrição de idade ou exigir uma conta conectada (Configurações &gt; Cookies e login).</string>
+    <string name="engine_error_private">Este conteúdo é privado. Se a sua conta pode vê-lo, adicione os cookies dela em Configurações &gt; Cookies e login.</string>
+    <string name="engine_error_geo">Não está disponível no seu país.</string>
+    <string name="engine_error_not_started">Esta transmissão ao vivo ou estreia ainda não começou.</string>
+    <string name="engine_error_format">A qualidade ou o formato escolhido não está disponível para este conteúdo.</string>
+    <string name="engine_error_rate_limited">O site está limitando as solicitações agora. Tente de novo em alguns minutos.</string>
+    <string name="engine_error_login">É preciso uma conta conectada. Adicione cookies deste site em Configurações &gt; Cookies e login.</string>
+    <string name="engine_error_forbidden">O site recusou o download. Tente mais tarde ou adicione os cookies dele em Configurações &gt; Cookies e login.</string>
+    <string name="engine_error_unavailable">Não está disponível. Talvez tenha sido removido.</string>
+    <string name="engine_error_unsupported">Este site ou link não é compatível.</string>
+    <string name="engine_error_no_media">Não há nada para baixar neste link.</string>
+    <string name="engine_error_network">Não foi possível acessar o site. Verifique sua conexão e tente de novo.</string>
 </resources>
