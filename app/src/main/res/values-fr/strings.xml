@@ -1038,4 +1038,22 @@
     <string name="language">Langue</string>
     <string name="language_system_default">Langue du téléphone</string>
     <string name="language_search_subtitle">La langue des textes de l\'app</string>
+    <string name="engine_error_no_space">Le téléphone n\'a plus d\'espace de stockage. Libère de l\'espace et réessaie.</string>
+    <string name="engine_error_socks_proxy">Instaloader ne peut pas utiliser de proxy SOCKS. Utilise un proxy http:// ou désactive Instaloader dans les Paramètres.</string>
+    <string name="engine_error_drm">Ce contenu est protégé par DRM et ne peut pas être téléchargé.</string>
+    <string name="engine_error_bot_check">YouTube veut vérifier que tu n\'es pas un robot. Réessaie plus tard ou ajoute des cookies YouTube dans Paramètres &gt; Cookies et connexion.</string>
+    <string name="engine_error_age">Ce contenu est soumis à une limite d\'âge. Ajoute les cookies d\'un compte connecté dans Paramètres &gt; Cookies et connexion.</string>
+    <string name="engine_error_members_only">Réservé aux membres de la chaîne. Ajoute les cookies d\'un compte membre dans Paramètres &gt; Cookies et connexion.</string>
+    <string name="engine_error_instagram_missing">Instagram n\'a pas renvoyé cette publication. Elle est peut-être privée, soumise à une limite d\'âge, ou nécessite un compte connecté (Paramètres &gt; Cookies et connexion).</string>
+    <string name="engine_error_private">C\'est privé. Si ton compte peut le voir, ajoute ses cookies dans Paramètres &gt; Cookies et connexion.</string>
+    <string name="engine_error_geo">Ce contenu n\'est pas disponible dans ton pays.</string>
+    <string name="engine_error_not_started">Ce direct ou cette première n\'a pas encore commencé.</string>
+    <string name="engine_error_format">La qualité ou le format choisi n\'est pas disponible pour ce contenu.</string>
+    <string name="engine_error_rate_limited">Le site limite les requêtes en ce moment. Réessaie dans quelques minutes.</string>
+    <string name="engine_error_login">Un compte connecté est nécessaire. Ajoute des cookies pour ce site dans Paramètres &gt; Cookies et connexion.</string>
+    <string name="engine_error_forbidden">Le site a refusé le téléchargement. Réessaie plus tard ou ajoute ses cookies dans Paramètres &gt; Cookies et connexion.</string>
+    <string name="engine_error_unavailable">Ce contenu n\'est pas disponible. Il a peut-être été supprimé.</string>
+    <string name="engine_error_unsupported">Ce site ou ce lien n\'est pas pris en charge.</string>
+    <string name="engine_error_no_media">Il n\'y a rien à télécharger à ce lien.</string>
+    <string name="engine_error_network">Impossible de joindre le site. Vérifie ta connexion et réessaie.</string>
 </resources>

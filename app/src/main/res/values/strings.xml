@@ -1071,4 +1071,23 @@
     <string name="subscribed">Subscribed. Only new uploads will download.</string>
     <string name="already_subscribed_to_x">Already subscribed to %1$s</string>
     <string name="subscribe_failed">Couldn\'t subscribe: %1$s</string>
+    <!-- Engine errors in the app's words (util/EngineErrors.kt). -->
+    <string name="engine_error_no_space">The phone is out of storage space. Free some up and try again.</string>
+    <string name="engine_error_socks_proxy">Instaloader can\'t use a SOCKS proxy. Use an http:// proxy, or turn Instaloader off in Settings.</string>
+    <string name="engine_error_drm">This is DRM-protected, so it can\'t be downloaded.</string>
+    <string name="engine_error_bot_check">YouTube wants to check you\'re not a bot. Try again later, or add YouTube cookies in Settings &gt; Cookies &amp; Login.</string>
+    <string name="engine_error_age">This is age-restricted. Add cookies from a signed-in account in Settings &gt; Cookies &amp; Login.</string>
+    <string name="engine_error_members_only">This is only for the channel\'s members. Add cookies from a member\'s account in Settings &gt; Cookies &amp; Login.</string>
+    <string name="engine_error_instagram_missing">Instagram didn\'t return this post. It may be private or age-restricted, or need a signed-in account (Settings &gt; Cookies &amp; Login).</string>
+    <string name="engine_error_private">This is private. If your account can see it, add its cookies in Settings &gt; Cookies &amp; Login.</string>
+    <string name="engine_error_geo">This isn\'t available in your country.</string>
+    <string name="engine_error_not_started">This live stream or premiere hasn\'t started yet.</string>
+    <string name="engine_error_format">The quality or format you picked isn\'t available for this one.</string>
+    <string name="engine_error_rate_limited">The site is limiting requests right now. Try again in a few minutes.</string>
+    <string name="engine_error_login">This needs a signed-in account. Add cookies for this site in Settings &gt; Cookies &amp; Login.</string>
+    <string name="engine_error_forbidden">The site refused the download. Try again later, or add cookies for it in Settings &gt; Cookies &amp; Login.</string>
+    <string name="engine_error_unavailable">This isn\'t available. It may have been removed.</string>
+    <string name="engine_error_unsupported">This site or link isn\'t supported.</string>
+    <string name="engine_error_no_media">There\'s nothing to download at this link.</string>
+    <string name="engine_error_network">Couldn\'t reach the site. Check your connection and try again.</string>
 </resources>

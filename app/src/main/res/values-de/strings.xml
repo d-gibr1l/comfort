@@ -1013,4 +1013,22 @@
     <string name="language">Sprache</string>
     <string name="language_system_default">Sprache des Telefons</string>
     <string name="language_search_subtitle">Die Sprache der App-Texte</string>
+    <string name="engine_error_no_space">Der Telefonspeicher ist voll. Gib Speicherplatz frei und versuche es erneut.</string>
+    <string name="engine_error_socks_proxy">Instaloader kann keinen SOCKS-Proxy nutzen. Verwende einen http://-Proxy oder schalte Instaloader in den Einstellungen aus.</string>
+    <string name="engine_error_drm">Dieser Inhalt ist DRM-geschützt und kann nicht heruntergeladen werden.</string>
+    <string name="engine_error_bot_check">YouTube möchte prüfen, dass du kein Bot bist. Versuche es später erneut oder füge YouTube-Cookies unter Einstellungen &gt; Cookies &amp; Anmeldung hinzu.</string>
+    <string name="engine_error_age">Dieser Inhalt hat eine Altersbeschränkung. Füge unter Einstellungen &gt; Cookies &amp; Anmeldung Cookies eines angemeldeten Kontos hinzu.</string>
+    <string name="engine_error_members_only">Nur für Kanalmitglieder. Füge unter Einstellungen &gt; Cookies &amp; Anmeldung Cookies eines Mitgliedskontos hinzu.</string>
+    <string name="engine_error_instagram_missing">Instagram hat diesen Beitrag nicht geliefert. Er ist vielleicht privat, altersbeschränkt oder braucht ein angemeldetes Konto (Einstellungen &gt; Cookies &amp; Anmeldung).</string>
+    <string name="engine_error_private">Das ist privat. Wenn dein Konto es sehen kann, füge seine Cookies unter Einstellungen &gt; Cookies &amp; Anmeldung hinzu.</string>
+    <string name="engine_error_geo">In deinem Land nicht verfügbar.</string>
+    <string name="engine_error_not_started">Dieser Livestream bzw. diese Premiere hat noch nicht begonnen.</string>
+    <string name="engine_error_format">Die gewählte Qualität bzw. das Format ist hierfür nicht verfügbar.</string>
+    <string name="engine_error_rate_limited">Die Seite begrenzt gerade Anfragen. Versuche es in ein paar Minuten erneut.</string>
+    <string name="engine_error_login">Dafür ist ein angemeldetes Konto nötig. Füge Cookies für diese Seite unter Einstellungen &gt; Cookies &amp; Anmeldung hinzu.</string>
+    <string name="engine_error_forbidden">Die Seite hat den Download abgelehnt. Versuche es später erneut oder füge ihre Cookies unter Einstellungen &gt; Cookies &amp; Anmeldung hinzu.</string>
+    <string name="engine_error_unavailable">Nicht verfügbar. Möglicherweise wurde es entfernt.</string>
+    <string name="engine_error_unsupported">Diese Seite bzw. dieser Link wird nicht unterstützt.</string>
+    <string name="engine_error_no_media">Unter diesem Link gibt es nichts herunterzuladen.</string>
+    <string name="engine_error_network">Die Seite ist nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.</string>
 </resources>
