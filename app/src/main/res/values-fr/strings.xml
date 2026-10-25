@@ -1056,4 +1056,9 @@
     <string name="engine_error_unsupported">Ce site ou ce lien n\'est pas pris en charge.</string>
     <string name="engine_error_no_media">Il n\'y a rien à télécharger à ce lien.</string>
     <string name="engine_error_network">Impossible de joindre le site. Vérifie ta connexion et réessaie.</string>
+    <string name="audio_track">Piste audio</string>
+    <string name="audio_track_original">Originale</string>
+    <string name="audio_language">Langue audio</string>
+    <string name="audio_language_app_x">Langue de l\'app (%1$s)</string>
+    <string name="audio_language_subtitle">Pour les vidéos doublées, comme beaucoup sur YouTube. Celles sans cette langue sont téléchargées en version originale. Les chansons gardent toujours la leur.</string>
 </resources>

@@ -70,6 +70,8 @@ data class PreviewInfo(
     val collectionThumbnail: String? = null,
     /** The listing stopped at the limit it was asked for: there's more of it to load. */
     val hasMore: Boolean = false,
+    /** A video's audio tracks when it has dubs (original first); empty for one track. */
+    val audioTracks: List<com.comfort.app.data.AudioTrack> = emptyList(),
 )
 
 /** One track of a multi-item song listing (Spotify album/playlist today — see [PreviewInfo.tracks]
@@ -793,6 +795,13 @@ object GalleryDlListing {
             collectionArtist = json.optString("collection_artist").blankToNull(),
             collectionThumbnail = collectionThumbnail,
             hasMore = json.optBoolean("has_more", false),
+            audioTracks = entry.optJSONArray("audio_languages")?.let { tracks ->
+                (0 until tracks.length()).mapNotNull { tracks.optJSONObject(it) }.mapNotNull { track ->
+                    track.optString("code").blankToNull()?.let { com.comfort.app.data.AudioTrack(it, track.optBoolean("original")) }
+                }
+                // Original first, then by name in the app's language (the wrapper sorts by code,
+                // which put "English" after "German").
+            }.orEmpty().sortedWith(compareBy({ !it.original }, { com.comfort.app.data.AudioLanguage.displayName(it.code) })),
         )
     }
 

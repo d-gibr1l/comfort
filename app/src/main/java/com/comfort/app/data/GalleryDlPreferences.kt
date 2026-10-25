@@ -120,6 +120,7 @@ object GalleryDlPreferences {
     const val KEY_APP_UPDATE_AVAILABLE = "app_update_available"
     const val KEY_OUTPUT_FORMAT = "output_format"
     const val KEY_AUDIO_FORMAT = "audio_format"
+    const val KEY_AUDIO_LANGUAGE = "audio_language"
     const val KEY_NORMALIZE_AUDIO = "normalize_audio"
     const val KEY_WEBP_TO_JPG = "webp_to_jpg"
     const val KEY_VIEWER_SOUND = "viewer_sound"
@@ -759,6 +760,15 @@ object GalleryDlPreferences {
 
     fun setOutputFormat(context: Context, format: OutputFormat) {
         prefs(context).edit().putString(KEY_OUTPUT_FORMAT, format.name).apply()
+    }
+
+    /** Which audio track a video with dubs downloads: AudioLanguage.ORIGINAL (default), .APP or a
+     * language code. */
+    fun getAudioLanguage(context: Context): String =
+        prefs(context).getString(KEY_AUDIO_LANGUAGE, AudioLanguage.ORIGINAL) ?: AudioLanguage.ORIGINAL
+
+    fun setAudioLanguage(context: Context, language: String) {
+        prefs(context).edit().putString(KEY_AUDIO_LANGUAGE, language).apply()
     }
 
     fun getAudioFormat(context: Context): AudioFormat {

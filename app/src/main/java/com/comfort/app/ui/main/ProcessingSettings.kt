@@ -4,6 +4,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -139,6 +142,12 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                     )
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            AudioLanguageSetting()
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -655,4 +664,77 @@ internal fun isValidFormatSelector(selector: String): Boolean {
     val last = trimmed.last()
     if (last == '/' || last == '+' || last == ',' || last == '|' || last == '&') return false
     return true
+}
+
+/** Settings > Processing > Audio language: which audio track a video with dubs downloads. A row
+ * naming the choice that opens a list of them: the original, the app's language, then the
+ * languages YouTube dubs into most. */
+@Composable
+private fun AudioLanguageSetting() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var current by remember { mutableStateOf(GalleryDlPreferences.getAudioLanguage(context)) }
+    var picking by remember { mutableStateOf(false) }
+    val appLanguageName = com.comfort.app.data.AudioLanguage.displayName(com.comfort.app.data.AudioLanguage.requested(com.comfort.app.data.AudioLanguage.APP))
+    val originalLabel = stringResource(R.string.audio_track_original)
+    val appLabel = stringResource(R.string.audio_language_app_x, appLanguageName)
+    fun label(value: String) = when (value) {
+        com.comfort.app.data.AudioLanguage.ORIGINAL -> originalLabel
+        com.comfort.app.data.AudioLanguage.APP -> appLabel
+        else -> com.comfort.app.data.AudioLanguage.displayName(value)
+    }
+    val title = stringResource(R.string.audio_language)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.audio_language_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(label(current), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    }
+    if (picking) {
+        val options = listOf(com.comfort.app.data.AudioLanguage.ORIGINAL, com.comfort.app.data.AudioLanguage.APP) +
+            com.comfort.app.data.AudioLanguage.COMMON
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { picking = false },
+            title = { Text(title) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    options.forEach { value ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    picking = false
+                                    current = value
+                                    GalleryDlPreferences.setAudioLanguage(context, value)
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = value == current, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(label(value), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { picking = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
 }
