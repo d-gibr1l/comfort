@@ -87,7 +87,7 @@
     <string name="restore_restart_text">Die wiederhergestellten Einstellungen gelten, sobald Comfort neu startet.</string>
     <string name="restore_restart_now">Neu starten</string>
     <string name="restore_restart_later">Später</string>
-    <string name="home_link_hint">Link einfügen oder YouTube durchsuchen</string>
+    <string name="home_link_hint">Link einfügen oder YouTube suchen</string>
     <string name="home_search_youtube">YouTube suchen</string>
     <string name="search_youtube_hint">YouTube durchsuchen</string>
     <string name="search_clear">Leeren</string>
