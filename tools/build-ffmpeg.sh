@@ -3,6 +3,8 @@
 # nasm and pkg-config; run in Linux/WSL. ffmpeg-src is a checkout of FFmpeg tag n7.1.
 # Comfort ffmpeg v2: audio encoders (aac, mp3, opus, flac), software decoders, image codecs,
 # MediaCodec (NDK) H.264/HEVC encode, and the filters the app uses. Same build for all 3 ABIs.
+# v3: subtitles (WebVTT, SubRip, ASS, and mov_text for MP4, "movtext" to configure) — yt-dlp embeds, converts and SponsorBlock-cuts
+# subtitle files through ffmpeg, and v2 couldn't read any of them.
 set -euo pipefail
 
 NDK=/tmp/ndk-linux/android-ndk-r28c
@@ -67,12 +69,12 @@ build_one() {
     --enable-zlib --enable-libmp3lame --enable-libopus \
     --enable-jni --enable-mediacodec \
     --enable-protocol=file,pipe \
-    --enable-demuxer=mov,matroska,wav,mp3,aac,ogg,flac,flv,mpegts,concat,image2,image2pipe,png_pipe,jpeg_pipe,webp_pipe,gif \
-    --enable-muxer=mp4,ipod,mov,matroska,webm,adts,wav,mp3,ogg,opus,flac,image2,gif,null \
+    --enable-demuxer=mov,matroska,wav,mp3,aac,ogg,flac,flv,mpegts,concat,image2,image2pipe,png_pipe,jpeg_pipe,webp_pipe,gif,webvtt,srt,ass \
+    --enable-muxer=mp4,ipod,mov,matroska,webm,adts,wav,mp3,ogg,opus,flac,image2,gif,null,webvtt,srt,ass \
     --enable-parser=h264,hevc,aac,mpegaudio,vp8,vp9,av1,opus,vorbis,flac,mjpeg,png,webp,gif \
     --enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,aac_adtstoasc,extract_extradata,vp9_superframe,vp9_superframe_split \
-    --enable-decoder=aac,aac_latm,mp3float,mp3,opus,vorbis,flac,alac,pcm_s16le,pcm_s24le,pcm_f32le,h264,hevc,vp8,vp9,mpeg4,mjpeg,png,webp,gif,bmp,h264_mediacodec,hevc_mediacodec,vp8_mediacodec,vp9_mediacodec,av1_mediacodec \
-    --enable-encoder=aac,libmp3lame,libopus,flac,alac,pcm_s16le,mjpeg,png,gif,h264_mediacodec,hevc_mediacodec \
+    --enable-decoder=aac,aac_latm,mp3float,mp3,opus,vorbis,flac,alac,pcm_s16le,pcm_s24le,pcm_f32le,h264,hevc,vp8,vp9,mpeg4,mjpeg,png,webp,gif,bmp,h264_mediacodec,hevc_mediacodec,vp8_mediacodec,vp9_mediacodec,av1_mediacodec,webvtt,subrip,srt,ass,ssa,movtext \
+    --enable-encoder=aac,libmp3lame,libopus,flac,alac,pcm_s16le,mjpeg,png,gif,h264_mediacodec,hevc_mediacodec,webvtt,subrip,srt,ass,ssa,movtext \
     --enable-filter=aresample,anull,null,scale,format,aformat,volume,loudnorm,atrim,trim,setpts,asetpts,fps,palettegen,paletteuse,split,crop,pad,concat,thumbnail,select,transpose,afade,fade \
     --disable-hwaccels --disable-indevs --disable-outdevs \
     > "$BUILD/configure.log" 2>&1 || { tail -40 "$BUILD/configure.log"; exit 1; }

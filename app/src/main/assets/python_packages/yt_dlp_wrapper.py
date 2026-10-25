@@ -588,22 +588,31 @@ class _SafeEmbedSubtitlePP(FFmpegEmbedSubtitlePP):
             return [], info
 
 
-class _VideoOnlyModifyChaptersPP(ModifyChaptersPP):
-    """ModifyChapters (SponsorBlock's cuts) on the video only. The stock step cuts each subtitle
-    file too, through ffmpeg, and the app's ffmpeg is built without any subtitle formats: a .vtt
-    failed the whole download after the video had downloaded and merged fine (reproduced live,
-    SponsorBlock remove + subtitles on). Swapped in for the stock instance in download()."""
+class _SafeModifyChaptersPP(ModifyChaptersPP):
+    """ModifyChapters (SponsorBlock's cuts), except subtitles can never cost the download. The
+    stock step cuts each subtitle file along with the video, and one it can't read fails the whole
+    download after the video downloaded and merged fine (reproduced live: a .vtt, with an ffmpeg
+    built before it had subtitle formats). Tracks with no captions are left out, and if a cut
+    still fails, it's done again on the video alone: every file is cut to a temp copy and only
+    renamed once all of them worked, so nothing has changed yet. Swapped in for the stock instance
+    in download()."""
 
     @classmethod
     def pp_key(cls):
         return "ModifyChapters"
 
     def run(self, info):
-        subtitles = info.get("requested_subtitles")
+        subtitles = info.get("requested_subtitles") or {}
         if not subtitles:
             return super().run(info)
-        # Left uncut: a kept subtitle file runs ahead of the video after each removed segment.
-        files, info = super().run({**info, "requested_subtitles": None})
+        usable = {lang: s for lang, s in subtitles.items() if _subtitle_has_captions(s.get("filepath"))}
+        try:
+            # A copy: run() rewrites the chapters and duration before cutting.
+            files, info = super().run({**info, "requested_subtitles": usable})
+        except PostProcessingError as e:
+            # Left uncut: a kept subtitle runs ahead of the video after each removed segment.
+            self.report_warning(f"Couldn't cut the subtitles, cutting the video alone: {e}")
+            files, info = super().run({**info, "requested_subtitles": None})
         info["requested_subtitles"] = subtitles
         return files, info
 
@@ -2136,7 +2145,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 post = ydl._pps["post_process"]
                 for pp in post:
                     if type(pp) is ModifyChaptersPP:
-                        pp.__class__ = _VideoOnlyModifyChaptersPP
+                        pp.__class__ = _SafeModifyChaptersPP
                 if audio_language:
                     # First, on the merged file, so every later step carries the tag.
                     post.insert(0, _AudioLanguageTagPP(ydl))
