@@ -1452,7 +1452,7 @@ private fun DuplicatesList(
     onRedownload: (com.comfort.app.data.DuplicateAttempt) -> Unit,
     onDismiss: (String) -> Unit,
 ) {
-    val sdf = remember { SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()) }
+    val sdf = remember { Locale.getDefault().let { SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(it, "MMMdjmm"), it) } }
     // Same entrance/removal treatment as the real download rows further up (HistoryRow/
     // HistoryGridItem) — a plain instant pop-out on Dismiss read as jarring/inconsistent next to
     // every other list in this app already animating removals, once actually compared side by
@@ -1869,7 +1869,7 @@ private fun StatusBadge(status: DownloadStatus, modifier: Modifier = Modifier) {
     }
 }
 
-// One "Oct 9, 2026" formatter for every Library card: a remember in HistoryRow built a new one
+// One "Oct 9, 2026" (or "9. Okt. 2026", in the language's own order) formatter for every Library card: a remember in HistoryRow built a new one
 // for each card scrolling into view, which showed on a fast fling. Rebuilt only if the language
 // changes. SimpleDateFormat isn't thread-safe; it's shared only because it's used while
 // composing, on the main thread.
@@ -1878,7 +1878,7 @@ private var historyDateFormatCache: Pair<Locale, SimpleDateFormat>? = null
 private fun historyDateFormat(): SimpleDateFormat {
     val locale = Locale.getDefault()
     historyDateFormatCache?.let { (cachedLocale, format) -> if (cachedLocale == locale) return format }
-    return SimpleDateFormat("MMM d, yyyy", locale).also { historyDateFormatCache = locale to it }
+    return SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMMMd"), locale).also { historyDateFormatCache = locale to it }
 }
 
 @OptIn(ExperimentalFoundationApi::class)

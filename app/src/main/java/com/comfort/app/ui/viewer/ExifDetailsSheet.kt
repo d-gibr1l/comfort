@@ -51,6 +51,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
+import android.icu.util.MeasureUnit
+import com.comfort.app.util.LocalFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -1278,14 +1280,14 @@ private fun ExposureBadge(
 }
 
 private fun formatFullTimestamp(timestamp: Long): String {
-    return SimpleDateFormat("dd MMMM yyyy, hh:mm:ss a", Locale.getDefault()).format(Date(timestamp))
+    return com.comfort.app.util.LocalFormat.date(timestamp, "yMMMMdjmmss")
 }
 
 private fun formatDetailedSize(sizeBytes: Long): String {
     return when {
-        sizeBytes < 1024 -> "$sizeBytes B"
-        sizeBytes < 1024 * 1024 -> String.format(Locale.US, "%.1f KB", sizeBytes / 1024.0)
-        sizeBytes < 1024 * 1024 * 1024 -> String.format(Locale.US, "%.2f MB", sizeBytes / (1024.0 * 1024.0))
-        else -> String.format(Locale.US, "%.2f GB", sizeBytes / (1024.0 * 1024.0 * 1024.0))
+        sizeBytes < 1024 -> LocalFormat.measure(sizeBytes.toDouble(), MeasureUnit.BYTE, 0)
+        sizeBytes < 1024 * 1024 -> LocalFormat.measure(sizeBytes / 1024.0, MeasureUnit.KILOBYTE, 1)
+        sizeBytes < 1024 * 1024 * 1024 -> LocalFormat.measure(sizeBytes / (1024.0 * 1024.0), MeasureUnit.MEGABYTE, 2)
+        else -> LocalFormat.measure(sizeBytes / (1024.0 * 1024.0 * 1024.0), MeasureUnit.GIGABYTE, 2)
     }
 }

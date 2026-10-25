@@ -1414,7 +1414,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                         )
                     } else if (item.speedMbs > 0f) {
                         Text(
-                            "${String.format(Locale.getDefault(), "%.2f", item.speedMbs)} MB/s",
+                            com.comfort.app.util.LocalFormat.measure(item.speedMbs.toDouble(), android.icu.util.MeasureUnit.MEGABYTE, 2, perSecond = true),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

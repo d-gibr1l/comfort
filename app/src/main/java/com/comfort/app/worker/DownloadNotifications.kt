@@ -199,7 +199,7 @@ object DownloadNotifications {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         ensureChannel(context)
         val sizeText = if (expectedBytes > 0) context.getString(R.string.x_of_x, formatFileSize(currentBytes), formatFileSize(expectedBytes)) else null
-        val speedText = if (speedMbs > 0.01f) "%.1f MB/s".format(speedMbs) else null
+        val speedText = if (speedMbs > 0.01f) com.comfort.app.util.LocalFormat.measure(speedMbs.toDouble(), android.icu.util.MeasureUnit.MEGABYTE, 1, perSecond = true) else null
         val byteDetail = listOfNotNull(sizeText, speedText).joinToString(" · ")
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_logo)
