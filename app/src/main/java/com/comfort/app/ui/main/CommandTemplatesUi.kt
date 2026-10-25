@@ -1,16 +1,25 @@
 package com.comfort.app.ui.main
 
+import android.content.ClipData
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -18,11 +27,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.comfort.app.data.CommandTemplate
 import com.comfort.app.data.CommandTemplates
+import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.R
+import com.comfort.app.worker.CurrentCommand
 import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Settings > Advanced > Command templates: the saved templates, each opened to edit or deleted,
- * and a button for a new one. They're picked per download on its Commands screen. */
+ * a button for a new one, and the current command the Settings make. Templates are picked per
+ * download on its Commands screen. */
 @Composable
 internal fun CommandTemplatesSection() {
     val context = LocalContext.current
@@ -74,6 +89,9 @@ internal fun CommandTemplatesSection() {
         Text(stringResource(R.string.command_template_new))
     }
 
+    Spacer(Modifier.height(16.dp))
+    CurrentSettingsCommand()
+
     editing?.let { template ->
         CommandTemplateDialog(
             initial = template,
@@ -85,6 +103,49 @@ internal fun CommandTemplatesSection() {
             },
         )
     }
+}
+
+/** gallery-dl's and yt-dlp's commands from the Settings alone, styled like the preview sheet's
+ * "Current command". Rebuilt on every Settings change (this page has switches of its own) and on
+ * resume (cookies and engines are set on other screens). */
+@Composable
+private fun CurrentSettingsCommand() {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    var version by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val prefs = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> version++ }
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) version++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    // Off the main thread: it reads the preferences and the cookie file.
+    val commands by produceState(emptyList<CurrentCommand.Shown>(), version) {
+        value = withContext(Dispatchers.IO) { CurrentCommand.forSettings(context) }
+    }
+
+    CommandCodePanel(
+        commands = commands,
+        subtitle = stringResource(R.string.current_command_settings_subtitle),
+        onCopy = { text ->
+            scope.launch {
+                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(context.getString(R.string.current_command), text)))
+                // Android 13+ shows its own copied confirmation.
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                    Toast.makeText(context, context.getString(R.string.command_copied), Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+    )
 }
 
 /** Names and edits a template: its name and its arguments. [initial] with a blank name is a new

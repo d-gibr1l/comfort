@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -178,11 +179,12 @@ internal fun LogViewer(onDismiss: () -> Unit) {
         // Each touch on the sheet first counts as not on the list; the list's own check below (which
         // sees it after this one) says otherwise.
         Column(Modifier.fillMaxWidth().height(height).onTouchDown { gestureOnList[0] = false }) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            SheetHeader(
+                icon = Icons.AutoMirrored.Outlined.Article,
+                title = stringResource(R.string.logs_title),
+                subtitle = stringResource(R.string.logs_subtitle),
+                modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
             ) {
-                Text(stringResource(R.string.logs_title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 IconButton(onClick = { confirmClear = true }, enabled = !lines.isNullOrEmpty()) {
                     Icon(Icons.Outlined.DeleteSweep, contentDescription = stringResource(R.string.clear_logs))
                 }

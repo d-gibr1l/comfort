@@ -1538,17 +1538,16 @@ private fun ErrorDetailsSheet(
     
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    Icons.Outlined.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(22.dp).padding(top = 2.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.error_details), style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-            }
-            Spacer(Modifier.height(10.dp))
+            // The download's name under the title, so it's clear which one failed.
+            SheetHeader(
+                icon = Icons.Outlined.Warning,
+                title = stringResource(R.string.error_details),
+                subtitle = item.title,
+                tileColor = MaterialTheme.colorScheme.errorContainer,
+                iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            Spacer(Modifier.height(16.dp))
             // Each engine's own error, in the order they ran (DownloadEntity.errorDetails) — the
             // card only shows one summary line, which could be a fallback engine's less relevant
             // message. Older failures have none: the summary is shown instead.
