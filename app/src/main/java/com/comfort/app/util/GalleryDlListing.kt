@@ -399,7 +399,9 @@ object GalleryDlListing {
     }
 
     private suspend fun listViaGalleryDl(context: Context, url: String, followRedirect: Boolean = true): ListingResult {
-        val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.GALLERY_DL)
+        // Apart, as for a download: the "both" set is checked for flags only yt-dlp reads that way.
+        val extraArgs = GalleryDlPreferences.getOwnExtraArgs(context, DownloadEngine.GALLERY_DL)
+        val sharedExtraArgs = GalleryDlPreferences.getSharedExtraArgs(context)
 
         val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
         try {
@@ -409,7 +411,7 @@ object GalleryDlListing {
             // the single block of text list_items() originally returned before parsing it as JSON.
             val lines = mutableListOf<String>()
             val rawText = runCatching {
-                PythonRuntime.run(context, "gallery_dl_wrapper.py", listOf("list_items", url, cookiesArg, extraArgs)) { line ->
+                PythonRuntime.run(context, "gallery_dl_wrapper.py", listOf("list_items", url, cookiesArg, extraArgs, sharedExtraArgs)) { line ->
                     lines.add(line)
                 }
                 lines.joinToString("\n")

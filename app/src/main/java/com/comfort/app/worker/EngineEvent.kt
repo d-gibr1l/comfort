@@ -37,6 +37,9 @@ sealed interface EngineEvent {
     data class Status(val message: String) : EngineEvent
     /** A finished file the engine saved (an absolute path; DownloadWorker checks it's in staging). */
     data class File(val path: String) : EngineEvent
+    /** An extra command the wrapper left out or changed, and why ([code], see ExtraCommandNotes);
+     * the download goes on without it. */
+    data class Note(val code: String, val flag: String?, val engine: String?, val detail: String?) : EngineEvent
     /** Warnings, debug output, status lines, traceback noise: nothing to act on. */
     data object Ignored : EngineEvent
 }
@@ -92,6 +95,7 @@ object EngineEventParser {
             "error" -> str("message")?.takeUnless { it.startsWith("Traceback (most recent call last)") }?.let { EngineEvent.Error(headline(it)) }
             "file" -> str("path")?.let { EngineEvent.File(it) }
             "status" -> str("message")?.let { EngineEvent.Status(it) }
+            "note" -> str("code")?.let { EngineEvent.Note(it, str("flag"), str("engine"), str("detail")) }
             else -> null // "warning", "debug", "exit", or a type from a newer script
         } ?: EngineEvent.Ignored
     }

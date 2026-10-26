@@ -2177,9 +2177,12 @@ private fun ExtraCommandsScreen(
     // The commands being saved as a new template (the dialog asks for its name).
     var savingTemplate by remember { mutableStateOf<String?>(null) }
 
+    // An unclosed quote would make the engines skip every extra command: not added until fixed.
+    val unclosedQuotes = input.isNotBlank() && hasUnmatchedQuotes(input)
+
     fun add() {
         val trimmed = input.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty() || unclosedQuotes) return
         onCommandsChange(commands + trimmed)
         input = ""
     }
@@ -2212,8 +2215,10 @@ private fun ExtraCommandsScreen(
             commands = shownCommands,
             subtitle = stringResource(R.string.current_command_download_subtitle),
             onCopy = onCopy,
-            // More room under the drag handle.
-            modifier = Modifier.padding(top = 8.dp),
+            // More room under the drag handle; shrinks so the chips, Add field and Done fit the
+            // sheet's capped height.
+            modifier = Modifier.weight(1f, fill = false).padding(top = 8.dp),
+            shrinkable = true,
         )
 
         if (commands.isNotEmpty()) {
@@ -2290,13 +2295,17 @@ private fun ExtraCommandsScreen(
             trailingIcon = {
                 FilledTonalIconButton(
                     onClick = { add() },
-                    enabled = input.isNotBlank(),
+                    enabled = input.isNotBlank() && !unclosedQuotes,
                     modifier = Modifier.padding(end = 6.dp).size(40.dp),
                 ) {
                     Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.add))
                 }
             },
             singleLine = true,
+            isError = unclosedQuotes,
+            supportingText = if (unclosedQuotes) {
+                { Text(stringResource(R.string.unclosed_quotation_marks_arguments_may_be)) }
+            } else null,
             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
             shape = androidx.compose.foundation.shape.CircleShape,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

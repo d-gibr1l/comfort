@@ -508,6 +508,8 @@ class DownloadWorker(
                 // the one-line summary). Keyed by engine name in the order the engines ran; an
                 // engine that ran without an error is listed too (see errorDetailsJson below).
                 val engineErrors = java.util.Collections.synchronizedMap(LinkedHashMap<String, String>())
+                // The wrappers' notes on extra commands they left out (see EngineEvent.Note).
+                val extraNotes = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
                 val attemptedEngines = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
                 val currentEngine = java.util.concurrent.atomic.AtomicReference<String?>(null)
                 fun recordEngineError(message: String) {
@@ -528,6 +530,15 @@ class DownloadWorker(
                     }
                     extra?.let { (engine, message) ->
                         entries.put(org.json.JSONObject().put("engine", engine).put("message", message.take(2000)))
+                    }
+                    // Left-out extra commands, after the engines: often the reason it failed.
+                    val notes = synchronized(extraNotes) { extraNotes.toList() }
+                    if (notes.isNotEmpty()) {
+                        entries.put(
+                            org.json.JSONObject()
+                                .put("engine", applicationContext.getString(R.string.extra_notes_title))
+                                .put("message", notes.joinToString("\n").take(2000)),
+                        )
                     }
                     return if (entries.length() == 0) null else entries.toString()
                 }
@@ -799,6 +810,12 @@ class DownloadWorker(
                         // Listing-only progress text, and the engines' warnings/debug/status lines.
                         is EngineEvent.RateLimited -> DownloadNotes.set(downloadId, applicationContext.getString(R.string.rate_limited_by_x_waiting_until, event.site, event.until))
                         is EngineEvent.Status, EngineEvent.Ignored -> Unit
+                        // An extra command left out: on the card while it runs, and in the finished
+                        // or failed notice (each said once, though both engines may report it).
+                        is EngineEvent.Note -> {
+                            val text = ExtraCommandNotes.text(applicationContext, event)
+                            if (extraNotes.add(text)) DownloadNotes.set(downloadId, text)
+                        }
                         is EngineEvent.File -> {
                             DownloadNotes.clear(downloadId)
                             try {
@@ -993,7 +1010,7 @@ class DownloadWorker(
                     }
                 }
 
-                if (commands.writeInfoFiles || commands.saveThumbnail || commands.saveSubtitleFiles) {
+                if (commands.writeInfoFiles || commands.saveThumbnail || commands.saveSubtitleFiles || commands.extrasWriteSidecars) {
                     // gallery-dl's --write-metadata, yt-dlp's --write-description/--write-info-json,
                     // and yt-dlp's own --write-thumbnail (this sheet's "Save thumbnail" chip, see
                     // saveThumbnail above) all write these silently to disk — neither engine ever
@@ -1012,7 +1029,9 @@ class DownloadWorker(
                                     // Save subtitle files (Settings > Processing) — the sidecar
                                     // .srt/.vtt yt_dlp_wrapper.py's own writesubtitles produces
                                     // when requested independently of embedding.
-                                    it.extension in setOf("srt", "vtt")
+                                    it.extension in setOf("srt", "vtt", "ass") ||
+                                    // gallery-dl's --write-tags.
+                                    (commands.extrasWriteSidecars && it.extension == "txt")
                                 )
                         }
                         .forEach { sidecarFile ->
@@ -1086,7 +1105,10 @@ class DownloadWorker(
                 } else null
                 DownloadLog.line(applicationContext, downloadId, "finished: ${savedCount.get()} saved" + (incompleteMessage?.let { ", $it" } ?: ""))
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
-                DownloadNotifications.notifyFinished(applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail, missingItems)
+                DownloadNotifications.notifyFinished(
+                    applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail, missingItems,
+                    notes = synchronized(extraNotes) { extraNotes.toList() },
+                )
                 if (entity?.incognito == true) {
                     // Imported from YTDLnis's own Incognito setting (see
                     // GalleryDlPreferences.isIncognitoDefault's doc comment): the real file is

@@ -287,6 +287,22 @@ object GalleryDlPreferences {
         return listOf(getExtraArgs(context), own).filter { it.isNotBlank() }.joinToString(" ")
     }
 
+    /** Only [engine]'s own set (typed for that engine on purpose), for the wrappers that take it
+     * apart from [getSharedExtraArgs]. */
+    fun getOwnExtraArgs(context: Context, engine: DownloadEngine): String {
+        if (!isExtraArgsEnabled(context)) return ""
+        return when (engine) {
+            DownloadEngine.GALLERY_DL -> getGalleryDlExtraArgs(context)
+            DownloadEngine.YT_DLP, DownloadEngine.SPOTIFY -> getYtDlpExtraArgs(context)
+            DownloadEngine.INSTALOADER -> ""
+        }
+    }
+
+    /** The "both" set. Each wrapper keeps from it only what it understands the same way (a yt-dlp
+     * flag there means something else, or nothing, to gallery-dl), and says what it left out. */
+    fun getSharedExtraArgs(context: Context): String =
+        if (isExtraArgsEnabled(context)) getExtraArgs(context) else ""
+
     /** yt-dlp CLI-syntax --extractor-args string(s), e.g. "youtube:player_client=android,web".
      * Multiple IE_KEY:ARGS blocks can be whitespace-separated, mirroring how --extractor-args can
      * be repeated on the real CLI for different extractors. gallery-dl isn't wired to this — its

@@ -64,6 +64,15 @@
     <string name="filename_templates_subtitle">How this download\'s files are named</string>
     <string name="saved_templates_subtitle">Tap one to use it</string>
     <string name="logs_subtitle">What your recent downloads did, step by step</string>
+    <string name="extra_note_unknown">Skipped “%1$s”: not an option this engine knows</string>
+    <string name="extra_note_other_engine">Skipped “%1$s” here: it\'s for %2$s</string>
+    <string name="extra_note_not_allowed">Skipped “%1$s”: the app chooses where files go, and this would save nothing or somewhere else</string>
+    <string name="extra_note_invalid">Skipped “%1$s”: %2$s</string>
+    <string name="extra_note_quotes">Skipped extra commands: a quote isn\'t closed</string>
+    <string name="extra_note_url">Skipped “%1$s”: put links in the link box</string>
+    <string name="extra_note_key_value">Skipped “%1$s”: not a setting this engine has</string>
+    <string name="extra_notes_title">Some extra commands weren\'t used</string>
+    <string name="command_note_instaloader_extras">Instaloader doesn\'t use extra commands; they apply only if another engine runs</string>
     <string name="command_template_unclosed_quotes">Unclosed quotation marks</string>
     <string name="command_template_save_as">Save as template</string>
     <!-- Settings > Backup & restore. -->

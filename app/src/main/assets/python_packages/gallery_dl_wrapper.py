@@ -8,6 +8,8 @@ from contextlib import redirect_stdout, redirect_stderr
 import gallery_dl
 import gallery_dl.job
 import gallery_dl.output
+import gallery_dl.option
+import gallery_dl.util
 import custom_names
 import gallery_dl.path
 import net_resilience
@@ -244,7 +246,309 @@ def _reddit_client_args(cookies_path):
     return ["-o", "extractor.reddit.client-id=6N9uN0krSDE-ig"]
 
 
-def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None, sleep_interval_seconds=None, restrict_filenames=False, force_ipv4=False, no_check_certificates=False):
+# The user's extra arguments go onto gallery-dl's command line one option at a time: argparse
+# stops at the first one it can't read (the whole download failed as "exited with code 2"), a
+# shlex error used to drop the whole set without a word, and some options gallery-dl does take
+# save nothing or save it outside the download folder. Every token left out is told to the app
+# as a "note" report (code, flag, detail, engine).
+
+# Spellings yt-dlp has too and gallery-dl reads the same way: kept in the set meant for both engines.
+# The last row means the same too but is refused anyway (_refusal).
+_SAME_IN_BOTH = frozenset((
+    "--cookies", "--download-archive", "--force-ipv4", "--force-ipv6", "-4", "-6", "--ignore-config",
+    "--limit-rate", "-r", "--netrc", "--no-colors", "--no-mtime", "--no-part", "--password", "-p",
+    "--print-traffic", "--proxy", "--quiet", "-q", "--retries", "-R", "--source-address",
+    "--user-agent", "--username", "-u", "--verbose", "-v", "--write-pages", "--xff",
+    "--windows-filenames", "--write-info-json",
+    "--cookies-from-browser", "--dump-json", "-j", "-J", "--exec", "--help", "-h", "--list-extractors",
+    "--no-download", "--print", "--print-to-file", "--simulate", "-s", "--version", "-U", "-g",
+))
+# The other spellings both have (gallery-dl 1.32.9 vs yt-dlp 2026.08), with how many values yt-dlp
+# gives each: gallery-dl reads them as something else. "-f best" named every file "best", "-N 4"
+# printed "4" instead of downloading, "-S res:720" started gallery-dl's server mode and took
+# "res:720" for a link, "-i"/"-c"/"-x" read the link itself as a file to load.
+_YTDLP_MEANING = {
+    "-C": 0, "-I": 1, "-N": 1, "-O": 1, "-P": 1, "-S": 1, "-a": 1, "-c": 0, "-e": 0, "-f": 1,
+    "-i": 0, "-o": 1, "-w": 0, "-x": 0, "--mtime": 0, "--restrict-filenames": 0,
+}
+# yt_dlp_wrapper's own markers in a download's extra commands (WebBrowser.queueCaught), with their
+# value counts: not the user's, and nothing gallery-dl should see.
+_APP_MARKERS = {"--comfort-direct-fallback": 0, "--comfort-merge-audio": 1}
+# Options that save nothing, print instead of saving, put files outside the download folder,
+# write to other paths (the process's cwd is "/" on Android, read-only), load config or code, or
+# read a browser's cookies.
+_REFUSED_DESTS = frozenset((
+    "directory", "base-directory", "list_urls", "dump_json", "jobtype", "list_modules",
+    "list_extractors", "update", "input_files", "configs_extra", "configs_json", "configs_yaml",
+    "configs_toml", "config_type", "config", "cookies_from_browser", "server", "extractor_sources",
+    "cache_file", "cache_status", "cache_show", "cache_clear", "cache_vacuum", "errorfile",
+    "logfile", "unsupportedfile", "cookies-update", "write-pages", "download", "help", "version",
+))
+_REFUSED_FLAGS = frozenset((
+    "--zip", "--cbz", "-N", "--print", "--Print", "--print-to-file", "--Print-to-file", "--exec",
+    "--exec-after",
+))
+# The same, as -o config keys (their last part).
+_REFUSED_KEYS = frozenset((
+    "part-directory", "logfile", "unsupportedfile", "errorfile", "cookies-update", "write-pages",
+    "globals", "module-sources",
+))
+_FILTER_DESTS = frozenset(("file-filter", "post-filter", "child-filter"))
+_FILTER_KEYS = frozenset(("image-filter", "file-filter", "post-filter", "child-filter", "chapter-filter"))
+_parsers = {}
+
+
+def _gdl_option(parser, tok):
+    """How gallery-dl's argparse reads [tok]: None for a value or link, else a list of
+    (action, spelling, inline value) — more than one for "-qv". action is None for an option
+    gallery-dl doesn't have, "ambiguous" for an abbreviation of several. Mirrors argparse's own
+    _parse_optional (abbreviations, "--opt=value", "-Rvalue")."""
+    acts = parser._option_string_actions
+    if not tok.startswith("-") or tok == "-":
+        return None
+    if tok in acts:
+        return [(acts[tok], tok, None)]
+    name, eq, value = tok.partition("=")
+    if eq and name in acts:
+        return [(acts[name], name, value)]
+    if tok.startswith("--"):
+        if tok == "--":
+            return [(None, tok, None)]
+        hits = [s for s in acts if s.startswith("--") and s.startswith(name)]
+        if len(hits) == 1:
+            return [(acts[hits[0]], hits[0], value if eq else None)]
+        if hits:
+            return [("ambiguous", tok, None)]
+    elif tok[:2] in acts:
+        found, rest = [], tok[1:]
+        while rest:
+            flag = "-" + rest[0]
+            action = acts.get(flag)
+            if action is None:
+                return [(None, tok, None)]
+            if action.nargs != 0:
+                found.append((action, flag, rest[1:] or None))
+                return found
+            found.append((action, flag, None))
+            rest = rest[1:]
+        return found
+    if parser._negative_number_matcher.match(tok) or " " in tok:
+        return None
+    return [(None, tok, None)]
+
+
+def _ytdlp_values(tok):
+    """How many of the tokens after [tok] are its values for yt-dlp, None if yt-dlp has no such
+    option (or can't be loaded: then the token is just unknown)."""
+    if "ytdlp" not in _parsers:
+        try:
+            import yt_dlp.options
+            _parsers["ytdlp"] = yt_dlp.options.create_parser()
+        except Exception:  # noqa: BLE001
+            _parsers["ytdlp"] = None
+    parser = _parsers["ytdlp"]
+    if parser is None:
+        return None
+    name, eq, _ = tok.partition("=")
+    if name.startswith("--"):
+        opt = parser._long_opt.get(name)
+        if opt is None:
+            hits = [s for s in parser._long_opt if s.startswith(name)]
+            opt = parser._long_opt[hits[0]] if len(hits) == 1 else None
+        inline = bool(eq)
+    else:
+        opt, inline = parser._short_opt.get(tok[:2]), len(tok) > 2
+    if opt is None:
+        return None
+    if not opt.takes_value():
+        return 0
+    return max(opt.nargs - (1 if inline else 0), 0)
+
+
+def _parse_error(parser, group):
+    """argparse's complaint about [group] alone, without its "usage: ... error:" lead, or None.
+    No link after it: a value left out would take the link instead ("--range URL")."""
+    err = io.StringIO()
+    try:
+        with redirect_stdout(io.StringIO()), redirect_stderr(err):
+            parser.parse_args(group)
+    except SystemExit:
+        lines = err.getvalue().strip().splitlines()
+        return lines[-1].split("error: ", 1)[-1] if lines else "invalid"
+    return None
+
+
+def _filter_error(expr):
+    # gallery-dl only warns about a filter that doesn't compile, and then downloads everything.
+    try:
+        gallery_dl.util.compile_filter(expr)
+    except Exception as e:  # noqa: BLE001
+        return str(e) or type(e).__name__
+    return None
+
+
+def _has_parent_segment(value):
+    if isinstance(value, str):
+        return any(seg.strip() == ".." for seg in value.replace("\\", "/").split("/"))
+    if isinstance(value, dict):
+        return any(_has_parent_segment(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_has_parent_segment(v) for v in value)
+    return False
+
+
+def _keeps_separators(restrict=None, replace="_"):
+    """True if names cleaned with this path-restrict/path-replace could still hold a "/" (or
+    Windows' "\\"), so a "../" in a name or format would leave the download folder."""
+    import os
+    if restrict in (None, "auto", "unix", "windows", "windows+", "ascii", "ascii+"):
+        restrict = "auto"
+        sample = os.sep
+    else:
+        sample = "/" + os.sep
+    if restrict == "auto":
+        restrict = "\\\\|/<>:\"?*" if os.name == "nt" else "/"
+    if not isinstance(replace, str) or "/" in replace or os.sep in replace:
+        return True
+    clean = gallery_dl.path._build_cleanfunc(dict(restrict) if isinstance(restrict, dict) else restrict, replace)
+    return any(c in clean(sample) for c in "/" + os.sep)
+
+
+def _refusal(action, spelling, values):
+    """(code, detail) for a gallery-dl option that can't be used here, else None."""
+    if spelling in _REFUSED_FLAGS or action.dest in _REFUSED_DESTS:
+        return "extra_not_allowed", None
+    value = values[0] if values else None
+    if action.dest in _FILTER_DESTS and isinstance(value, str):
+        error = _filter_error(value)
+        return ("extra_invalid", error) if error else None
+    if action.dest == "postprocessors" and spelling in ("-P", "--postprocessor") and value in ("zip", "exec"):
+        return "extra_not_allowed", value
+    if action.dest == "path-restrict" and action.nargs != 0:
+        try:
+            return ("extra_not_allowed", value) if _keeps_separators(value) else None
+        except Exception as e:  # noqa: BLE001
+            return "extra_invalid", str(e)
+    if action.dest in ("options", "options_pp"):
+        if "=" not in (value or ""):
+            return "extra_invalid", "expected KEY=VALUE"
+        key, parsed = gallery_dl.option._parse_option(value)
+        parts = key.split(".")
+        last, top = parts[-1], len(parts) == 1
+        if action.dest == "options_pp":
+            # Post processor options (the metadata writer's): its own folder, relative to each file's.
+            if last == "base-directory" or (last == "directory" and _has_parent_segment(parsed)):
+                return "extra_not_allowed", value
+            return None
+        # --directory sets the top-level base-directory and directory, which beat every
+        # extractor's own (config.interpolate), so only top-level ones can move files.
+        if (last in _REFUSED_KEYS or (top and last == "base-directory")
+                or (top and last == "directory" and _has_parent_segment(parsed))
+                or (last == "download" and parsed is False)
+                or (last == "cookies" and not isinstance(parsed, str))
+                or (last == "postprocessors" and ("zip" in str(parsed) or "exec" in str(parsed)))):
+            return "extra_not_allowed", value
+        if last in _FILTER_KEYS and isinstance(parsed, str):
+            error = _filter_error(parsed)
+            return ("extra_invalid", error) if error else None
+        try:
+            if last == "path-restrict" and _keeps_separators(parsed):
+                return "extra_not_allowed", value
+            if last == "path-replace" and _keeps_separators(replace=parsed):
+                return "extra_not_allowed", value
+        except Exception as e:  # noqa: BLE001
+            return "extra_invalid", str(e)
+    return None
+
+
+def _checked_extras(text, shared, note):
+    """The tokens of [text] gallery-dl can use, in order; note(**fields) for each one left out.
+    [shared]: the set meant for both engines, where options gallery-dl doesn't have but yt-dlp
+    does, and those both have but read differently, were meant for yt-dlp."""
+    if not text or not text.strip():
+        return []
+    try:
+        tokens = shlex.split(text)
+    except ValueError:
+        note(code="extra_quotes")
+        return []
+    if "gdl" not in _parsers:
+        _parsers["gdl"] = gallery_dl.option.build_parser()
+    parser = _parsers["gdl"]
+
+    def is_value(t):
+        return _gdl_option(parser, t) is None
+
+    def is_link(t):
+        return "://" in t or t.lower().startswith(("http:", "https:"))
+
+    kept, i = [], 0
+    while i < len(tokens):
+        tok = tokens[i]
+        i += 1
+        if shared and tok in _APP_MARKERS:
+            i += _APP_MARKERS[tok]
+            continue
+        found = _gdl_option(parser, tok)
+        if found is None:
+            # A word on its own: gallery-dl would take it for one more link to download.
+            note(code="extra_url" if is_link(tok) else "extra_unknown", flag=tok)
+            continue
+        for n, (action, spelling, inline) in enumerate(found):
+            last = n == len(found) - 1
+            if action == "ambiguous":
+                note(code="extra_invalid", flag=tok, detail=_parse_error(parser, [tok]) or "ambiguous option")
+                continue
+            if action is None or (shared and spelling in _YTDLP_MEANING and spelling not in _SAME_IN_BOTH):
+                count = _ytdlp_values(tok) if action is None else (0 if inline is not None else _YTDLP_MEANING[spelling])
+                if shared and count is not None:
+                    i += min(count, len(tokens) - i)
+                    note(code="extra_other_engine", flag=tok, engine="yt-dlp")
+                else:
+                    # Its value too, if it has one: the words after it that aren't links.
+                    while i < len(tokens) and is_value(tokens[i]) and not is_link(tokens[i]):
+                        i += 1
+                    note(code="extra_unknown", flag=tok)
+                break
+            flag = spelling if len(found) > 1 else tok
+            values = [] if inline is None else [inline]
+            if last and inline is None and action.nargs != 0:
+                want = {None: 1, "?": 1, "*": len(tokens), "+": len(tokens)}.get(action.nargs, action.nargs)
+                while len(values) < want and i < len(tokens) and is_value(tokens[i]):
+                    values.append(tokens[i])
+                    i += 1
+            if inline is None:
+                group = [spelling] + values
+            else:
+                group = [spelling + ("=" if spelling.startswith("--") else "") + inline]
+            # Refused before parsing: --help and --version exit from inside the parse.
+            refused = _refusal(action, spelling, values) if action.dest not in ("options", "options_pp") or values else None
+            error = None if refused else _parse_error(parser, group)
+            if error:
+                note(code="extra_invalid", flag=flag, detail=error)
+                continue
+            if refused:
+                code, detail = refused
+                fields = {"code": code, "flag": flag}
+                if detail:
+                    fields["detail"] = str(detail)
+                note(**fields)
+                continue
+            kept.extend(group)
+    return kept
+
+
+def _extras(text, shared, note):
+    # Whatever goes wrong in here mustn't fail the download: the set is left out, and said so.
+    try:
+        return _checked_extras(text, shared, note)
+    except Exception as e:  # noqa: BLE001
+        if text and text.strip():
+            note(code="extra_invalid", flag=text, detail=f"{type(e).__name__}: {e}")
+        return []
+
+
+def download(url, download_dir, cookies_path=None, callback=None, filename_format=None, extra_args=None, archive_path=None, limit_rate=None, item_filter=None, should_cancel=None, exclude_video=False, retries=None, max_filesize=None, write_info_files=False, proxy_url=None, socket_timeout_seconds=None, sleep_interval_seconds=None, restrict_filenames=False, force_ipv4=False, no_check_certificates=False, shared_extra_args=None):
     writer = CallbackWriter(callback, should_cancel) if callback else sys.stdout
 
     original_argv = sys.argv
@@ -330,11 +634,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # gallery-dl's closest analog to yt-dlp's --write-info-json: one JSON sidecar per
         # downloaded file, containing the same metadata used for --filename/-filter expressions.
         args.append("--write-metadata")
-    if extra_args:
-        try:
-            args.extend(shlex.split(extra_args))
-        except ValueError:
-            pass
+    # The set meant for both engines first, gallery-dl's own after it: gallery-dl's own wins where
+    # they set the same thing, as when the app joined them into one set.
+    def note(**fields):
+        (callback or print)(event("note", **fields))
+    args.extend(_extras(shared_extra_args, True, note))
+    args.extend(_extras(extra_args, False, note))
     args.append(url)
 
     sys.argv = args
@@ -410,7 +715,7 @@ def _with_sizes(dump_json, referer=None):
         return dump_json
 
 
-def list_items(url, cookies_path=None, extra_args=None):
+def list_items(url, cookies_path=None, extra_args=None, shared_extra_args=None):
     """Enumerates items in a gallery without downloading anything, for the share-sheet item
     picker. Returns gallery-dl's raw --dump-json output as text (a JSON array of
     [message_type, url, keywords] entries); parsed on the Kotlin side. --dump-json already
@@ -420,11 +725,10 @@ def list_items(url, cookies_path=None, extra_args=None):
     args = ["gallery-dl", "--dump-json"] + _reddit_client_args(cookies_path)
     if cookies_path:
         args.extend(["--cookies", cookies_path])
-    if extra_args:
-        try:
-            args.extend(shlex.split(extra_args))
-        except ValueError:
-            pass
+    # Checked as download() does (a stray -g or link broke the listing's JSON); the notes aren't
+    # shown while listing, the download reports them.
+    args.extend(_extras(shared_extra_args, True, lambda **fields: None))
+    args.extend(_extras(extra_args, False, lambda **fields: None))
     args.append(url)
 
     sys.argv = args
@@ -517,10 +821,12 @@ if __name__ == "__main__":
             restrict_filenames=(_rest[15] == "1") if len(_rest) > 15 else False,
             force_ipv4=(_rest[16] == "1") if len(_rest) > 16 else False,
             no_check_certificates=(_rest[17] == "1") if len(_rest) > 17 else False,
+            shared_extra_args=_s(_rest[18]) if len(_rest) > 18 else None,
         )
         print(event("exit", status=_status), file=_real_stdout, flush=True)
     elif _cmd == "list_items":
-        _result = list_items(url=_rest[0], cookies_path=_s(_rest[1]), extra_args=_s(_rest[2]))
+        _result = list_items(url=_rest[0], cookies_path=_s(_rest[1]), extra_args=_s(_rest[2]),
+                             shared_extra_args=_s(_rest[3]) if len(_rest) > 3 else None)
         print(_result, file=_real_stdout, flush=True)
     elif _cmd == "probe":
         print(probe(_rest[0]), file=_real_stdout, flush=True)

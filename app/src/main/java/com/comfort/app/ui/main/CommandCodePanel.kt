@@ -10,6 +10,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +59,9 @@ internal fun CommandCodePanel(
     subtitle: String,
     onCopy: (String) -> Unit,
     modifier: Modifier = Modifier,
+    // In a height-capped sheet: the panel gives up height so what's under it (the Add field,
+    // Done) stays on screen. Pass a weighted [modifier] too. Off in a scrolling page.
+    shrinkable: Boolean = false,
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     val index = selected.coerceIn(0, (commands.size - 1).coerceAtLeast(0))
@@ -78,7 +82,9 @@ internal fun CommandCodePanel(
             }
         }
         Surface(
-            modifier = Modifier.fillMaxWidth().height(260.dp),
+            modifier = Modifier.fillMaxWidth().then(
+                if (shrinkable) Modifier.weight(1f, fill = false).heightIn(min = 96.dp, max = 260.dp) else Modifier.height(260.dp),
+            ),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {

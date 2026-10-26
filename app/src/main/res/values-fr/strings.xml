@@ -60,6 +60,15 @@
     <string name="filename_templates_subtitle">Comment les fichiers de ce téléchargement sont nommés</string>
     <string name="saved_templates_subtitle">Touchez-en un pour l\'utiliser</string>
     <string name="logs_subtitle">Ce qu\'ont fait vos derniers téléchargements, étape par étape</string>
+    <string name="extra_note_unknown">“%1$s” ignoré : ce moteur ne connaît pas cette option</string>
+    <string name="extra_note_other_engine">“%1$s” ignoré ici : il est pour %2$s</string>
+    <string name="extra_note_not_allowed">“%1$s” ignoré : l\'appli choisit où vont les fichiers, et ceci n\'enregistrerait rien ou ailleurs</string>
+    <string name="extra_note_invalid">“%1$s” ignoré : %2$s</string>
+    <string name="extra_note_quotes">Commandes supplémentaires ignorées : un guillemet n\'est pas fermé</string>
+    <string name="extra_note_url">“%1$s” ignoré : mettez les liens dans le champ du lien</string>
+    <string name="extra_note_key_value">“%1$s” ignoré : ce moteur n\'a pas ce réglage</string>
+    <string name="extra_notes_title">Certaines commandes supplémentaires n\'ont pas été utilisées</string>
+    <string name="command_note_instaloader_extras">Instaloader n\'utilise pas les commandes supplémentaires ; elles ne servent que si un autre moteur est utilisé</string>
     <string name="command_template_unclosed_quotes">Guillemets non fermés</string>
     <string name="command_template_save_as">Enregistrer comme modèle</string>
     <string name="backup_title">Sauvegarde et restauration</string>

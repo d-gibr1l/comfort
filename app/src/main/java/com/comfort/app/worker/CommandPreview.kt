@@ -149,8 +149,10 @@ internal object CommandPreview {
         if (a.overrideTitle.isNotEmpty()) notes += Note(R.string.command_note_title, listOf(a.overrideTitle))
         if (a.overrideArtist.isNotEmpty()) notes += Note(R.string.command_note_artist, listOf(a.overrideArtist))
 
-        // Settings' extra arguments, then this download's: last, so they win, as in the wrapper.
+        // Settings' yt-dlp set, then the shared part ("both" + this download's): last, so they
+        // win, as in the wrapper — which leaves out what isn't for yt-dlp and says so.
         if (a.extraArgs.isNotBlank()) o += maskArgs(a.extraArgs.trim())
+        if (a.sharedExtraArgs.isNotBlank()) o += maskArgs(a.sharedExtraArgs.trim())
         return Block("yt-dlp", o, a.url, notes)
     }
 
@@ -186,6 +188,7 @@ internal object CommandPreview {
         if (a.noCheckCertificates) o += "--no-check-certificate"
         if (a.writeInfoFiles) o += "--write-metadata"
         if (a.extraArgs.isNotBlank()) o += maskArgs(a.extraArgs.trim())
+        if (a.sharedExtraArgs.isNotBlank()) o += maskArgs(a.sharedExtraArgs.trim())
         return Block("gallery-dl", o, a.url)
     }
 
@@ -297,10 +300,58 @@ internal object CommandPreview {
     // A quoted header's whole value ("Authorization: Bearer x" — not just "Bearer"), else one word.
     private val SECRET_HEADER_ARG_RE = Regex("""(?i)(--add-header\s+)(?:(["'])([^:"']*(?:$SECRET_WORDS)[^:"']*:\s*)[^"']*\2|([^:"'\s]*(?:$SECRET_WORDS)[^:"'\s]*:)\S+)""")
     // A gallery-dl "-o extractor.x.password=..." / "...refresh-token=..." option.
-    private val SECRET_OPTION_RE = Regex("""(?i)((?<!\S)-o\s+["']?[\w.-]*(?:password|token|secret|api-?key|cookie)[\w.-]*=)([^"'\s]+)""")
+    private val SECRET_OPTION_RE = Regex("""(?i)((?<!\S)(?:-o|--option)\s*=?\s*["']?[\w.-]*(?:password|token|secret|api-?key|cookie|session)[\w.-]*=)([^"'\s]+)""")
 
-    /** Extra arguments as typed, with passwords and secret header/option values masked. */
+    /** Extra arguments with passwords and secret header/option values masked, word by word as
+     * the engines split them (so a "-p" inside a quoted value is left alone), then quoted back.
+     * Text the engines can't split (an unclosed quote) is masked by pattern instead. */
     fun maskArgs(args: String): String {
+        val words = ShellWords.split(args) ?: return maskArgsByPattern(args)
+        val out = mutableListOf<String>()
+        var maskNext: ((String) -> String)? = null
+        for (word in words) {
+            maskNext?.let { mask -> out += mask(word); maskNext = null; continue }
+            val flag = word.substringBefore('=')
+            val attached = if ('=' in word && word.startsWith("--")) word.substringAfter('=') else null
+            out += when {
+                flag in SECRET_FLAGS -> attached?.let { "$flag=$MASK" } ?: word.also { maskNext = { MASK } }
+                // "-pSECRET": yt-dlp and gallery-dl both take a short option's value attached.
+                word.startsWith("-p") && word.length > 2 && !word.startsWith("--") -> "-p$MASK"
+                flag == "--add-header" -> attached?.let { "$flag=${maskHeader(it)}" } ?: word.also { maskNext = ::maskHeader }
+                flag == "-o" || flag == "--option" -> attached?.let { "$flag=${maskOption(it)}" } ?: word.also { maskNext = ::maskOption }
+                word.startsWith("-o") && !word.startsWith("--") && '=' in word -> "-o" + maskOption(word.drop(2))
+                flag == "--extractor-args" -> attached?.let { "$flag=${maskExtractorArgs(it)}" } ?: word.also { maskNext = ::maskExtractorArgs }
+                else -> maskProxy(word)
+            }
+        }
+        // "***" itself needs no quoting (a shell would glob it, but it's only shown).
+        return out.joinToString(" ") { quote(it.replace(MASK, "\u0000")).replace("\u0000", MASK) }
+    }
+
+    private val SECRET_FLAGS = setOf("--password", "-p", "--ap-password", "--video-password", "--twofactor", "--client-secret")
+    private val SECRET_KEY_RE = Regex("(?i)$SECRET_WORDS|api-?key|po_token")
+
+    /** "Name: value" with a secret-looking name: the whole value masked. */
+    private fun maskHeader(header: String): String {
+        val name = header.substringBefore(':', "")
+        val separator = ":" + header.substringAfter(':').takeWhile { it == ' ' }
+        return if (name.isNotEmpty() && SECRET_KEY_RE.containsMatchIn(name)) "$name$separator$MASK" else header
+    }
+
+    /** A gallery-dl "key=value" option whose key names a secret ("extractor.x.password"). */
+    private fun maskOption(option: String): String {
+        val key = option.substringBefore('=', "")
+        return if (key.isNotEmpty() && SECRET_KEY_RE.containsMatchIn(key)) "$key=$MASK" else option
+    }
+
+    /** "youtube:po_token=...;player_client=web": each secret-looking key's value masked. */
+    private fun maskExtractorArgs(value: String): String {
+        val ie = value.substringBefore(':', "")
+        if (ie.isEmpty()) return value
+        return ie + ":" + value.substringAfter(':').split(';').joinToString(";") { maskOption(it) }
+    }
+
+    private fun maskArgsByPattern(args: String): String {
         val flags = SECRET_FLAG_RE.replace(args) { "${it.groupValues[1]}${it.groupValues[2]}$MASK" }
         val headers = SECRET_HEADER_ARG_RE.replace(flags) { m ->
             val (_, flag, q, quotedName, bareName) = m.groupValues

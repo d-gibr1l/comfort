@@ -57,6 +57,15 @@
     <string name="filename_templates_subtitle">Cara file unduhan ini dinamai</string>
     <string name="saved_templates_subtitle">Ketuk salah satu untuk memakainya</string>
     <string name="logs_subtitle">Apa yang dilakukan unduhan terbaru Anda, langkah demi langkah</string>
+    <string name="extra_note_unknown">“%1$s” dilewati: mesin ini tidak mengenal opsi itu</string>
+    <string name="extra_note_other_engine">“%1$s” dilewati di sini: untuk %2$s</string>
+    <string name="extra_note_not_allowed">“%1$s” dilewati: aplikasi yang memilih lokasi file, dan ini tidak akan menyimpan apa pun atau menyimpan di tempat lain</string>
+    <string name="extra_note_invalid">“%1$s” dilewati: %2$s</string>
+    <string name="extra_note_quotes">Perintah tambahan dilewati: ada tanda kutip yang belum ditutup</string>
+    <string name="extra_note_url">“%1$s” dilewati: taruh link di kotak link</string>
+    <string name="extra_note_key_value">“%1$s” dilewati: mesin ini tidak punya pengaturan itu</string>
+    <string name="extra_notes_title">Beberapa perintah tambahan tidak dipakai</string>
+    <string name="command_note_instaloader_extras">Instaloader tidak memakai perintah tambahan; perintah itu hanya berlaku jika mesin lain berjalan</string>
     <string name="command_template_unclosed_quotes">Tanda kutip belum ditutup</string>
     <string name="command_template_save_as">Simpan sebagai template</string>
     <string name="backup_title">Cadangkan &amp; pulihkan</string>

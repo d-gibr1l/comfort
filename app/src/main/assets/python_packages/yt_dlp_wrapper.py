@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 import yt_dlp
@@ -361,6 +362,14 @@ def _patch_filename_byte_limit():
         if not filename or filename == "-":
             return filename
         folder, name = os.path.split(filename)
+        trim = self.params.get("comfort_trim_file_name")
+        if trim:
+            # The extras' --trim-filenames, on the file's name only: yt-dlp's own counts the
+            # folders too, so the download folder's path alone could use it all up.
+            stem, ext = os.path.splitext(name)
+            if len(ext) > 12:  # not a real extension (see fit_name)
+                stem, ext = name, ""
+            name = stem[:trim].rstrip() + ext
         return os.path.join(folder, custom_names.fit_name(name)) if folder else custom_names.fit_name(name)
 
     yt_dlp.YoutubeDL._prepare_filename = _prepare_filename
@@ -1360,55 +1369,510 @@ _INFO_JSON_MAX_AGE_SECONDS = 20 * 60
 
 
 
-def _apply_extra_args(ydl_opts, extra_args, emit=None):
-    """Settings > Advanced > Extra arguments (and a download's own extra commands) for yt-dlp.
+def _note(emit, code, **fields):
+    """A "note" report: an extra command that was left out or changed, by code (the app words it)."""
+    if emit:
+        emit(event("note", code=code, **{k: str(v) for k, v in fields.items() if v is not None}))
 
-    Real yt-dlp command-line flags ("--user-agent ...", "--extractor-args ...") are parsed with
-    yt-dlp's own option parser, and only what they change from its defaults is applied, merged
-    into the options already built here: a nested option (the output template, HTTP headers)
-    gains just the changed keys, and extra post-processors are added after the app's own rather
-    than replacing them. Text with no flags at all keeps the old "key=value" form (raw option
-    names). A flag yt-dlp doesn't know is reported as a warning and the rest of the download
-    goes ahead without the extra arguments."""
-    if not extra_args or not extra_args.strip():
-        return
-    import shlex
-    try:
-        tokens = shlex.split(extra_args)
-    except ValueError:
-        tokens = extra_args.split()
-    if not any(t.startswith("-") for t in tokens):
-        for token in tokens:
-            if "=" in token:
-                key, _, value = token.partition("=")
-                ydl_opts[key] = value
-        return
+
+# yt-dlp options that would save files outside the download folder, save nothing (print or list
+# instead), or run something besides yt-dlp: --exec and --netrc-cmd run shell commands, a batch
+# file or config file brings in options of its own, and there are no browsers to read cookies
+# from on the phone. --write-comments can run for many minutes on a popular video.
+_EXTRA_NOT_ALLOWED_DESTS = {
+    "paths", "simulate", "skip_download", "dumpjson", "dump_single_json", "forceprint", "print_to_file",
+    "print_json", "listformats", "listsubtitles", "list_thumbnails", "geturl", "gettitle", "getid",
+    "getthumbnail", "getdescription", "getduration", "getfilename", "getformat", "print_help",
+    "update_self", "cookiesfrombrowser", "exec_cmd", "exec_before_dl_cmd", "batchfile",
+    "load_info_filename", "config_locations", "getcomments", "add_postprocessors", "plugin_dirs",
+    "netrc_cmd", "write_pages", "list_extractors", "list_extractor_descriptions",
+    "list_impersonate_targets", "ap_list_mso", "rm_cachedir",
+}
+# The same, for options with no dest (they print and exit).
+_EXTRA_NOT_ALLOWED_OPTS = {"--version", "--dump-user-agent"}
+# Where an option's dest isn't the YoutubeDL key it ends up in.
+_EXTRA_DEST_KEYS = {
+    "no_check_certificate": "nocheckcertificate", "continue_dl": "continuedl",
+    "playlist_reverse": "playlistreverse", "playlist_random": "playlistrandom",
+    "legacy_server_connect": "legacyserverconnect", "headers": "http_headers",
+    "user_agent": "http_headers", "referer": "http_headers", "retry_sleep": "retry_sleep_functions",
+    "date": "daterange", "dateafter": "daterange", "datebefore": "daterange",
+    "breaking_match_filter": "match_filter",
+}
+# YoutubeDL keys the app builds itself from what the extras say (_extras_to_app / _merge_extras),
+# never copied over as they are: the app's post-processors, subtitles and thumbnails, and the
+# output template, which must stay inside the download folder.
+_EXTRA_APP_KEYS = {
+    "postprocessors", "outtmpl", "trim_file_name", "writethumbnail", "writesubtitles",
+    "subtitleslangs", "extractor_args", "download_ranges", "format", "_warnings",
+    "_deprecation_warnings",
+}
+# Legacy key=value names that would do what the options above do.
+_EXTRA_NOT_ALLOWED_KEYS = {
+    "paths", "simulate", "skip_download", "forcejson", "dump_single_json", "forceprint", "print_to_file",
+    "listformats", "listsubtitles", "list_thumbnails", "forceurl", "forcetitle", "forceid",
+    "forcethumbnail", "forcedescription", "forceduration", "forcefilename", "forceformat",
+    "cookiesfrombrowser", "getcomments", "postprocessors", "write_pages", "netrc_cmd", "logger",
+    "progress_hooks", "postprocessor_hooks", "post_hooks", "load_info_filename",
+}
+
+
+def _quiet_parse(tokens, alone=False):
+    """yt_dlp.parse_options(tokens), with whatever it prints kept out of stdout (reports go there).
+    A --username without --password makes yt-dlp ask for it on the terminal, which here waits
+    forever: checking an option [alone] (its --password may come next) it reads as blank, and
+    otherwise it's an error."""
     import contextlib
+    import getpass
     import io
+
+    def _no_prompt(prompt="", *args, **kwargs):
+        if alone:
+            return ""
+        raise ValueError(f"--{'ap-' if 'TV provider' in prompt else ''}password is needed too")
+
+    original = getpass.getpass
+    getpass.getpass = _no_prompt
     try:
         with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
-            defaults = yt_dlp.parse_options([]).ydl_opts
-            parsed = yt_dlp.parse_options(tokens).ydl_opts
+            return yt_dlp.parse_options(list(tokens))
+    finally:
+        getpass.getpass = original
+
+
+def _option_error(e):
+    """yt-dlp's message for a rejected option, without its usage text and "prog: error:" prefix."""
+    text = str(e).strip()
+    line = text.splitlines()[-1] if text else type(e).__name__
+    return re.sub(r"^[^:\n]*: error: ", "", line).strip()
+
+
+def _is_url(token):
+    return bool(re.match(r"^https?://", token or "", re.I))
+
+
+def _file_name_template(template):
+    """Whether an output template from the extras names only a file, so it can be put in the
+    download folder: no folder, no absolute or "~" path, not stdout ("-")."""
+    return bool(template) and template != "-" and not template.startswith("~") \
+        and not os.path.isabs(template) and "/" not in template and "\\" not in template
+
+
+_GDL_ACTIONS = []
+
+
+def _gdl_actions():
+    """gallery-dl's own options, {option string: argparse action}; {} if it can't be imported."""
+    if not _GDL_ACTIONS:
+        try:
+            from gallery_dl import option as gdl_option
+            _GDL_ACTIONS.append(dict(gdl_option.build_parser()._option_string_actions))
+        except Exception:  # noqa: BLE001 - then nothing is recognised as gallery-dl's
+            _GDL_ACTIONS.append({})
+    return _GDL_ACTIONS[0]
+
+
+def _gdl_span(tokens, i):
+    """How many tokens from tokens[i] gallery-dl would take as one option and its value; 0 when
+    it doesn't know the option or would reject it (a value missing)."""
+    actions = _gdl_actions()
+    tok = tokens[i]
+    if tok.startswith("--"):
+        name, eq, _ = tok.partition("=")
+        action = actions.get(name)
+        if action is None:  # argparse takes a unique abbreviation too
+            matches = {id(a): a for s, a in actions.items() if s.startswith(name) and s.startswith("--")}
+            action = next(iter(matches.values())) if len(matches) == 1 else None
+        if action is None:
+            return 0
+        if eq:
+            return 1
+    else:
+        action = actions.get(tok[:2])
+        if action is None:
+            return 0
+        if len(tok) > 2:
+            return 1
+    nargs = action.nargs
+    rest = tokens[i + 1:]
+    # argparse doesn't take "-x"-looking text as a value.
+    values = next((n for n, t in enumerate(rest) if t.startswith("-") and not re.match(r"^-\d", t)), len(rest))
+    if nargs is None:
+        need = 1
+    elif nargs == "?":
+        need = 1 if rest and not rest[0].startswith("-") else 0
+    elif nargs in ("*", "+"):
+        need = values
+    else:
+        need = int(nargs)
+    return 1 + need if need <= values else 0
+
+
+class _Extras:
+    """The extra commands for one download, checked: what's kept (tokens, parsed once together)
+    and which options the user named, with the value each was given."""
+
+    def __init__(self):
+        self.tokens = []
+        self.parsed = None      # yt_dlp.ParsedOptions of every kept token
+        self.defaults = None    # ... of none
+        self.named = {}         # option dest -> its value, from the last option naming it
+        self.key_values = {}    # the legacy "key=value" form
+
+    def given(self, dest):
+        """(True, value) when the user named the option with this dest — even to its default
+        value, which a comparison with the defaults can't tell from not naming it. A preset alias
+        (-t mp3) names nothing itself, so then a changed value counts too."""
+        if dest in self.named:
+            return True, self.named[dest]
+        if self.parsed is not None and "_" in self.named:
+            value = getattr(self.parsed.options, dest, None)
+            if value != getattr(self.defaults.options, dest, None):
+                return True, value
+        return False, None
+
+
+def _check_extra_group(group, option, context=()):
+    """(code, detail) for one option and its values that can't be used, else (None, parsed).
+    [context] is what's been kept before it: --password alone is an error, after --username not."""
+    if option.get_opt_string() in _EXTRA_NOT_ALLOWED_OPTS or option.dest in _EXTRA_NOT_ALLOWED_DESTS:
+        # --no-simulate, --no-exec, --no-batch-file... turn the same thing off, which is fine.
+        negating = option.action == "store_false" or (option.action == "store_const" and not option.const)
+        if not negating:
+            return "extra_not_allowed", None
+    try:
+        parsed = _quiet_parse(group, alone=True)
     except BaseException as e:  # noqa: BLE001 - optparse raises OptParseError/SystemExit
-        message = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
-        line = event("warning", message=f"Ignoring extra arguments: {message}")
-        (emit or print)(line)
+        try:
+            if not context:
+                raise
+            parsed = _quiet_parse(list(context) + list(group), alone=True)
+        except BaseException:  # noqa: BLE001 - retried once the rest is known (_parse_extras)
+            return "extra_retry", _option_error(e)
+    opts = parsed.ydl_opts
+    if option.dest == "outtmpl" and not all(_file_name_template(v) for v in (opts.get("outtmpl") or {}).values() if v):
+        return "extra_not_allowed", None
+    if opts.get("impersonate") is not None:
+        available = _IMPERSONATE_AVAILABLE
+        if available:
+            try:
+                with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "logger": _LastError()}) as ydl:
+                    available = ydl._impersonate_target_available(opts["impersonate"])
+            except Exception:  # noqa: BLE001
+                available = False
+        if not available:
+            return "extra_invalid", "not available on this device"
+    if option.dest == "download_ranges":
+        # Sections are cut from the local file (_LocalTrimPP; this ffmpeg has no network): time
+        # ranges from the start only, not chapters by name or times counted from the end.
+        ranges = opts.get("download_ranges")
+        if getattr(ranges, "chapters", None) or any(t < 0 for r in getattr(ranges, "ranges", None) or [] for t in r):
+            return "extra_invalid", "not available on this device"
+    return None, parsed
+
+
+def _yt_dlp_spans(tokens, i, parser):
+    """The option groups ([option string, values...], Option) yt-dlp would read from tokens[i]
+    (several for a cluster of short flags, "-xk"), the token count they take, and a problem
+    found on the way as (code, flag, detail)."""
+    import optparse
+    tok = tokens[i]
+    if tok.startswith("--"):
+        name, eq, value = tok.partition("=")
+        try:
+            option = parser._long_opt[parser._match_long_opt(name)]
+        except (optparse.BadOptionError, optparse.AmbiguousOptionError):
+            return [], 1, ("extra_unknown", tok if not eq else name, None)
+        nargs = option.nargs if option.takes_value() else 0
+        if eq:
+            if nargs != 1:
+                return [], 1, ("extra_invalid", name, f"{name} option does not take a value" if not nargs
+                               else f"{name} option requires {nargs} arguments")
+            return [([name, value], option)], 1, None
+        if i + 1 + nargs > len(tokens):
+            return [], len(tokens) - i, ("extra_invalid", name, f"{name} option requires {nargs} argument"
+                                         + ("s" if nargs > 1 else ""))
+        return [([name] + tokens[i + 1:i + 1 + nargs], option)], 1 + nargs, None
+    groups, used = [], 1
+    for j in range(1, len(tok)):
+        flag = "-" + tok[j]
+        option = parser._short_opt.get(flag)
+        if option is None:
+            return groups, used, ("extra_unknown", tok if j == 1 else flag, None)
+        if option.takes_value():
+            attached = tok[j + 1:]
+            nargs = option.nargs - (1 if attached else 0)
+            if i + used + nargs > len(tokens):
+                return groups, len(tokens) - i, ("extra_invalid", flag, f"{flag} option requires {option.nargs} argument"
+                                                 + ("s" if option.nargs > 1 else ""))
+            values = ([attached] if attached else []) + tokens[i + used:i + used + nargs]
+            groups.append(([flag] + values, option))
+            return groups, used + nargs, None
+        groups.append(([flag], option))
+    return groups, used, None
+
+
+def _looks_like_gallery_dl(group, option):
+    """An option both engines have, written the way gallery-dl's means: -o key=value (gallery-dl's
+    --option, not an output template) and -f with {fields} (its --filename, not a format)."""
+    value = group[1] if len(group) > 1 else ""
+    if option.dest == "outtmpl":
+        return "%(" not in value and bool(re.match(r"^[\w.-]+=", value))
+    if option.dest == "format":
+        return "{" in value
+    return False
+
+
+def _split_extras(text, shared, emit, parser, extras, kept, deferred):
+    """One set of extra commands: what's kept goes to [kept] as (tokens, Option, ParsedOptions),
+    an option yt-dlp rejected on its own to [deferred] (it may need one that comes later),
+    everything else is reported with a note. [shared] is the set the user may have meant for
+    gallery-dl: an option only gallery-dl reads (or reads differently) is left to it."""
+    import shlex
+    if not text or not text.strip():
         return
-    for key, value in parsed.items():
-        default = defaults.get(key)
-        if value == default:
+    try:
+        tokens = shlex.split(text)
+    except ValueError:
+        # An unclosed quote: guessing where it ends could hand yt-dlp half an option.
+        _note(emit, "extra_quotes")
+        return
+    if not any(t.startswith("-") and t != "-" for t in tokens):
+        _split_key_values(tokens, emit, extras)
+        return
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "--" or not tok.startswith("-") or tok == "-":
+            rest = tokens[i + 1:] if tok == "--" else [tok]
+            for t in rest:
+                _note(emit, "extra_url" if _is_url(t) else "extra_unknown", flag=t)
+            i += len(rest) + (1 if tok == "--" else 0)
             continue
-        if key == "postprocessors" and isinstance(value, list):
-            added = [pp for pp in value if pp not in (default or [])]
-            ydl_opts[key] = list(ydl_opts.get(key) or []) + added
-        elif isinstance(value, dict) and isinstance(default, dict):
-            changed = {k: v for k, v in value.items() if default.get(k) != v}
-            base = ydl_opts.get(key)
-            if key == "outtmpl" and isinstance(base, str):
-                base = {"default": base}
-            ydl_opts[key] = {**base, **changed} if isinstance(base, dict) else changed
+        groups, used, problem = _yt_dlp_spans(tokens, i, parser)
+        checked = []
+        if problem is None:
+            context = [t for kept_group, _, _ in kept for t in kept_group]
+            for group, option in groups:
+                code, result = _check_extra_group(group, option, context)
+                checked.append((group, option, code, result))
+        gdl = _gdl_span(tokens, i) if shared else 0
+        if gdl:
+            ytdlp_ok = problem is None and all(code is None for *_, code, _ in checked)
+            takes_more = gdl > used and not any(_is_url(t) for t in tokens[i + used:i + gdl])
+            if not ytdlp_ok or takes_more or any(_looks_like_gallery_dl(g, o) for g, o, *_ in checked):
+                _note(emit, "extra_other_engine", flag=tok.partition("=")[0] if tok.startswith("--") else tok[:2],
+                      engine="gallery-dl")
+                i += gdl
+                continue
+        for group, option, code, result in checked:
+            if code is None:
+                kept.append((group, option, result))
+            elif code == "extra_retry":
+                deferred.append((group, option, result))
+            else:
+                _note(emit, code, flag=group[0], detail=result)
+        if problem is not None:
+            code, flag, detail = problem
+            _note(emit, code, flag=flag, detail=detail)
+            if code == "extra_unknown":
+                # Its value ("--range 1-3"), not something else to report.
+                while i + used < len(tokens) and not tokens[i + used].startswith("-") and not _is_url(tokens[i + used]):
+                    used += 1
+        i += used
+
+
+def _split_key_values(tokens, emit, extras):
+    """The old "key=value" form (YoutubeDL's own option names), for text with no options in it.
+    Values become numbers, true/false or none where they read as one."""
+    valid = set(yt_dlp.parse_options([]).ydl_opts) | set(re.findall(r"^ {0,4}(\w+):\s", yt_dlp.YoutubeDL.__doc__ or "", re.M))
+    for token in tokens:
+        if _is_url(token):
+            _note(emit, "extra_url", flag=token)
+            continue
+        key, eq, raw = token.partition("=")
+        key = key.strip()
+        if not eq or key not in valid or key.startswith("_"):
+            _note(emit, "extra_key_value", flag=key or token, detail=token)
+            continue
+        if key in _EXTRA_NOT_ALLOWED_KEYS or (key == "outtmpl" and not _file_name_template(raw)):
+            _note(emit, "extra_not_allowed", flag=key)
+            continue
+        lowered = raw.strip().lower()
+        if lowered in ("true", "false"):
+            value = lowered == "true"
+        elif lowered in ("none", "null"):
+            value = None
+        else:
+            try:
+                value = int(raw)
+            except ValueError:
+                try:
+                    value = float(raw)
+                except ValueError:
+                    value = raw
+        extras.key_values[key] = value
+
+
+def _parse_extras(extra_args, shared_extra_args=None, emit=None):
+    """Settings' yt-dlp extra arguments, then the shared ones (Settings' "both" set and the
+    download's own extra commands), checked one option at a time so that one bad option costs
+    only itself: each is reported with a "note" when it's left out (_split_extras), and what's
+    kept is parsed together with yt-dlp's own parser. The shared set comes second, so the
+    download's own commands win."""
+    from yt_dlp import options as ytdlp_options
+    extras = _Extras()
+    parser = ytdlp_options.create_parser()
+    kept, deferred = [], []
+    _split_extras(extra_args, False, emit, parser, extras, kept, deferred)
+    _split_extras(shared_extra_args, True, emit, parser, extras, kept, deferred)
+    for group, option, detail in deferred:
+        # "--password b --username a": the password was checked before the username was seen.
+        try:
+            kept.append((group, option, _quiet_parse([t for g, _, _ in kept for t in g] + group, alone=True)))
+        except BaseException:  # noqa: BLE001
+            _note(emit, "extra_invalid", flag=group[0], detail=detail)
+    if not kept:
+        return extras
+    extras.defaults = _quiet_parse([])
+    try:
+        extras.parsed = _quiet_parse([t for group, _, _ in kept for t in group])
+    except BaseException:  # noqa: BLE001 - two options that are fine alone clash: drop the later one
+        good = []
+        for entry in kept:
+            try:
+                extras.parsed = _quiet_parse([t for group, _, _ in good + [entry] for t in group])
+                good.append(entry)
+            except BaseException as e:  # noqa: BLE001
+                _note(emit, "extra_invalid", flag=entry[0][0], detail=_option_error(e))
+        kept = good
+        if not kept:
+            extras.parsed = None
+            return extras
+    for group, option, parsed in kept:
+        extras.tokens.extend(group)
+        if option.dest:
+            extras.named[option.dest] = getattr(parsed.options, option.dest, None)
+    return extras
+
+
+def _extra_pp(extras, key):
+    """The user's post-processor entries with this key (yt-dlp's own default ones left out)."""
+    if extras.parsed is None:
+        return []
+    default = extras.defaults.ydl_opts.get("postprocessors") or []
+    return [pp for pp in extras.parsed.ydl_opts.get("postprocessors") or [] if pp not in default and pp.get("key") == key]
+
+
+def _merge_extras(ydl_opts, extras, download_dir=None, split_chapters=False):
+    """What the extras change, merged into the options the app built: only what the user named or
+    changed, a dict (headers, extractor args) per key, output templates put in the download
+    folder, and post-processors the app doesn't make itself (_extras_to_app turned the others
+    into the app's own settings) added where yt-dlp would run them. Without [download_dir]
+    (list_info) only plain options are merged."""
+    for key, value in extras.key_values.items():
+        if key == "outtmpl":
+            if download_dir:
+                ydl_opts["outtmpl"] = os.path.join(download_dir, value)
+        elif key == "trim_file_name":
+            ydl_opts["comfort_trim_file_name"] = value
         else:
             ydl_opts[key] = value
+    if extras.parsed is None:
+        return
+    parsed, defaults = extras.parsed.ydl_opts, extras.defaults.ydl_opts
+    named_keys = {_EXTRA_DEST_KEYS.get(d, d) for d in extras.named}
+    for key, value in parsed.items():
+        if key in _EXTRA_APP_KEYS:
+            continue
+        default = defaults.get(key)
+        if value == default and key not in named_keys:
+            continue
+        base = ydl_opts.get(key)
+        if isinstance(value, dict) and isinstance(base, dict):
+            ydl_opts[key] = {**base, **{k: v for k, v in value.items() if (default or {}).get(k) != v}}
+        else:
+            ydl_opts[key] = value
+    # The format -x picks ("bestaudio/best") is the app's audio choice's business; only a
+    # format the user gave (or a preset alias's) replaces the app's.
+    if "format" in extras.named or "_" in extras.named:
+        ydl_opts["format"] = parsed["format"]
+    # Per extractor and per key: youtube:player_client=web leaves the app's other youtube args.
+    user_ie_args = parsed.get("extractor_args") or {}
+    if user_ie_args:
+        merged = {ie: dict(args) for ie, args in (ydl_opts.get("extractor_args") or {}).items()}
+        for ie, args in user_ie_args.items():
+            merged.setdefault(ie, {}).update(args)
+        ydl_opts["extractor_args"] = merged
+    if not download_dir:
+        return
+    named, trim = extras.given("trim_file_name")
+    if named and trim:
+        # yt-dlp trims its whole (absolute) path to this, folders included; the app trims the
+        # file name only (_patch_filename_byte_limit).
+        ydl_opts["comfort_trim_file_name"] = int(trim)
+    user_tmpl = {k: v for k, v in (parsed.get("outtmpl") or {}).items() if v and (defaults.get("outtmpl") or {}).get(k) != v}
+    if user_tmpl:
+        tmpl = ydl_opts.get("outtmpl")
+        tmpl = dict(tmpl) if isinstance(tmpl, dict) else {"default": tmpl}
+        for kind, value in user_tmpl.items():
+            tmpl[kind] = os.path.join(download_dir, value)
+        if split_chapters and "default" in user_tmpl and "chapter" not in user_tmpl:
+            # Chapters named after the user's name for the whole file, as the app's are after its own.
+            tmpl["chapter"] = os.path.join(download_dir, re.sub(r"\.%\(ext\)s$", "", user_tmpl["default"])
+                                           + " - %(section_number)03d %(section_title)s.%(ext)s")
+        ydl_opts["outtmpl"] = tmpl
+    pps = ydl_opts.setdefault("postprocessors", [])
+
+    def _index(*keys):
+        return next((i for i, pp in enumerate(pps) if pp.get("key") in keys), len(pps))
+
+    default_pps = defaults.get("postprocessors") or []
+    for pp in parsed.get("postprocessors") or []:
+        if pp in default_pps:
+            continue
+        key = pp.get("key")
+        if key in ("FFmpegExtractAudio", "EmbedThumbnail", "FFmpegEmbedSubtitle", "FFmpegSplitChapters", "SponsorBlock"):
+            continue  # turned into the app's own (_extras_to_app)
+        if key == "FFmpegMetadata":
+            # One metadata pass: a second one ran ffmpeg again, and --embed-chapters' own
+            # (add_metadata False) wiped the tags the app's had written.
+            app = next((p for p in pps if p.get("key") == "FFmpegMetadata"), None)
+            if app is None:
+                pps.insert(_index("EmbedThumbnail"), dict(pp))
+            else:
+                for field in ("add_chapters", "add_infojson"):
+                    if pp.get(field):
+                        app[field] = app.get(field) or pp[field]
+            continue
+        if key == "ModifyChapters":
+            if not (pp.get("remove_chapters_patterns") or pp.get("remove_ranges")):
+                continue  # SponsorBlock's alone, which the app sets up
+            app = next((p for p in pps if p.get("key") == "ModifyChapters"), None)
+            if app is None:
+                pps.insert(_index("FFmpegMetadata", "EmbedThumbnail"), {**pp, "remove_sponsor_segments": set()})
+            else:
+                app["remove_chapters_patterns"] = list(app.get("remove_chapters_patterns") or []) + list(pp.get("remove_chapters_patterns") or [])
+                app["remove_ranges"] = list(app.get("remove_ranges") or []) + list(pp.get("remove_ranges") or [])
+                app["force_keyframes"] = bool(app.get("force_keyframes") or pp.get("force_keyframes"))
+            continue
+        if key in ("FFmpegVideoRemuxer", "FFmpegVideoConvertor"):
+            # Before the tags, cover and chapters go in, so the converted file keeps them.
+            pps.insert(_index("ModifyChapters", "FFmpegMetadata", "EmbedThumbnail"), pp)
+            continue
+        pps.append(pp)
+    named, keyframes = extras.given("force_keyframes_at_cuts")
+    if named and keyframes:
+        for pp in pps:
+            if pp.get("key") == "ModifyChapters":
+                pp["force_keyframes"] = True
+    if not pps:
+        ydl_opts.pop("postprocessors")
+
+
+def _apply_extra_args(ydl_opts, extra_args, emit=None):
+    """list_info's extra arguments: plain options only (nothing is saved there)."""
+    _merge_extras(ydl_opts, _parse_extras(extra_args, None, emit))
 
 
 def download(url, download_dir, cookies_path=None, callback=None, filename_format=None,
@@ -1427,13 +1891,17 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              override_title=None, override_artist=None, info_json_path=None,
              audio_format=None, normalize_audio=False, site=None,
              sponsorblock_remove=None, sponsorblock_mark=None, split_chapters=False,
-             audio_language=None):
+             audio_language=None, shared_extra_args=None):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
     dict and reports progress through callbacks, so it's self-contained per call. Every finished
     file's absolute path is sent to `callback`, matching how DownloadWorker's actualCallback
-    already expects one path per line from gallery_dl_wrapper.download()."""
+    already expects one path per line from gallery_dl_wrapper.download().
+
+    `extra_args` is Settings' yt-dlp extra arguments; `shared_extra_args` is Settings' set for
+    both engines plus the download's own extra commands, which may be meant for gallery-dl
+    (see _parse_extras)."""
     url = _channel_videos_url(url)
     # DownloadWorker throttles nothing on its own end, so a raw per-chunk progress_hook (which
     # fires dozens of times a second) would otherwise flood the DB with writes — this closure
@@ -1445,12 +1913,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # A file the in-app browser caught (WebBrowser.queueCaught) carries this marker: if yt-dlp
     # can't save it, it's downloaded directly instead (_direct_download). Not a yt-dlp flag, so
     # it's taken out before the rest reaches yt-dlp's own option parser.
-    direct_fallback = bool(extra_args) and _DIRECT_FALLBACK_FLAG in extra_args
+    direct_fallback = any(s and _DIRECT_FALLBACK_FLAG in s for s in (extra_args, shared_extra_args))
     if direct_fallback:
-        extra_args = extra_args.replace(_DIRECT_FALLBACK_FLAG, " ")
+        extra_args = extra_args and extra_args.replace(_DIRECT_FALLBACK_FLAG, " ")
+        shared_extra_args = shared_extra_args and shared_extra_args.replace(_DIRECT_FALLBACK_FLAG, " ")
     # A video file the browser's player paired with a separate audio file (Instagram's are one
     # each): the saved video gets that audio merged in (_merge_audio) before it's reported.
     merge_audio, extra_args = _take_merge_audio(extra_args)
+    if not merge_audio:
+        merge_audio, shared_extra_args = _take_merge_audio(shared_extra_args)
     saved_any = [False]
     held_files = []
     _report = callback
@@ -1483,6 +1954,81 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # meaningful with ffmpeg bundled, since every one of these postprocessors requires it.
     # Parsed early (not down where it's actually used, alongside the other ydl_opts) so its
     # presence can feed custom_pp_keys below, same as every other postprocessor-triggering flag.
+    extras = _parse_extras(extra_args, shared_extra_args, callback)
+    # What the extras ask for that the app does itself turns on (or off) the app's own way of
+    # doing it: yt-dlp's stock steps next to the app's ran ffmpeg twice, wiped tags, embedded
+    # into a file that was then converted, or wrote chapters where the app doesn't look.
+    metadata_off = cover_off = converts_video = False
+    extra_audio_codec = extra_audio_quality = None
+    named, value = extras.given("extractaudio")
+    if named and value:
+        # -x on a video download: the app's audio download, so the cover and tags go in too.
+        audio_only = True
+    if audio_only:
+        named, value = extras.given("audioformat")
+        if named and value and value != "best":
+            audio_format = extra_audio_codec = value
+        named, value = extras.given("audioquality")
+        if named and value is not None:
+            extra_audio_quality = str(value)
+    named, value = extras.given("addmetadata")
+    if named:
+        embed_metadata, metadata_off = bool(value), not value
+    named, value = extras.given("addchapters")
+    if named:
+        embed_chapters = bool(value)
+    named, value = extras.given("embedthumbnail")
+    if named:
+        embed_thumbnail, cover_off = bool(value), not value
+    named, value = extras.given("writethumbnail")
+    if named:
+        save_thumbnail = bool(value)
+    named, value = extras.given("embedsubtitles")
+    if named:
+        download_subtitles = bool(value)
+    named, value = extras.given("writesubtitles")
+    if named:
+        save_subtitle_files = bool(value)
+    named, value = extras.given("subtitleslangs")
+    if named and value:
+        subtitle_langs = ",".join(value)
+    named, value = extras.given("allsubtitles")
+    if named and value:
+        subtitle_langs = "all"
+        save_subtitle_files = save_subtitle_files or not download_subtitles
+    named, value = extras.given("writeautomaticsub")
+    if named and value and not (download_subtitles or save_subtitle_files):
+        save_subtitle_files = True  # the files are what was asked for
+    named, value = extras.given("split_chapters")
+    if named:
+        split_chapters = bool(value)
+    for dest in ("sponsorblock_remove", "sponsorblock_mark"):
+        named, value = extras.given(dest)
+        if named and value:
+            current = sponsorblock_remove if dest == "sponsorblock_remove" else sponsorblock_mark
+            merged = ",".join(sorted({c for c in (current or "").split(",") if c} | set(value)))
+            if dest == "sponsorblock_remove":
+                sponsorblock_remove = merged
+            else:
+                sponsorblock_mark = merged
+    named, value = extras.given("no_sponsorblock")
+    if named and value:
+        sponsorblock_remove = sponsorblock_mark = None
+    named, _ = extras.given("download_ranges")
+    sections = getattr(extras.parsed.ydl_opts.get("download_ranges"), "ranges", None) if named else None
+    if sections:
+        # Cut from the downloaded file (_LocalTrimPP), as the preview sheet's trim is: yt-dlp's
+        # own way streams the sections through ffmpeg, and this ffmpeg has no network.
+        clip_range = ",".join(f"{start}-{'' if end == float('inf') else end}" for start, end in sections)
+    for dest in ("remuxvideo", "recodevideo"):
+        named, value = extras.given(dest)
+        converts_video = converts_video or bool(named and value)
+    named, force_keyframes = extras.given("force_keyframes_at_cuts")
+    force_keyframes = bool(named and force_keyframes)
+    # The app's own metadata pass and cover: an audio download always gets both, unless the
+    # user's extras said --no-embed-metadata / --no-embed-thumbnail.
+    embed_tags = (embed_metadata or embed_chapters or audio_only) and not (metadata_off and not embed_chapters)
+    embed_cover = (embed_thumbnail or audio_only) and not cover_off
     clip_ranges = _parse_clip_range(clip_range)
     # SponsorBlock's segments and the chapters are times in the whole video; a clip range cuts
     # that timeline, so a clipped download leaves them out rather than cutting at wrong times.
@@ -1503,7 +2049,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # silently stripped the cover art that step had just embedded (reproduced live: an audio
         # download with both "Embed Metadata" and a thumbnail landed with real tags but no art at
         # all). Embedding art last means nothing downstream ever remuxes the file again to lose it.
-        if embed_metadata or embed_chapters or audio_only:
+        if embed_tags:
             custom_pp_keys.append("Metadata")
         # Cover art is worth embedding into an audio file regardless of the general "Embed
         # thumbnail" setting (which is really about *video* files) — an audio-only download with
@@ -1512,7 +2058,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # ExtractAudio entry is appended just above, so this stays in the same relative order —
         # EmbedThumbnail needs to run *after* ExtractAudio so info['ext'] is already 'm4a' by the
         # time it runs, which is what lets it use mutagen's ffmpeg-free embed path at all.
-        if embed_thumbnail or audio_only:
+        if embed_cover:
             custom_pp_keys.append("EmbedThumbnail")
             _patch_embed_thumbnail_fallback()
         if download_subtitles and not audio_only:
@@ -1988,8 +2534,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # see FFmpegExtractAudioPP.run): AAC -> .m4a, Opus -> .opus. A named format converts
             # unless the source already is that codec, which is then copied too. Quality: LAME VBR
             # V0 for MP3 ("0" maps to -q:a 0), 256k AAC, 160k Opus (values over 10 are kbps).
-            codec = audio_format if audio_format in ("mp3", "m4a", "opus", "flac") else "best"
-            quality = {"mp3": "0", "m4a": "256", "opus": "160"}.get(codec)
+            codec = extra_audio_codec or (audio_format if audio_format in ("mp3", "m4a", "opus", "flac") else "best")
+            quality = extra_audio_quality or {"mp3": "0", "m4a": "256", "opus": "160"}.get(codec)
             postprocessors.append({"key": "FFmpegExtractAudio", "preferredcodec": codec, "preferredquality": quality})
         if sb_remove or sb_mark:
             # As yt-dlp's own --sponsorblock-remove/--sponsorblock-mark set them up: the segments
@@ -2009,7 +2555,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 "sponsorblock_chapter_title": "[SponsorBlock]: %(category_names)l",
                 "force_keyframes": False,
             })
-        if embed_metadata or embed_chapters or audio_only:
+        if embed_tags:
             # A single FFmpegMetadata entry handles both — add_chapters is that postprocessor's
             # own independent kwarg (this is literally how the real CLI's --embed-chapters is
             # implemented), so embed_chapters doesn't need a metadata embed to come along with it.
@@ -2028,8 +2574,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # its own doc comment there has the full story) — FFmpegMetadataPP's own ffmpeg
             # command includes "-vn", which silently strips an m4a's embedded cover art if a
             # thumbnail was already embedded by the time this runs.
-            postprocessors.append({"key": "FFmpegMetadata", "add_chapters": embed_chapters})
-        if embed_thumbnail or audio_only:
+            postprocessors.append({"key": "FFmpegMetadata", "add_chapters": embed_chapters,
+                                   **({"add_metadata": False} if metadata_off else {})})
+        if embed_cover:
             ydl_opts["writethumbnail"] = True
             postprocessors.append({"key": "EmbedThumbnail"})
         if (download_subtitles or save_subtitle_files) and not audio_only:
@@ -2102,7 +2649,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     # clip_ranges was already parsed earlier (feeds custom_pp_keys above) — _LocalTrimPP itself is
     # registered below, once the YoutubeDL instance exists to construct it with.
 
-    _apply_extra_args(ydl_opts, extra_args, callback)
+    _merge_extras(ydl_opts, extras, download_dir, split_chapters)
 
     # YouTube refuses the stream links it hands a signed-in session with 403 on this connection
     # (reproduced on the phone: the same download with and without the cookie file, every other
@@ -2156,13 +2703,14 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 elif clip_ranges:
                     # Last, so embedded metadata, thumbnail and subtitles are trimmed with it.
                     ydl.add_post_processor(_LocalTrimPP(ydl, clip_ranges), when="post_process")
-                if output_format == "mp4" and not audio_only:
-                    # First, so everything after it writes into the final .mp4.
+                if output_format == "mp4" and not audio_only and not converts_video:
+                    # First, so everything after it writes into the final .mp4. Not when the
+                    # extras convert the video themselves (--remux-video/--recode-video).
                     post.insert(0, _Mp4ConvertPP(ydl))
             if split_chapters:
                 # After everything that changes the file (tags, cover, subtitles), so every part
                 # carries them; before _FinalFilePP, which reports the parts.
-                ydl.add_post_processor(_SplitChaptersPP(ydl), when="post_process")
+                ydl.add_post_processor(_SplitChaptersPP(ydl, force_keyframes=force_keyframes), when="post_process")
             if ffmpeg_path and callback:
                 # See _FinalFilePP's own doc comment for why this (not postprocessor_hooks) is
                 # what reports the real final file whenever any postprocessing could happen —
@@ -2202,7 +2750,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             opts.pop("cookiefile", None)
             _attempt(opts, reuse_info=False)
         if direct_fallback and not saved_any[0]:
-            status = _direct_download(url, download_dir, ydl_opts, callback, extra_args)
+            status = _direct_download(url, download_dir, ydl_opts, callback, shlex.join(extras.tokens))
         else:
             status = "Done"
     except _Cancelled:
@@ -2211,7 +2759,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         if direct_fallback and not saved_any[0]:
             if callback:
                 callback(event("warning", message=f"yt-dlp couldn't download it ({e}); downloading the file directly"))
-            status = _direct_download(url, download_dir, ydl_opts, callback, extra_args)
+            status = _direct_download(url, download_dir, ydl_opts, callback, shlex.join(extras.tokens))
         else:
             if callback:
                 callback(event("error", message=str(e)))
@@ -2759,5 +3307,6 @@ if __name__ == "__main__":
         sponsorblock_mark=(_s(a[52]) if len(a) > 52 else None),
         split_chapters=_b(a[53]) if len(a) > 53 else False,
         audio_language=(_s(a[54]) if len(a) > 54 else None),
+        shared_extra_args=(_s(a[55]) if len(a) > 55 else None),
     )
     print(event("exit", status=status), flush=True)
