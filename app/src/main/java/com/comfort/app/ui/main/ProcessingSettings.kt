@@ -330,7 +330,8 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                 var custom by remember { mutableStateOf(subtitleLanguages !in presets) }
                 SubtitleLanguagesSetting(
                     current = if (custom) null else subtitleLanguages,
-                    customLabel = subtitleLanguages.takeIf { custom },
+                    // "Others…" until codes are typed: a preset's own value isn't one to show.
+                    customLabel = subtitleLanguages.takeIf { custom && it !in presets },
                     onPick = { value ->
                         custom = value == null
                         if (value != null) {
