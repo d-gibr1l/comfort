@@ -170,6 +170,9 @@ data class DownloadEntity(
     /** The audio track asked for (AudioLanguage: "" the original, or a dub's language code), picked
      * in the preview sheet; null follows Settings > Processing > Audio language. */
     val audioLanguage: String? = null,
+    /** The subtitle languages asked for (SubtitleLanguage: codes and "orig"; "" none), picked in
+     * the preview sheet; null follows Settings > Processing > Subtitles. */
+    val subtitleLanguages: String? = null,
     /** Each engine's own error when this download failed, as a JSON array of
      * {"engine": ..., "message": ...} in the order the engines ran — shown by the errored card's
      * info sheet. [errorMessage] stays the one-line summary. Null for failures from before this

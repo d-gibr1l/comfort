@@ -99,8 +99,13 @@ internal class EngineCommands(
         ?: GalleryDlPreferences.getVideoQuality(context)
     private val audioOnly = videoQuality == VideoQuality.AUDIO_ONLY
     private val clipRange = entity?.clipRange.orEmpty()
-    private val downloadSubtitles = GalleryDlPreferences.isDownloadSubtitles(context)
-    private val subtitleLangs = GalleryDlPreferences.getSubtitleLanguages(context)
+    // The sheet's pick ("" none) wins over Settings; "app" becomes the app's language here, "orig"
+    // the video's own in the wrapper.
+    private val downloadSubtitles = entity?.subtitleLanguages?.let { it.isNotBlank() } ?: GalleryDlPreferences.isDownloadSubtitles(context)
+    private val subtitleLangs = com.comfort.app.data.SubtitleLanguage.requested(
+        entity?.subtitleLanguages?.takeIf { it.isNotBlank() } ?: GalleryDlPreferences.getSubtitleLanguages(context),
+    )
+    private val subtitleAuto = GalleryDlPreferences.isSubtitleAuto(context)
     private val embedThumbnail = GalleryDlPreferences.isEmbedThumbnail(context)
     // The sheet's "Save thumbnail" chip writes the thumbnail as its own file (yt-dlp's
     // writethumbnail), separate from the global "Embed thumbnail" setting above.
@@ -203,6 +208,7 @@ internal class EngineCommands(
         splitChapters = splitChapters,
         audioLanguage = audioLanguage,
         sharedExtraArgs = sharedExtraArgs,
+        subtitleAuto = subtitleAuto,
     )
 
     // Always audio-only — spotify_wrapper.py hands each matched track to yt_dlp_wrapper's own

@@ -16,6 +16,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -222,6 +223,8 @@ data class DownloadOptions(
     val audioFormat: AudioFormat? = null,
     /** The audio track picked — see DownloadEntity.audioLanguage; null follows Settings. */
     val audioLanguage: String? = null,
+    /** The subtitle languages picked — see DownloadEntity.subtitleLanguages; null follows Settings. */
+    val subtitleLanguages: String? = null,
 )
 
 /** The engines the Configure sheet offers for [url]: only links more than one engine can download
@@ -332,6 +335,8 @@ fun DownloadPreviewSheet(
     var audioFormat by remember { mutableStateOf(GalleryDlPreferences.getAudioFormat(context)) }
     // The audio track (a dub instead of the original); null follows Settings until one is picked.
     var audioLanguage by remember { mutableStateOf<String?>(null) }
+    // The sheet's own subtitle pick ("" none); null until changed, following Settings.
+    var subtitleLanguages by remember { mutableStateOf<String?>(null) }
     var saveThumbnail by remember { mutableStateOf(false) }
     // Per-download engine (null = Auto) and the engines the link can use.
     var engineOverride by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
@@ -644,9 +649,7 @@ fun DownloadPreviewSheet(
                 }
             },
             outputFormat = outputFormat,
-            onToggleFormat = {
-                outputFormat = if (outputFormat == OutputFormat.MP4) OutputFormat.MKV else OutputFormat.MP4
-            },
+            onFormatChange = { outputFormat = it },
             audioFormat = audioFormat,
             onAudioFormatChange = { audioFormat = it },
             audioTracks = preview?.audioTracks.orEmpty(),
@@ -655,6 +658,22 @@ fun DownloadPreviewSheet(
                 com.comfort.app.data.AudioLanguage.pick(tracks, audioLanguage ?: GalleryDlPreferences.getAudioLanguage(context))
             },
             onAudioLanguageChange = { audioLanguage = if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
+            // Shown for a video with subtitles, or one the site can caption in the app's language.
+            subtitles = preview?.let { info ->
+                val auto = GalleryDlPreferences.isSubtitleAuto(context)
+                val appLanguage = com.comfort.app.data.SubtitleLanguage.requested(com.comfort.app.data.SubtitleLanguage.APP)
+                val translated = com.comfort.app.data.SubtitleTrack(appLanguage, auto = true)
+                    .takeIf { info.subtitleTranslations && auto && info.subtitleTracks.none { it.code == appLanguage || it.code.startsWith("$appLanguage-") } }
+                if (info.subtitleTracks.isEmpty() && translated == null) return@let null
+                val setting = subtitleLanguages
+                    ?: if (GalleryDlPreferences.isDownloadSubtitles(context)) GalleryDlPreferences.getSubtitleLanguages(context) else ""
+                SubtitleChoice(
+                    tracks = info.subtitleTracks,
+                    selected = com.comfort.app.data.SubtitleLanguage.pick(info.subtitleTracks, setting, info.language, auto, info.subtitleTranslations),
+                    translated = translated,
+                )
+            },
+            onSubtitlesChange = { picked -> subtitleLanguages = picked.joinToString(",") { it.code } },
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
             engineOptions = engineOptions,
@@ -702,12 +721,14 @@ private fun PreviewSheetOverlayHost(
     quality: VideoQuality,
     onQualityChange: (VideoQuality) -> Unit,
     outputFormat: OutputFormat,
-    onToggleFormat: () -> Unit,
+    onFormatChange: (OutputFormat) -> Unit,
     audioFormat: AudioFormat,
     onAudioFormatChange: (AudioFormat) -> Unit,
     audioTracks: List<com.comfort.app.data.AudioTrack>,
     audioTrack: com.comfort.app.data.AudioTrack?,
     onAudioLanguageChange: (com.comfort.app.data.AudioTrack) -> Unit,
+    subtitles: SubtitleChoice?,
+    onSubtitlesChange: (List<com.comfort.app.data.SubtitleTrack>) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
@@ -803,6 +824,8 @@ private fun PreviewSheetOverlayHost(
         engine = engineOverride,
         audioFormat = audioFormat,
         audioLanguage = audioTrack?.let { if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
+        // What the chip shows is what downloads; no chip (no subtitles listed) follows Settings.
+        subtitleLanguages = subtitles?.selected?.joinToString(",") { it.code },
     )
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -819,12 +842,14 @@ private fun PreviewSheetOverlayHost(
             quality = quality,
             onQualityChange = onQualityChange,
             outputFormat = outputFormat,
-            onToggleFormat = onToggleFormat,
+            onFormatChange = onFormatChange,
             audioFormat = audioFormat,
             onAudioFormatChange = onAudioFormatChange,
             audioTracks = audioTracks,
             audioTrack = audioTrack,
             onAudioLanguageChange = onAudioLanguageChange,
+            subtitles = subtitles,
+            onSubtitlesChange = onSubtitlesChange,
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = onToggleSaveThumbnail,
             engineOptions = engineOptions,
@@ -1127,6 +1152,169 @@ private fun AudioFormatChip(
     }
 }
 
+/** The video container: a chip naming it, opening a panel of both with what each is for. Same
+ * panel as [AudioFormatChip]. */
+@Composable
+private fun VideoFormatChip(
+    format: OutputFormat,
+    shape: androidx.compose.ui.graphics.Shape,
+    onChange: (OutputFormat) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        PreviewChip(label = format.label, icon = Icons.Outlined.Movie, shape = shape, onClick = { open = true })
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            shadowElevation = 3.dp,
+            modifier = Modifier.widthIn(min = 180.dp, max = 264.dp),
+        ) {
+            Text(
+                stringResource(R.string.save_video_as),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 6.dp),
+            )
+            OutputFormat.entries.forEach { option ->
+                val selected = option == format
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        .selectable(selected = selected, role = Role.RadioButton) {
+                            onChange(option)
+                            open = false
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            option.label,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            stringResource(if (option == OutputFormat.MKV) R.string.video_format_mkv_hint else R.string.video_format_mp4_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (selected) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+}
+
+/** The subtitle tracks a video has and the ones this download gets ([selected]); [translated] is
+ * the app's language when the site can translate captions into it and has no track of its own. */
+internal data class SubtitleChoice(
+    val tracks: List<com.comfort.app.data.SubtitleTrack>,
+    val selected: List<com.comfort.app.data.SubtitleTrack>,
+    val translated: com.comfort.app.data.SubtitleTrack?,
+)
+
+/** A video's subtitles: a chip naming the languages that download ("Off" for none), opening a
+ * panel to tick any of them — uploaded tracks first, auto-generated ones marked, and the app's
+ * language as a translation where the site offers one. Same panel shape as [AudioLanguageChip]. */
+@Composable
+private fun SubtitleChip(
+    choice: SubtitleChoice,
+    shape: androidx.compose.ui.graphics.Shape,
+    onChange: (List<com.comfort.app.data.SubtitleTrack>) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    val options = choice.tracks + listOfNotNull(choice.translated)
+    Box {
+        PreviewChip(
+            label = if (choice.selected.isEmpty()) stringResource(R.string.subtitles_off)
+            else choice.selected.joinToString(", ") { com.comfort.app.data.SubtitleLanguage.displayName(it.code) },
+            selected = choice.selected.isNotEmpty(),
+            icon = Icons.Outlined.Subtitles,
+            shape = shape,
+            onClick = { open = true },
+        )
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            shadowElevation = 3.dp,
+            modifier = Modifier.widthIn(min = 180.dp, max = 264.dp).heightIn(max = 420.dp),
+        ) {
+            Text(
+                stringResource(R.string.subtitles),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 6.dp),
+            )
+            options.forEach { option ->
+                val checked = choice.selected.any { it.code == option.code }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(if (checked) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                        // Several can be ticked, so the panel stays open.
+                        .toggleable(value = checked, role = Role.Checkbox) { on ->
+                            onChange(if (on) choice.selected + option else choice.selected.filter { it.code != option.code })
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            com.comfort.app.data.SubtitleLanguage.displayName(option.code),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (checked) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                        )
+                        val note = when {
+                            option === choice.translated -> stringResource(R.string.subtitles_translated)
+                            option.auto -> stringResource(R.string.subtitles_auto_generated)
+                            else -> null
+                        }
+                        note?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (checked) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (checked) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** The audio track of a video with dubs: a chip naming the one that downloads, opening a panel of
  * them all with the original marked. Same panel shape as [AudioFormatChip]. */
 @Composable
@@ -1152,7 +1340,7 @@ private fun AudioLanguageChip(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 0.dp,
             shadowElevation = 3.dp,
-            modifier = Modifier.width(264.dp).heightIn(max = 420.dp),
+            modifier = Modifier.widthIn(min = 180.dp, max = 264.dp).heightIn(max = 420.dp),
         ) {
             Text(
                 stringResource(R.string.audio_track),
@@ -1346,12 +1534,14 @@ private fun MainPreviewScreen(
     quality: VideoQuality,
     onQualityChange: (VideoQuality) -> Unit,
     outputFormat: OutputFormat,
-    onToggleFormat: () -> Unit,
+    onFormatChange: (OutputFormat) -> Unit,
     audioFormat: AudioFormat,
     onAudioFormatChange: (AudioFormat) -> Unit,
     audioTracks: List<com.comfort.app.data.AudioTrack>,
     audioTrack: com.comfort.app.data.AudioTrack?,
     onAudioLanguageChange: (com.comfort.app.data.AudioTrack) -> Unit,
+    subtitles: SubtitleChoice?,
+    onSubtitlesChange: (List<com.comfort.app.data.SubtitleTrack>) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
@@ -1618,16 +1808,19 @@ private fun MainPreviewScreen(
                                 onChange = onAudioFormatChange,
                             )
                         } else {
-                            PreviewChip(
-                                label = outputFormat.name.lowercase().replaceFirstChar { it.uppercase() },
-                                icon = Icons.Outlined.Movie,
+                            VideoFormatChip(
+                                format = outputFormat,
                                 shape = if (showTrim) MIDDLE_CHIP_SHAPE else FIRST_CHIP_SHAPE,
-                                onClick = onToggleFormat,
+                                onChange = onFormatChange,
                             )
                         }
                         // Only for a video with dubbed audio tracks.
                         audioTrack?.let { track ->
                             AudioLanguageChip(track = track, tracks = audioTracks, shape = MIDDLE_CHIP_SHAPE, onChange = onAudioLanguageChange)
+                        }
+                        // Only for a video with subtitles (or captions the site can translate).
+                        subtitles?.let { choice ->
+                            SubtitleChip(choice = choice, shape = MIDDLE_CHIP_SHAPE, onChange = onSubtitlesChange)
                         }
                         PreviewChip(
                             label = stringResource(R.string.filename_templates),
@@ -2205,6 +2398,7 @@ private fun ExtraCommandsScreen(
                     extraCommands = options.extraCommands, filenameTemplate = options.filenameTemplate,
                     itemFilter = options.itemFilter, engineOverride = options.engine,
                     audioFormat = options.audioFormat?.name, audioLanguage = options.audioLanguage,
+                    subtitleLanguages = options.subtitleLanguages,
                     overrideTitle = options.overrideTitle, overrideArtist = options.overrideArtist,
                 )
                 com.comfort.app.worker.CurrentCommand.forDownload(context, url.trim(), entity)
