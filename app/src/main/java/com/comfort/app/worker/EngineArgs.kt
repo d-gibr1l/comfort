@@ -60,6 +60,8 @@ internal data class YtDlpArgs(
     val sponsorBlockMark: String = "",
     val splitChapters: Boolean = false,
     val audioLanguage: String = "",
+    // Settings' "both" set plus the download's own extra commands; extraArgs is yt-dlp's own set.
+    val sharedExtraArgs: String = "",
 ) {
     fun toArgs() = listOf(
         "download", url, downloadDir, cookies,
@@ -100,6 +102,7 @@ internal data class YtDlpArgs(
         sponsorBlockMark,
         flag(splitChapters),
         audioLanguage,
+        sharedExtraArgs,
     )
 }
 
@@ -122,6 +125,8 @@ internal data class GalleryDlArgs(
     val restrictFilenames: Boolean = false,
     val forceIpv4: Boolean = false,
     val noCheckCertificates: Boolean = false,
+    // Settings' "both" set plus the download's own extra commands; extraArgs is gallery-dl's own set.
+    val sharedExtraArgs: String = "",
 ) {
     fun toArgs() = listOf(
         "download", url, downloadDir, cookies,
@@ -131,6 +136,7 @@ internal data class GalleryDlArgs(
         socketTimeout,
         sleepInterval,
         flag(restrictFilenames), flag(forceIpv4), flag(noCheckCertificates),
+        sharedExtraArgs,
     )
 }
 

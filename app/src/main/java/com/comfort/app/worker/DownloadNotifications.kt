@@ -253,7 +253,11 @@ object DownloadNotifications {
 
     /** [missingItems]: how many of the download's items failed while the rest saved (see
      * DownloadWorker) — said in the text, so a partly saved post doesn't read as complete. */
-    fun notifyFinished(context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?, missingItems: Int = 0) {
+    fun notifyFinished(
+        context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?, missingItems: Int = 0,
+        // Extra commands the wrappers left out (ExtraCommandNotes): said under the result.
+        notes: List<String> = emptyList(),
+    ) {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         // "picture(s)" used to be hardcoded here regardless of what actually got saved — a
         // downloaded video or audio file still read "1 picture saved," which looked like a bug.
@@ -268,9 +272,12 @@ object DownloadNotifications {
             // without having to read the text.
             .setSmallIcon(R.drawable.ic_notif_success)
             .setContentTitle(title)
-            .setContentText(text)
+            .setContentText(if (notes.isEmpty()) text else "$text · ${context.getString(R.string.extra_notes_title)}")
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        if (notes.isNotEmpty()) {
+            builder.setStyle(NotificationCompat.BigTextStyle().bigText((listOf(text) + notes).joinToString("\n")))
+        }
 
         if (thumbnailUri != null) {
             val uri = Uri.parse(thumbnailUri)

@@ -60,6 +60,15 @@
     <string name="filename_templates_subtitle">Como os arquivos deste download são nomeados</string>
     <string name="saved_templates_subtitle">Toque em um para usar</string>
     <string name="logs_subtitle">O que seus downloads recentes fizeram, passo a passo</string>
+    <string name="extra_note_unknown">Ignorado “%1$s”: este motor não conhece essa opção</string>
+    <string name="extra_note_other_engine">Ignorado “%1$s” aqui: é para o %2$s</string>
+    <string name="extra_note_not_allowed">Ignorado “%1$s”: o app escolhe onde os arquivos ficam, e isso não salvaria nada ou salvaria em outro lugar</string>
+    <string name="extra_note_invalid">Ignorado “%1$s”: %2$s</string>
+    <string name="extra_note_quotes">Comandos extras ignorados: há uma aspa sem fechar</string>
+    <string name="extra_note_url">Ignorado “%1$s”: coloque links na caixa de link</string>
+    <string name="extra_note_key_value">Ignorado “%1$s”: este motor não tem essa configuração</string>
+    <string name="extra_notes_title">Alguns comandos extras não foram usados</string>
+    <string name="command_note_instaloader_extras">O Instaloader não usa comandos extras; eles só valem se outro motor for usado</string>
     <string name="command_template_unclosed_quotes">Aspas não fechadas</string>
     <string name="command_template_save_as">Salvar como modelo</string>
     <string name="backup_title">Backup e restauração</string>

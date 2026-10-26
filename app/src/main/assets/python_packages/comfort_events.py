@@ -8,6 +8,7 @@ newline, an error with a traceback) without a parser having to guess where a val
 Types: size{bytes} total{count} phase{phase} format{tags} progress{downloaded, speed}
 thumbnail{url} title{title} artist{artist} album{album} track{track} error{message} file{path}
 warning{message} debug{message} status{message} exit{status}
+note{code, flag?, engine?, detail?} — an extra command left out or changed (ExtraCommandNotes)
 """
 import json
 

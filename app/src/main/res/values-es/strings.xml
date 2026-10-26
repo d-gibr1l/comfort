@@ -58,6 +58,15 @@
     <string name="filename_templates_subtitle">Cómo se llaman los archivos de esta descarga</string>
     <string name="saved_templates_subtitle">Toca una para usarla</string>
     <string name="logs_subtitle">Lo que hicieron tus descargas recientes, paso a paso</string>
+    <string name="extra_note_unknown">Omitido “%1$s”: este motor no conoce esa opción</string>
+    <string name="extra_note_other_engine">Omitido “%1$s” aquí: es para %2$s</string>
+    <string name="extra_note_not_allowed">Omitido “%1$s”: la app elige dónde van los archivos, y esto no guardaría nada o lo guardaría en otro sitio</string>
+    <string name="extra_note_invalid">Omitido “%1$s”: %2$s</string>
+    <string name="extra_note_quotes">Comandos extra omitidos: hay una comilla sin cerrar</string>
+    <string name="extra_note_url">Omitido “%1$s”: pon los enlaces en el cuadro de enlace</string>
+    <string name="extra_note_key_value">Omitido “%1$s”: este motor no tiene ese ajuste</string>
+    <string name="extra_notes_title">Algunos comandos extra no se usaron</string>
+    <string name="command_note_instaloader_extras">Instaloader no usa comandos extra; solo se aplican si se usa otro motor</string>
     <string name="command_template_unclosed_quotes">Comillas sin cerrar</string>
     <string name="command_template_save_as">Guardar como plantilla</string>
     <string name="backup_title">Copia y restauración</string>

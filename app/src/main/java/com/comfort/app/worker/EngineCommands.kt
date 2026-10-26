@@ -47,15 +47,20 @@ internal class EngineCommands(
         else filenameFormat
     }
 
-    // Advanced > Extra arguments: each engine gets the "both" set plus its own (see
-    // GalleryDlPreferences.getExtraArgsFor) — the engines take different flags. The sheet's extra
-    // commands are appended, not a replacement, so a per-download tweak keeps the global ones.
-    private fun extraArgsFor(engine: DownloadEngine) = listOfNotNull(
-        GalleryDlPreferences.getExtraArgsFor(context, engine).takeIf { it.isNotBlank() },
+    // Advanced > Extra arguments, in two parts: each engine's own set, typed for it on purpose, and
+    // the shared part — the "both" set plus this download's extra commands from the sheet, which
+    // may be meant for the other engine. Each wrapper keeps from the shared part only what it reads
+    // the same way (yt-dlp's -N or -f mean something else to gallery-dl) and says what it left out.
+    private val galleryDlExtraArgs = GalleryDlPreferences.getOwnExtraArgs(context, DownloadEngine.GALLERY_DL)
+    private val ytDlpExtraArgs = GalleryDlPreferences.getOwnExtraArgs(context, DownloadEngine.YT_DLP)
+    private val sharedExtraArgs = listOfNotNull(
+        GalleryDlPreferences.getSharedExtraArgs(context).takeIf { it.isNotBlank() },
         entity?.extraCommands?.takeIf { it.isNotBlank() },
     ).joinToString(" ")
-    private val galleryDlExtraArgs = extraArgsFor(DownloadEngine.GALLERY_DL)
-    private val ytDlpExtraArgs = extraArgsFor(DownloadEngine.YT_DLP)
+
+    // Extra commands asking for files next to the media (descriptions, info JSON, subtitles,
+    // thumbnails): kept like the Settings' own, not deleted with the staging folder.
+    val extrasWriteSidecars = listOf(ytDlpExtraArgs, galleryDlExtraArgs, sharedExtraArgs).any { SIDECAR_FLAG_RE.containsMatchIn(it) }
 
     // Already-fetched item IDs across retries, so a paused/retried download resumes where it left
     // off. One file per engine: gallery-dl's archive is sqlite, yt-dlp's and Instaloader's are text.
@@ -161,6 +166,7 @@ internal class EngineCommands(
         socketTimeout = socketTimeoutSeconds,
         sleepInterval = if (sleepIntervalSeconds > 0) sleepIntervalSeconds.toString() else "",
         restrictFilenames = restrictFilenames, forceIpv4 = forceIpv4, noCheckCertificates = noCheckCertificates,
+        sharedExtraArgs = sharedExtraArgs,
     )
 
     // A custom filename format (gallery-dl's syntax) is filled in by the wrapper itself.
@@ -196,6 +202,7 @@ internal class EngineCommands(
         sponsorBlockMark = if (sponsorBlockMode == GalleryDlPreferences.SPONSORBLOCK_MARK) sponsorBlockCategories else "",
         splitChapters = splitChapters,
         audioLanguage = audioLanguage,
+        sharedExtraArgs = sharedExtraArgs,
     )
 
     // Always audio-only — spotify_wrapper.py hands each matched track to yt_dlp_wrapper's own
@@ -249,5 +256,8 @@ internal class EngineCommands(
     private companion object {
         // The comma-separated item numbers in SharePickerScreen's gallery-dl --filter ("num in {1,3,4}").
         val ITEM_FILTER_NUMS_RE = Regex("""\{([\d,]+)\}""")
+        // yt-dlp's --write-description/-info-json/-subs/-auto-subs/-thumbnail/-all-thumbnails,
+        // gallery-dl's --write-metadata/-info-json/-tags.
+        val SIDECAR_FLAG_RE = Regex("""(?<!\S)--write-(description|info-json|subs|auto-subs|thumbnail|all-thumbnails|metadata|tags)(?!\S)""")
     }
 }

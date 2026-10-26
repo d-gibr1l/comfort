@@ -541,22 +541,8 @@ internal fun isValidFormatSort(formatSort: String): Boolean {
     return !formatSort.any { it in "\"'$`;|&" || it == '\n' || it == '\r' }
 }
 
-internal fun hasUnmatchedQuotes(args: String): Boolean {
-    var inSingle = false
-    var inDouble = false
-    var escape = false
-    for (char in args) {
-        if (escape) {
-            escape = false
-            continue
-        }
-        when (char) {
-            '\\' -> escape = true
-            '\'' -> if (!inDouble) inSingle = !inSingle
-            '"' -> if (!inSingle) inDouble = !inDouble
-        }
-    }
-    return inSingle || inDouble
-}
+/** True where the engines couldn't split [args] (an unclosed quote, a backslash at the end) and
+ * would skip them: the same rules as the wrappers' shlex.split. */
+internal fun hasUnmatchedQuotes(args: String): Boolean = com.comfort.app.worker.ShellWords.split(args) == null
 
 

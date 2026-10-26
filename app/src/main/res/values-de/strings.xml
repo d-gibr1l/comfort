@@ -58,6 +58,15 @@
     <string name="filename_templates_subtitle">Wie die Dateien dieses Downloads heißen</string>
     <string name="saved_templates_subtitle">Zum Verwenden antippen</string>
     <string name="logs_subtitle">Was deine letzten Downloads getan haben, Schritt für Schritt</string>
+    <string name="extra_note_unknown">“%1$s” übersprungen: diese Engine kennt die Option nicht</string>
+    <string name="extra_note_other_engine">“%1$s” hier übersprungen: gilt für %2$s</string>
+    <string name="extra_note_not_allowed">“%1$s” übersprungen: die App bestimmt, wohin Dateien kommen, und damit würde nichts oder woanders gespeichert</string>
+    <string name="extra_note_invalid">“%1$s” übersprungen: %2$s</string>
+    <string name="extra_note_quotes">Zusatzbefehle übersprungen: ein Anführungszeichen ist nicht geschlossen</string>
+    <string name="extra_note_url">“%1$s” übersprungen: Links gehören ins Linkfeld</string>
+    <string name="extra_note_key_value">“%1$s” übersprungen: diese Engine hat keine solche Einstellung</string>
+    <string name="extra_notes_title">Einige Zusatzbefehle wurden nicht verwendet</string>
+    <string name="command_note_instaloader_extras">Instaloader verwendet keine Zusatzbefehle; sie gelten nur, wenn eine andere Engine läuft</string>
     <string name="command_template_unclosed_quotes">Nicht geschlossene Anführungszeichen</string>
     <string name="command_template_save_as">Als Vorlage speichern</string>
     <string name="backup_title">Sichern &amp; wiederherstellen</string>

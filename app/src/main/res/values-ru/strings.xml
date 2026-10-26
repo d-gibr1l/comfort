@@ -60,6 +60,15 @@
     <string name="filename_templates_subtitle">Как будут названы файлы этой загрузки</string>
     <string name="saved_templates_subtitle">Нажмите, чтобы использовать</string>
     <string name="logs_subtitle">Что делали недавние загрузки, шаг за шагом</string>
+    <string name="extra_note_unknown">Пропущено “%1$s”: этот движок не знает такой опции</string>
+    <string name="extra_note_other_engine">Пропущено “%1$s” здесь: это для %2$s</string>
+    <string name="extra_note_not_allowed">Пропущено “%1$s”: папку для файлов выбирает приложение, а с этим ничего не сохранится или сохранится в другое место</string>
+    <string name="extra_note_invalid">Пропущено “%1$s”: %2$s</string>
+    <string name="extra_note_quotes">Доп. команды пропущены: не закрыта кавычка</string>
+    <string name="extra_note_url">Пропущено “%1$s”: ссылки вставляйте в поле ссылки</string>
+    <string name="extra_note_key_value">Пропущено “%1$s”: у этого движка нет такой настройки</string>
+    <string name="extra_notes_title">Некоторые доп. команды не использованы</string>
+    <string name="command_note_instaloader_extras">Instaloader не использует доп. команды; они действуют, только если работает другой движок</string>
     <string name="command_template_unclosed_quotes">Незакрытые кавычки</string>
     <string name="command_template_save_as">Сохранить как шаблон</string>
     <string name="backup_title">Резервное копирование</string>

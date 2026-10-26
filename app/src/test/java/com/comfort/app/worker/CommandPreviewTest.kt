@@ -374,7 +374,8 @@ class CommandPreviewTest {
         assertTrue(src.contains("\"%(uploader,channel,creator|Unknown)s\",\n                r\"(?P<uploader>.*?)(?: - Topic)?\$\","))
         assertTrue(src.contains("youtube_args.setdefault(\"player_client\", [\"default\", \"android\", \"web\", \"ios\"])"))
         assertTrue(src.contains("ydl_opts[\"sleep_interval\"] = 2"))
-        assertTrue(src.contains("quality = {\"mp3\": \"0\", \"m4a\": \"256\", \"opus\": \"160\"}.get(codec)"))
+        // An extra --audio-quality wins over these defaults.
+        assertTrue(src.contains("quality = extra_audio_quality or {\"mp3\": \"0\", \"m4a\": \"256\", \"opus\": \"160\"}.get(codec)"))
     }
 
     // ── gallery-dl ──────────────────────────────────────────────────────────────────────────────
@@ -551,10 +552,24 @@ class CommandPreviewTest {
         assertEquals("--password ***", m("--password \"two words\""))
         assertEquals("--video-password *** --ap-password ***", m("--video-password a --ap-password b"))
         assertEquals("--add-header \"Authorization: ***\"", m("--add-header \"Authorization: Bearer x\""))
-        assertEquals("--add-header 'Cookie: ***'", m("--add-header 'Cookie: a=b; c=d'"))
+        // Shown re-quoted the way the engines split it.
+        assertEquals("--add-header \"Cookie: ***\"", m("--add-header 'Cookie: a=b; c=d'"))
         assertEquals("--add-header X-Api-Key:***", m("--add-header X-Api-Key:abc"))
         assertEquals("-o extractor.pixiv.refresh-token=***", m("-o extractor.pixiv.refresh-token=abc"))
-        assertEquals("-o \"extractor.twitter.password=***\"", m("-o \"extractor.twitter.password=abc\""))
+        assertEquals("-o extractor.twitter.password=***", m("-o \"extractor.twitter.password=abc\""))
+        // Forms the first version missed (found testing real commands):
+        assertEquals("-p***", m("-pSECRET"))
+        assertEquals("--add-header=Authorization:***", m("--add-header=Authorization:SECRET"))
+        assertEquals("-o extractor.x.password=***", m("-o \"extractor.x.password=my SECRET\""))
+        assertEquals("--option extractor.x.password=***", m("--option extractor.x.password=SECRET"))
+        assertEquals("-oextractor.x.password=***", m("-oextractor.x.password=SECRET"))
+        assertEquals("-o extractor.fanbox.sessionid=***", m("-o extractor.fanbox.sessionid=abc"))
+        assertEquals("--proxy http://user:***@host:8080", m("--proxy http://user:SECRET@host:8080"))
+        assertEquals("--extractor-args \"youtube:po_token=***;player_client=web\"", m("--extractor-args youtube:po_token=abc;player_client=web"))
+        // A " -p " inside a quoted value isn't a password flag, and the quote survives.
+        assertEquals("--filter \"title contains ' -p '\" --range 1-2", m("--filter \"title contains ' -p '\" --range 1-2"))
+        // Text the engines can't split is still masked, by pattern.
+        assertEquals("--password *** --ua \"Mozilla", m("--password x --ua \"Mozilla"))
         // Ordinary flags untouched — "-P" (yt-dlp's --paths) included.
         listOf(
             "--no-part -N 4 --user-agent \"Foo Bar\"",

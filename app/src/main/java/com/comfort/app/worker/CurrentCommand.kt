@@ -22,8 +22,14 @@ internal object CurrentCommand {
         val redditLogin = cookiesArg(context).isNotEmpty() && hasRedditLogin(CookieStore.file(context))
         val engines = engines(context, url, choices)
         return engines.mapIndexed { i, engine ->
-            val block = if (engine == DownloadEngine.GALLERY_DL) CommandPreview.galleryDl(commands.galleryDlArgs(galleryDlExcludesVideo(engines)), redditLogin)
-            else commands.preview(engine)
+            val block = when {
+                engine == DownloadEngine.GALLERY_DL -> CommandPreview.galleryDl(commands.galleryDlArgs(galleryDlExcludesVideo(engines)), redditLogin)
+                // Instaloader runs as a library, without the download's extra commands: said where
+                // they'd seem to be missing.
+                engine == DownloadEngine.INSTALOADER && !choices.extraCommands.isNullOrBlank() ->
+                    commands.preview(engine).let { it.copy(notes = it.notes + CommandPreview.Note(R.string.command_note_instaloader_extras)) }
+                else -> commands.preview(engine)
+            }
             // A later engine is a fallback or the video supplement: it runs only if needed.
             val shown = if (i == 0) block else block.copy(notes = listOf(CommandPreview.Note(R.string.command_note_then)) + block.notes)
             Shown(engine, shown.render { text(context, it) })
