@@ -1170,7 +1170,7 @@ private fun VideoFormatChip(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 0.dp,
             shadowElevation = 3.dp,
-            modifier = Modifier.widthIn(min = 180.dp, max = 264.dp),
+            modifier = Modifier.widthIn(min = 160.dp, max = 216.dp),
         ) {
             Text(
                 stringResource(R.string.save_video_as),
