@@ -62,6 +62,8 @@ internal data class YtDlpArgs(
     val audioLanguage: String = "",
     // Settings' "both" set plus the download's own extra commands; extraArgs is yt-dlp's own set.
     val sharedExtraArgs: String = "",
+    // A requested subtitle language with no uploaded track gets the auto-generated one.
+    val subtitleAuto: Boolean = false,
 ) {
     fun toArgs() = listOf(
         "download", url, downloadDir, cookies,
@@ -103,6 +105,7 @@ internal data class YtDlpArgs(
         flag(splitChapters),
         audioLanguage,
         sharedExtraArgs,
+        flag(subtitleAuto),
     )
 }
 

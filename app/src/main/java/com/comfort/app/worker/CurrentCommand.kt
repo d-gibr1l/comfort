@@ -69,6 +69,7 @@ internal object CurrentCommand {
         engineOverride: DownloadEngine?,
         audioFormat: String?,
         audioLanguage: String?,
+        subtitleLanguages: String?,
         overrideTitle: String?,
         overrideArtist: String?,
     ) = DownloadEntity(
@@ -81,6 +82,7 @@ internal object CurrentCommand {
         filenameTemplate = filenameTemplate, saveThumbnail = saveThumbnail,
         overrideTitle = overrideTitle?.trim()?.ifBlank { null }, overrideArtist = overrideArtist?.trim()?.ifBlank { null },
         engineOverride = engineOverride?.name, audioFormat = audioFormat, audioLanguage = audioLanguage,
+        subtitleLanguages = subtitleLanguages,
     )
 
     /** The engines DownloadWorker would run for [url], in order — the ones that might run, as a

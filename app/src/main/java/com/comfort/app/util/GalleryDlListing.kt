@@ -72,6 +72,12 @@ data class PreviewInfo(
     val hasMore: Boolean = false,
     /** A video's audio tracks when it has dubs (original first); empty for one track. */
     val audioTracks: List<com.comfort.app.data.AudioTrack> = emptyList(),
+    /** The video's subtitle tracks (uploaded first, then its auto-generated captions). */
+    val subtitleTracks: List<com.comfort.app.data.SubtitleTrack> = emptyList(),
+    /** The video's own language, when the site says (what "orig" in the subtitle setting means). */
+    val language: String? = null,
+    /** The site can machine-translate its captions into other languages (YouTube). */
+    val subtitleTranslations: Boolean = false,
 )
 
 /** One track of a multi-item song listing (Spotify album/playlist today — see [PreviewInfo.tracks]
@@ -804,6 +810,14 @@ object GalleryDlListing {
                 // Original first, then by name in the app's language (the wrapper sorts by code,
                 // which put "English" after "German").
             }.orEmpty().sortedWith(compareBy({ !it.original }, { com.comfort.app.data.AudioLanguage.displayName(it.code) })),
+            subtitleTracks = entry.optJSONArray("subtitles")?.let { tracks ->
+                (0 until tracks.length()).mapNotNull { tracks.optJSONObject(it) }.mapNotNull { track ->
+                    track.optString("code").blankToNull()?.let { com.comfort.app.data.SubtitleTrack(it, track.optBoolean("auto")) }
+                }
+                // Uploaded first, then by name in the app's language.
+            }.orEmpty().sortedWith(compareBy({ it.auto }, { com.comfort.app.data.SubtitleLanguage.displayName(it.code) })),
+            language = entry.optString("language").blankToNull(),
+            subtitleTranslations = entry.optBoolean("subtitle_translations", false),
         )
     }
 

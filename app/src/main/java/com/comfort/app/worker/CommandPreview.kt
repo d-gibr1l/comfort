@@ -112,6 +112,8 @@ internal object CommandPreview {
             if (a.embedThumbnail || a.audioOnly) o += "--embed-thumbnail"
             if ((a.downloadSubtitles || a.saveSubtitleFiles) && !a.audioOnly) {
                 o += "--write-subs --sub-langs ${quote(a.subtitleLangs.ifBlank { "en" })}"
+                // A language with no uploaded track takes the site's auto-generated one.
+                if (a.subtitleAuto) o += "--write-auto-subs"
                 if (a.downloadSubtitles) o += "--embed-subs"
             }
             if (a.audioLanguage.isNotEmpty()) notes += Note(R.string.command_note_audio_tag, listOf(a.audioLanguage))

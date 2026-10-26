@@ -106,6 +106,7 @@ object GalleryDlPreferences {
     const val KEY_VIDEO_QUALITY = "video_quality"
     const val KEY_DOWNLOAD_SUBTITLES = "download_subtitles"
     const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
+    const val KEY_SUBTITLE_AUTO = "subtitle_auto"
     const val KEY_DISABLED_COOKIE_DOMAINS = "disabled_cookie_domains"
     const val KEY_EMBED_THUMBNAIL = "embed_thumbnail"
     const val KEY_EMBED_METADATA = "embed_metadata"
@@ -588,7 +589,15 @@ object GalleryDlPreferences {
     }
 
     fun getSubtitleLanguages(context: Context): String {
-        return prefs(context).getString(KEY_SUBTITLE_LANGUAGES, "en") ?: "en"
+        return prefs(context).getString(KEY_SUBTITLE_LANGUAGES, SubtitleLanguage.DEFAULT)?.takeIf { it.isNotBlank() } ?: SubtitleLanguage.DEFAULT
+    }
+
+    /** A requested language with no uploaded track gets the site's auto-generated one (YouTube
+     * also translates them into any language). */
+    fun isSubtitleAuto(context: Context): Boolean = prefs(context).getBoolean(KEY_SUBTITLE_AUTO, true)
+
+    fun setSubtitleAuto(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SUBTITLE_AUTO, enabled).apply()
     }
 
     fun setSubtitleLanguages(context: Context, languages: String) {

@@ -558,6 +558,140 @@ def _parse_extractor_args(raw):
     return result or None
 
 _SUBTITLE_EXTENSIONS = ("vtt", "srt", "ass", "ssa", "ttml", "srv1", "srv2", "srv3", "json3")
+# Listed as subtitles by some sites but are chat replays, not captions.
+_NOT_SUBTITLES = {"live_chat", "rechat"}
+
+
+def _video_language(info):
+    """The video's own language: what the site says, else its original audio track's (YouTube
+    marks it among dubs, and tags a lone track from its speech recognition), else the code of
+    YouTube's "-orig" automatic caption (that speech-recognition track)."""
+    if info.get("language"):
+        return info["language"]
+    audio = [f for f in info.get("formats") or [] if f.get("language") and f.get("acodec") not in (None, "none")]
+    original = next((f["language"] for f in audio if (f.get("language_preference") or 0) >= 10), None)
+    if original or len({f["language"] for f in audio}) == 1:
+        return original or audio[0]["language"]
+    return next((k[:-len("-orig")] for k in info.get("automatic_captions") or {} if k.endswith("-orig")), None)
+
+
+def _pick_subtitles(tokens, uploaded, automatic, language, allow_auto):
+    """The subtitle keys to fetch for the app's languages ("de", "pt-BR", "orig" for the video's
+    own), one track per language: uploaded "xx", uploaded "xx-*" (de-DE), then — only with
+    automatic captions allowed — automatic "xx" (YouTube translates its speech recognition into
+    any language), automatic "xx-orig", then an uploaded track translated into it ("fr-en",
+    YouTube's French from the English upload; the original language's first). A language with
+    nothing to offer is skipped."""
+    uploaded = {k: v for k, v in (uploaded or {}).items() if k not in _NOT_SUBTITLES}
+    automatic = automatic or {}
+    picked, seen = [], set()
+    for token in tokens:
+        code = language if token.lower() == "orig" else token
+        if not code or code.lower() in seen:
+            continue
+        seen.add(code.lower())
+        # "pt-BR", then plain "pt": YouTube tags a dubbed video's original audio "en-US".
+        codes = [code.lower()] + ([code.lower().split("-")[0]] if "-" in code else [])
+        key = next((k for low in codes for exact in (True, False) for k in uploaded
+                    if (k.lower() == low if exact else k.lower().startswith(low + "-"))), None)
+        if key is None and allow_auto:
+            wanted = [w for low in codes for w in [low, low + "-orig"]
+                      + [f"{low}-{src.lower()}" for src in [language, *uploaded] if src]]
+            key = next((k for w in wanted for k in automatic if k.lower() == w), None)
+        # "de" and "orig" can land on the same track (a German video).
+        if key is not None and key not in picked:
+            picked.append(key)
+    return picked
+
+
+def _pick_subtitles_on(ydl):
+    """Makes [ydl] fetch _pick_subtitles' tracks for its subtitleslangs. yt-dlp matches those as
+    regexes against every key, so "de" never finds "de-DE" and "orig" means nothing to it; here
+    its own selection is handed the exact keys instead. The video's language is taken as each
+    video comes through process_video_result, which is what calls process_subtitles."""
+    tokens = list(ydl.params.get("subtitleslangs") or [])
+    process_video_result, process_subtitles = ydl.process_video_result, ydl.process_subtitles
+    language = [None]
+
+    def _process_video_result(info_dict, *args, **kwargs):
+        language[0] = _video_language(info_dict)
+        return process_video_result(info_dict, *args, **kwargs)
+
+    def _process_subtitles(video_id, normal_subtitles, automatic_captions):
+        keys = _pick_subtitles(
+            tokens, normal_subtitles, automatic_captions,
+            language[0] or _video_language({"automatic_captions": automatic_captions}),
+            bool(ydl.params.get("writeautomaticsub")))
+        if not keys:
+            return None  # an empty list would be yt-dlp's "pick one for me" (English first)
+        ydl.params["subtitleslangs"] = [re.escape(k) for k in keys]
+        try:
+            return process_subtitles(video_id, normal_subtitles, automatic_captions)
+        finally:
+            ydl.params["subtitleslangs"] = tokens
+
+    ydl.process_video_result = _process_video_result
+    ydl.process_subtitles = _process_subtitles
+
+
+def _subtitle_failures_as_warnings(ydl):
+    """A subtitle track that fails to download is a warning, not the download's failure (seen:
+    YouTube answering a translated track with HTTP 429). yt-dlp only lets one through with
+    ignoreerrors fully on, so it's on just while the tracks are written; the failed one has no
+    file and _SafeEmbedSubtitlePP leaves it out."""
+    write_subtitles = ydl._write_subtitles
+
+    def _write_subtitles(info_dict, filename):
+        ignoreerrors = ydl.params.get("ignoreerrors")
+        ydl.params["ignoreerrors"] = True
+        try:
+            return write_subtitles(info_dict, filename)
+        finally:
+            ydl.params["ignoreerrors"] = ignoreerrors
+
+    ydl._write_subtitles = _write_subtitles
+
+
+def _cached_info_lacks_translations(path, tokens):
+    """Whether the preview's saved extraction (download()'s info_json_path) can't give [tokens]
+    a track that a fresh one could: YouTube only lists translations of uploaded tracks ("fr-en")
+    when automatic captions are asked for, which the preview doesn't, so a video with uploaded
+    subtitles but no speech recognition ("Me at the zoo") has no French there at all."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            info = json.load(f)
+    except (OSError, ValueError):
+        return False
+    uploaded = [k for k in info.get("subtitles") or {} if k not in _NOT_SUBTITLES]
+    automatic = info.get("automatic_captions") or {}
+    if info.get("_type", "video") != "video" or not uploaded or \
+            any(k.lower().endswith("-" + u.lower()) for k in automatic for u in uploaded):
+        return False
+    language = _video_language(info)
+    return any(not _pick_subtitles([t], info["subtitles"], automatic, language, True)
+               for t in tokens if t.lower() != "orig")
+
+
+def _subtitle_choices(info):
+    """What the preview sheet offers: every uploaded track, then the original-language automatic
+    caption when nothing uploaded covers that language, plus the video's language and whether the
+    site translates captions (YouTube: automatic tracks beyond the original's)."""
+    uploaded = [k for k in info.get("subtitles") or {} if k not in _NOT_SUBTITLES]
+    automatic = info.get("automatic_captions") or {}
+    tracks = [{"code": k, "auto": False} for k in uploaded]
+    orig = next((k[:-len("-orig")] for k in automatic if k.endswith("-orig")), None)
+    if orig and not any(k.lower() == orig.lower() or k.lower().startswith(orig.lower() + "-") for k in uploaded):
+        tracks.append({"code": orig, "auto": True})
+    result = {}
+    if tracks:
+        result["subtitles"] = tracks
+    language = _video_language(info)
+    if language:
+        result["language"] = language
+    # The original track comes twice ("en" and "en-orig"); anything else is a translation.
+    if orig and any(k != orig and not k.endswith("-orig") for k in automatic):
+        result["subtitle_translations"] = True
+    return result
 
 
 def _subtitle_has_captions(path):
@@ -1891,7 +2025,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              override_title=None, override_artist=None, info_json_path=None,
              audio_format=None, normalize_audio=False, site=None,
              sponsorblock_remove=None, sponsorblock_mark=None, split_chapters=False,
-             audio_language=None, shared_extra_args=None):
+             audio_language=None, shared_extra_args=None, subtitle_auto=False):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -1989,12 +2123,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     named, value = extras.given("writesubtitles")
     if named:
         save_subtitle_files = bool(value)
+    # Languages the user typed are yt-dlp's own regexes, matched its own way, not the app's pick.
+    pick_subtitles = True
     named, value = extras.given("subtitleslangs")
     if named and value:
         subtitle_langs = ",".join(value)
+        pick_subtitles = False
     named, value = extras.given("allsubtitles")
     if named and value:
         subtitle_langs = "all"
+        pick_subtitles = False
         save_subtitle_files = save_subtitle_files or not download_subtitles
     named, value = extras.given("writeautomaticsub")
     if named and value and not (download_subtitles or save_subtitle_files):
@@ -2588,6 +2726,11 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # (save_subtitle_files) are independent choices; either, both, or neither can be on.
             ydl_opts["writesubtitles"] = True
             ydl_opts["subtitleslangs"] = [lang.strip() for lang in (subtitle_langs or "en").split(",") if lang.strip()]
+            if subtitle_auto:
+                # A language with no uploaded track gets the automatic one (_pick_subtitles).
+                ydl_opts["writeautomaticsub"] = True
+            if "all" in ydl_opts["subtitleslangs"]:
+                pick_subtitles = False  # yt-dlp's own "all": every uploaded track
             # Embedded by _SafeEmbedSubtitlePP (added in _attempt below, after these), not
             # yt-dlp's stock "FFmpegEmbedSubtitle", which fails the whole download on a bad track.
             embed_subtitles = download_subtitles
@@ -2679,6 +2822,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         with yt_dlp.YoutubeDL(opts) as ydl:
             # Added after ydl_opts' own pre_process MetadataParser, so it sees the cleaned uploader.
             ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames, custom_format=custom_format, site=site), when="pre_process")
+            if pick_subtitles and opts.get("writesubtitles"):
+                _pick_subtitles_on(ydl)
+            if opts.get("writesubtitles") or opts.get("writeautomaticsub"):
+                _subtitle_failures_as_warnings(ydl)
             if embed_subtitles:
                 # Same place the stock step had: after metadata/thumbnail, before trimming and
                 # _FinalFilePP. already_have_subtitle keeps the subtitle file on disk when "Save
@@ -2726,7 +2873,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # never runs here: "ignoreerrors" reports a failed download instead of raising it. The
             # age check just avoids trying links that have most likely expired.
             if reuse_info and info_json_path and os.path.isfile(info_json_path) and \
-                    time.time() - os.path.getmtime(info_json_path) < _INFO_JSON_MAX_AGE_SECONDS:
+                    time.time() - os.path.getmtime(info_json_path) < _INFO_JSON_MAX_AGE_SECONDS and \
+                    not (pick_subtitles and opts.get("writesubtitles") and opts.get("writeautomaticsub")
+                         and _cached_info_lacks_translations(info_json_path, opts.get("subtitleslangs") or [])):
                 ydl.download_with_info_file(info_json_path)
             else:
                 ydl.download([url])
@@ -3197,6 +3346,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
         languages = _audio_languages(info)
         if languages:
             picked["audio_languages"] = languages
+        picked.update(_subtitle_choices(info))
     return json.dumps(picked or {"error": errors.message or "no info extracted"})
 
 
@@ -3308,5 +3458,6 @@ if __name__ == "__main__":
         split_chapters=_b(a[53]) if len(a) > 53 else False,
         audio_language=(_s(a[54]) if len(a) > 54 else None),
         shared_extra_args=(_s(a[55]) if len(a) > 55 else None),
+        subtitle_auto=_b(a[56]) if len(a) > 56 else False,
     )
     print(event("exit", status=status), flush=True)

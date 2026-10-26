@@ -226,12 +226,19 @@ private val MIGRATION_26_27 = object : Migration(26, 27) {
     }
 }
 
+// Adds subtitleLanguages (SubtitleLanguage) — a per-download pick of subtitle languages.
+private val MIGRATION_27_28 = object : Migration(27, 28) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN subtitleLanguages TEXT")
+    }
+}
+
 @Database(
     entities = [
         DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class, SavedFile::class,
         Subscription::class, SubscriptionSeenEntry::class,
     ],
-    version = 27,
+    version = 28,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -251,7 +258,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
                         MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
-                        MIGRATION_26_27,
+                        MIGRATION_26_27, MIGRATION_27_28,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

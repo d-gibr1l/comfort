@@ -50,6 +50,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
     var writeInfoFiles by remember { mutableStateOf(GalleryDlPreferences.isWriteInfoFiles(context)) }
     var downloadSubtitles by remember { mutableStateOf(GalleryDlPreferences.isDownloadSubtitles(context)) }
     var subtitleLanguages by remember { mutableStateOf(GalleryDlPreferences.getSubtitleLanguages(context)) }
+    var subtitleAuto by remember { mutableStateOf(GalleryDlPreferences.isSubtitleAuto(context)) }
     var saveSubtitleFiles by remember { mutableStateOf(GalleryDlPreferences.isSaveSubtitleFiles(context)) }
     var formatIdOverride by remember { mutableStateOf(GalleryDlPreferences.getFormatIdOverride(context)) }
     var lyricsMode by remember { mutableStateOf(GalleryDlPreferences.getLyricsMode(context)) }
@@ -320,33 +321,69 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             )
             ToggleReveal(downloadSubtitles) {
                 Spacer(Modifier.height(12.dp))
-                val isSubtitlesError = subtitleLanguages.isNotBlank() && subtitleLanguages.split(',').any { segment ->
-                    val trimmed = segment.trim()
-                    trimmed.isNotEmpty() && !SUBTITLE_LANG_REGEX.matches(trimmed)
-                }
-                OutlinedTextField(
-                    value = subtitleLanguages,
-                    onValueChange = { input ->
-                        val sanitized = input.filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == ',' || it == ' ' }
-                        subtitleLanguages = sanitized
-                        GalleryDlPreferences.setSubtitleLanguages(context, sanitized.trim())
-                    },
-                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text(stringResource(R.string.subtitle_languages)) },
-                    placeholder = { Text("en") },
-                    singleLine = true,
-                    isError = isSubtitlesError,
-                    supportingText = {
-                        if (isSubtitlesError) {
-                            Text(stringResource(R.string.use_comma_separated_language_codes_e), color = MaterialTheme.colorScheme.error)
-                        } else {
-                            Text(stringResource(R.string.comma_separated_language_codes_e_g))
+                // Presets, or "Others" for codes typed by hand (the field below).
+                val presets = listOf(
+                    com.comfort.app.data.SubtitleLanguage.DEFAULT,
+                    com.comfort.app.data.SubtitleLanguage.APP,
+                    com.comfort.app.data.SubtitleLanguage.ORIGINAL,
+                )
+                var custom by remember { mutableStateOf(subtitleLanguages !in presets) }
+                SubtitleLanguagesSetting(
+                    current = if (custom) null else subtitleLanguages,
+                    customLabel = subtitleLanguages.takeIf { custom },
+                    onPick = { value ->
+                        custom = value == null
+                        if (value != null) {
+                            subtitleLanguages = value
+                            GalleryDlPreferences.setSubtitleLanguages(context, value)
                         }
                     },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    shape = MaterialTheme.shapes.medium,
                 )
+                if (custom) {
+                    Spacer(Modifier.height(12.dp))
+                    val isSubtitlesError = subtitleLanguages.isNotBlank() && subtitleLanguages.split(',').any { segment ->
+                        val trimmed = segment.trim()
+                        trimmed.isNotEmpty() && !SUBTITLE_LANG_REGEX.matches(trimmed)
+                    }
+                    OutlinedTextField(
+                        value = if (subtitleLanguages in presets) "" else subtitleLanguages,
+                        onValueChange = { input ->
+                            val sanitized = input.filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == ',' || it == ' ' }
+                            subtitleLanguages = sanitized
+                            GalleryDlPreferences.setSubtitleLanguages(context, sanitized.trim())
+                        },
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                        label = { Text(stringResource(R.string.subtitle_languages)) },
+                        placeholder = { Text("en, es") },
+                        singleLine = true,
+                        isError = isSubtitlesError,
+                        supportingText = {
+                            if (isSubtitlesError) {
+                                Text(stringResource(R.string.use_comma_separated_language_codes_e), color = MaterialTheme.colorScheme.error)
+                            } else {
+                                Text(stringResource(R.string.comma_separated_language_codes_e_g))
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                }
             }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            IconToggleRow(
+                icon = Icons.Outlined.ClosedCaption,
+                title = stringResource(R.string.subtitle_auto_title),
+                subtitle = stringResource(R.string.subtitle_auto_subtitle),
+                checked = subtitleAuto,
+                onCheckedChange = {
+                    subtitleAuto = it
+                    GalleryDlPreferences.setSubtitleAuto(context, it)
+                },
+            )
 
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -727,6 +764,73 @@ private fun AudioLanguageSetting() {
                             androidx.compose.material3.RadioButton(selected = value == current, onClick = null)
                             Spacer(Modifier.width(12.dp))
                             Text(label(value), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { picking = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+/** Settings > Processing > Subtitle languages: your language and the original (the default), one
+ * of them, or codes typed by hand ([onPick] null: the field below the row). */
+@Composable
+private fun SubtitleLanguagesSetting(current: String?, customLabel: String?, onPick: (String?) -> Unit) {
+    var picking by remember { mutableStateOf(false) }
+    val appName = com.comfort.app.data.SubtitleLanguage.displayName(
+        com.comfort.app.data.SubtitleLanguage.requested(com.comfort.app.data.SubtitleLanguage.APP),
+    )
+    @Composable
+    fun label(value: String?) = when (value) {
+        com.comfort.app.data.SubtitleLanguage.DEFAULT -> stringResource(R.string.subtitle_langs_app_and_original, appName)
+        com.comfort.app.data.SubtitleLanguage.APP -> stringResource(R.string.audio_language_app_x, appName)
+        com.comfort.app.data.SubtitleLanguage.ORIGINAL -> stringResource(R.string.subtitle_langs_original)
+        else -> customLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.subtitle_langs_custom)
+    }
+    val title = stringResource(R.string.subtitle_languages)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable { picking = true }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        Text(label(current), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    }
+    if (picking) {
+        val options = listOf(
+            com.comfort.app.data.SubtitleLanguage.DEFAULT,
+            com.comfort.app.data.SubtitleLanguage.APP,
+            com.comfort.app.data.SubtitleLanguage.ORIGINAL,
+            null,
+        )
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { picking = false },
+            title = { Text(title) },
+            text = {
+                Column {
+                    options.forEach { value ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    picking = false
+                                    onPick(value)
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            androidx.compose.material3.RadioButton(selected = value == current, onClick = null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(if (value == null) stringResource(R.string.subtitle_langs_custom) else label(value), style = MaterialTheme.typography.bodyLarge)
                         }
                     }
                 }
