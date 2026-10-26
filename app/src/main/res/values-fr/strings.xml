@@ -81,6 +81,8 @@
     <string name="save_video_as">Enregistrer la vidéo en</string>
     <string name="video_format_mkv_hint">Tel que le site l\'envoie, sans conversion</string>
     <string name="video_format_mp4_hint">Se lit partout ; certaines vidéos sont converties avant</string>
+    <string name="track_n">Piste %1$d</string>
+    <string name="subtitles_off_short">Désactivés</string>
     <string name="command_template_unclosed_quotes">Guillemets non fermés</string>
     <string name="command_template_save_as">Enregistrer comme modèle</string>
     <string name="backup_title">Sauvegarde et restauration</string>

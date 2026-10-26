@@ -723,12 +723,37 @@ class _SafeEmbedSubtitlePP(FFmpegEmbedSubtitlePP):
         skipped = [lang for lang in subtitles if lang not in usable]
         if skipped:
             self.report_warning(f"Skipping subtitles with no captions in them: {', '.join(skipped)}")
+        # An MKV gets them as SRT: ffmpeg stores WebVTT in Matroska as "D_WEBVTT/SUBTITLES", which
+        # the app's player (Media3) and many others don't read — reproduced on the phone: both
+        # embedded tracks were in the file, the viewer saw neither. MP4's mov_text is read fine.
+        converted = []
+        if info.get("ext") == "mkv":
+            for lang, sub in list(usable.items()):
+                path = sub.get("filepath")
+                if not path or sub.get("ext") in ("srt", "ass", "ssa"):
+                    continue
+                srt = prepend_extension(path, "comfort", expected_real_ext=sub.get("ext")).rsplit(".", 1)[0] + ".srt"
+                try:
+                    self.run_ffmpeg(path, srt, ["-f", "srt"])
+                except PostProcessingError as e:
+                    self.report_warning(f"Couldn't convert the {lang} subtitles to SRT, embedding them as they are: {e}")
+                    continue
+                usable[lang] = {**sub, "filepath": srt, "ext": "srt"}
+                converted.append(srt)
         info = {**info, "requested_subtitles": usable}
         try:
-            return super().run(info)
+            files, info = super().run(info)
         except PostProcessingError as e:
             self.report_warning(f"Couldn't embed subtitles, keeping the video without them: {e}")
-            return [], info
+            files = []
+        # The SRT copies are only for embedding: a saved subtitle file stays the site's own.
+        for path in converted:
+            if os.path.exists(path) and path not in files:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+        return files, {**info, "requested_subtitles": subtitles}
 
 
 class _SafeModifyChaptersPP(ModifyChaptersPP):

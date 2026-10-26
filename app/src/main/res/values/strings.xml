@@ -85,6 +85,8 @@
     <string name="save_video_as">Save video as</string>
     <string name="video_format_mkv_hint">Exactly as the site sends it, nothing converted</string>
     <string name="video_format_mp4_hint">Plays everywhere; some videos are converted first</string>
+    <string name="track_n">Track %1$d</string>
+    <string name="subtitles_off_short">Off</string>
     <string name="command_template_unclosed_quotes">Unclosed quotation marks</string>
     <string name="command_template_save_as">Save as template</string>
     <!-- Settings > Backup & restore. -->
