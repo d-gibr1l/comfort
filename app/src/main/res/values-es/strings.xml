@@ -79,6 +79,8 @@
     <string name="save_video_as">Guardar vídeo como</string>
     <string name="video_format_mkv_hint">Tal como lo envía el sitio, sin convertir</string>
     <string name="video_format_mp4_hint">Se reproduce en todas partes; algunos vídeos se convierten antes</string>
+    <string name="track_n">Pista %1$d</string>
+    <string name="subtitles_off_short">Desactivados</string>
     <string name="command_template_unclosed_quotes">Comillas sin cerrar</string>
     <string name="command_template_save_as">Guardar como plantilla</string>
     <string name="backup_title">Copia y restauración</string>

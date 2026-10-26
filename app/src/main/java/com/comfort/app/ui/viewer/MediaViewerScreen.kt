@@ -10,6 +10,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.FilledTonalIconButton
 import android.content.Context
@@ -293,6 +296,10 @@ fun MediaViewerScreen(
 
     var showRenameDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    // Comfort: the tracks of the video on screen (with its page, so a page swiped away doesn't
+    // leave its tracks behind), and which picker of the ⋮ menu is open.
+    var pageTracks by remember { mutableStateOf<Pair<Int, VideoTracks?>?>(null) }
+    var trackPicker by remember { mutableStateOf<Int?>(null) }
 
     androidx.compose.runtime.DisposableEffect(useFullScreenGlobal) {
         if (window != null && insetsController != null) {
@@ -321,6 +328,16 @@ fun MediaViewerScreen(
         }
     }
 
+    // Comfort: the ⋮ menu's track pickers.
+    pageTracks?.takeIf { it.first == pagerState.currentPage }?.second?.let { tracks ->
+        trackPicker?.let { type ->
+            TrackPickerDialog(
+                tracks = tracks,
+                subtitles = type == androidx.media3.common.C.TRACK_TYPE_TEXT,
+                onDismiss = { trackPicker = null },
+            )
+        }
+    }
     if (showRenameDialog && currentItem != null) {
         var renameValue by remember(currentItem) { mutableStateOf(renameText(currentItem)) }
         androidx.compose.material3.AlertDialog(
@@ -561,6 +578,7 @@ fun MediaViewerScreen(
                             muted = videosMuted,
                             onMutedChange = { videosMuted = it },
                             onPlayingChange = { playing -> if (page == pagerState.currentPage) currentVideoPlaying = playing },
+                            onTracksChange = { tracks -> pageTracks = page to tracks },
                             // Comfort: above a carousel's filmstrip.
                             controlsBottomPadding = if (galleryItems.count { groupKey(it) == groupKey(item) } > 1) 64.dp + FILMSTRIP_SPACE else 64.dp,
                             modifier = Modifier.fillMaxSize(),
@@ -1201,6 +1219,44 @@ fun MediaViewerScreen(
                                             }
                                         )
                                         extraMenuItems(currentItem) { showMoreMenu = false }
+                                        // Comfort: a downloaded video's subtitles, and its audio tracks when it has dubs.
+                                        val tracks = pageTracks?.takeIf { it.first == pagerState.currentPage }?.second
+                                        if (currentItem.isVideo && tracks != null) {
+                                            if (tracks.subtitles.isNotEmpty()) {
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.subtitles)) },
+                                                    leadingIcon = { Icon(androidx.compose.material.icons.Icons.Outlined.Subtitles, contentDescription = null) },
+                                                    trailingIcon = {
+                                                        Text(
+                                                            tracks.subtitles.firstOrNull { it.selected }?.label ?: stringResource(R.string.subtitles_off_short),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        showMoreMenu = false
+                                                        trackPicker = androidx.media3.common.C.TRACK_TYPE_TEXT
+                                                    }
+                                                )
+                                            }
+                                            if (tracks.audio.size > 1) {
+                                                androidx.compose.material3.DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.audio_track)) },
+                                                    leadingIcon = { Icon(androidx.compose.material.icons.Icons.Outlined.Language, contentDescription = null) },
+                                                    trailingIcon = {
+                                                        Text(
+                                                            tracks.audio.firstOrNull { it.selected }?.label.orEmpty(),
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        showMoreMenu = false
+                                                        trackPicker = androidx.media3.common.C.TRACK_TYPE_AUDIO
+                                                    }
+                                                )
+                                            }
+                                        }
                                         // Comfort: whether videos start with sound, here where they play.
                                         var soundOn by remember { mutableStateOf(!startMuted) }
                                         androidx.compose.material3.DropdownMenuItem(
@@ -1358,3 +1414,40 @@ private fun InfoBlock(label: String, value: String, modifier: Modifier = Modifie
 
 // How far up (px) a page is dragged to open the info sheet (after the 0.35 resistance).
 private const val INFO_SWIPE_PX = 60f
+
+/** A video's subtitle tracks ("Off" first) or audio tracks, as a radio list; picking one switches
+ * the playing video to it. */
+@Composable
+private fun TrackPickerDialog(tracks: VideoTracks, subtitles: Boolean, onDismiss: () -> Unit) {
+    val options: List<VideoTrack?> = if (subtitles) listOf<VideoTrack?>(null) + tracks.subtitles else tracks.audio
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(if (subtitles) R.string.subtitles else R.string.audio_track)) },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                options.forEach { option ->
+                    val selected = if (option == null) tracks.subtitlesOff else option.selected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.medium)
+                            .clickable {
+                                if (subtitles) tracks.selectSubtitles(option) else option?.let(tracks::selectAudio)
+                                onDismiss()
+                            }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = selected, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Text(option?.label ?: stringResource(R.string.subtitles_off_short), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}

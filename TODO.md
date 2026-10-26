@@ -1,9 +1,7 @@
 # Comfort - To-Do List
 
 ## Next up (in order)
-1. **Subtitles** (Content languages below): phone's language + the original by default, a picker in the preview sheet, auto-generated captions. ffmpeg v3 (7e1226f) can now read and write the subtitle formats this needs.
-2. **Track switching in the viewer** (Content languages below), so downloaded dubs and subtitles can be picked during playback.
-3. Then: right-to-left, fonts, lyrics from `.lrc` files, channel/playlist subscriptions, and the unverified items.
+1. Right-to-left, fonts, lyrics from `.lrc` files, channel/playlist subscriptions, and the unverified items.
 
 ## Features & Enhancements
 - [x] **Instagram File Sizes:** *(done in a914351 — sizes come from the media servers in parallel; shown on the picker/preview Download buttons, track rows and the single-item card, and Instaloader downloads report their total up front)* Add HTTP HEAD requests to instaloader_wrapper.py and gallery_dl_wrapper.py to fetch Content-Length of media files prior to downloading. This will allow the app to display file sizes for Instagram/Reddit links on the preview card and during the active download progress bar.
@@ -26,8 +24,8 @@
 
 ## Content languages (audio tracks, subtitles, lyrics)
 - [x] **Audio language picker:** *(done — a chip in the preview sheet for videos with dubs (original marked), Settings > Processing > Audio language: Original, the app's language or a common dub language; yt-dlp is asked with a `[language^=xx]` filter and falls back to the original; the file's audio is tagged with the real language, as YouTube labels every dub "eng")* the preview sheet lists a video's audio languages (Original + each dub, from the extraction it already does) and picks one; Settings gets "Preferred audio language" (Original by default, or the phone's language, or a set one). Songs and Spotify stay on the original. Today yt-dlp's ranking just takes the original.
-- [ ] **Subtitles:** default to the phone's language plus the video's original instead of always `en`; the preview sheet shows which languages exist (uploaded vs auto-generated) to pick from; an option for auto-generated captions and YouTube's auto-translation when nothing was uploaded (`writeautomaticsub` is never set today).
-- [ ] **Track switching in the viewer:** for files with several audio or subtitle tracks, the video viewer's ⋮ menu picks the audio track and shows subtitles (Media3 supports it; not wired up).
+- [x] **Subtitles:** *(done in 2c9726d — Settings > Processing: your language and the original by default, presets or codes; one track per language, the uploaded one else the auto-generated/translated one (new switch, on); a Subtitles chip in the preview sheet; YouTube's translated tracks can be refused with 429 on some connections, the download goes on without them)* default to the phone's language plus the video's original instead of always `en`; the preview sheet shows which languages exist (uploaded vs auto-generated) to pick from; an option for auto-generated captions and YouTube's auto-translation when nothing was uploaded (`writeautomaticsub` is never set today).
+- [x] **Track switching in the viewer:** *(done — the viewer's ⋮ menu: Subtitles (off by default) and Audio track (with more than one); MKV subtitles are now embedded as SRT, since Media3 can't read ffmpeg's WebVTT-in-Matroska — MKVs downloaded before keep theirs unreadable here)* for files with several audio or subtitle tracks, the video viewer's ⋮ menu picks the audio track and shows subtitles (Media3 supports it; not wired up).
 - [x] **Lyrics language tag:** *(done in 2bea8a2 — MP3 USLT frames now say `und`)* `lyrics.py` wrote every MP3's USLT frame as `lang="eng"`; use `und` (or a detected language).
 - [ ] **Translated/romanised lyrics:** would need another source than LRCLIB (left out for now).
 

@@ -78,6 +78,8 @@
     <string name="save_video_as">Simpan video sebagai</string>
     <string name="video_format_mkv_hint">Persis seperti yang dikirim situs, tanpa dikonversi</string>
     <string name="video_format_mp4_hint">Bisa diputar di mana saja; beberapa video dikonversi dulu</string>
+    <string name="track_n">Trek %1$d</string>
+    <string name="subtitles_off_short">Mati</string>
     <string name="command_template_unclosed_quotes">Tanda kutip belum ditutup</string>
     <string name="command_template_save_as">Simpan sebagai template</string>
     <string name="backup_title">Cadangkan &amp; pulihkan</string>

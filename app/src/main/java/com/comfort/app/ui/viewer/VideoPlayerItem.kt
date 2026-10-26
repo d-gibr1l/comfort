@@ -77,6 +77,8 @@ fun VideoPlayerItem(
     muted: Boolean = true,
     onMutedChange: (Boolean) -> Unit = {},
     onPlayingChange: (Boolean) -> Unit = {},
+    // Comfort: the audio and subtitle tracks of the video on screen, for the viewer's ⋮ menu.
+    onTracksChange: (VideoTracks?) -> Unit = {},
     onTap: (() -> Unit)? = null,
 ) {
     VideoPlayerItemWithResolvedUri(
@@ -87,6 +89,7 @@ fun VideoPlayerItem(
         muted = muted,
         onMutedChange = onMutedChange,
         onPlayingChange = onPlayingChange,
+        onTracksChange = onTracksChange,
         controlsBottomPadding = controlsBottomPadding,
         modifier = modifier,
         onTap = onTap
@@ -105,6 +108,7 @@ fun VideoPlayerItemWithResolvedUri(
     muted: Boolean = true,
     onMutedChange: (Boolean) -> Unit = {},
     onPlayingChange: (Boolean) -> Unit = {},
+    onTracksChange: (VideoTracks?) -> Unit = {},
     onTap: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -116,6 +120,11 @@ fun VideoPlayerItemWithResolvedUri(
             .setRenderersFactory(renderersFactory)
             
         builder.build().apply {
+            // Subtitles start off: a downloaded video's are shown when picked in the ⋮ menu (an
+            // embedded track is flagged "default", which would otherwise show it right away).
+            trackSelectionParameters = trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+                .build()
             setMediaItem(MediaItem.fromUri(uri))
             prepare()
             playWhenReady = true
@@ -168,10 +177,15 @@ fun VideoPlayerItemWithResolvedUri(
     // Comfort: the video's thumbnail until its first frame is up (~0.5 s to start a player), not
     // an empty page.
     var firstFrameShown by remember(uri) { mutableStateOf(false) }
+    val untitledTrack = androidx.compose.ui.res.stringResource(R.string.track_n)
+    var tracks by remember(uri) { mutableStateOf<VideoTracks?>(null) }
 
     DisposableEffect(exoPlayer) {
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onRenderedFirstFrame() { firstFrameShown = true }
+            override fun onTracksChanged(newTracks: androidx.media3.common.Tracks) {
+                tracks = VideoTracks.from(exoPlayer, newTracks) { n -> untitledTrack.format(n) }
+            }
             override fun onIsPlayingChanged(isPlayingState: Boolean) {
                 isPlaying = isPlayingState
             }
@@ -220,6 +234,11 @@ fun VideoPlayerItemWithResolvedUri(
 
     LaunchedEffect(isPlaying, isCurrentPage) {
         if (isCurrentPage) onPlayingChange(isPlaying)
+    }
+
+    // Only the page on screen tells the viewer its tracks.
+    LaunchedEffect(tracks, isCurrentPage) {
+        if (isCurrentPage) onTracksChange(tracks)
     }
 
     LaunchedEffect(isMuted) {
