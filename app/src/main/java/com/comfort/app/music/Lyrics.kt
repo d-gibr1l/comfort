@@ -73,9 +73,35 @@ data class Lyrics(val lines: List<Line>?, val plain: String?) {
                         .filterNotNull()
                         .firstNotNullOfOrNull { lyricsIn(it) }
                 }.getOrNull()?.let { parse(it) }
+                    // A song whose file can't hold tags (Spotify's .webm) has its lyrics beside it.
+                    ?: runCatching { sidecarLrc(context, uri) }.getOrNull()?.let { parse(it) }
             }
             synchronized(cache) { cache[uri] = found }
             return found
+        }
+
+        /** The text of "<song's name>.lrc" in the song's own folder (the app saves one there when
+         * Settings > Processing > Lyrics > .lrc file is on). For a MediaStore song it's found by
+         * name and folder; the app can read the .lrc files it saved itself. */
+        private fun sidecarLrc(context: Context, uri: Uri): String? {
+            if (uri.scheme == "file") {
+                val song = java.io.File(uri.path ?: return null)
+                return java.io.File(song.parentFile, song.nameWithoutExtension + ".lrc").takeIf { it.isFile }?.readText()
+            }
+            if (uri.scheme != "content") return null
+            val resolver = context.contentResolver
+            val columns = arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, android.provider.MediaStore.MediaColumns.RELATIVE_PATH)
+            val (name, folder) = resolver.query(uri, columns, null, null, null)?.use { c ->
+                if (c.moveToFirst()) (c.getString(0) ?: return null) to (c.getString(1) ?: return null) else null
+            } ?: return null
+            val lrcName = name.substringBeforeLast('.') + ".lrc"
+            val files = android.provider.MediaStore.Files.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL)
+            val lrc = resolver.query(
+                files, arrayOf(android.provider.MediaStore.MediaColumns._ID),
+                "${android.provider.MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${android.provider.MediaStore.MediaColumns.RELATIVE_PATH} = ?",
+                arrayOf(lrcName, folder), null,
+            )?.use { c -> if (c.moveToFirst()) android.content.ContentUris.withAppendedId(files, c.getLong(0)) else null } ?: return null
+            return resolver.openInputStream(lrc)?.use { it.readBytes().toString(Charsets.UTF_8) }
         }
 
         private fun lyricsIn(metadata: Metadata): String? {

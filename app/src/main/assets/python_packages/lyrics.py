@@ -62,11 +62,37 @@ def _artists(artist):
     return [artist] if not first or first == artist else [artist, first]
 
 
+# A release note in brackets or after a dash: "Her Majesty (Remastered 2009)", "Song - Radio Edit".
+# LRCLIB files the song without it, and its search finds nothing with it (seen: zero results).
+_RELEASE_NOTE = re.compile(
+    r"\s*(?:[(\[][^)\]]*\b(?:remaster(?:ed)?|mono|stereo|version|edit|mix|live|bonus|deluxe|anniversary)\b[^)\]]*[)\]]"
+    r"|\s-\s.*\b(?:remaster(?:ed)?|mono|stereo|version|edit|mix|live|bonus)\b.*)\s*$",
+    re.I,
+)
+
+
+def _titles(title):
+    """The title as given, then without a trailing release note."""
+    bare = title
+    while True:
+        stripped = _RELEASE_NOTE.sub("", bare).strip()
+        if stripped == bare or not stripped:
+            break
+        bare = stripped
+    return [title] if bare == title else [title, bare]
+
+
 def _lookup(title, artist, album, seconds):
     for name in _artists(artist):
-        hit = _lookup_one(title, name, album, seconds)
-        if hit:
-            return hit
+        for t in _titles(title):
+            # A failed request (LRCLIB answers 503 at times) moves on to the next title, it doesn't
+            # end the lookup.
+            try:
+                hit = _lookup_one(t, name, album, seconds)
+            except Exception:
+                continue
+            if hit:
+                return hit
     return None
 
 

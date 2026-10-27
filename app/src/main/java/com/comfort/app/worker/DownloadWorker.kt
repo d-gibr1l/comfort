@@ -190,6 +190,9 @@ class DownloadWorker(
                 } finally { release() }
             }
         }.getOrNull()
+        // On the card while it looks (up to LYRICS_CAP_MS a song): the download is otherwise done
+        // and would sit there with nothing moving.
+        com.comfort.app.data.DownloadNotes.set(downloadId, applicationContext.getString(R.string.finding_lyrics))
         runCatching {
             kotlinx.coroutines.withTimeoutOrNull(LYRICS_CAP_MS) {
                 PythonRuntime.run(
@@ -201,6 +204,7 @@ class DownloadWorker(
                 ) { }
             }
         }
+        com.comfort.app.data.DownloadNotes.clear(downloadId)
         return File(song.parentFile, song.nameWithoutExtension + ".lrc").takeIf { writeLrc && it.isFile }
     }
 
@@ -615,7 +619,18 @@ class DownloadWorker(
                         applicationContext, candidate, forceAudioMime = isAudioFile,
                     )
                     if (savedUri != null && lrcFile != null) {
-                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrcFile) }
+                        // Named after the song as it was saved: a name already taken makes it
+                        // "Song (1).opus", and the .lrc must follow for players (and Now Playing) to
+                        // pair them.
+                        val savedName = runCatching {
+                            applicationContext.contentResolver.query(
+                                savedUri, arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME), null, null, null,
+                            )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                        }.getOrNull()
+                        val lrc = savedName?.substringBeforeLast('.')?.takeIf { it != candidate.nameWithoutExtension }
+                            ?.let { base -> File(lrcFile.parentFile, "$base.lrc").takeIf { lrcFile.renameTo(it) } } ?: lrcFile
+                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrc) }
+                        lrc.delete()
                     }
                     lrcFile?.delete()
                     // Where it went, in the post's order: what the media viewer pages through.
