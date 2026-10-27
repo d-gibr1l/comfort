@@ -376,10 +376,13 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         if (rows.isEmpty()) return
         val context = getApplication<Application>()
         val now = System.currentTimeMillis()
-        val status = DownloadDispatcher.predictedDispatchStatus(context, userInitiated = userInitiated)
+        // A retried failure loses any "Up next" mark (moveToQueueEnd clears it); a paused one keeps
+        // it, so its resume skips the schedule window like Resume All and the repairs already do.
+        fun forced(entity: DownloadEntity) = entity.forceStart && entity.status != DownloadStatus.ERRORED
         val dispatches = rows.mapIndexed { index, entity ->
             DownloadDispatcher.Dispatch(
                 entity.id, entity.url,
+                forceImmediate = forced(entity),
                 // Each as it was listed: one that has changed since (finished, failed again,
                 // deleted) is left as it is.
                 expectedStatus = setOf(entity.status),
@@ -388,6 +391,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val moves = rows.zip(dispatches).associate { (entity, dispatch) ->
             val queueEnd = dispatch.moveToQueueEndAt
+            val status = DownloadDispatcher.predictedDispatchStatus(context, forceImmediate = dispatch.forceImmediate, userInitiated = userInitiated)
             entity.id to PendingMove(entity.status) { row ->
                 if (queueEnd == null) row.copy(status = status)
                 else row.copy(status = status, queueOrder = 0, forceStart = false, dateAdded = queueEnd)

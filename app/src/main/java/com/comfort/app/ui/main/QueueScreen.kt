@@ -639,6 +639,7 @@ fun QueueScreen(
                                     StoppedRow(
                                         item = item,
                                         onResume = { viewModel.retryDownload(item.id) },
+                                        onStartNow = { viewModel.startNow(item.id) },
                                         onDelete = { requestDelete(setOf(item.id)) },
                                         selectionMode = selectionMode,
                                         selected = isSelected,
@@ -838,6 +839,7 @@ private fun StoppedRow(
     item: DownloadEntity,
     onResume: () -> Unit,
     onDelete: () -> Unit,
+    onStartNow: () -> Unit = {},
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onToggleSelect: () -> Unit = {},
@@ -975,6 +977,15 @@ private fun StoppedRow(
                         Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        // Resume waits for a closed schedule window; this is the paused card's way to
+                        // skip it, like the waiting cards' own "Up next". Read when the menu opens.
+                        if (isPaused && com.comfort.app.data.DownloadDispatcher.scheduleDelayMillis(context) > 0) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.up_next)) },
+                                leadingIcon = { Icon(Icons.Outlined.KeyboardDoubleArrowUp, contentDescription = null) },
+                                onClick = { menuExpanded = false; onStartNow() },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.copy_link)) },
                             leadingIcon = { Icon(Icons.Outlined.ContentCopy, contentDescription = null) },
