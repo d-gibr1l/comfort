@@ -225,6 +225,29 @@ fun VideoPlayerItemWithResolvedUri(
         }
     }
 
+    // Comfort: the video pauses when the app goes to the background (Home, Recents, the screen
+    // off) and goes on when it comes back, if it was playing then.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val currentPage by androidx.compose.runtime.rememberUpdatedState(isCurrentPage)
+    DisposableEffect(lifecycleOwner, exoPlayer) {
+        var resumeOnStart = false
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    resumeOnStart = exoPlayer.playWhenReady
+                    exoPlayer.pause()
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_START -> {
+                    if (resumeOnStart && currentPage) exoPlayer.play()
+                    resumeOnStart = false
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
             currentPosition = exoPlayer.currentPosition
@@ -292,8 +315,12 @@ fun VideoPlayerItemWithResolvedUri(
             if (surfaceReady) AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
+                        // Comfort: the built-in controller off before the player is attached:
+                        // attaching it first showed the controller, and turning it off after
+                        // only faded it out, so it flashed on every video swiped to.
+                        useController = false
+                        controllerAutoShow = false
                         player = exoPlayer
-                        useController = false // Hide default legacy controller
                         // Comfort: no black shutter over the thumbnail shown until the first frame.
                         setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                         resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
