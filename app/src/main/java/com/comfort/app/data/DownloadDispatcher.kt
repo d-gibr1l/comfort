@@ -761,7 +761,8 @@ object DownloadDispatcher {
     suspend fun resumeDownload(context: Context, id: String) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
-        enqueueWork(context, id, entity.url, userInitiated = true)
+        // Keeps an earlier "Up next" (forceStart), same as a card's Resume and Resume All.
+        enqueueWork(context, id, entity.url, forceImmediate = entity.forceStart, userInitiated = true)
     }
 
     /** Jumps a still-waiting download (QUEUED or SCHEDULED) to the front of the queue and past
