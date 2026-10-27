@@ -81,6 +81,7 @@
     <string name="video_format_mp4_hint">Läuft überall; manche Videos werden vorher umgewandelt</string>
     <string name="track_n">Spur %1$d</string>
     <string name="subtitles_off_short">Aus</string>
+    <string name="finding_lyrics">Songtext wird gesucht…</string>
     <string name="command_template_unclosed_quotes">Nicht geschlossene Anführungszeichen</string>
     <string name="command_template_save_as">Als Vorlage speichern</string>
     <string name="backup_title">Sichern &amp; wiederherstellen</string>
