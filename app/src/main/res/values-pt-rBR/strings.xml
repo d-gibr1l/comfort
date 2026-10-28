@@ -588,11 +588,11 @@
     <string name="speed_x">Velocidade: %1$s</string>
     <string name="waiting_to_start">Esperando para começar…</string>
     <string name="waiting_for_a_network_connection_2">Esperando uma conexão de rede…</string>
-    <string name="x_up_next_starts_it_now">%1$s · A seguir inicia agora</string>
+    <string name="x_up_next_starts_it_now">%1$s · Iniciar agora começa já</string>
     <string name="temporarily_rate_limited_by_the_site">Limitado temporariamente pelo site — tentar de novo na hora não resolve. Ligar e desligar o modo avião ou reiniciar o roteador geralmente dá um IP novo e resolve.</string>
     <string name="error_details">Detalhes do erro</string>
     <string name="add_cookies">Adicionar cookies</string>
-    <string name="up_next">A seguir</string>
+    <string name="up_next">Iniciar agora</string>
     <string name="cancel_download">Cancelar download</string>
     <string name="unknown_error">Erro desconhecido</string>
     <string name="error_message">Mensagem de erro</string>
@@ -803,7 +803,7 @@
     <string name="long_press_a_card_in_queue">Toque e segure um card na Fila para selecionar vários downloads de uma vez.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">O yt-dlp, gallery-dl e Instaloader se atualizam sozinhos em segundo plano — veja em Configurações &gt; Atualizações.</string>
     <string name="add_cookies_from_settings_to_unlock">Adicione cookies nas Configurações para liberar conteúdo privado ou com restrição de idade.</string>
-    <string name="tap_a_queued_download_s_up">Toque em \"A seguir\" num download da fila para passá-lo para a frente, pulando qualquer espera de agendamento.</string>
+    <string name="tap_a_queued_download_s_up">Toque em \"Iniciar agora\" num download da fila para começá-lo já, pulando qualquer espera de agendamento. Se todas as vagas estiverem ocupadas, o download mais recente espera a vez.</string>
     <string name="choose_mp4_or_mkv_output_and">Escolha saída em MP4 ou MKV, e quantas vezes um download que falhou é tentado de novo, em Configurações &gt; Downloads.</string>
     <string name="next_tip">Próxima dica</string>
     <string name="x_of_x_selected">%1$s de %2$s selecionados</string>

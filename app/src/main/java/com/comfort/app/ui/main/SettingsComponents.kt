@@ -805,11 +805,13 @@ internal fun ConfirmCancelSplitButton(
     outlinedConfirm: Boolean = true,
     // The trailing half's icon: ✕ for cancel, a bin where it deletes (an errored Queue card).
     cancelIcon: ImageVector = Icons.Outlined.Close,
+    // In place of [icon] and [label]: a Queue card's animated Start now.
+    leadingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
     SplitButtonLayout(
         modifier = modifier,
         leadingButton = {
-            val content: @Composable RowScope.() -> Unit = {
+            val content: @Composable RowScope.() -> Unit = leadingContent ?: {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize))
                 Spacer(Modifier.width(8.dp))
                 Text(label)

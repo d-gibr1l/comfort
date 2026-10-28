@@ -73,7 +73,7 @@ private suspend fun CoroutineWorker.setForegroundSafely(info: ForegroundInfo) {
  * Poll-based (checked once per [POLL_INTERVAL_MS]) rather than a fixed-size Semaphore specifically
  * so it keeps respecting a concurrency-limit change made mid-session without needing to recreate or
  * resize anything — each wait iteration re-reads the current preference value fresh. */
-private object DownloadConcurrencyGate {
+internal object DownloadConcurrencyGate {
     // Fallback only now, not the steady-state wait — a waiter normally wakes the instant
     // slotFreed fires below, so this only actually matters for the one case that can't signal
     // itself: the user *raising* the concurrency limit in Settings while every existing slot is
@@ -138,6 +138,10 @@ private object DownloadConcurrencyGate {
         active.updateAndGet { (it - 1).coerceAtLeast(0) }
         slotFreed.tryEmit(Unit)
     }
+
+    /** Whether [downloadId]'s worker is in line here for a slot — Start now waits for this before
+     * freeing one (see DownloadDispatcher.startNow). */
+    fun isWaiting(downloadId: String): Boolean = waiting.containsKey(downloadId)
 }
 
 /** Extensions this app's own yt-dlp wrapper can actually produce for an audio-only download (see

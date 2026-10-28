@@ -977,12 +977,12 @@ private fun StoppedRow(
                         Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        // Resume waits for a closed schedule window; this is the paused card's way to
-                        // skip it, like the waiting cards' own "Up next". Read when the menu opens.
-                        if (isPaused && com.comfort.app.data.DownloadDispatcher.scheduleDelayMillis(context) > 0) {
+                        // Resume waits for a free slot and a closed schedule window; Start now, like
+                        // on a waiting card, starts it right away (making room if every slot is busy).
+                        if (isPaused) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.up_next)) },
-                                leadingIcon = { Icon(Icons.Outlined.KeyboardDoubleArrowUp, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Outlined.PlayArrow, contentDescription = null) },
                                 onClick = { menuExpanded = false; onStartNow() },
                             )
                         }
@@ -1492,7 +1492,7 @@ fun QueueItemCard(
                                     Text(stringResource(R.string.add_cookies))
                                 }
                             }
-                            // Retry and delete as one split button, like "Up next" / cancel on a
+                            // Retry and delete as one split button, like "Start now" / cancel on a
                             // queued card. No copy button: a long-press on the card's link copies it
                             // (QueueLink).
                             ConfirmCancelSplitButton(
@@ -1505,22 +1505,64 @@ fun QueueItemCard(
                             )
                         }
                         DownloadStatus.QUEUED, DownloadStatus.SCHEDULED -> {
-                            // Same split button as Settings' edit sheets: "Up next" moves this
-                            // download to the front of the line (skipping any schedule wait) —
-                            // it doesn't run alongside what's already downloading; cancel on the
-                            // trailing half.
+                            // Same split button as Settings' edit sheets: "Start now" starts this
+                            // download right away, past any schedule wait — when every slot is busy
+                            // the newest running download steps aside for it (see
+                            // DownloadDispatcher.startNow); cancel on the trailing half.
+                            // Tapped, it turns into "Starting…" with a spinner until the card moves
+                            // to Running: making room can take a few seconds (see startNow).
+                            var starting by remember(item.id) { mutableStateOf(false) }
+                            LaunchedEffect(starting) {
+                                // Back to the button if it never started (it stays in the queue).
+                                if (starting) { kotlinx.coroutines.delay(20_000L); starting = false }
+                            }
                             ConfirmCancelSplitButton(
                                 label = stringResource(R.string.up_next),
-                                icon = Icons.Outlined.KeyboardDoubleArrowUp,
-                                onConfirm = onStartNow,
+                                icon = Icons.Outlined.PlayArrow,
+                                // Taps while starting are ignored rather than the button disabled:
+                                // disabled, it turned a dim grey that hid the spinner.
+                                onConfirm = { if (!starting) { starting = true; onStartNow() } },
                                 onCancel = onCancel,
                                 cancelDescription = stringResource(R.string.cancel_download),
+                                leadingContent = { StartNowLabel(starting) },
                             )
                         }
                         else -> {}
                     }
                 }
             }
+        }
+    }
+}
+
+/** A waiting card's Start now: the play icon slides away and "Starting…" with a spinner comes up
+ * from below once tapped, and back if it never starts. */
+@Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+private fun StartNowLabel(starting: Boolean) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = starting,
+        transitionSpec = {
+            if (targetState) {
+                (slideInVertically(tween(260)) { it } + fadeIn(tween(260))) togetherWith
+                    (androidx.compose.animation.slideOutHorizontally(tween(220)) { it / 2 } + fadeOut(tween(180)))
+            } else {
+                fadeIn(tween(220)) togetherWith fadeOut(tween(180))
+            } using androidx.compose.animation.SizeTransform(clip = false)
+        },
+        label = "startNow",
+    ) { isStarting ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isStarting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(SplitButtonDefaults.LeadingIconSize))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(if (isStarting) R.string.starting else R.string.up_next))
         }
     }
 }
