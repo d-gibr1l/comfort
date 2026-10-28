@@ -334,6 +334,18 @@ class DownloadWorker(
                 // two used to be overwritten with RUNNING, and the cancellation then requeued it
                 // (RUNNING -> QUEUED), bringing a paused download back. Only a download still
                 // waiting to start (or one whose earlier run was cut off, still RUNNING) starts.
+                // The window may have closed while this worker waited for a slot: only an open
+                // window was checked when it woke, so a long queue kept starting downloads after
+                // the end time until it was empty. Back to waiting for the next window instead,
+                // the way a download the window closes on mid-transfer goes (Up next excepted).
+                if (entity?.forceStart != true &&
+                    GalleryDlPreferences.isScheduleEnabled(applicationContext) &&
+                    !GalleryDlPreferences.isGloballyPaused(applicationContext) &&
+                    !DownloadDispatcher.isWithinScheduleWindow(applicationContext)
+                ) {
+                    DownloadDispatcher.suspendForSchedule(applicationContext, downloadId)
+                    return@withContext Result.success()
+                }
                 val started = dao.updateStatusIfIn(
                     downloadId, DownloadStatus.RUNNING,
                     listOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED, DownloadStatus.RUNNING),
@@ -716,10 +728,15 @@ class DownloadWorker(
                     }
                 }
 
-                val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
-                    android.util.Log.d("DownloadEngine", "Python output: $line")
-                    DownloadLog.line(applicationContext, downloadId, line)
-
+                // At most once a minute; called for every engine line and every second by the
+                // watchdog below — a silent stretch (an ffmpeg step, a stalled connection) printed
+                // nothing, so the download ran on past the window's end.
+                suspend fun checkScheduleWindow() {
+                    // Everything it was getting is already downloaded (a song's lyrics lookup and
+                    // saving are what's left): it finishes. Sent back to wait, its finished file was
+                    // saved and it was downloaded all over again when the window reopened (seen
+                    // live: a song saved at 17:05:41, then left "Scheduled").
+                    if (savedCount.get() >= totalItemsRef.get().coerceAtLeast(1)) return
                     if (!scheduleClosedPauseRequested.get() && !startedViaStartNow) {
                         val now = System.currentTimeMillis()
                         val last = lastScheduleCheckMs.get()
@@ -739,6 +756,12 @@ class DownloadWorker(
                             }
                         }
                     }
+                }
+
+                val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
+                    android.util.Log.d("DownloadEngine", "Python output: $line")
+                    DownloadLog.line(applicationContext, downloadId, line)
+                    checkScheduleWindow()
 
                     // What the line reports — see EngineEventParser for every shape it understands.
                     when (val event = EngineEventParser.parse(line)) {
@@ -969,6 +992,7 @@ class DownloadWorker(
                         var zeroed = false
                         while (true) {
                             kotlinx.coroutines.delay(1_000)
+                            checkScheduleWindow()
                             val now = System.currentTimeMillis()
                             val engineReporting = lastProgressLineAt.get() > 0L
                             val staged = if (engineReporting) currentFileBytesRef.get() else runCatching {

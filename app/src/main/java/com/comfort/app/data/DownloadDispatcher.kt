@@ -807,14 +807,21 @@ object DownloadDispatcher {
         }
         if (withinWindow) return 0L
 
-        val minutesUntilStart = if (nowMin < startMin) startMin - nowMin else (24 * 60 - nowMin) + startMin
-        // To the window's start exactly, not in whole minutes from now: the seconds already gone
-        // in this minute come off. Without that each download's job woke up to a minute after the
-        // window opened — at the seconds-past-the-minute it was queued at (seen live: queued at
-        // :04, :11, :19 past, they started at 16:28:04, :11, :19), so a batch trickled into
-        // Running instead of starting together.
-        val intoThisMinute = now.get(Calendar.SECOND) * 1000L + now.get(Calendar.MILLISECOND)
-        return (TimeUnit.MINUTES.toMillis(minutesUntilStart.toLong()) - intoThisMinute).coerceAtLeast(1L)
+        // The window's next start as a real moment, not a count of clock minutes from now: across
+        // a daylight-saving change the clock skips or repeats an hour, and "180 minutes until
+        // 03:00" was an hour off (Android sends no broadcast for DST, so ClockChangeReceiver never
+        // corrected it). Calendar lands on the start's actual instant either side of the change.
+        // To the window's start exactly, seconds included: each job used to wake up to a minute
+        // after the window opened, at the seconds-past-the-minute it was queued at (seen live:
+        // queued at :04, :11, :19 past, they started at 16:28:04, :11, :19).
+        val start = (now.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, startMin / 60)
+            set(Calendar.MINUTE, startMin % 60)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (!after(now)) add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return (start.timeInMillis - now.timeInMillis).coerceAtLeast(1L)
     }
 
     private const val SCHEDULE_ALARM_REQUEST_CODE = 1001
