@@ -917,6 +917,9 @@ fun HomeScreen(
                     // Text that isn't a link is a YouTube search: the buttons below become one
                     // "Search YouTube", and the keyboard's action searches.
                     val isSearch = url.isNotBlank() && !looksLikeLink(url)
+                    // The field lets go of focus when a sheet opens over it: still focused under
+                    // the sheet, it brought the keyboard back up as the sheet closed.
+                    val fieldFocus = androidx.compose.ui.platform.LocalFocusManager.current
                     fun openSearch() {
                         if (!isSearch) return
                         youtubeSearch = url.trim()
@@ -975,6 +978,7 @@ fun HomeScreen(
                                 onClick = {
                                     if (url.isNotBlank() && !isSearch) {
                                         val target = normalizeInputUrl(url)
+                                        fieldFocus.clearFocus()
                                         onConfigure(target)
                                         url = ""
                                     }
@@ -1002,6 +1006,7 @@ fun HomeScreen(
                                     openSearch()
                                 } else if (url.isNotBlank()) {
                                     val target = normalizeInputUrl(url)
+                                    fieldFocus.clearFocus()
                                     downloadNow(target)
                                     url = ""
                                 }
