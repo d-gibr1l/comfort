@@ -572,11 +572,11 @@
     <string name="speed_x">Kecepatan: %1$s</string>
     <string name="waiting_to_start">Menunggu dimulai…</string>
     <string name="waiting_for_a_network_connection_2">Menunggu koneksi jaringan…</string>
-    <string name="x_up_next_starts_it_now">%1$s · Berikutnya untuk memulai sekarang</string>
+    <string name="x_up_next_starts_it_now">%1$s · Mulai sekarang untuk langsung memulai</string>
     <string name="temporarily_rate_limited_by_the_site">Sementara dibatasi oleh situs — mencoba lagi sekarang tidak akan membantu. Menyalakan-matikan mode pesawat atau memulai ulang router biasanya memberi IP baru dan mengatasinya.</string>
     <string name="error_details">Detail error</string>
     <string name="add_cookies">Tambahkan cookie</string>
-    <string name="up_next">Berikutnya</string>
+    <string name="up_next">Mulai sekarang</string>
     <string name="cancel_download">Batalkan unduhan</string>
     <string name="unknown_error">Error tidak diketahui</string>
     <string name="error_message">Pesan error</string>
@@ -778,7 +778,7 @@
     <string name="long_press_a_card_in_queue">Tekan lama kartu di Antrean untuk memilih beberapa unduhan sekaligus.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">yt-dlp, gallery-dl, dan Instaloader diperbarui otomatis di latar belakang — cek Setelan > Pembaruan.</string>
     <string name="add_cookies_from_settings_to_unlock">Tambahkan cookie dari Setelan untuk membuka konten pribadi atau dengan batasan usia.</string>
-    <string name="tap_a_queued_download_s_up">Ketuk \"Berikutnya\" pada unduhan di antrean untuk memindahkannya ke urutan terdepan, tanpa menunggu jadwal.</string>
+    <string name="tap_a_queued_download_s_up">Ketuk \"Mulai sekarang\" pada unduhan di antrean untuk langsung memulainya, tanpa menunggu jadwal. Jika semua slot terpakai, unduhan terbaru menunggu gilirannya.</string>
     <string name="choose_mp4_or_mkv_output_and">Pilih output MP4 atau MKV, dan berapa kali unduhan gagal dicoba lagi, di Setelan > Unduhan.</string>
     <string name="next_tip">Tips berikutnya</string>
     <string name="x_of_x_selected">%1$s dari %2$s dipilih</string>

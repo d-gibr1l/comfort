@@ -531,7 +531,13 @@ object DownloadDispatcher {
             // before its turn must stay FINISHED/ERRORED rather than being flipped to PAUSED.
             val paused = db.withTransaction {
                 rows.filter { dao.updateStatusIfIn(it.id, DownloadStatus.PAUSED, PAUSABLE_STATUSES) > 0 }
-                    .onEach { dao.resetSpeed(it.id) }
+                    .onEach {
+                        dao.resetSpeed(it.id)
+                        // "Up next" doesn't outlast a pause: resumed, a download waits for a
+                        // closed schedule window again (asked for: Up next, Pause, Resume went
+                        // straight on downloading). The paused card's own "Up next" skips it.
+                        dao.clearForceStart(it.id)
+                    }
             }
             paused.forEach { entity ->
                 if (notify) {
@@ -761,22 +767,50 @@ object DownloadDispatcher {
     suspend fun resumeDownload(context: Context, id: String) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
-        // Keeps an earlier "Up next" (forceStart), same as a card's Resume and Resume All.
+        // forceStart is false after a pause (see pauseDownloads); still read, for a paused row
+        // whose mark predates that.
         enqueueWork(context, id, entity.url, forceImmediate = entity.forceStart, userInitiated = true)
     }
 
-    /** Jumps a still-waiting download (QUEUED or SCHEDULED) to the front of the queue and past
-     * the schedule window's delay, if one was blocking it — the Queue card's "Up next" action. It
-     * takes the next free download slot (DownloadWorker's concurrency gate hands slots out in this
-     * same queueOrder), never an extra one alongside what's already running. Negative
-     * seconds-since-epoch so a later "Start now" tap always outranks an earlier one (more negative
-     * = sorts first in getQueueFlow's `queueOrder ASC`), safely within Int range for decades. */
+    /** The Queue card's "Start now": this download starts right away, past the schedule window's
+     * delay if one was holding it. When every download slot is busy, the download that started
+     * most recently steps aside for it — sent back to the front of the queue, right behind this
+     * one, so it picks up where it left off as soon as a slot frees. (It used to be "Up next",
+     * which only moved the download to the front of the line to wait for the next free slot.)
+     * Negative seconds-since-epoch as its place: a later Start now always outranks an earlier one
+     * (more negative = sorts first in getQueueFlow's `queueOrder ASC`), within Int range for
+     * decades. */
     suspend fun startNow(context: Context, id: String) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
-        dao.setForceStart(id, -(System.currentTimeMillis() / 1000L).toInt())
+        val order = -(System.currentTimeMillis() / 1000L).toInt()
+        dao.setForceStart(id, order)
         enqueueWork(context, id, entity.url, forceImmediate = true, userInitiated = true)
+        makeRoomFor(context, id, order)
         repairOrphanedQueue(context)
+    }
+
+    /** Frees a slot for [id] when all of them are taken — see [startNow]. Waits until its worker
+     * is actually in line at the gate first: freed any earlier, the slot went to whichever worker
+     * asked for it next, which could be the very download that was just sent back. */
+    private suspend fun makeRoomFor(context: Context, id: String, order: Int) {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        val giveUpAt = System.currentTimeMillis() + 15_000L
+        while (!com.comfort.app.worker.DownloadConcurrencyGate.isWaiting(id)) {
+            // Already running (a slot was free), or stopped meanwhile: nothing to make room for.
+            if (dao.getById(id)?.status != DownloadStatus.QUEUED || System.currentTimeMillis() > giveUpAt) return
+            kotlinx.coroutines.delay(200L)
+        }
+        val limit = GalleryDlPreferences.getEffectiveConcurrentDownloads(context).coerceAtLeast(1)
+        val running = dao.getRunningOnce().filter { it.id != id }
+        if (running.size < limit) return
+        val bumped = running.maxByOrNull { it.downloadStartTime } ?: return
+        withDownloadLock(bumped.id) { dao.setQueueOrder(bumped.id, order + 1) }
+        dao.resetSpeed(bumped.id)
+        DownloadNotifications.cancel(context, bumped.id)
+        // Its job is cancelled and a new one queued (still RUNNING, so only that row): the same
+        // way the schedule window closing sends a running download back to wait.
+        enqueueWorkMany(context, listOf(Dispatch(bumped.id, bumped.url, bumped.forceStart, setOf(DownloadStatus.RUNNING))))
     }
 
     /** Whether the configured schedule window (if any) currently allows downloading — the

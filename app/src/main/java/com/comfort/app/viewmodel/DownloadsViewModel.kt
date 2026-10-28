@@ -376,8 +376,8 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         if (rows.isEmpty()) return
         val context = getApplication<Application>()
         val now = System.currentTimeMillis()
-        // A retried failure loses any "Up next" mark (moveToQueueEnd clears it); a paused one keeps
-        // it, so its resume skips the schedule window like Resume All and the repairs already do.
+        // A retried failure loses any "Up next" mark (moveToQueueEnd clears it), and so does a
+        // pause (DownloadDispatcher.pauseDownloads): resumed, it waits for a closed window again.
         fun forced(entity: DownloadEntity) = entity.forceStart && entity.status != DownloadStatus.ERRORED
         val dispatches = rows.mapIndexed { index, entity ->
             DownloadDispatcher.Dispatch(

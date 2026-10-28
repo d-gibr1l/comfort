@@ -601,11 +601,11 @@
     <string name="speed_x">Скорость: %1$s</string>
     <string name="waiting_to_start">Ожидание запуска…</string>
     <string name="waiting_for_a_network_connection_2">Ожидание подключения к сети…</string>
-    <string name="x_up_next_starts_it_now">%1$s · «Вне очереди» запустит сразу</string>
+    <string name="x_up_next_starts_it_now">%1$s · «Начать сейчас» запустит сразу</string>
     <string name="temporarily_rate_limited_by_the_site">Сайт временно ограничил запросы — сразу повторять бесполезно. Обычно помогает включить и выключить режим полёта или перезагрузить роутер: так вы получите новый IP.</string>
     <string name="error_details">Подробности ошибки</string>
     <string name="add_cookies">Добавить cookie</string>
-    <string name="up_next">Вне очереди</string>
+    <string name="up_next">Начать сейчас</string>
     <string name="cancel_download">Отменить загрузку</string>
     <string name="unknown_error">Неизвестная ошибка</string>
     <string name="error_message">Текст ошибки</string>
@@ -827,7 +827,7 @@
     <string name="long_press_a_card_in_queue">Нажмите и удерживайте карточку в очереди, чтобы выбрать сразу несколько загрузок.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">yt-dlp, gallery-dl и Instaloader обновляются в фоне сами — см. Настройки > Обновления.</string>
     <string name="add_cookies_from_settings_to_unlock">Добавьте cookie в настройках, чтобы открыть закрытый контент или контент с возрастными ограничениями.</string>
-    <string name="tap_a_queued_download_s_up">Нажмите «Вне очереди» у загрузки, чтобы переместить её в начало очереди без ожидания расписания.</string>
+    <string name="tap_a_queued_download_s_up">Нажмите «Начать сейчас» у загрузки в очереди, чтобы запустить её сразу, даже вне расписания. Если все места заняты, последняя запущенная загрузка подождёт.</string>
     <string name="choose_mp4_or_mkv_output_and">Выбрать MP4 или MKV и число повторов при ошибке можно в разделе Настройки > Загрузки.</string>
     <string name="next_tip">Следующий совет</string>
     <string name="x_of_x_selected">Выбрано %1$s из %2$s</string>

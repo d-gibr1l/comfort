@@ -575,11 +575,11 @@
     <string name="speed_x">Tempo: %1$s</string>
     <string name="waiting_to_start">Wartet auf Start…</string>
     <string name="waiting_for_a_network_connection_2">Warte auf Netzwerkverbindung…</string>
-    <string name="x_up_next_starts_it_now">%1$s · „Als Nächstes“ startet ihn sofort</string>
+    <string name="x_up_next_starts_it_now">%1$s · „Jetzt starten“ startet ihn sofort</string>
     <string name="temporarily_rate_limited_by_the_site">Vorübergehend von der Seite gedrosselt – sofortiges Wiederholen hilft nicht. Flugmodus an und aus oder ein Router-Neustart bringt meist eine neue IP und behebt das.</string>
     <string name="error_details">Fehlerdetails</string>
     <string name="add_cookies">Cookies hinzufügen</string>
-    <string name="up_next">Als Nächstes</string>
+    <string name="up_next">Jetzt starten</string>
     <string name="cancel_download">Download abbrechen</string>
     <string name="unknown_error">Unbekannter Fehler</string>
     <string name="error_message">Fehlermeldung</string>
@@ -785,7 +785,7 @@
     <string name="long_press_a_card_in_queue">Halte eine Karte in der Warteschlange gedrückt, um mehrere Downloads auf einmal auszuwählen.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">yt-dlp, gallery-dl und Instaloader aktualisieren sich im Hintergrund – siehe Einstellungen > Updates.</string>
     <string name="add_cookies_from_settings_to_unlock">Füge in den Einstellungen Cookies hinzu, um private oder altersbeschränkte Inhalte freizuschalten.</string>
-    <string name="tap_a_queued_download_s_up">Tippe bei einem wartenden Download auf „Als Nächstes“, um ihn nach vorne zu holen und jede Zeitplan-Wartezeit zu überspringen.</string>
+    <string name="tap_a_queued_download_s_up">Tippe bei einem wartenden Download auf „Jetzt starten“, um ihn sofort zu starten, auch außerhalb des Zeitplans. Sind alle Plätze belegt, wartet der zuletzt gestartete Download.</string>
     <string name="choose_mp4_or_mkv_output_and">Wähle MP4 oder MKV und wie oft ein fehlgeschlagener Download wiederholt wird, unter Einstellungen > Downloads.</string>
     <string name="next_tip">Nächster Tipp</string>
     <string name="x_of_x_selected">%1$s von %2$s ausgewählt</string>

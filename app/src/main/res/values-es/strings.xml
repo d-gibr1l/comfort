@@ -583,11 +583,11 @@
     <string name="speed_x">Velocidad: %1$s</string>
     <string name="waiting_to_start">Esperando para empezar…</string>
     <string name="waiting_for_a_network_connection_2">Esperando conexión a la red…</string>
-    <string name="x_up_next_starts_it_now">%1$s · Siguiente la inicia ahora</string>
+    <string name="x_up_next_starts_it_now">%1$s · Iniciar ahora la empieza ya</string>
     <string name="temporarily_rate_limited_by_the_site">El sitio limitó temporalmente las solicitudes; reintentar de inmediato no lo arregla. Activar y desactivar el modo avión o reiniciar el router suele darte una IP nueva y lo resuelve.</string>
     <string name="error_details">Detalles del error</string>
     <string name="add_cookies">Añadir cookies</string>
-    <string name="up_next">Siguiente</string>
+    <string name="up_next">Iniciar ahora</string>
     <string name="cancel_download">Cancelar descarga</string>
     <string name="unknown_error">Error desconocido</string>
     <string name="error_message">Mensaje de error</string>
@@ -795,7 +795,7 @@
     <string name="long_press_a_card_in_queue">Mantén presionada una tarjeta en la Cola para seleccionar varias descargas a la vez.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">yt-dlp, gallery-dl e Instaloader se actualizan solos en segundo plano; consulta Ajustes > Actualizaciones.</string>
     <string name="add_cookies_from_settings_to_unlock">Añade cookies desde Ajustes para acceder a contenido privado o con restricción de edad.</string>
-    <string name="tap_a_queued_download_s_up">Toca \"Siguiente\" en una descarga en cola para pasarla al frente de la fila, sin esperar ningún horario.</string>
+    <string name="tap_a_queued_download_s_up">Toca \"Iniciar ahora\" en una descarga en cola para empezarla ya, sin esperar ningún horario. Si todas las plazas están ocupadas, la descarga más reciente espera su turno.</string>
     <string name="choose_mp4_or_mkv_output_and">Elige la salida MP4 o MKV, y cuántas veces se reintenta una descarga fallida, en Ajustes > Descargas.</string>
     <string name="next_tip">Siguiente consejo</string>
     <string name="x_of_x_selected">%1$s de %2$s seleccionados</string>

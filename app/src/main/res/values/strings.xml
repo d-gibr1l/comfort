@@ -605,11 +605,11 @@
     <string name="speed_x">Speed: %1$s</string>
     <string name="waiting_to_start">Waiting to start…</string>
     <string name="waiting_for_a_network_connection_2">Waiting for a network connection…</string>
-    <string name="x_up_next_starts_it_now">%1$s · Up next starts it now</string>
+    <string name="x_up_next_starts_it_now">%1$s · Start now starts it right away</string>
     <string name="temporarily_rate_limited_by_the_site">Temporarily rate-limited by the site — this isn\'t fixed by retrying immediately. Toggling airplane mode or restarting your router usually gets a fresh IP and clears it.</string>
     <string name="error_details">Error details</string>
     <string name="add_cookies">Add cookies</string>
-    <string name="up_next">Up next</string>
+    <string name="up_next">Start now</string>
     <string name="cancel_download">Cancel download</string>
     <string name="unknown_error">Unknown error</string>
     <string name="error_message">Error message</string>
@@ -820,7 +820,7 @@
     <string name="long_press_a_card_in_queue">Long-press a card in Queue to select multiple downloads at once.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">yt-dlp, gallery-dl and Instaloader auto-update in the background — check Settings > Updates.</string>
     <string name="add_cookies_from_settings_to_unlock">Add cookies from Settings to unlock private or age-restricted content.</string>
-    <string name="tap_a_queued_download_s_up">Tap a queued download\'s \"Up next\" to move it to the front of the line, skipping any schedule wait.</string>
+    <string name="tap_a_queued_download_s_up">Tap a queued download\'s \"Start now\" to start it right away, past any schedule wait. If every slot is busy, the newest running download waits its turn.</string>
     <string name="choose_mp4_or_mkv_output_and">Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads.</string>
     <string name="next_tip">Next tip</string>
     <!-- SharePickerScreen.kt -->

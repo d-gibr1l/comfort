@@ -588,11 +588,11 @@
     <string name="speed_x">Vitesse\u00A0: %1$s</string>
     <string name="waiting_to_start">En attente de démarrage…</string>
     <string name="waiting_for_a_network_connection_2">En attente d\'une connexion réseau…</string>
-    <string name="x_up_next_starts_it_now">%1$s · Passer devant le lance maintenant</string>
+    <string name="x_up_next_starts_it_now">%1$s · Démarrer maintenant le lance tout de suite</string>
     <string name="temporarily_rate_limited_by_the_site">Limité temporairement par le site — réessayer tout de suite n\'y changera rien. Activer puis couper le mode avion ou redémarrer ta box donne en général une nouvelle IP et règle le problème.</string>
     <string name="error_details">Détails de l\'erreur</string>
     <string name="add_cookies">Ajouter des cookies</string>
-    <string name="up_next">Passer devant</string>
+    <string name="up_next">Démarrer maintenant</string>
     <string name="cancel_download">Annuler le téléchargement</string>
     <string name="unknown_error">Erreur inconnue</string>
     <string name="error_message">Message d\'erreur</string>
@@ -807,7 +807,7 @@
     <string name="long_press_a_card_in_queue">Appuie longuement sur une carte dans la File pour sélectionner plusieurs téléchargements à la fois.</string>
     <string name="yt_dlp_gallery_dl_and_instaloader">yt-dlp, gallery-dl et Instaloader se mettent à jour en arrière-plan — voir Paramètres &gt; Mises à jour.</string>
     <string name="add_cookies_from_settings_to_unlock">Ajoute des cookies dans les Paramètres pour débloquer les contenus privés ou soumis à une limite d\'âge.</string>
-    <string name="tap_a_queued_download_s_up">Appuie sur «\u00A0Passer devant\u00A0» d\'un téléchargement en file pour le mettre en tête, sans attendre sa plage horaire.</string>
+    <string name="tap_a_queued_download_s_up">Appuie sur «\u00A0Démarrer maintenant\u00A0» d\'un téléchargement en file pour le lancer tout de suite, sans attendre sa plage horaire. Si toutes les places sont prises, le dernier téléchargement lancé attend son tour.</string>
     <string name="choose_mp4_or_mkv_output_and">Choisis la sortie MP4 ou MKV, et le nombre de tentatives d\'un téléchargement échoué, dans Paramètres &gt; Téléchargements.</string>
     <string name="next_tip">Astuce suivante</string>
     <string name="x_of_x_selected">%1$s sur %2$s sélectionnés</string>

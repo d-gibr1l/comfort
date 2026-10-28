@@ -66,6 +66,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET queueOrder = :order WHERE id = :id")
     suspend fun setQueueOrder(id: String, order: Int)
 
+    /** Pausing ends [setForceStart]'s window skip (see [DownloadDispatcher.pauseDownloads]); the
+     * place at the front of the line stays. */
+    @Query("UPDATE downloads SET forceStart = 0 WHERE id = :id")
+    suspend fun clearForceStart(id: String)
+
     /** [DownloadDispatcher.startNow]'s override: front of the line *and* past the schedule window. */
     @Query("UPDATE downloads SET queueOrder = :order, forceStart = 1 WHERE id = :id")
     suspend fun setForceStart(id: String, order: Int)
