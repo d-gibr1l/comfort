@@ -839,6 +839,16 @@ def _probe_media(executable, path):
     return result
 
 
+def _has_subtitles(executable, path):
+    """Whether `path` has a subtitle stream, from `ffmpeg -i`'s stream listing."""
+    try:
+        out = subprocess.run([executable, "-hide_banner", "-i", path], capture_output=True,
+                             text=True, errors="replace", timeout=60, env=_ffmpeg_env()).stderr
+    except Exception:
+        return False
+    return re.search(r"Stream #\d+:\d+[^:]*: Subtitle:", out) is not None
+
+
 # Bitrate for re-encoded H.264 when the source's own isn't known, by the short side of the frame.
 _H264_KBPS = ((240, 600), (360, 1200), (480, 2500), (720, 5000), (1080, 8000), (1440, 16000))
 
@@ -938,7 +948,9 @@ class _LocalTrimPP(FFmpegPostProcessor):
     def _cut(self, filepath, ranges, out_opts):
         base, ext = os.path.splitext(filepath)
         ext = ext.lstrip(".")
+        has_subs = _has_subtitles(self.executable, filepath)
         segment_paths = []
+        temp_paths = []
         try:
             for i, (start, end) in enumerate(ranges):
                 seg_path = f"{base}.trimseg{i}.{ext}"
@@ -947,9 +959,28 @@ class _LocalTrimPP(FFmpegPostProcessor):
                     seek_opts += ["-ss", str(start)]
                 if end != float("inf"):
                     seek_opts += ["-to", str(end)]
-                # Input-side (ahead of -i, see real_run_ffmpeg): a fast seek, frame-exact when
-                # re-encoding, keyframe-aligned when copying.
-                self.real_run_ffmpeg([(filepath, seek_opts)], [(seg_path, list(out_opts))])
+                if not has_subs:
+                    # Input-side (ahead of -i, see real_run_ffmpeg): a fast seek, frame-exact when
+                    # re-encoding, keyframe-aligned when copying.
+                    self.real_run_ffmpeg([(filepath, seek_opts)], [(seg_path, list(out_opts))])
+                    segment_paths.append(seg_path)
+                    continue
+                # Copied subtitle packets don't go through that seek: the cue before the start came
+                # along and pulled the whole cut's start back with it (3.8-7 s of a 19 s video came
+                # out 5.8 s long, the extra at its start). So the video and audio are cut as above
+                # without the subtitles, the subtitles on their own with an output-side seek (only
+                # packets are read, nothing decoded), and the two put back together.
+                av_path = f"{base}.trimseg{i}.av.{ext}"
+                subs_path = f"{base}.trimseg{i}.subs.{ext}"
+                temp_paths += [av_path, subs_path]
+                self.real_run_ffmpeg([(filepath, seek_opts)], [(av_path, [*out_opts, "-map", "-0:s"])])
+                self.real_run_ffmpeg([(filepath, [])], [(subs_path, ["-map", "0:s", *seek_opts, "-c", "copy"])])
+                self.real_run_ffmpeg(
+                    [(av_path, []), (subs_path, [])],
+                    [(seg_path, ["-map", "0", "-map", "1", "-c", "copy"])],
+                )
+                os.remove(av_path)
+                os.remove(subs_path)
                 segment_paths.append(seg_path)
 
             if len(segment_paths) == 1:
@@ -957,12 +988,18 @@ class _LocalTrimPP(FFmpegPostProcessor):
             else:
                 concat_list_path = f"{base}.trimconcat.txt"
                 with open(concat_list_path, "w", encoding="utf-8") as f:
-                    for seg_path in segment_paths:
+                    for seg_path, (start, end) in zip(segment_paths, ranges):
                         f.write("file '{}'\n".format(seg_path.replace("'", "'\\''")))
+                        # Each part's own length, not its file's: a subtitle shown past the cut's
+                        # end makes the file longer, and the next part would start that much late.
+                        if end != float("inf"):
+                            f.write(f"duration {end - (start or 0):.3f}\n")
                 result = f"{base}.trimmed.{ext}"
                 self.real_run_ffmpeg(
                     [(concat_list_path, ["-f", "concat", "-safe", "0"])],
-                    [(result, ["-map", "0", *self.stream_copy_opts(ext=ext)])],
+                    # stream_copy_opts maps every stream itself: another "-map 0" had the result
+                    # carry each one twice.
+                    [(result, list(self.stream_copy_opts(ext=ext)))],
                 )
                 os.remove(concat_list_path)
                 for seg_path in segment_paths:
@@ -977,7 +1014,7 @@ class _LocalTrimPP(FFmpegPostProcessor):
                 )
             return result
         except Exception:
-            for seg_path in segment_paths:
+            for seg_path in segment_paths + temp_paths:
                 if os.path.exists(seg_path):
                     os.remove(seg_path)
             raise
@@ -1002,7 +1039,7 @@ class _LocalTrimPP(FFmpegPostProcessor):
         if result is None:
             if not self._ranges:
                 return [], info
-            result = self._cut(filepath, ranges, ["-map", "0", *self.stream_copy_opts(ext=ext)])
+            result = self._cut(filepath, ranges, list(self.stream_copy_opts(ext=ext)))
         # Same path the file already had, so nothing downstream needs to know a trim happened.
         os.replace(result, filepath)
         return [], info

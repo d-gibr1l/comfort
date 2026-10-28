@@ -75,6 +75,7 @@ import com.comfort.app.util.GalleryDlListing
 import com.comfort.app.util.PreviewInfo
 import com.comfort.app.util.TrackPreview
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 import kotlinx.coroutines.Dispatchers
@@ -460,6 +461,15 @@ fun DownloadPreviewSheet(
         key = url,
     ) { com.comfort.app.viewmodel.PreviewSheetViewModel(context.applicationContext as android.app.Application, url, preloadedPreview) }
     val preview by sheet.preview.collectAsState()
+    // The default segment seeded before the video's length was known (Trim opened while the
+    // preview was still loading) is cut down to it once it arrives, without counting as an edit.
+    val knownDurationMs = preview?.durationMs?.takeIf { it > 0L }
+    LaunchedEffect(knownDurationMs) {
+        val d = knownDurationMs ?: return@LaunchedEffect
+        if (!segmentsEdited && segments.any { it.endMs > d }) {
+            segments = segments.map { it.copy(endMs = it.endMs.coerceAtMost(d)) }
+        }
+    }
     val previewLoading by sheet.loading.collectAsState()
     val previewStatus by sheet.status.collectAsState()
     val isDuplicate by sheet.isDuplicate.collectAsState()
@@ -874,7 +884,10 @@ private fun PreviewSheetOverlayHost(
                 // of leaving it behind as a silent, never-confirmed 30-second clip.
                 onOpenOverlay(PreviewScreen.TRIM)
                 if (segments.isEmpty()) {
-                    onSegmentsChange(listOf(TrimSegment(startMs = 0L, endMs = DEFAULT_SEGMENT_LENGTH_MS)))
+                    // No longer than the video: a 19-second one showed "End 00:30.000".
+                    val end = previewDurationMs?.takeIf { it > 0L }?.coerceAtMost(DEFAULT_SEGMENT_LENGTH_MS)
+                        ?: DEFAULT_SEGMENT_LENGTH_MS
+                    onSegmentsChange(listOf(TrimSegment(startMs = 0L, endMs = end)))
                 }
             },
             onOpenTemplates = { onOpenOverlay(PreviewScreen.TEMPLATES) },
@@ -2546,6 +2559,7 @@ private fun TrimVideoScreen(
         onSegmentsChange(segments.map { if (it.id == target.id) transform(it) else it })
     }
     val context = LocalContext.current
+    var playerPlaying by remember { mutableStateOf(false) }
     val exoPlayer = remember { 
         androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
             playWhenReady = true
@@ -2553,6 +2567,7 @@ private fun TrimVideoScreen(
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     android.util.Log.e("ExoPlayer", "Playback error", error)
                 }
+                override fun onIsPlayingChanged(isPlaying: Boolean) { playerPlaying = isPlaying }
             })
         }
     }
@@ -2631,19 +2646,16 @@ private fun TrimVideoScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SheetHeader(
-            icon = Icons.Outlined.ContentCut,
-            title = stringResource(R.string.trim_video_2),
-            subtitle = stringResource(R.string.trim_subtitle),
-            modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
-        )
+    // The header, the video and its slider stay put and the rest scrolls under them: inside the
+    // scroll, scrolling down to Done took the sheet's title with it and slid half the video out of
+    // view.
+    Column(modifier = Modifier.fillMaxWidth()) {
+    SheetHeader(
+        icon = Icons.Outlined.ContentCut,
+        title = stringResource(R.string.trim_video_2),
+        subtitle = stringResource(R.string.trim_subtitle),
+        modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 16.dp),
+    )
 
         val realDurationMs = durationMs?.takeIf { it > 0L }
         val effectiveDurationMs = realDurationMs ?: NOMINAL_DURATION_MS
@@ -2665,16 +2677,52 @@ private fun TrimVideoScreen(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 if (streamUrls.isNotEmpty() && !streamLoadFailed) {
+                    // Media3's own controls are off: they were a second seek bar over the one
+                    // below, with previous/next buttons and a settings gear that do nothing here.
+                    // A tap plays or pauses; the slider below seeks.
                     androidx.compose.ui.viewinterop.AndroidView(
                         factory = { ctx ->
                             androidx.media3.ui.PlayerView(ctx).apply {
+                                useController = false
                                 player = exoPlayer
-                                useController = true
                                 setBackgroundColor(android.graphics.Color.BLACK)
                             }
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                if (exoPlayer.isPlaying) exoPlayer.pause()
+                                else {
+                                    if (exoPlayer.playbackState == androidx.media3.common.Player.STATE_ENDED) exoPlayer.seekTo(0)
+                                    exoPlayer.play()
+                                }
+                            },
+                    )
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !playerPlaying,
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(),
+                    ) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f),
+                            modifier = Modifier.size(56.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Rounded.PlayArrow,
+                                    contentDescription = stringResource(R.string.widget_music_play),
+                                    modifier = Modifier.size(28.dp),
+                                )
+                            }
+                        }
+                    }
                 } else if (thumbnail != null) {
                     AsyncImage(
                         model = thumbnailRequest(thumbnail, pageUrl),
@@ -2720,6 +2768,7 @@ private fun TrimVideoScreen(
             }
         }
 
+        Spacer(Modifier.height(8.dp))
         // The M3 Expressive slider: a thick track and a tall handle rather than the default thin
         // track + round dot, per the spec's own component guidance.
         //
@@ -2732,6 +2781,7 @@ private fun TrimVideoScreen(
         // comment) — there's nothing real to range against yet, so it's the one honest fallback.
 
         Slider(
+            modifier = Modifier.padding(horizontal = 16.dp),
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
             onValueChange = { playheadMs = it.toLong() },
             valueRange = 0f..maxSliderMs,
@@ -2765,13 +2815,43 @@ private fun TrimVideoScreen(
                                 .width(maxWidth * (endFrac - startFrac))
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
+                                // Its own colour: a lighter primary disappeared over the part
+                                // already played, which is primary too.
+                                .background(MaterialTheme.colorScheme.tertiary),
                         )
                     }
                 }
             },
         )
 
+        // Where the playhead is, for Set Start/Set End: the player's own time display went with
+        // its controls.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                formatTimestamp(playheadMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (realDurationMs != null) {
+                Text(
+                    formatTimestamp(realDurationMs),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f, fill = false)
+            .verticalScroll(rememberScrollState())
+            .padding(top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
@@ -2833,7 +2913,7 @@ private fun TrimVideoScreen(
                 onValueChange = { 
                     startInput = it
                     parseTimestampToMs(it)?.let { ms ->
-                        if (ms <= (active?.endMs ?: 0L)) {
+                        if (ms <= (active?.endMs ?: 0L) && (realDurationMs == null || ms < realDurationMs)) {
                             updateActive { segment -> segment.copy(startMs = ms) }
                         }
                     }
@@ -2855,7 +2935,9 @@ private fun TrimVideoScreen(
                 value = endInput,
                 onValueChange = { 
                     endInput = it
-                    parseTimestampToMs(it)?.let { ms ->
+                    parseTimestampToMs(it)?.let { typed ->
+                        // Past the end it's the end: "25" on a 19-second video was kept as 0:25.
+                        val ms = realDurationMs?.let { d -> typed.coerceAtMost(d) } ?: typed
                         if (ms >= (active?.startMs ?: 0L)) {
                             updateActive { segment -> segment.copy(endMs = ms) }
                         }
@@ -2943,6 +3025,7 @@ private fun TrimVideoScreen(
                 onCancel = onCancel,
             )
         }
+    }
     }
 }
 
