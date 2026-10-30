@@ -56,8 +56,9 @@ object EngineProbe {
 
     /** Where [url] redirects to (following up to [MAX_REDIRECTS] hops), or null when it doesn't
      * redirect or the request fails. Only the headers are read: no page is downloaded. Through the
-     * proxy setting; not asked at all when that proxy can't be used from here (see [proxyFor]). */
-    private suspend fun resolveRedirect(context: Context, url: String): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+     * proxy setting; not asked at all when that proxy can't be used from here (see [proxyFor]).
+     * Also finds a Reddit share link's post for the duplicate check (ShareLinks). */
+    internal suspend fun resolveRedirect(context: Context, url: String): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val proxy = proxyFor(com.comfort.app.data.GalleryDlPreferences.getEffectiveProxyUrl(context)) ?: return@withContext null
         var current = url
         var redirected = false

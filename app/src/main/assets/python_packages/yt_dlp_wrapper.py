@@ -1193,6 +1193,68 @@ class _CaptionPP(PostProcessor):
         return fields
 
 
+# The streams a download picked, kept in its folder next to the partial files: a download stopped
+# mid-file (paused, stepped aside for Start now, the schedule window closing) asks for the same
+# ones when it starts again. No .json extension, so DownloadWorker's sidecar sweep doesn't save it.
+_PICKED_FORMATS_FILE = ".comfort-formats"
+_FORMAT_ID_RE = re.compile(r"[\w.-]+(\+[\w.-]+)*")
+
+
+class _RememberFormatsPP(PostProcessor):
+    """Writes each video's format_id ("137+140") to _PICKED_FORMATS_FILE just before its download
+    starts. See _resume_format for why."""
+
+    def __init__(self, downloader, download_dir):
+        super().__init__(downloader)
+        self._path = os.path.join(download_dir, _PICKED_FORMATS_FILE)
+
+    def run(self, info):
+        video_id, format_id = info.get("id"), info.get("format_id")
+        if video_id and format_id:
+            try:
+                with open(self._path, encoding="utf-8") as f:
+                    picked = json.load(f)
+            except (OSError, ValueError):
+                picked = {}
+            picked[str(video_id)] = str(format_id)
+            try:
+                with open(self._path + ".tmp", "w", encoding="utf-8") as f:
+                    json.dump(picked, f)
+                os.replace(self._path + ".tmp", self._path)
+            except OSError:
+                pass
+        return [], info
+
+
+def _resume_format(download_dir, chosen_format, no_playlist):
+    """[chosen_format] with the streams an earlier, stopped run of this download was fetching put
+    first, when their partial files are still here. Starting again later than the preview's saved
+    extraction lasts (_INFO_JSON_MAX_AGE_SECONDS: a download that stepped aside for Start now and
+    waited for a slot, or one the schedule window closed on), yt-dlp extracts afresh and can pick
+    other streams — another YouTube itag is another ".f399.mp4.part" name, so the earlier part was
+    never resumed and the file started from zero. Single videos only: in a playlist a pinned itag
+    would apply to every entry. Falls back to [chosen_format] when those streams are gone."""
+    if not no_playlist:
+        return chosen_format
+    try:
+        names = os.listdir(download_dir)
+    except OSError:
+        return chosen_format
+    if not any(n.endswith((".part", ".ytdl")) or ".part-Frag" in n for n in names):
+        return chosen_format
+    try:
+        with open(os.path.join(download_dir, _PICKED_FORMATS_FILE), encoding="utf-8") as f:
+            picked = json.load(f)
+    except (OSError, ValueError):
+        return chosen_format
+    if not isinstance(picked, dict) or len(picked) != 1:
+        return chosen_format
+    format_id = next(iter(picked.values()))
+    if not isinstance(format_id, str) or not _FORMAT_ID_RE.fullmatch(format_id):
+        return chosen_format
+    return f"{format_id}/{chosen_format}"
+
+
 class _FinalFilePP(PostProcessor):
     """Reports the download's real final file to `callback` once every other requested
     postprocessor (whichever combination of ExtractAudio/EmbedThumbnail/Metadata/EmbedSubtitle/
@@ -2463,6 +2525,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     chosen_format = audio_selector if audio_only else (format_selector or default_format)
     # A dub instead of the original audio (the preview sheet's audio language, or Settings').
     chosen_format = _with_audio_language(chosen_format, audio_language)
+    # Picking up a stopped download: the streams its partial files belong to.
+    chosen_format = _resume_format(download_dir, chosen_format, no_playlist)
     # Poster name, then caption; DownloadWorker derives the entity's own display title from this
     # same "name - caption [id]" shape (see its own comment on that), so the two need to keep
     # matching. Only this *default* template; a caller-supplied filename_format (a saved template,
@@ -2884,6 +2948,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         with yt_dlp.YoutubeDL(opts) as ydl:
             # Added after ydl_opts' own pre_process MetadataParser, so it sees the cleaned uploader.
             ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames, custom_format=custom_format, site=site), when="pre_process")
+            ydl.add_post_processor(_RememberFormatsPP(ydl, download_dir), when="before_dl")
             if pick_subtitles and opts.get("writesubtitles"):
                 _pick_subtitles_on(ydl)
             if opts.get("writesubtitles") or opts.get("writeautomaticsub"):

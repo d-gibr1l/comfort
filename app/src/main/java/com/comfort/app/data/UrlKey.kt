@@ -46,6 +46,10 @@ object UrlKey {
             X_STATUS.find(path)?.let { return "x.com/status/${it.groupValues[1]}" }
             host = "x.com"
         }
+        if (host == "redd.it") {
+            // Reddit's short link is the post's own id: redd.it/<id> is /comments/<id>.
+            Regex("""^/(\w+)$""").find(path)?.let { return "reddit.com/comments/${it.groupValues[1]}" }
+        }
         for ((site, pattern, prefix) in PATH_IDS) {
             if (host != site && !host.endsWith(".$site")) continue
             val m = pattern.find(path) ?: break

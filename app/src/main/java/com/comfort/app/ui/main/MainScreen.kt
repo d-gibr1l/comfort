@@ -1225,26 +1225,31 @@ fun HomeScreen(
                 val isRecentListDragged by recentListState.interactionSource.collectIsDraggedAsState()
                 val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
                 val homeWindowFocused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+                // One whole pixel per step at ~25 dp a second (the old 1.1 px every 16 ms on a
+                // typical screen): a fraction of a pixel moved nothing on screen but still cost a
+                // frame.
+                val driftStepMs = with(androidx.compose.ui.platform.LocalDensity.current) { (1000f / 25.dp.toPx()).toLong().coerceAtLeast(8L) }
                 LaunchedEffect(recentDownloads.size, reducedMotion, homeWindowFocused) {
                     if (recentDownloads.size <= 1 || reducedMotion || !homeWindowFocused) return@LaunchedEffect
                     // Only while Home is on screen and the app is in front (see `active`).
                     androidx.compose.runtime.snapshotFlow { active() }.collectLatest { onScreen ->
                     if (!onScreen) return@collectLatest
                     kotlinx.coroutines.delay(3500)
+                    // One pass to the end and back, then it stays still: every step is a frame, and
+                    // drifting for as long as Home was open kept the phone from ever idling there
+                    // (~100 redraws a second, traced). Coming back to Home, or a new download,
+                    // starts it again.
                     while (true) {
                         if (isRecentListDragged) {
                             kotlinx.coroutines.delay(200)
                             continue
                         }
-                        if (recentListState.canScrollForward) {
-                            recentListState.scrollBy(1.1f)
-                        } else {
-                            kotlinx.coroutines.delay(1800)
-                            recentListState.animateScrollToItem(0)
-                            kotlinx.coroutines.delay(1800)
-                        }
-                        kotlinx.coroutines.delay(16)
+                        if (!recentListState.canScrollForward) break
+                        recentListState.scrollBy(1f)
+                        kotlinx.coroutines.delay(driftStepMs)
                     }
+                    kotlinx.coroutines.delay(1800)
+                    recentListState.animateScrollToItem(0)
                     }
                 }
                 // Comfort: a tap opens the item in the media viewer, paging through the strip.

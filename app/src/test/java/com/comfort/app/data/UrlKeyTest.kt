@@ -36,6 +36,8 @@ class UrlKeyTest {
         same("https://www.tiktok.com/@balleronibolonga/video/7664096922206014733?_r=1&preview_pb=0&sharer_language=en&_d=f34&share_link_id=x",
             "https://tiktok.com/@balleronibolonga/video/7664096922206014733")
         same("https://www.reddit.com/r/pics/comments/1abcde/some_title/?share_id=X&utm_source=share", "https://old.reddit.com/comments/1abcde")
+        same("https://redd.it/1abcde", "https://www.reddit.com/r/pics/comments/1abcde/some_title/")
+        differ("https://redd.it/1abcde", "https://redd.it/1zzzzz")
         same("https://open.spotify.com/track/0nj9Bq5sHDiTxSHunhgkFb?si=HXhWoOW5S6WUekPq2nInFw", "https://open.spotify.com/intl-de/track/0nj9Bq5sHDiTxSHunhgkFb")
         differ("https://open.spotify.com/track/0nj9Bq5sHDiTxSHunhgkFb", "https://open.spotify.com/album/0nj9Bq5sHDiTxSHunhgkFb")
     }
