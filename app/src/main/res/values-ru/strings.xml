@@ -621,6 +621,8 @@
     <string name="your_start_time">Ваше время начала</string>
     <string name="remove_start_time">Убрать время начала</string>
     <string name="starting_soon">Скоро начнётся</string>
+    <string name="starts_at_x">Начнётся в %1$s</string>
+    <string name="start_at_running_note">Загрузка встанет на паузу и в это время продолжится с того же места.</string>
     <string name="open_link">Открыть ссылку</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d загрузка начнётся, когда появится Wi-Fi (включено «Только Wi-Fi»).</item>

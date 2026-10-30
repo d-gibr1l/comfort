@@ -226,6 +226,9 @@ data class DownloadOptions(
     val audioLanguage: String? = null,
     /** The subtitle languages picked — see DownloadEntity.subtitleLanguages; null follows Settings. */
     val subtitleLanguages: String? = null,
+    /** "Start at…" picked in the sheet (epoch millis) — see DownloadEntity.scheduledAt; null starts
+     * it as usual (now, or when the schedule window opens). */
+    val scheduledAt: Long? = null,
 )
 
 /** The engines the Configure sheet offers for [url]: only links more than one engine can download
@@ -761,6 +764,19 @@ private fun PreviewSheetOverlayHost(
 ) {
     val overlayOpen = screen != PreviewScreen.MAIN
 
+    // "Start at…": the time this download waits for, if one was picked (StartAtDialog, shared
+    // with the Queue's cards). Only this sheet's: a new opening starts without one.
+    var startAt by remember { mutableStateOf<Long?>(null) }
+    var showStartAt by remember { mutableStateOf(false) }
+    if (showStartAt) {
+        StartAtDialog(
+            initial = startAt,
+            onDismiss = { showStartAt = false },
+            onPicked = { at -> startAt = at; showStartAt = false },
+            onRemove = if (startAt != null) ({ startAt = null; showStartAt = false }) else null,
+        )
+    }
+
     // Live drag offset for the overlay panel's own handle — follows the finger while dragging
     // down (like the outer sheet's own handle does), snapped back to 0 whenever the overlay opens
     // fresh for a different screen.
@@ -836,6 +852,8 @@ private fun PreviewSheetOverlayHost(
         audioLanguage = audioTrack?.let { if (it.original) com.comfort.app.data.AudioLanguage.ORIGINAL else it.code },
         // What the chip shows is what downloads; no chip (no subtitles listed) follows Settings.
         subtitleLanguages = subtitles?.selected?.joinToString(",") { it.code },
+        // A time that has passed while the sheet was open just starts it as usual.
+        scheduledAt = startAt?.takeIf { it > System.currentTimeMillis() },
     )
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -892,6 +910,8 @@ private fun PreviewSheetOverlayHost(
             },
             onOpenTemplates = { onOpenOverlay(PreviewScreen.TEMPLATES) },
             onDownload = { onDownload(currentOptions()) },
+            startAt = startAt,
+            onOpenStartAt = { showStartAt = true },
             // The choices that make sense for every future upload: not the trim, the item
             // selection or an edited title, which belong to this listing only.
             onSubscribe = onSubscribe?.let { subscribe ->
@@ -1571,7 +1591,13 @@ private fun MainPreviewScreen(
     onDownload: () -> Unit,
     /** Shown as a Subscribe button beside Download when non-null — a YouTube channel/playlist. */
     onSubscribe: (() -> Unit)? = null,
+    /** The "Start at…" chip: the time picked (null: none) and what tapping it opens. */
+    startAt: Long? = null,
+    onOpenStartAt: () -> Unit = {},
 ) {
+    val startAtLabel = startAt?.let {
+        stringResource(R.string.starts_at_x, android.text.format.DateFormat.getTimeFormat(androidx.compose.ui.platform.LocalContext.current).format(java.util.Date(it)))
+    } ?: stringResource(R.string.start_at)
     // A plain LazyColumn cannot nest inside a verticalScroll parent (unbounded height), which is
     // exactly what SONG_LIST's track list needs to host efficiently. The top icon row and the
     // Download button are fixed siblings *outside* this LazyColumn (in the Column below) rather
@@ -1786,8 +1812,16 @@ private fun MainPreviewScreen(
                             label = if (commandCount > 0) stringResource(R.string.commands_x, commandCount) else stringResource(R.string.add_extra_commands),
                             selected = commandCount > 0,
                             icon = Icons.Outlined.Terminal,
-                            shape = LAST_CHIP_SHAPE,
+                            shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenCommands,
+                        )
+                        // Added now, started later (StartAtDialog).
+                        PreviewChip(
+                            label = startAtLabel,
+                            selected = startAt != null,
+                            icon = Icons.Outlined.Schedule,
+                            shape = LAST_CHIP_SHAPE,
+                            onClick = onOpenStartAt,
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                     }
@@ -1871,6 +1905,13 @@ private fun MainPreviewScreen(
                             icon = Icons.Outlined.Terminal,
                             shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenCommands,
+                        )
+                        PreviewChip(
+                            label = startAtLabel,
+                            selected = startAt != null,
+                            icon = Icons.Outlined.Schedule,
+                            shape = MIDDLE_CHIP_SHAPE,
+                            onClick = onOpenStartAt,
                         )
                         PreviewChip(
                             label = stringResource(R.string.filename_templates),

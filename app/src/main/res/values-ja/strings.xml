@@ -554,6 +554,8 @@
     <string name="your_start_time">設定した開始時刻</string>
     <string name="remove_start_time">開始時刻を削除</string>
     <string name="starting_soon">まもなく開始</string>
+    <string name="starts_at_x">%1$s に開始</string>
+    <string name="start_at_running_note">今すぐ一時停止し、その時刻に中断したところから再開します。</string>
     <string name="open_link">リンクを開く</string>
     <string name="started_when">%1$s に開始</string>
     <string name="added_when">%1$s に追加</string>

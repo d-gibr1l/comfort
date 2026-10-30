@@ -554,6 +554,8 @@
     <string name="your_start_time">你设定的开始时间</string>
     <string name="remove_start_time">移除开始时间</string>
     <string name="starting_soon">即将开始</string>
+    <string name="starts_at_x">%1$s 开始</string>
+    <string name="start_at_running_note">现在暂停，到时会从中断处继续下载。</string>
     <string name="open_link">打开链接</string>
     <string name="started_when">开始于 %1$s</string>
     <string name="added_when">添加于 %1$s</string>

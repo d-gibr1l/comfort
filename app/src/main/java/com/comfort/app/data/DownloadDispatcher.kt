@@ -247,6 +247,8 @@ object DownloadDispatcher {
         // Set true for the explicit "Redownload anyway" action on a duplicate's own Snackbar/
         // Library entry — skips the check below for just this one deliberate retry, same shape as
         // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
+        // The preview sheet's "Start at…" — see DownloadEntity.scheduledAt.
+        scheduledAt: Long? = null,
         forceDuplicate: Boolean = false,
     ): EnqueueResult {
         val trimmedUrl = url.trim()
@@ -312,6 +314,8 @@ object DownloadDispatcher {
                 audioFormat = audioFormat?.name,
                 audioLanguage = audioLanguage,
                 subtitleLanguages = subtitleLanguages,
+                // enqueueWork below waits for it (enqueueWorkMany's own start-time delay).
+                scheduledAt = scheduledAt?.takeIf { it > System.currentTimeMillis() },
                 // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
                 // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
                 // this as (a plain Settings switch, not a per-download picker).
@@ -838,10 +842,14 @@ object DownloadDispatcher {
     /** The Queue's "Start at…": [id] starts at [at] (epoch millis) — or, with null, goes back to
      * waiting for the schedule window like any other download. A set time replaces the window and
      * Start now for this download (see [DownloadEntity.scheduledAt]); a paused one is sent back to
-     * wait for it. An explicit request for this download, so it ends a Pause All, like Resume. */
+     * wait for it, and a running one is paused first, keeping what it has downloaded. An explicit
+     * request for this download, so it ends a Pause All, like Resume. */
     suspend fun scheduleAt(context: Context, id: String, at: Long?) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         val entity = dao.getById(id) ?: return
+        // A running one stops first, the way Pause stops it: its staging folder stays, so at its
+        // time it picks up where it left off. No "Paused" notification: it's waiting, not paused.
+        if (entity.status == DownloadStatus.RUNNING) pauseDownloads(context, listOf(id), notify = false)
         dao.setScheduledAt(id, at)
         enqueueWork(
             context, id, entity.url, userInitiated = true,

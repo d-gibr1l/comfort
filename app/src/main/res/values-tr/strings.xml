@@ -554,6 +554,8 @@
     <string name="your_start_time">Senin başlangıç saatin</string>
     <string name="remove_start_time">Başlangıç saatini kaldır</string>
     <string name="starting_soon">Birazdan başlıyor</string>
+    <string name="starts_at_x">%1$s\'de başlar</string>
+    <string name="start_at_running_note">Şimdi duraklar ve o saatte kaldığı yerden devam eder.</string>
     <string name="open_link">Bağlantıyı aç</string>
     <string name="started_when">%1$s başladı</string>
     <string name="added_when">%1$s eklendi</string>
