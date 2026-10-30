@@ -188,15 +188,26 @@ object DownloadDispatcher {
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) return false
         if (!GalleryDlPreferences.isPreventDuplicateDownloads(context)) return false
-        return findExisting(AppDatabase.getDatabase(context).downloadDao(), trimmedUrl, itemFilter) != null
+        return findExisting(context, AppDatabase.getDatabase(context).downloadDao(), trimmedUrl, itemFilter) != null
     }
 
     /** The active or finished download of [url] — by [UrlKey], so the same link shared again with
-     * a different tracking token (X's "?a=…&s=09") is still found. */
-    private suspend fun findExisting(dao: DownloadDao, url: String, itemFilter: String?): DownloadEntity? {
+     * a different tracking token (X's "?a=…&s=09") is still found, and a Reddit post by where its
+     * share links lead ([ShareLinks]). */
+    private suspend fun findExisting(context: Context, dao: DownloadDao, url: String, itemFilter: String?): DownloadEntity? {
         dao.findActiveOrFinishedByUrl(url, itemFilter)?.let { return it }
         val key = UrlKey.of(url)
-        return dao.findActiveOrFinishedLike(UrlKey.likePattern(url), itemFilter).firstOrNull { UrlKey.of(it.url) == key }
+        dao.findActiveOrFinishedLike(UrlKey.likePattern(url), itemFilter).firstOrNull { UrlKey.of(it.url) == key }?.let { return it }
+        val postKey = if (ShareLinks.isShareLink(url)) (ShareLinks.postKey(context, url) ?: return null) else key
+        if (!postKey.startsWith(ShareLinks.REDDIT_POST)) return null
+        if (postKey != key) {
+            // A share link: the post's own link, saved earlier.
+            dao.findActiveOrFinishedLike(UrlKey.likePattern("https://$postKey"), itemFilter)
+                .firstOrNull { UrlKey.of(it.url) == postKey }?.let { return it }
+        }
+        // Another share of the same post (each looked up once, then kept).
+        return dao.findActiveOrFinishedLike(ShareLinks.LIKE_PATTERN, itemFilter)
+            .firstOrNull { UrlKey.of(it.url) != key && ShareLinks.postKey(context, it.url) == postKey }
     }
 
     suspend fun enqueueDownload(
@@ -237,7 +248,7 @@ object DownloadDispatcher {
         // in duplicate_attempts (see DuplicateAttempt's own doc comment) rather than creating a
         // redundant second downloads row for the same URL.
         if (!forceDuplicate && GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
-            findExisting(dao, trimmedUrl, itemFilter)?.let { existing ->
+            findExisting(context, dao, trimmedUrl, itemFilter)?.let { existing ->
                 dao.insertDuplicateAttempt(
                     DuplicateAttempt(
                         id = UUID.randomUUID().toString(),

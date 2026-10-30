@@ -1082,8 +1082,6 @@ class DownloadWorker(
                         }
                 }
 
-                stagingDir.deleteRecursively()
-
                 // Superseded, not just stopped: some other reschedule already moved this row onto a
                 // *new* WorkManager job before this one's own cancellation was actually observed —
                 // suspendForSchedule() (called from this same actualCallback above when the
@@ -1107,10 +1105,13 @@ class DownloadWorker(
                     // Leave whatever status pauseDownload()/cancelDownload()/suspendForSchedule()
                     // already set instead of overwriting it either way.
                     // Result.success() — see the isStopped branch above for why.
+                    // The staging dir is kept: its partial files are what the next run resumes.
                     requeueIfStillRunning(dao, downloadId)
                     DownloadNotifications.cancel(applicationContext, downloadId)
                     return@withContext Result.success()
                 }
+
+                stagingDir.deleteRecursively()
 
                 if (savedCount.get() == 0) {
                     // Neither engine found anything to save. Previously this silently reported
