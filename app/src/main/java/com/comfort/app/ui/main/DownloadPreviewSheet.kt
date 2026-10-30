@@ -2780,6 +2780,8 @@ private fun TrimVideoScreen(
         // this was originally written for: no stream/duration resolved at all (see its own doc
         // comment) — there's nothing real to range against yet, so it's the one honest fallback.
 
+        // A video's timeline: left to right in any language (see MediaLtr), the trim band with it.
+        com.comfort.app.ui.MediaLtr {
         Slider(
             modifier = Modifier.padding(horizontal = 16.dp),
             value = playheadMs.toFloat().coerceIn(0f, maxSliderMs),
@@ -2823,6 +2825,7 @@ private fun TrimVideoScreen(
                 }
             },
         )
+        }
 
         // Where the playhead is, for Set Start/Set End: the player's own time display went with
         // its controls.

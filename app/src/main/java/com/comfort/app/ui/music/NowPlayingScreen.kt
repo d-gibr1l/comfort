@@ -455,6 +455,7 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
     val total = duration.coerceAtLeast(1L)
     val fraction = (position.toFloat() / total).coerceIn(0f, 1f)
     val amplitude by animateFloatAsState(if (playing) 1f else 0f, label = "waveAmplitude")
+    com.comfort.app.ui.MediaLtr {
     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(40.dp)) {
         androidx.compose.material3.LinearWavyProgressIndicator(
             progress = { fraction },
@@ -487,6 +488,7 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
         Text(formatTime(position), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
         Text(formatTime(duration), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
     }
+    }
 }
 
 /** Auxio's row of controls: repeat and shuffle as outlined toggles at the ends, tonal previous and
@@ -494,6 +496,7 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
 @Composable
 private fun PlaybackButtons(state: com.comfort.app.music.MusicState) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    com.comfort.app.ui.MediaLtr {
     Row(
         modifier = Modifier.fillMaxWidth().height(72.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -537,6 +540,7 @@ private fun PlaybackButtons(state: com.comfort.app.music.MusicState) {
             },
             modifier = Modifier.weight(1f),
         )
+    }
     }
 }
 
@@ -652,6 +656,8 @@ private fun QueueLayout(
                 Text(state.song?.title.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 state.song?.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
+            // Play then next in any language (see MediaLtr).
+            com.comfort.app.ui.MediaLtr { Row(verticalAlignment = Alignment.CenterVertically) {
             FilledIconButton(
                 onClick = MusicPlayer::togglePlay,
                 shape = RoundedCornerShape(12.dp),
@@ -670,7 +676,9 @@ private fun QueueLayout(
             ) {
                 Icon(Icons.Rounded.SkipNext, contentDescription = stringResource(R.string.widget_music_next))
             }
+            } }
         }
+        com.comfort.app.ui.MediaLtr {
         androidx.compose.material3.LinearProgressIndicator(
             progress = { if (state.duration > 0) (position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f },
             color = Color.White,
@@ -679,6 +687,7 @@ private fun QueueLayout(
             drawStopIndicator = {},
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(3.dp),
         )
+        }
         Spacer(Modifier.height(8.dp))
         androidx.compose.material3.Surface(
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),

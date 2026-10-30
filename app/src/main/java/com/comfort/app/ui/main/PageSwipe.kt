@@ -43,6 +43,10 @@ import kotlin.math.abs
  * - anywhere else, the page turns only if nothing on it wanted the drag first: a row that
  *   scrolls sideways, a slider, a list scrolling up and down all keep their gestures.
  * Taps on the nav bar and Back keep their own transitions; this only adds the swipe.
+ *
+ * Pages run along the line of text, like the nav bar's buttons: the next one is to the right, or to
+ * the left in a right-to-left language. [offset] and the drags it's given are along that line;
+ * only [pageSwipeLayer] and [pageSwipeArea] deal in screen pixels, through [dir].
  */
 @Stable
 class PageSwipeState internal constructor(
@@ -55,6 +59,9 @@ class PageSwipeState internal constructor(
     /** The drag as a fraction of the page width; negative is toward the next page. Read only
      * while drawing ([pageSwipeLayer]), so following the finger recomposes nothing. */
     internal var offset by mutableFloatStateOf(0f)
+
+    /** 1, or -1 in a right-to-left language: screen pixels times this are along the line. */
+    internal var dir by mutableFloatStateOf(1f)
 
     /** The page being swiped toward, from the moment a swipe is taken until it has settled. */
     var neighbor by mutableStateOf<Int?>(null)
@@ -129,7 +136,9 @@ fun rememberPageSwipeState(current: Int, allowed: Boolean, pageCount: Int = 3, o
     val pageCountState = rememberUpdatedState(pageCount)
     val allowedState = rememberUpdatedState(allowed)
     val onSettledState = rememberUpdatedState(onSettled)
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     return remember { PageSwipeState(scope, currentState, pageCountState, allowedState, onSettledState) }
+        .also { it.dir = if (rtl) -1f else 1f }
 }
 
 /** The page swipe the content belongs to (the main pages', or the Queue's filters'), for the
@@ -138,7 +147,7 @@ val LocalPageSwipe = staticCompositionLocalOf<PageSwipeState?> { null }
 
 /** Where [page] sits while a swipe moves it: its place beside the selected page, plus the drag. */
 fun Modifier.pageSwipeLayer(state: PageSwipeState, page: Int, selected: Int): Modifier =
-    graphicsLayer { translationX = (page - selected + state.offset) * size.width }
+    graphicsLayer { translationX = (page - selected + state.offset) * size.width * state.dir }
 
 /**
  * Takes sideways swipes over the pages. Watches each gesture until it's clearly sideways —
@@ -173,7 +182,7 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
                 val flickY = dy + step.y
                 val systemCancelled = change.isConsumed || change.uptimeMillis == change.previousUptimeMillis
                 if (!systemCancelled && abs(flickX) > slop * TAKE_AFTER_SLOPS && abs(flickX) > abs(flickY)) {
-                    val flickTarget = state.neighborFor(flickX) ?: return@awaitEachGesture
+                    val flickTarget = state.neighborFor(flickX * state.dir) ?: return@awaitEachGesture
                     val width = size.width.toFloat().coerceAtLeast(1f)
                     tracker.addPointerInputChange(change)
                     // Down and up alone (no move between) give the tracker nothing to measure:
@@ -182,8 +191,8 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
                     val elapsed = (change.uptimeMillis - down.uptimeMillis).coerceAtLeast(1L)
                     val velocity = if (tracked != 0f) tracked else flickX * 1000f / elapsed
                     state.begin(flickTarget)
-                    state.dragBy(flickX / width)
-                    state.release(velocity / width)
+                    state.dragBy(flickX * state.dir / width)
+                    state.release(velocity * state.dir / width)
                 }
                 return@awaitEachGesture
             }
@@ -194,7 +203,7 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
             if (abs(dy) > slop && abs(dy) >= abs(dx)) return@awaitEachGesture
             if (down.id in state.edgeDowns) {
                 if (abs(dx) > slop) {
-                    target = state.neighborFor(dx) ?: return@awaitEachGesture
+                    target = state.neighborFor(dx * state.dir) ?: return@awaitEachGesture
                     change.consume()
                 }
                 continue
@@ -204,7 +213,7 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
             val mine = after.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
             if (mine.isConsumed) return@awaitEachGesture
             if (abs(dx) > slop * TAKE_AFTER_SLOPS) {
-                target = state.neighborFor(dx) ?: return@awaitEachGesture
+                target = state.neighborFor(dx * state.dir) ?: return@awaitEachGesture
                 mine.consume()
             }
         }
@@ -212,7 +221,7 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
         val width = size.width.toFloat().coerceAtLeast(1f)
         // The distance it took to be taken counts too: a flick taken on one long move then lifted
         // otherwise stayed at 0 and snapped back, however fast.
-        state.dragBy(dx / width)
+        state.dragBy(dx * state.dir / width)
         var cancelled = true
         try {
             while (true) {
@@ -230,12 +239,12 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
                 // say), the moves arrive batched, and without them the lift looked like the finger
                 // had stopped — velocity 0, so a quick flick snapped back.
                 tracker.addPointerInputChange(change)
-                state.dragBy(change.positionChangeIgnoreConsumed().x / width)
+                state.dragBy(change.positionChangeIgnoreConsumed().x * state.dir / width)
                 change.consume()
             }
         } finally {
             // Also here when the gesture ended any other way (this handler cancelled): back.
-            state.release(tracker.calculateVelocity().x / width, cancelled)
+            state.release(tracker.calculateVelocity().x * state.dir / width, cancelled)
         }
     }
 }

@@ -429,6 +429,9 @@ fun VideoPlayerItemWithResolvedUri(
                     .fillMaxWidth()
                     .clickable(enabled = false) {} // Consume clicks so they don't toggle controller
             ) {
+                // Comfort: time, seek bar, time and mute stay in this order in a right-to-left
+                // language (see MediaLtr).
+                com.comfort.app.ui.MediaLtr {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -482,6 +485,7 @@ fun VideoPlayerItemWithResolvedUri(
                             modifier = Modifier.size(20.dp)
                         )
                     }
+                }
                 }
             }
         }

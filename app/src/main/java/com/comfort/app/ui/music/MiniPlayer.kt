@@ -96,6 +96,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         Column {
             // How far into the song, along the top edge (Auxio's mini player).
+            com.comfort.app.ui.MediaLtr {
             LinearProgressIndicator(
                 progress = { if (state.duration > 0) (position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f },
                 strokeCap = StrokeCap.Butt,
@@ -103,6 +104,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
                 drawStopIndicator = {},
                 modifier = Modifier.fillMaxWidth().height(3.dp),
             )
+            }
             Row(
                 modifier = Modifier.weight(1f).padding(start = 8.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -123,6 +125,8 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
                         }
                     }
                 }
+                // Previous, play, next in this order in any language (see MediaLtr).
+                com.comfort.app.ui.MediaLtr { Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.count > 1) {
                     IconButton(onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() }) {
                         Icon(Icons.Rounded.SkipPrevious, contentDescription = stringResource(R.string.widget_music_previous))
@@ -139,6 +143,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
                         Icon(Icons.Rounded.SkipNext, contentDescription = stringResource(R.string.widget_music_next))
                     }
                 }
+                } }
                 IconButton(onClick = MusicPlayer::stop) {
                     Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.stop_music))
                 }

@@ -128,6 +128,9 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                 )
                 val scale by animateFloatAsState(if (active) 1f else 0.96f, animationSpec = tween(300), label = "lyricScale")
                 val color by animateColorAsState(if (active) Color.White else Color.White.copy(alpha = 0.9f), label = "lyricColor")
+                // Shrinks towards the side the line is aligned to: its own script decides that (an
+                // Arabic or Hebrew line sits on the right, whatever the app's language).
+                val originX = remember(line.text) { if (java.text.Bidi(line.text, java.text.Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT).baseIsLeftToRight()) 0f else 1f }
                 Text(
                     line.text.ifBlank { "♪" },
                     style = lineStyle,
@@ -141,7 +144,7 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                             this.alpha = alpha
                             scaleX = scale
                             scaleY = scale
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(originX, 0.5f)
                         }
                         .padding(vertical = 10.dp, horizontal = 4.dp),
                 )
