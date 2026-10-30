@@ -188,7 +188,15 @@ object DownloadDispatcher {
         val trimmedUrl = url.trim()
         if (trimmedUrl.isBlank()) return false
         if (!GalleryDlPreferences.isPreventDuplicateDownloads(context)) return false
-        return AppDatabase.getDatabase(context).downloadDao().findActiveOrFinishedByUrl(trimmedUrl, itemFilter) != null
+        return findExisting(AppDatabase.getDatabase(context).downloadDao(), trimmedUrl, itemFilter) != null
+    }
+
+    /** The active or finished download of [url] — by [UrlKey], so the same link shared again with
+     * a different tracking token (X's "?a=…&s=09") is still found. */
+    private suspend fun findExisting(dao: DownloadDao, url: String, itemFilter: String?): DownloadEntity? {
+        dao.findActiveOrFinishedByUrl(url, itemFilter)?.let { return it }
+        val key = UrlKey.of(url)
+        return dao.findActiveOrFinishedLike(UrlKey.likePattern(url), itemFilter).firstOrNull { UrlKey.of(it.url) == key }
     }
 
     suspend fun enqueueDownload(
@@ -229,7 +237,7 @@ object DownloadDispatcher {
         // in duplicate_attempts (see DuplicateAttempt's own doc comment) rather than creating a
         // redundant second downloads row for the same URL.
         if (!forceDuplicate && GalleryDlPreferences.isPreventDuplicateDownloads(context)) {
-            dao.findActiveOrFinishedByUrl(trimmedUrl, itemFilter)?.let { existing ->
+            findExisting(dao, trimmedUrl, itemFilter)?.let { existing ->
                 dao.insertDuplicateAttempt(
                     DuplicateAttempt(
                         id = UUID.randomUUID().toString(),
