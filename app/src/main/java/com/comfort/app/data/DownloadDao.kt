@@ -76,6 +76,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET scheduledAt = :at, forceStart = 0 WHERE id = :id")
     suspend fun setScheduledAt(id: String, at: Long?)
 
+    /** Ends a "Start at…" time once the download it was for is over (see
+     * DownloadDispatcher.enqueueWorkMany). */
+    @Query("UPDATE downloads SET scheduledAt = NULL WHERE id = :id")
+    suspend fun clearScheduledAt(id: String)
+
     /** The earliest start time still ahead among downloads waiting for one, for the wake-up alarm
      * (DownloadDispatcher.scheduleStartAtAlarm). */
     @Query("SELECT MIN(scheduledAt) FROM downloads WHERE status = 'SCHEDULED' AND scheduledAt > :now")

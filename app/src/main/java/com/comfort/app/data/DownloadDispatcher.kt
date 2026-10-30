@@ -159,6 +159,9 @@ object DownloadDispatcher {
 
     private const val QUEUE_REPAIR_DEBOUNCE_MS = 600L
 
+    /** A download that's over: retried, it's a new run. */
+    private val FINISHED_STATUSES = setOf(DownloadStatus.FINISHED, DownloadStatus.SAVED, DownloadStatus.ERRORED, DownloadStatus.CANCELLED, DownloadStatus.DELETED)
+
     private val PAUSABLE_STATUSES = listOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
     private val CANCELLABLE_STATUSES = PAUSABLE_STATUSES + DownloadStatus.PAUSED
 
@@ -444,7 +447,14 @@ object DownloadDispatcher {
                     }
                     // A start time of its own ("Start at…", see scheduleAt) replaces the window, and
                     // the Download Delay with it: it starts at the time the user picked.
-                    val ownStartDelay = row.scheduledAt?.let { (it - now).coerceAtLeast(0L) }
+                    // Only for the run it was set for: a download that has since finished, failed
+                    // or been cancelled and is now retried waits for the window like any other.
+                    // Kept, its time long past read as "start now" and the retry skipped the window.
+                    val ownStartAt = if (row.status in FINISHED_STATUSES && row.scheduledAt != null) {
+                        dao.clearScheduledAt(dispatch.id)
+                        null
+                    } else row.scheduledAt
+                    val ownStartDelay = ownStartAt?.let { (it - now).coerceAtLeast(0L) }
                     val windowDelayMillis = when {
                         dispatch.forceImmediate -> 0L
                         ownStartDelay != null -> ownStartDelay
