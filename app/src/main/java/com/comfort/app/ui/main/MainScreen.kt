@@ -1451,7 +1451,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
     }
 }

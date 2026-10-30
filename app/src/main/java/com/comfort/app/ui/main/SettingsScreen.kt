@@ -617,7 +617,7 @@ internal fun SettingsListRow(
                     )
                 }
             }
-            Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = onContainerColor, modifier = Modifier.size(18.dp))
         }
     }
 }

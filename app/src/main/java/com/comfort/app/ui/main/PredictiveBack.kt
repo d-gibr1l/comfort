@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -42,6 +44,8 @@ import kotlin.math.roundToInt
  *    fades fully in, over up to 150ms, decelerating;
  *  - a cancelled gesture eases everything back.
  * Opening a page plays J2K's push, the mirror image (see [BackRevealState.animateEnter]).
+ * Left and right are for a left-to-right language: in a right-to-left one it all mirrors (the
+ * front page slides left, the shadow on its right edge), as pages there open from the left.
  *
  * Callers apply [Modifier.predictiveBackReveal] to the page in front and
  * [Modifier.predictiveBackBehind] to the page it reveals, and must keep that page composed
@@ -53,6 +57,9 @@ class BackRevealState internal constructor(
     private val onBack: State<() -> Unit>,
 ) {
     // Fractions of the page width / plain alphas — read only in the draw phase (see modifiers).
+    /** 1, or -1 in a right-to-left language: the x values below times this are screen pixels. */
+    internal var dir by androidx.compose.runtime.mutableFloatStateOf(1f)
+
     internal val frontX = Animatable(0f)
     internal val frontAlpha = Animatable(1f)
     internal val behindX = Animatable(-BEHIND_OFFSET)
@@ -192,7 +199,8 @@ class BackRevealState internal constructor(
 fun rememberBackRevealState(enabled: Boolean, onBack: () -> Unit): BackRevealState {
     val scope = rememberCoroutineScope()
     val currentOnBack = rememberUpdatedState(onBack)
-    val state = remember { BackRevealState(scope, currentOnBack) }
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    val state = remember { BackRevealState(scope, currentOnBack) }.also { it.dir = if (rtl) -1f else 1f }
     PredictiveBackHandler(enabled = enabled) { gestureProgress ->
         try {
             gestureProgress.collect { backEvent -> state.track(backEvent.progress) }
@@ -209,21 +217,28 @@ fun rememberBackRevealState(enabled: Boolean, onBack: () -> Unit): BackRevealSta
  * just outside its bounds, inside its own layer so it moves and fades with it). */
 fun Modifier.predictiveBackReveal(state: BackRevealState): Modifier = this
     .graphicsLayer {
-        translationX = state.frontX.value * size.width
+        translationX = state.frontX.value * size.width * state.dir
         alpha = state.frontAlpha.value
     }
     .drawBehind {
         val s = state.shadow.value
         if (s > 0f) {
             val width = 16.dp.toPx()
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.33f * s)),
-                    startX = -width, endX = 0f,
-                ),
-                topLeft = Offset(-width, 0f),
-                size = Size(width, size.height),
-            )
+            val shadow = listOf(Color.Transparent, Color.Black.copy(alpha = 0.33f * s))
+            if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Rtl) {
+                // Along the right edge instead, darkest at the page.
+                drawRect(
+                    brush = Brush.horizontalGradient(shadow.reversed(), startX = size.width, endX = size.width + width),
+                    topLeft = Offset(size.width, 0f),
+                    size = Size(width, size.height),
+                )
+            } else {
+                drawRect(
+                    brush = Brush.horizontalGradient(shadow, startX = -width, endX = 0f),
+                    topLeft = Offset(-width, 0f),
+                    size = Size(width, size.height),
+                )
+            }
         }
     }
 
@@ -235,7 +250,7 @@ fun Modifier.predictiveBackBehind(state: BackRevealState, active: Boolean): Modi
         this
     } else {
         this.graphicsLayer {
-            translationX = state.behindX.value * size.width
+            translationX = state.behindX.value * size.width * state.dir
             alpha = state.behindAlpha.value
         }
     }

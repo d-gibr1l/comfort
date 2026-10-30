@@ -502,12 +502,14 @@ fun QueueScreen(
                             if (count > 0) {
                                 Badge(
                                     containerColor = if (selectedFilter == filter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                                    // A long count grows leftward over the chip, not past its
+                                    // A long count grows back over the chip, not past its
                                     // end: "1,234" on the last chip ran off the screen's edge.
+                                    // placeRelative: rightward in a right-to-left language, where
+                                    // the badge sits on the chip's left corner.
                                     modifier = Modifier.layout { measurable, constraints ->
                                         val badge = measurable.measure(constraints)
                                         val grow = (badge.width - 16.dp.roundToPx()).coerceAtLeast(0)
-                                        layout(badge.width, badge.height) { badge.place(-grow, 0) }
+                                        layout(badge.width, badge.height) { badge.placeRelative(-grow, 0) }
                                     },
                                 ) {
                                     // The full count, not badgeCountText's "99+": a chip has room
