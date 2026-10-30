@@ -494,6 +494,7 @@
     <string name="automatically_installs_newer_yt_dlp_gallery">Instala automaticamente novas versões do yt-dlp, gallery-dl e Instaloader quando encontradas.</string>
     <string name="version_unknown">Versão desconhecida</string>
     <string name="update_to_x">Atualizar para %1$s</string>
+    <string name="stable">Estável</string>
     <string name="open_x_website">Abrir o site do %1$s</string>
     <string name="every_supported_site_by_engine">Todos os sites compatíveis, por motor</string>
     <plurals name="sites_changed_by_you">
