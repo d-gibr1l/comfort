@@ -608,6 +608,8 @@
     <string name="your_start_time">Votre heure de début</string>
     <string name="remove_start_time">Retirer l’heure de début</string>
     <string name="starting_soon">Démarrage imminent</string>
+    <string name="starts_at_x">Démarre à %1$s</string>
+    <string name="start_at_running_note">Il se met en pause maintenant et reprend là où il s’était arrêté à cette heure-là.</string>
     <string name="open_link">Ouvrir le lien</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d téléchargement démarrera dès que tu seras en Wi-Fi (Wi-Fi uniquement est activé).</item>

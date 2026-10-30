@@ -113,6 +113,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
             audioFormat = options.audioFormat,
             audioLanguage = options.audioLanguage,
             subtitleLanguages = options.subtitleLanguages,
+            scheduledAt = options.scheduledAt,
             forceDuplicate = true,
         )
     }

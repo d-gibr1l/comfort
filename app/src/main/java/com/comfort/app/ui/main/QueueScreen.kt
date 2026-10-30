@@ -191,14 +191,17 @@ fun QueueScreen(
     // the download starts or goes meanwhile.
     var startAtItemId by remember { mutableStateOf<String?>(null) }
     val startAtItem = startAtItemId?.let { id ->
-        queueItems.find { it.id == id && it.status in setOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED, DownloadStatus.PAUSED) }
+        queueItems.find { it.id == id && it.status in setOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED, DownloadStatus.PAUSED, DownloadStatus.RUNNING) }
     }
     startAtItem?.let { item ->
+        val running = item.status == DownloadStatus.RUNNING
         StartAtDialog(
-            initial = item.scheduledAt,
+            initial = item.scheduledAt.takeIf { !running },
             onDismiss = { startAtItemId = null },
             onPicked = { at -> startAtItemId = null; viewModel.scheduleAt(item.id, at) },
-            onRemove = if (item.scheduledAt != null) ({ startAtItemId = null; viewModel.scheduleAt(item.id, null) }) else null,
+            // A running one has no time of its own to take off.
+            onRemove = if (item.scheduledAt != null && !running) ({ startAtItemId = null; viewModel.scheduleAt(item.id, null) }) else null,
+            note = if (running) stringResource(R.string.start_at_running_note) else null,
         )
     }
     
@@ -1475,6 +1478,10 @@ fun QueueItemCard(
                 ) {
                     when (item.status) {
                         DownloadStatus.RUNNING -> {
+                            // Stop now and continue at a picked time (StartAtDialog).
+                            IconButton(onClick = onStartAt) {
+                                Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.start_at))
+                            }
                             // Real AssistChips (8dp corners, 32dp tall — M3's own chip spec) with
                             // the connected-group shape treatment: fully rounded on the pair's own
                             // outer ends (Pause's left, Cancel's right), a tighter corner where
@@ -1778,11 +1785,13 @@ internal fun nextOccurrence(minutesOfDay: Int, now: Long): Long = java.util.Cale
  * [initial]: the time already set, if any (else the next full hour). [onRemove], when a time is
  * set: back to waiting for the window like the rest. */
 @Composable
-private fun StartAtDialog(
+internal fun StartAtDialog(
     initial: Long?,
     onDismiss: () -> Unit,
     onPicked: (Long) -> Unit,
     onRemove: (() -> Unit)?,
+    /** A line under the title: what picking a time does here (a running download pauses). */
+    note: String? = null,
 ) {
     val context = LocalContext.current
     // Seeded once, then only written by the wheel (re-seeding it would fight its scrolling).
@@ -1812,6 +1821,10 @@ private fun StartAtDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(stringResource(R.string.start_at), style = MaterialTheme.typography.titleMedium)
+                note?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                }
                 Spacer(Modifier.height(16.dp))
                 dev.darkokoa.datetimewheelpicker.WheelTimePicker(
                     modifier = Modifier.size(280.dp, 160.dp),

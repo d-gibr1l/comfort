@@ -554,6 +554,8 @@
     <string name="your_start_time">Giờ bắt đầu bạn đặt</string>
     <string name="remove_start_time">Xóa giờ bắt đầu</string>
     <string name="starting_soon">Sắp bắt đầu</string>
+    <string name="starts_at_x">Bắt đầu lúc %1$s</string>
+    <string name="start_at_running_note">Lượt tải tạm dừng ngay và tiếp tục từ chỗ đã dừng vào lúc đó.</string>
     <string name="open_link">Mở liên kết</string>
     <string name="started_when">bắt đầu %1$s</string>
     <string name="added_when">đã thêm %1$s</string>

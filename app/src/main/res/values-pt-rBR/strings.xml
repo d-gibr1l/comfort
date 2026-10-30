@@ -606,6 +606,8 @@
     <string name="your_start_time">Seu horário de início</string>
     <string name="remove_start_time">Remover horário de início</string>
     <string name="starting_soon">Começa em instantes</string>
+    <string name="starts_at_x">Começa às %1$s</string>
+    <string name="start_at_running_note">O download pausa agora e continua de onde parou nesse horário.</string>
     <string name="open_link">Abrir link</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d download começa quando você estiver no Wi-Fi (Só Wi-Fi está ligado).</item>

@@ -554,6 +554,8 @@
     <string name="your_start_time">आपका शुरू होने का समय</string>
     <string name="remove_start_time">शुरू होने का समय हटाएँ</string>
     <string name="starting_soon">जल्द शुरू होगा</string>
+    <string name="starts_at_x">%1$s पर शुरू</string>
+    <string name="start_at_running_note">यह अभी रुकेगा और उस समय वहीं से आगे बढ़ेगा जहाँ रुका था।</string>
     <string name="open_link">लिंक खोलें</string>
     <string name="started_when">%1$s शुरू हुआ</string>
     <string name="added_when">%1$s जोड़ा गया</string>
