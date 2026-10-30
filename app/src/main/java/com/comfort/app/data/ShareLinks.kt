@@ -23,15 +23,32 @@ object ShareLinks {
 
     fun isShareLink(url: String): Boolean = REDDIT_SHARE.containsMatchIn(url.trim())
 
+    /** Share links whose lookup failed just now, by UrlKey → when. Not looked up again for
+     * [RETRY_AFTER_MS]: every duplicate check goes through every saved share link, and offline each
+     * lookup waited out its timeout (5 s) — the preview sheet's button waited for all of them. */
+    private val failedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private const val RETRY_AFTER_MS = 10 * 60_000L
+
+    /** Whether [url]'s lookup failed within the last [RETRY_AFTER_MS]. */
+    fun failedRecently(url: String): Boolean =
+        failedAt[UrlKey.of(url)]?.let { System.currentTimeMillis() - it < RETRY_AFTER_MS } == true
+
     /** The UrlKey of the post share link [url] leads to. Null when it can't be followed right now
-     * (offline, refused, the proxy can't be used) or doesn't lead to a post: then it's only the
-     * same as itself, as before. */
-    suspend fun postKey(context: Context, url: String): String? {
+     * (offline, refused, the proxy can't be used), failed within [RETRY_AFTER_MS], or doesn't lead
+     * to a post: then it's only the same as itself, as before. [lookUp] false answers only from
+     * what's kept, without asking Reddit. */
+    suspend fun postKey(context: Context, url: String, lookUp: Boolean = true): String? {
         val shareKey = UrlKey.of(url)
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.getString(shareKey, null)?.let { return it }
-        val target = com.comfort.app.util.EngineProbe.resolveRedirect(context, url.trim()) ?: return null
-        val key = UrlKey.of(target).takeIf { it.startsWith(REDDIT_POST) } ?: return null
+        if (!lookUp || failedRecently(url)) return null
+        val key = com.comfort.app.util.EngineProbe.resolveRedirect(context, url.trim())
+            ?.let { UrlKey.of(it) }?.takeIf { it.startsWith(REDDIT_POST) }
+        if (key == null) {
+            failedAt[shareKey] = System.currentTimeMillis()
+            return null
+        }
+        failedAt.remove(shareKey)
         prefs.edit().apply {
             if (prefs.all.size >= MAX_KEPT) clear()
             putString(shareKey, key)

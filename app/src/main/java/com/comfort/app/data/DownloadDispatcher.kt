@@ -205,9 +205,16 @@ object DownloadDispatcher {
             dao.findActiveOrFinishedLike(UrlKey.likePattern("https://$postKey"), itemFilter)
                 .firstOrNull { UrlKey.of(it.url) == postKey }?.let { return it }
         }
-        // Another share of the same post (each looked up once, then kept).
-        return dao.findActiveOrFinishedLike(ShareLinks.LIKE_PATTERN, itemFilter)
-            .firstOrNull { UrlKey.of(it.url) != key && ShareLinks.postKey(context, it.url) == postKey }
+        // Another share of the same post (each looked up once, then kept). Once one lookup fails
+        // (offline, Reddit refusing), the rest answer only from what's kept: each would wait out
+        // the same timeout.
+        var lookUp = true
+        return dao.findActiveOrFinishedLike(ShareLinks.LIKE_PATTERN, itemFilter).firstOrNull { saved ->
+            if (UrlKey.of(saved.url) == key) return@firstOrNull false
+            val savedPost = ShareLinks.postKey(context, saved.url, lookUp)
+            if (savedPost == null && ShareLinks.failedRecently(saved.url)) lookUp = false
+            savedPost == postKey
+        }
     }
 
     suspend fun enqueueDownload(
