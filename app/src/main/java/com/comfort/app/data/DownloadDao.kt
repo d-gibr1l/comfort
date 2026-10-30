@@ -67,12 +67,23 @@ interface DownloadDao {
     suspend fun setQueueOrder(id: String, order: Int)
 
     /** Pausing ends [setForceStart]'s window skip (see [DownloadDispatcher.pauseDownloads]); the
-     * place at the front of the line stays. */
-    @Query("UPDATE downloads SET forceStart = 0 WHERE id = :id")
+     * place at the front of the line stays. A start time set with "Start at…" ends with it. */
+    @Query("UPDATE downloads SET forceStart = 0, scheduledAt = NULL WHERE id = :id")
     suspend fun clearForceStart(id: String)
 
-    /** [DownloadDispatcher.startNow]'s override: front of the line *and* past the schedule window. */
-    @Query("UPDATE downloads SET queueOrder = :order, forceStart = 1 WHERE id = :id")
+    /** The Queue's "Start at…" (see [DownloadEntity.scheduledAt]); null takes it off. Start now's
+     * override goes, so the download waits for this time instead. */
+    @Query("UPDATE downloads SET scheduledAt = :at, forceStart = 0 WHERE id = :id")
+    suspend fun setScheduledAt(id: String, at: Long?)
+
+    /** The earliest start time still ahead among downloads waiting for one, for the wake-up alarm
+     * (DownloadDispatcher.scheduleStartAtAlarm). */
+    @Query("SELECT MIN(scheduledAt) FROM downloads WHERE status = 'SCHEDULED' AND scheduledAt > :now")
+    suspend fun earliestScheduledAt(now: Long): Long?
+
+    /** [DownloadDispatcher.startNow]'s override: front of the line *and* past the schedule window.
+     * Any start time set with "Start at…" is replaced by it. */
+    @Query("UPDATE downloads SET queueOrder = :order, forceStart = 1, scheduledAt = NULL WHERE id = :id")
     suspend fun setForceStart(id: String, order: Int)
 
     /** Status write that only lands if the row is still in one of [allowed] — Pause/Cancel work from
@@ -237,9 +248,10 @@ interface DownloadDao {
     suspend fun getQueuedOnce(): List<DownloadEntity>
 
     /** Every download waiting for the schedule window, now waiting only for a slot: called once
-     * the window is open (see DownloadWorker). Their jobs start on their own, one by one. */
-    @Query("UPDATE downloads SET status = 'QUEUED' WHERE status = 'SCHEDULED'")
-    suspend fun releaseScheduled(): Int
+     * the window is open (see DownloadWorker). Their jobs start on their own, one by one. Not one
+     * waiting for its own start time ("Start at…") that hasn't come yet. */
+    @Query("UPDATE downloads SET status = 'QUEUED' WHERE status = 'SCHEDULED' AND (scheduledAt IS NULL OR scheduledAt <= :now)")
+    suspend fun releaseScheduled(now: Long): Int
 
     /** One-shot snapshot of everything still marked RUNNING — used at app startup to catch a
      * download whose WorkManager job died out from under it (process killed/frozen mid-download,

@@ -186,6 +186,21 @@ fun QueueScreen(
             onDismiss = { errorSheetItemId = null }
         )
     }
+
+    // "Start at…" on a waiting or paused card. By id, like the error sheet: it closes by itself if
+    // the download starts or goes meanwhile.
+    var startAtItemId by remember { mutableStateOf<String?>(null) }
+    val startAtItem = startAtItemId?.let { id ->
+        queueItems.find { it.id == id && it.status in setOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED, DownloadStatus.PAUSED) }
+    }
+    startAtItem?.let { item ->
+        StartAtDialog(
+            initial = item.scheduledAt,
+            onDismiss = { startAtItemId = null },
+            onPicked = { at -> startAtItemId = null; viewModel.scheduleAt(item.id, at) },
+            onRemove = if (item.scheduledAt != null) ({ startAtItemId = null; viewModel.scheduleAt(item.id, null) }) else null,
+        )
+    }
     
     cookieLoginTarget?.let { (loginUrl, downloadId) ->
         CookieLoginDialog(
@@ -642,6 +657,7 @@ fun QueueScreen(
                                         item = item,
                                         onResume = { viewModel.retryDownload(item.id) },
                                         onStartNow = { viewModel.startNow(item.id) },
+                                        onStartAt = { startAtItemId = item.id },
                                         onDelete = { requestDelete(setOf(item.id)) },
                                         selectionMode = selectionMode,
                                         selected = isSelected,
@@ -656,6 +672,7 @@ fun QueueScreen(
                                         onPauseResume = { viewModel.pauseDownload(item.id) },
                                         onRetry = { viewModel.retryDownload(item.id) },
                                         onStartNow = { viewModel.startNow(item.id) },
+                                        onStartAt = { startAtItemId = item.id },
                                         onAddCookies = {
                                             val host = runCatching { android.net.Uri.parse(item.url).host }.getOrNull()
                                             val targetUrl = if (!host.isNullOrBlank()) "https://$host" else item.url
@@ -842,6 +859,7 @@ private fun StoppedRow(
     onResume: () -> Unit,
     onDelete: () -> Unit,
     onStartNow: () -> Unit = {},
+    onStartAt: () -> Unit = {},
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onToggleSelect: () -> Unit = {},
@@ -987,6 +1005,12 @@ private fun StoppedRow(
                                 leadingIcon = { Icon(Icons.Outlined.PlayArrow, contentDescription = null) },
                                 onClick = { menuExpanded = false; onStartNow() },
                             )
+                            // Or later, at a time picked for it (StartAtDialog).
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.start_at)) },
+                                leadingIcon = { Icon(Icons.Outlined.Schedule, contentDescription = null) },
+                                onClick = { menuExpanded = false; onStartAt() },
+                            )
                         }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.copy_link)) },
@@ -1023,6 +1047,7 @@ fun QueueItemCard(
     onPauseResume: () -> Unit,
     onRetry: () -> Unit,
     onStartNow: () -> Unit = {},
+    onStartAt: () -> Unit = {},
     onAddCookies: () -> Unit = {},
     onShowError: () -> Unit = {},
     selectionMode: Boolean = false,
@@ -1390,7 +1415,11 @@ fun QueueItemCard(
                         value = System.currentTimeMillis()
                     }
                 }
-                val (startsText, windowText) = remember(now) { scheduleTexts(context) }
+                // Its own start time ("Start at…"), or the window's.
+                val (startsText, windowText) = remember(now, item.scheduledAt) {
+                    item.scheduledAt?.let { ownStartText(context, it) to context.getString(R.string.your_start_time) }
+                        ?: scheduleTexts(context)
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Outlined.Schedule,
@@ -1517,6 +1546,10 @@ fun QueueItemCard(
                             LaunchedEffect(starting) {
                                 // Back to the button if it never started (it stays in the queue).
                                 if (starting) { kotlinx.coroutines.delay(20_000L); starting = false }
+                            }
+                            // Set or change when it starts (StartAtDialog).
+                            IconButton(onClick = onStartAt) {
+                                Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.start_at))
                             }
                             ConfirmCancelSplitButton(
                                 label = stringResource(R.string.up_next),
@@ -1706,14 +1739,110 @@ internal fun scheduleTexts(context: android.content.Context): Pair<String, Strin
     val window = context.getString(R.string.downloads_run_x_x, clock(start), clock(end))
     val delay = com.comfort.app.data.DownloadDispatcher.scheduleDelayMillis(context)
     if (delay <= 0) return context.getString(R.string.starting_soon_the_window_is_open) to window
-    val minutes = (delay + 59_999) / 60_000
-    val inText = when {
+    val startsAt = timeFormat.format(Date(System.currentTimeMillis() + delay))
+    return context.getString(R.string.starts_at_x_in_x, startsAt, inText(context, delay)) to window
+}
+
+/** "3 h 20 min" until something [delayMillis] away, rounded up to the minute. */
+private fun inText(context: android.content.Context, delayMillis: Long): String {
+    val minutes = (delayMillis + 59_999) / 60_000
+    return when {
         minutes < 60 -> context.getString(R.string.x_min, minutes)
         minutes % 60 == 0L -> context.getString(R.string.x_h, minutes / 60)
         else -> context.getString(R.string.x_h_x_min, minutes / 60, minutes % 60)
     }
-    val startsAt = timeFormat.format(Date(System.currentTimeMillis() + delay))
-    return context.getString(R.string.starts_at_x_in_x, startsAt, inText) to window
+}
+
+/** [scheduleTexts]' first line for a download with its own start time [at] ("Start at…"):
+ * "Starts at 7:00 AM · in 9 h 10 min", or "Starting soon" once it's come. */
+internal fun ownStartText(context: android.content.Context, at: Long, now: Long = System.currentTimeMillis()): String {
+    if (at <= now) return context.getString(R.string.starting_soon)
+    val startsAt = android.text.format.DateFormat.getTimeFormat(context).format(Date(at))
+    return context.getString(R.string.starts_at_x_in_x, startsAt, inText(context, at - now))
+}
+
+/** The next time the clock shows [minutesOfDay] after [now]: later today, or tomorrow once it's
+ * passed. Seconds at 0, so it starts on the minute picked. */
+internal fun nextOccurrence(minutesOfDay: Int, now: Long): Long = java.util.Calendar.getInstance().apply {
+    timeInMillis = now
+    set(java.util.Calendar.HOUR_OF_DAY, minutesOfDay / 60)
+    set(java.util.Calendar.MINUTE, minutesOfDay % 60)
+    set(java.util.Calendar.SECOND, 0)
+    set(java.util.Calendar.MILLISECOND, 0)
+    if (timeInMillis <= now) add(java.util.Calendar.DAY_OF_MONTH, 1)
+}.timeInMillis
+
+/** The Queue's "Start at…" on a waiting or paused download: a time of day on the same wheel as the
+ * schedule window's (Settings › Downloads), for the next time it comes round — later today, or
+ * tomorrow once it's passed — said underneath as it turns ("Starts at 7:00 AM · in 9 h 10 min").
+ * [initial]: the time already set, if any (else the next full hour). [onRemove], when a time is
+ * set: back to waiting for the window like the rest. */
+@Composable
+private fun StartAtDialog(
+    initial: Long?,
+    onDismiss: () -> Unit,
+    onPicked: (Long) -> Unit,
+    onRemove: (() -> Unit)?,
+) {
+    val context = LocalContext.current
+    // Seeded once, then only written by the wheel (re-seeding it would fight its scrolling).
+    val startMinutes = remember {
+        val c = java.util.Calendar.getInstance()
+        if (initial != null && initial > System.currentTimeMillis()) {
+            c.timeInMillis = initial
+        } else {
+            c.add(java.util.Calendar.HOUR_OF_DAY, 1)
+            c.set(java.util.Calendar.MINUTE, 0)
+        }
+        c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)
+    }
+    var minutes by remember { mutableStateOf(startMinutes) }
+    val startTime = remember { kotlinx.datetime.LocalTime(hour = startMinutes / 60, minute = startMinutes % 60) }
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            value = System.currentTimeMillis()
+        }
+    }
+    val summary = remember(minutes, now) { ownStartText(context, nextOccurrence(minutes, now), now) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(shape = MaterialTheme.shapes.large) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(stringResource(R.string.start_at), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(16.dp))
+                dev.darkokoa.datetimewheelpicker.WheelTimePicker(
+                    modifier = Modifier.size(280.dp, 160.dp),
+                    startTime = startTime,
+                    // The phone's own 12/24-hour setting.
+                    timeFormatter = dev.darkokoa.datetimewheelpicker.core.format.timeFormatter(
+                        timeFormat = if (android.text.format.DateFormat.is24HourFormat(context)) {
+                            dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.HOUR_24
+                        } else {
+                            dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.AM_PM
+                        },
+                    ),
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    selectedTextStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    onSnappedTime = { snapped -> minutes = snapped.hour * 60 + snapped.minute },
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(summary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (onRemove != null) {
+                        TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_start_time)) }
+                        Spacer(Modifier.weight(1f))
+                    }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                    TextButton(onClick = { onPicked(nextOccurrence(minutes, System.currentTimeMillis())) }) { Text(stringResource(R.string.done)) }
+                }
+            }
+        }
+    }
 }
 
 /** A queue card's link, without the scheme/"www." and cut off with an ellipsis so it never pushes

@@ -596,6 +596,10 @@
     <string name="downloads_run_x_x">Descargas de %1$s a %2$s</string>
     <string name="starting_soon_the_window_is_open">Empieza pronto, la franja está abierta</string>
     <string name="starts_at_x_in_x">Empieza a las %1$s · en %2$s</string>
+    <string name="start_at">Empezar a las…</string>
+    <string name="your_start_time">Tu hora de inicio</string>
+    <string name="remove_start_time">Quitar hora de inicio</string>
+    <string name="starting_soon">Empieza enseguida</string>
     <string name="open_link">Abrir enlace</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d descarga empezará cuando estés en Wi-Fi (Solo Wi-Fi está activado).</item>

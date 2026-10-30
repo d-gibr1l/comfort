@@ -604,6 +604,10 @@
     <string name="x_h">%1$s h</string>
     <string name="x_h_x_min">%1$s h %2$s min</string>
     <string name="starts_at_x_in_x">Démarre à %1$s · dans %2$s</string>
+    <string name="start_at">Démarrer à…</string>
+    <string name="your_start_time">Votre heure de début</string>
+    <string name="remove_start_time">Retirer l’heure de début</string>
+    <string name="starting_soon">Démarrage imminent</string>
     <string name="open_link">Ouvrir le lien</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d téléchargement démarrera dès que tu seras en Wi-Fi (Wi-Fi uniquement est activé).</item>

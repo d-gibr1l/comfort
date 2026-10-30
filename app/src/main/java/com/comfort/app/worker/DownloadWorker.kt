@@ -292,10 +292,11 @@ class DownloadWorker(
         // more, only for a slot: all of them go to QUEUED now. Each only changed when it got a
         // slot (RUNNING), and Android wakes their jobs one at a time, so with the alarm off a big
         // batch kept saying "waiting for the scheduled time window" long after it opened, then
-        // went to Running one by one (seen live with 8). Start now only moves this one.
+        // went to Running one by one (seen live with 8). Start now only moves this one, and so
+        // does a start time of its own ("Start at…"): its job only runs once that time has come.
         if (DownloadDispatcher.isWithinScheduleWindow(applicationContext)) {
-            dao.releaseScheduled()
-        } else if (entity?.forceStart == true) {
+            dao.releaseScheduled(System.currentTimeMillis())
+        } else if (entity?.forceStart == true || entity?.scheduledAt != null) {
             dao.updateStatusIfIn(downloadId, DownloadStatus.QUEUED, listOf(DownloadStatus.SCHEDULED))
         }
         val gateAcquired = AtomicBoolean(false)
@@ -342,7 +343,8 @@ class DownloadWorker(
                 // window was checked when it woke, so a long queue kept starting downloads after
                 // the end time until it was empty. Back to waiting for the next window instead,
                 // the way a download the window closes on mid-transfer goes (Up next excepted).
-                if (entity?.forceStart != true &&
+                // A start time of its own ("Start at…") replaces the window, like Start now.
+                if (entity?.forceStart != true && entity?.scheduledAt == null &&
                     GalleryDlPreferences.isScheduleEnabled(applicationContext) &&
                     !GalleryDlPreferences.isGloballyPaused(applicationContext) &&
                     !DownloadDispatcher.isWithinScheduleWindow(applicationContext)
@@ -605,7 +607,8 @@ class DownloadWorker(
                 // silently undoing the very override the user just tapped. Snapshotted once from the
                 // entity fetched at the top of doWork(), not re-read live, so this exemption covers
                 // this entire run exactly like the initial forceImmediate skip already did.
-                val startedViaStartNow = entity?.forceStart == true
+                // A start time the user set ("Start at…") is the same explicit override.
+                val startedViaStartNow = entity?.forceStart == true || entity?.scheduledAt != null
 
                 // suspend, not a plain lambda — PythonRuntime's onLine has no JNI-reentrancy
                 // constraint (unlike Chaquopy's old synchronous callback), so every DB write below

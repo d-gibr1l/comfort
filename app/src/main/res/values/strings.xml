@@ -621,6 +621,10 @@
     <string name="x_h">%1$s h</string>
     <string name="x_h_x_min">%1$s h %2$s min</string>
     <string name="starts_at_x_in_x">Starts at %1$s · in %2$s</string>
+    <string name="start_at">Start at…</string>
+    <string name="your_start_time">Your start time</string>
+    <string name="remove_start_time">Remove start time</string>
+    <string name="starting_soon">Starting soon</string>
     <string name="open_link">Open link</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d download starts once you\'re on Wi-Fi (Wi-Fi only is on).</item>
