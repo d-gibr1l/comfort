@@ -12,4 +12,6 @@
     <locale android:name="ar" />
     <locale android:name="iw" />
     <locale android:name="fa" />
+    <locale android:name="tr" />
+    <locale android:name="it" />
 </locale-config>
