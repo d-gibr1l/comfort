@@ -38,6 +38,9 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
@@ -398,7 +401,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 onOpenLibrary = { selectedTab = 1 },
                 onOpenQueue = openQueue,
                 pasteDownloadSignal = pasteDownloadSignal,
-                active = (selectedTab == 0 || pageSwipe.involves(0)) && !showQueueScreen && mediaViewer == null && !showNowPlaying,
+                // A lambda, read only by the strip's drift: as a plain value, leaving Home
+                // recomposed all of it (6.4 ms of the Library's opening frame, traced).
+                active = { (selectedTab == 0 || pageSwipe.involves(0)) && !showQueueScreen && mediaViewer == null && !showNowPlaying },
             )
             }
         }
@@ -419,18 +424,29 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     // Moved by a swipe: its background moves with it (inside the layer), or it
                     // would stay put and cover the page coming in beside it.
                     Modifier.fillMaxSize().pageSwipeLayer(pageSwipe, tab, selectedTab).background(MaterialTheme.colorScheme.background)
-                } else Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).then(
-                    when {
-                        tab == selectedTab -> Modifier.predictiveBackReveal(tabBack)
-                        tab == outgoingTab -> Modifier.predictiveBackBehind(tabBack, active = true)
-                        // Kept but not shown: measured (so showing it only has to draw) but not
-                        // placed — so not drawn and not hit-testable.
-                        else -> Modifier.layout { measurable, constraints ->
-                            measurable.measure(constraints)
-                            layout(0, 0) {}
+                } else if (tab == outgoingTab) {
+                    Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).predictiveBackBehind(tabBack, active = true)
+                } else {
+                    // Kept but not shown: laid out and drawn, invisible and underneath Home, so
+                    // showing it is only a change of its layer's alpha. Left unplaced (as it was),
+                    // the opening frame still had to lay out and draw the whole page from scratch:
+                    // 46 ms, about five dropped frames at 120 Hz (traced on the benchmark build:
+                    // 14 ms layout, 12 ms drawing). The same modifiers either way, so the switch
+                    // doesn't rebuild them; the hidden copy can't be touched or read out.
+                    val hidden = tab != selectedTab
+                    Modifier.fillMaxSize()
+                        .zIndex(if (hidden) -1f else 0f)
+                        .graphicsLayer { alpha = if (hidden) 0f else 1f }
+                        .pointerInput(hidden) {
+                            if (!hidden) return@pointerInput
+                            awaitPointerEventScope {
+                                while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
+                            }
                         }
-                    }
-                )
+                        .background(MaterialTheme.colorScheme.background)
+                        .predictiveBackReveal(tabBack)
+                        .then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier)
+                }
             ) {
                 when (tab) {
                     1 -> DownloadsHistoryScreen(
@@ -773,7 +789,7 @@ fun HomeScreen(
     // Whether Home is the page on screen. It stays composed under the other pages (they reveal it
     // on back), and its strip's auto-scroll laid it out every frame there too: a page switch ran
     // on top of that the whole time (choppy, measured: ~70 frames a second with nothing moving).
-    active: Boolean = true,
+    active: () -> Boolean = { true },
 ) {
     var url by remember { mutableStateOf("") }
     // The in-app browser (WebBrowser), open at this address; null when closed.
@@ -1209,9 +1225,11 @@ fun HomeScreen(
                 val isRecentListDragged by recentListState.interactionSource.collectIsDraggedAsState()
                 val reducedMotion = com.comfort.app.util.rememberIsReducedMotionEnabled()
                 val homeWindowFocused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
-                LaunchedEffect(recentDownloads.size, reducedMotion, active, homeWindowFocused) {
+                LaunchedEffect(recentDownloads.size, reducedMotion, homeWindowFocused) {
+                    if (recentDownloads.size <= 1 || reducedMotion || !homeWindowFocused) return@LaunchedEffect
                     // Only while Home is on screen and the app is in front (see `active`).
-                    if (recentDownloads.size <= 1 || reducedMotion || !active || !homeWindowFocused) return@LaunchedEffect
+                    androidx.compose.runtime.snapshotFlow { active() }.collectLatest { onScreen ->
+                    if (!onScreen) return@collectLatest
                     kotlinx.coroutines.delay(3500)
                     while (true) {
                         if (isRecentListDragged) {
@@ -1226,6 +1244,7 @@ fun HomeScreen(
                             kotlinx.coroutines.delay(1800)
                         }
                         kotlinx.coroutines.delay(16)
+                    }
                     }
                 }
                 // Comfort: a tap opens the item in the media viewer, paging through the strip.
