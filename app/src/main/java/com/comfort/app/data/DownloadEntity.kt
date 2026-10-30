@@ -184,6 +184,11 @@ data class DownloadEntity(
      * ignore the schedule window on Resume. */
     @ColumnInfo(defaultValue = "0")
     val forceStart: Boolean = false,
+    /** A start time the user set on this download (the Queue's "Start at…"), epoch millis; null
+     * when none. It replaces the schedule window for this download, the way [forceStart] skips it:
+     * it waits until then, then starts whether the window is open or not. Ended by a pause or
+     * Start now (DownloadDispatcher). */
+    val scheduledAt: Long? = null,
 ) {
     /** When this download actually happened, not when the link was submitted — those can differ
      * a lot with Wi-Fi-only or a schedule window in play, where a download can sit QUEUED for

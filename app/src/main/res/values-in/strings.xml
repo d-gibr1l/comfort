@@ -588,6 +588,10 @@
     <string name="x_h">%1$s jam</string>
     <string name="x_h_x_min">%1$s jam %2$s mnt</string>
     <string name="starts_at_x_in_x">Mulai pukul %1$s · dalam %2$s</string>
+    <string name="start_at">Mulai pada…</string>
+    <string name="your_start_time">Waktu mulai Anda</string>
+    <string name="remove_start_time">Hapus waktu mulai</string>
+    <string name="starting_soon">Segera dimulai</string>
     <string name="open_link">Buka tautan</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d unduhan dimulai saat Anda terhubung ke Wi-Fi (Hanya Wi-Fi aktif).</item>

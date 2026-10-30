@@ -601,6 +601,10 @@
     <string name="downloads_run_x_x">Downloads rodam das %1$s às %2$s</string>
     <string name="starting_soon_the_window_is_open">Começando em breve, o horário está aberto</string>
     <string name="starts_at_x_in_x">Começa às %1$s · em %2$s</string>
+    <string name="start_at">Começar às…</string>
+    <string name="your_start_time">Seu horário de início</string>
+    <string name="remove_start_time">Remover horário de início</string>
+    <string name="starting_soon">Começa em instantes</string>
     <string name="open_link">Abrir link</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d download começa quando você estiver no Wi-Fi (Só Wi-Fi está ligado).</item>

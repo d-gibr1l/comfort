@@ -419,6 +419,7 @@ object DownloadDispatcher {
             // skipping every reason this item would otherwise wait, not just one of them.
             val downloadDelay = GalleryDlPreferences.getEffectiveDownloadDelaySeconds(context) * 1000L
             val windowDelay = scheduleDelayMillis(context)
+            val now = System.currentTimeMillis()
 
             val requests = mutableListOf<Pair<Dispatch, androidx.work.OneTimeWorkRequest>>()
             val pausedIds = mutableSetOf<String>()
@@ -434,8 +435,15 @@ object DownloadDispatcher {
                         pausedIds += dispatch.id
                         continue
                     }
-                    val windowDelayMillis = if (dispatch.forceImmediate) 0L else windowDelay
-                    val delayMillis = windowDelayMillis + if (dispatch.forceImmediate) 0L else downloadDelay
+                    // A start time of its own ("Start at…", see scheduleAt) replaces the window, and
+                    // the Download Delay with it: it starts at the time the user picked.
+                    val ownStartDelay = row.scheduledAt?.let { (it - now).coerceAtLeast(0L) }
+                    val windowDelayMillis = when {
+                        dispatch.forceImmediate -> 0L
+                        ownStartDelay != null -> ownStartDelay
+                        else -> windowDelay
+                    }
+                    val delayMillis = windowDelayMillis + if (dispatch.forceImmediate || ownStartDelay != null) 0L else downloadDelay
                     val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
                         .setInputData(workDataOf("downloadId" to dispatch.id, "url" to dispatch.url))
                         .setConstraints(constraints)
@@ -469,6 +477,7 @@ object DownloadDispatcher {
             }
             if (requests.isEmpty()) return@withDownloadLocks pausedIds
             scheduleWindowAlarm(context)
+            scheduleStartAtAlarm(context)
 
             // One job per download, not a slot in a chain. Downloads used to be appended round-robin
             // to one WorkManager chain per concurrency slot ("gallery_dl_queue_N"), which ran each
@@ -809,6 +818,21 @@ object DownloadDispatcher {
         repairOrphanedQueue(context)
     }
 
+    /** The Queue's "Start at…": [id] starts at [at] (epoch millis) — or, with null, goes back to
+     * waiting for the schedule window like any other download. A set time replaces the window and
+     * Start now for this download (see [DownloadEntity.scheduledAt]); a paused one is sent back to
+     * wait for it. An explicit request for this download, so it ends a Pause All, like Resume. */
+    suspend fun scheduleAt(context: Context, id: String, at: Long?) {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        val entity = dao.getById(id) ?: return
+        dao.setScheduledAt(id, at)
+        enqueueWork(
+            context, id, entity.url, userInitiated = true,
+            expectedStatus = setOf(DownloadStatus.QUEUED, DownloadStatus.SCHEDULED, DownloadStatus.PAUSED),
+        )
+        repairOrphanedQueue(context)
+    }
+
     /** Frees a slot for [id] when all of them are taken — see [startNow]. Waits until its worker
      * is actually in line at the gate first: freed any earlier, the slot went to whichever worker
      * asked for it next, which could be the very download that was just sent back. */
@@ -878,6 +902,33 @@ object DownloadDispatcher {
     }
 
     private const val SCHEDULE_ALARM_REQUEST_CODE = 1001
+    private const val START_AT_ALARM_REQUEST_CODE = 1002
+
+    /** [scheduleWindowAlarm]'s backstop for the downloads' own start times ("Start at…"): an alarm
+     * at the earliest one still ahead, so Doze can't hold it back past its time. Its own alarm
+     * (request code), not the window's: Settings re-arms that one without knowing about these. The
+     * same receiver re-submits everything waiting, which starts what's due and re-arms this for the
+     * next. Under the same "Use alarm for scheduling" switch; not tied to the window being on. */
+    suspend fun scheduleStartAtAlarm(context: Context) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, START_AT_ALARM_REQUEST_CODE,
+            Intent(context, ScheduleAlarmReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val at = if (GalleryDlPreferences.isAlarmSchedulingEnabled(context)) {
+            AppDatabase.getDatabase(context).downloadDao().earliestScheduledAt(System.currentTimeMillis())
+        } else null
+        if (at == null) {
+            runCatching { alarmManager.cancel(pendingIntent) }
+            return
+        }
+        runCatching {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pendingIntent)
+        }.onFailure { e ->
+            android.util.Log.w("DownloadDispatcher", "Failed to schedule start-time alarm", e)
+        }
+    }
 
     /** (Re)arms — or cancels — the exact-alarm backstop for the Schedule window, ported from
      * YTDLnis's own "Use alarm for scheduling" toggle. WorkManager's setInitialDelay() is a plain

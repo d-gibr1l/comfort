@@ -617,6 +617,10 @@
     <string name="x_h">%1$s ч</string>
     <string name="x_h_x_min">%1$s ч %2$s мин</string>
     <string name="starts_at_x_in_x">Начнётся в %1$s · через %2$s</string>
+    <string name="start_at">Начать в…</string>
+    <string name="your_start_time">Ваше время начала</string>
+    <string name="remove_start_time">Убрать время начала</string>
+    <string name="starting_soon">Скоро начнётся</string>
     <string name="open_link">Открыть ссылку</string>
     <plurals name="downloads_start_on_wifi">
         <item quantity="one">%d загрузка начнётся, когда появится Wi-Fi (включено «Только Wi-Fi»).</item>

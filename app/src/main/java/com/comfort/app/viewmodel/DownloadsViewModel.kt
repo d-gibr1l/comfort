@@ -363,6 +363,14 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** The Queue's "Start at…": [id] starts at [at] (epoch millis), or with null waits for the
+     * schedule window again — see DownloadDispatcher.scheduleAt. */
+    fun scheduleAt(id: String, at: Long?) {
+        viewModelScope.launch {
+            DownloadDispatcher.scheduleAt(getApplication(), id, at)
+        }
+    }
+
     /** The "Retry All" FAB on the Queue screen's Errored/Cancelled filter tabs. */
     fun retryAll(status: DownloadStatus) {
         dispatchRetries(queueFlow.value.filter { it.status == status }, userInitiated = false)
