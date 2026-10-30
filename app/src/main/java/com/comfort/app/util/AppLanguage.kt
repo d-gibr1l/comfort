@@ -18,7 +18,7 @@ import java.util.Locale
 object AppLanguage {
     /** The languages the app has text for, as BCP 47 tags; "" follows the phone. Each is shown in
      * its own language in the picker, so it can be found whatever the app is set to. */
-    val SUPPORTED = listOf("", "en", "es", "pt-BR", "de", "fr", "ru", "id", "ar", "iw", "fa", "tr", "it")
+    val SUPPORTED = listOf("", "en", "es", "pt-BR", "de", "fr", "ru", "id", "ar", "iw", "fa", "tr", "it", "ja", "zh-CN")
 
     private const val PREFS = "app_language"
     private const val KEY = "tag"
