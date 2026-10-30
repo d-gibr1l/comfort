@@ -9,7 +9,7 @@ import time
 import yt_dlp
 from yt_dlp.networking.impersonate import ImpersonateTarget
 from yt_dlp.postprocessor.common import PostProcessor
-from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegPostProcessor, FFmpegSplitChaptersPP
+from yt_dlp.postprocessor.ffmpeg import FFmpegEmbedSubtitlePP, FFmpegExtractAudioPP, FFmpegPostProcessor, FFmpegSplitChaptersPP
 from yt_dlp.utils import ISO639Utils, PostProcessingError, prepend_extension
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 from yt_dlp.postprocessor.modify_chapters import ModifyChaptersPP
@@ -1223,6 +1223,32 @@ class _RememberFormatsPP(PostProcessor):
                 os.replace(self._path + ".tmp", self._path)
             except OSError:
                 pass
+        return [], info
+
+
+class _DropUnfinishedConversionPP(PostProcessor):
+    """A download stopped while its file was being converted (WorkManager stopping it when the
+    network blinks, say) is started again with the original still there, next to a half-written
+    converted file: ffmpeg writes straight to the final name, and the original is only removed once
+    the conversion has finished. With final_ext set (see download()), yt-dlp would take that half
+    file for the finished download — so, just before it looks, a converted file whose original is
+    still there is removed, and the conversion runs again from the whole original. A converted file
+    on its own is the finished one, and is kept: no download again."""
+
+    def __init__(self, downloader, final_ext):
+        super().__init__(downloader)
+        self._final_ext = final_ext
+
+    def run(self, info):
+        name, ext = info.get("_filename"), info.get("ext")
+        if name and ext and ext != self._final_ext:
+            base = os.path.splitext(name)[0]
+            original, converted = f"{base}.{ext}", f"{base}.{self._final_ext}"
+            if os.path.isfile(original) and os.path.isfile(converted):
+                try:
+                    os.remove(converted)
+                except OSError:
+                    pass
         return [], info
 
 
@@ -2920,6 +2946,22 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     _merge_extras(ydl_opts, extras, download_dir, split_chapters)
 
+    # The extension the finished file ends up with when the app converts it, as yt-dlp's own CLI
+    # sets it: the audio format picked (ExtractAudio), or .mp4 (_Mp4ConvertPP). Without it, a
+    # download stopped after the conversion had removed the original wasn't recognised as done when
+    # it started again — yt-dlp looked for the original's name only — and was downloaded all over
+    # (seen 2026-10-30: a song stopped by a Wi-Fi blip while converting). A conversion stopped
+    # part-way is handled by _DropUnfinishedConversionPP. Not over one the extras chose themselves.
+    final_ext = None
+    if ffmpeg_path and not ydl_opts.get("final_ext"):
+        if audio_only and codec in FFmpegExtractAudioPP.SUPPORTED_EXTS:
+            # The file's extension, not the codec's name: AAC and ALAC land as .m4a, Vorbis as .ogg.
+            final_ext = (getattr(yt_dlp.postprocessor.ffmpeg, "ACODECS", {}).get(codec) or (codec,))[0]
+        elif not audio_only and output_format == "mp4" and not converts_video and not split_chapters:
+            final_ext = "mp4"
+    if final_ext:
+        ydl_opts["final_ext"] = final_ext
+
     # YouTube refuses the stream links it hands a signed-in session with 403 on this connection
     # (reproduced on the phone: the same download with and without the cookie file, every other
     # option equal — only the cookie run failed, on its first request). The Instant path rarely
@@ -2949,6 +2991,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # Added after ydl_opts' own pre_process MetadataParser, so it sees the cleaned uploader.
             ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames, custom_format=custom_format, site=site), when="pre_process")
             ydl.add_post_processor(_RememberFormatsPP(ydl, download_dir), when="before_dl")
+            if final_ext:
+                ydl.add_post_processor(_DropUnfinishedConversionPP(ydl, final_ext), when="before_dl")
             if pick_subtitles and opts.get("writesubtitles"):
                 _pick_subtitles_on(ydl)
             if opts.get("writesubtitles") or opts.get("writeautomaticsub"):
