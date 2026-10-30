@@ -10,4 +10,6 @@
     <locale android:name="ru" />
     <locale android:name="id" />
     <locale android:name="ar" />
+    <locale android:name="iw" />
+    <locale android:name="fa" />
 </locale-config>
