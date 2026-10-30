@@ -222,6 +222,11 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE url = :url AND itemFilter IS :itemFilter AND status IN ('QUEUED', 'SCHEDULED', 'RUNNING', 'PAUSED', 'FINISHED') LIMIT 1")
     suspend fun findActiveOrFinishedByUrl(url: String, itemFilter: String? = null): DownloadEntity?
 
+    /** [findActiveOrFinishedByUrl]'s rows for links whose URL matches [pattern] (UrlKey.likePattern),
+     * to be compared by UrlKey: the same link shared with different tracking parameters. */
+    @Query("SELECT * FROM downloads WHERE url LIKE :pattern ESCAPE '\\' AND itemFilter IS :itemFilter AND status IN ('QUEUED', 'SCHEDULED', 'RUNNING', 'PAUSED', 'FINISHED')")
+    suspend fun findActiveOrFinishedLike(pattern: String, itemFilter: String? = null): List<DownloadEntity>
+
     /** One-shot (non-Flow) snapshot of everything still waiting to start — used to re-submit
      * their WorkManager jobs when a setting that affects delay (like the schedule window)
      * changes, since a job's setInitialDelay() is fixed at the moment it was enqueued and won't

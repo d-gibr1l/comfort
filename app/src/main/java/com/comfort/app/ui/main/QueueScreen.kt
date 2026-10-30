@@ -1781,15 +1781,10 @@ internal fun shortQueueLink(url: String): String {
     val path = base.substringBefore('?').trimEnd('/')
     val kept = base.substringAfter('?', "").split('&').filter { param ->
         val name = param.substringBefore('=').lowercase()
-        param.isNotBlank() && name !in TRACKING_PARAMS && !name.startsWith("utm_")
+        param.isNotBlank() && !com.comfort.app.data.UrlKey.isTracking(name)
     }
     return if (kept.isEmpty()) path else path + "?" + kept.joinToString("&")
 }
-
-private val TRACKING_PARAMS = setOf(
-    "si", "igsh", "igshid", "fbclid", "gclid", "feature", "pp", "share_id", "share_app_id",
-    "is_from_webapp", "sender_device", "web_id", "ref", "ref_src", "s", "t", "xmt", "mibextid", "rdt",
-)
 
 /** A filter's name as shown; the filters themselves are keyed by their English names. */
 @Composable
