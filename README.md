@@ -12,10 +12,10 @@ video, gallery, or song behind it with real quality, format, and trim control.
 
 Package: `com.comfort.app` · minSdk 24 · targetSdk 36 · Jetpack Compose (Material 3 Expressive)
 
-Download the APK from [Releases](https://github.com/d-gibr1l/Gallery-dl/releases/latest), or get updates
+Download the APK from [Releases](https://github.com/d-gibr1l/comfort/releases/latest), or get updates
 straight from them with Obtainium:
 
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-gibr1l/Gallery-dl"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" width="161"></a>
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-gibr1l/comfort"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" width="161"></a>
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="200" alt="Home">&nbsp;
@@ -171,8 +171,8 @@ with Material 3 Expressive components.
 ## Building
 
 ```bash
-git clone https://github.com/d-gibr1l/Gallery-dl.git
-cd Gallery-dl
+git clone https://github.com/d-gibr1l/comfort.git
+cd comfort
 ./gradlew :app:assembleDebug
 ```
 
