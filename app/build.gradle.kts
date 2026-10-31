@@ -86,6 +86,14 @@ android {
             "fa", "tr", "it", "ja", "zh-rCN", "hi", "vi",
         )
     }
+    // Android Lint, run by CI on every push (.github/workflows/build.yml, "lint" job).
+    lint {
+        abortOnError = false
+        textReport = true
+        textOutput = file("stdout")
+        xmlReport = true
+        htmlReport = true
+    }
     buildFeatures {
       compose = true
       aidl = false

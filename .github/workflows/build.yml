@@ -59,6 +59,27 @@ jobs:
           path: app/build/reports/tests/
           retention-days: 7
 
+  # Android Lint: bugs the compiler doesn't catch (API levels, permissions, resources, leaks).
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Lint
+        run: ./gradlew :app:lintDebug --stacktrace
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.*
+          retention-days: 14
+
   # yt_dlp_wrapper.py against a local server: a stopped download resumes, a stopped conversion
   # isn't downloaded again (tools/test_wrapper_resume.py). Against the newest yt-dlp on purpose —
   # what users get from Settings › Updates and engines — so an upstream change that breaks resuming
