@@ -12,10 +12,10 @@ video, gallery, or song behind it with real quality, format, and trim control.
 
 Package: `com.comfort.app` · minSdk 24 · targetSdk 36 · Jetpack Compose (Material 3 Expressive)
 
-Download the APK from [Releases](https://github.com/d-gibr1l/comfort/releases/latest), or get updates
+Download the APK from [Releases](https://github.com/d-gibr1l/Gallery-dl/releases/latest), or get updates
 straight from them with Obtainium:
 
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-gibr1l/comfort"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" width="161"></a>
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/d-gibr1l/Gallery-dl"><img src="docs/badge_obtainium.png" alt="Get it on Obtainium" width="161"></a>
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="200" alt="Home">&nbsp;
@@ -52,18 +52,24 @@ straight from them with Obtainium:
 - Content detection: a link that resolves to video (from *any* site, not a fixed host list) or a
   song opens the preview sheet; a real multi-item gallery shows an item picker to choose which
   files to grab
-- Queue with pause/resume/cancel, configurable concurrent downloads, "Up next" to move a download to
-  the front of the line, and a scheduled download window (only download overnight, say) that
-  starts everything waiting the moment it opens
+- Queue with pause/resume/cancel, configurable concurrent downloads, **Start now** to start a
+  download at once (past the window and the line), and a scheduled download window (only download
+  overnight, say) that starts everything waiting the moment it opens
+- **Start at…**: give any download its own start time — from the preview sheet, a queued or paused
+  card, or a running one (which pauses until then)
 - Select many downloads at once to retry, resume, pause, cancel or delete them together, or Retry
   All on the Errored tab — a hundred cards move in one go
 - A download that saved some of its items and not others says so, and can fetch just the rest
-- Live speed and progress, a stall watchdog, and automatic retries on flaky connections
+- Live speed and progress, a stall watchdog, and automatic retries on flaky connections; a dropped
+  connection is ridden out for a few minutes, then the download waits for the network and carries
+  on where it stopped
 - Resumable in-progress downloads survive process death — a killed app picks a download back up
   instead of restarting it
-- yt-dlp, gallery-dl and Instaloader update independently of the app itself, on a Stable or
-  Bleeding Edge channel per engine, from Settings — no need to wait for a new app release to pick up
-  a site-extractor fix
+- **Subscriptions**: subscribe to a channel or playlist from the download sheet, and its new uploads
+  download on their own (Settings › Subscriptions)
+- yt-dlp, gallery-dl and Instaloader update independently of the app itself — automatically by
+  default, on a Stable or Bleeding Edge channel per engine (Settings › Updates and engines) — no need
+  to wait for a new app release to pick up a site-extractor fix
 
 🎵 **Music**
 - Spotify track/album/playlist links — no API key or login needed. Scrapes Spotify's own public
@@ -86,13 +92,16 @@ straight from them with Obtainium:
 - A built-in viewer for pictures and videos: swipe through the Library, see a photo's details,
   share, or open in another app
 - A full music player, with Auxio's playback engine and look: a queue, shuffle, Now Playing with
-  synced lyrics, and a video with sound pauses the music, which plays on after
+  synced lyrics, and a video with sound pauses the music, which plays on after. Controls on the lock
+  screen, from headphones and Bluetooth, and a home-screen widget
 
 🎛️ **Per-download options** (the preview sheet)
 - Video quality: Best / 4K / 1440p / 1080p / 720p / 480p / Audio-only, showing the size of the
   quality you pick before you download
 - Clip/section trimming — multi-segment, Set Start/Set End against the real video position
 - MP4 or MKV output; MP4 converts VP9/AV1-only videos to H.264 on the phone's hardware encoder
+- Audio language for videos with dubs (the original marked), and subtitles in your language and the
+  original by default — per download, or as a default in Settings › Processing
 - SponsorBlock (YouTube): mark sponsored segments as chapters, or cut them out
 - Split a video with chapters into one file per chapter
 - Save thumbnail, embed metadata/subtitles, write description/info.json sidecar files
@@ -118,6 +127,9 @@ straight from them with Obtainium:
 - Swipe sideways between Home, Library and Settings, and between the Queue's tabs
 - Backup & restore of your settings, command templates, Library history and logins
 - Light/dark/system theme, several named color themes, dynamic color, and a pure-black OLED option
+- 16 languages — English, Spanish, Portuguese (Brazil), German, French, Italian, Russian, Turkish,
+  Indonesian, Vietnamese, Hindi, Japanese, Chinese (Simplified), and right-to-left Arabic, Hebrew and
+  Persian — picked in Settings › Appearance › Language
 
 ## Screenshots
 
@@ -148,9 +160,9 @@ gallery-dl, yt-dlp and Instaloader (plus a small Spotify wrapper that scrapes Sp
 embed pages, then delegates the actual audio download to yt-dlp) run in a real standalone Python
 interpreter — a genuine OS process per download, not an embedded JNI interpreter — which is what
 makes `curl_cffi` browser impersonation possible on Android at all. A small fork server keeps the
-engines pre-loaded so each download starts without paying Python's import cost again. Kotlin talks
-to it over a stdout line protocol (`[title]`/`[thumbnail]`/`[progress]`/`[error]`/bare file paths),
-the same shape either tool prints when run from a terminal. A bundled `ffmpeg` build handles muxing,
+engines pre-loaded so each download starts without paying Python's import cost again. The wrappers
+report back to Kotlin as structured JSON lines on stdout (title, size, progress, each saved file,
+errors), next to the engines' own log output. A bundled `ffmpeg` build handles muxing,
 exact trims, audio conversion (MP3/M4A/Opus/FLAC), volume levelling and MP4 conversion.
 
 Room + WorkManager persist the download queue across process death; the UI is 100% Jetpack Compose
@@ -159,13 +171,24 @@ with Material 3 Expressive components.
 ## Building
 
 ```bash
-git clone <this repo>
-cd gallerydl
+git clone https://github.com/d-gibr1l/Gallery-dl.git
+cd Gallery-dl
 ./gradlew :app:assembleDebug
 ```
 
 Requires the Android SDK (targetSdk 36) and a JDK 17 toolchain. Debug builds install straight from
 `app/build/outputs/apk/debug/`.
+
+Checks — the same ones CI runs on every push (`.github/workflows/build.yml`):
+
+```bash
+./gradlew :app:testDebugUnitTest   # unit tests
+./gradlew :app:lintDebug           # Android Lint; any error fails (settings in app/lint.xml)
+python tools/test_wrapper_resume.py   # resuming and conversion through yt_dlp_wrapper.py (needs yt-dlp and ffmpeg)
+```
+
+The bundled Python runtime (`app/src/main/jniLibs/*/libpython.zip.so`, from ytdlnis-packages) is
+trimmed by `tools/trim_runtime_zips.py`; run it again after replacing those zips.
 
 Ships as per-ABI APKs for `arm64-v8a`, `armeabi-v7a` (kept for real 32-bit-only budget devices,
 not just emulators) and `x86_64`, plus a universal APK with all three.
@@ -184,6 +207,10 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
   merging, converting, trimming and re-encoding (H.264 on the phone's own hardware encoder)
 - [aria2](https://github.com/aria2/aria2) (GPLv2+) — multi-connection downloads
 - [QuickJS](https://github.com/bellard/quickjs) (MIT) — JS-challenge solving for sites that require it
+- [yt-dlp-ejs](https://github.com/yt-dlp/ejs) (Unlicense, with MIT/ISC parts) — the scripts yt-dlp
+  runs in QuickJS to solve YouTube's challenges
+- [curl_cffi](https://github.com/lexiforest/curl_cffi) (MIT) — browser impersonation for sites that
+  block scripted requests
 - [TachiyomiJ2K](https://github.com/Jays2Kings/tachiyomiJ2K) (Apache-2.0) — the Appearance
   screen's theme-picker layout (light/dark preview card rows) is ported from its own Settings UI
 - [Auxio](https://github.com/OxygenCobalt/Auxio) (GPLv3) — the music player's playback engine
@@ -199,5 +226,5 @@ directly (gallery-dl, aria2, the ytdlnis-packages Python/QuickJS binaries, and t
 from Auxio and Photon Gallery) — bundling
 GPL code into a distributed app means the combined work has to be GPL-compatible too, with source
 available to anyone who gets the APK (this repo). The permissively-licensed pieces (yt-dlp,
-Instaloader, QuickJS, the ported TachiyomiJ2K UI) are all GPL-compatible on their own terms; see
+Instaloader, QuickJS, yt-dlp-ejs, curl_cffi, the ported TachiyomiJ2K UI) are all GPL-compatible on their own terms; see
 Credits above for each one's actual license.
