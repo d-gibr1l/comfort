@@ -157,8 +157,6 @@ object DownloadDispatcher {
 
     private const val QUEUE_REPAIR_DEBOUNCE_MS = 600L
 
-    /** A download that's over: retried, it's a new run. */
-    private val FINISHED_STATUSES = setOf(DownloadStatus.FINISHED, DownloadStatus.SAVED, DownloadStatus.ERRORED, DownloadStatus.CANCELLED, DownloadStatus.DELETED)
 
     private val PAUSABLE_STATUSES = listOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
     private val CANCELLABLE_STATUSES = PAUSABLE_STATUSES + DownloadStatus.PAUSED
@@ -451,22 +449,11 @@ object DownloadDispatcher {
                         pausedIds += dispatch.id
                         continue
                     }
-                    // A start time of its own ("Start at…", see scheduleAt) replaces the window, and
-                    // the Download Delay with it: it starts at the time the user picked.
-                    // Only for the run it was set for: a download that has since finished, failed
-                    // or been cancelled and is now retried waits for the window like any other.
-                    // Kept, its time long past read as "start now" and the retry skipped the window.
-                    val ownStartAt = if (row.status in FINISHED_STATUSES && row.scheduledAt != null) {
-                        dao.clearScheduledAt(dispatch.id)
-                        null
-                    } else row.scheduledAt
-                    val ownStartDelay = ownStartAt?.let { (it - now).coerceAtLeast(0L) }
-                    val windowDelayMillis = when {
-                        dispatch.forceImmediate -> 0L
-                        ownStartDelay != null -> ownStartDelay
-                        else -> windowDelay
-                    }
-                    val delayMillis = windowDelayMillis + if (dispatch.forceImmediate || ownStartDelay != null) 0L else downloadDelay
+                    // The window, a start time of its own, Start now and the Download Delay — see
+                    // DispatchTiming.timing (unit-tested).
+                    val timing = DispatchTiming.timing(row.status, row.scheduledAt, dispatch.forceImmediate, windowDelay, downloadDelay, now)
+                    if (timing.clearStartAt) dao.clearScheduledAt(dispatch.id)
+                    val delayMillis = timing.delayMillis
                     val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
                         .setInputData(workDataOf("downloadId" to dispatch.id, "url" to dispatch.url))
                         .apply {
@@ -493,7 +480,7 @@ object DownloadDispatcher {
                     // rescheduleQueuedDownloads() re-submits. Only the schedule window makes it
                     // SCHEDULED — the generic Download Delay is a short wait that still counts as
                     // plain "In Queue", not "Waiting for the scheduled time window".
-                    dao.updateStatus(dispatch.id, if (windowDelayMillis > 0) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED)
+                    dao.updateStatus(dispatch.id, if (timing.scheduled) DownloadStatus.SCHEDULED else DownloadStatus.QUEUED)
                     requests += dispatch to workRequest
                 }
             }
@@ -908,40 +895,9 @@ object DownloadDispatcher {
     /** Millis until the configured download window next opens, or 0 if downloads are allowed right now. */
     fun scheduleDelayMillis(context: Context): Long {
         if (!GalleryDlPreferences.isScheduleEnabled(context)) return 0L
-
         val startMin = GalleryDlPreferences.getScheduleStartMinutes(context).coerceIn(0, 1439)
         val endMin = GalleryDlPreferences.getScheduleEndMinutes(context).coerceIn(0, 1439)
-        // Identical Start/End would otherwise fall into the non-wrapping branch below and read as
-        // "open" only during that exact one minute of the day, closed the other 1439 — surprising
-        // for a value nobody would deliberately pick to mean "almost never download." Treating it
-        // as no restriction is the reading that can't ever silently starve every download.
-        if (startMin == endMin) return 0L
-        val now = Calendar.getInstance()
-        val nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
-
-        val withinWindow = if (startMin <= endMin) {
-            nowMin in startMin..endMin
-        } else {
-            // window wraps past midnight, e.g. 22:00-06:00
-            nowMin >= startMin || nowMin <= endMin
-        }
-        if (withinWindow) return 0L
-
-        // The window's next start as a real moment, not a count of clock minutes from now: across
-        // a daylight-saving change the clock skips or repeats an hour, and "180 minutes until
-        // 03:00" was an hour off (Android sends no broadcast for DST, so ClockChangeReceiver never
-        // corrected it). Calendar lands on the start's actual instant either side of the change.
-        // To the window's start exactly, seconds included: each job used to wake up to a minute
-        // after the window opened, at the seconds-past-the-minute it was queued at (seen live:
-        // queued at :04, :11, :19 past, they started at 16:28:04, :11, :19).
-        val start = (now.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, startMin / 60)
-            set(Calendar.MINUTE, startMin % 60)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            if (!after(now)) add(Calendar.DAY_OF_MONTH, 1)
-        }
-        return (start.timeInMillis - now.timeInMillis).coerceAtLeast(1L)
+        return DispatchTiming.windowDelayMillis(startMin, endMin, Calendar.getInstance())
     }
 
     private const val SCHEDULE_ALARM_REQUEST_CODE = 1001
