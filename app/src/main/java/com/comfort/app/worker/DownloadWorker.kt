@@ -307,6 +307,12 @@ class DownloadWorker(
             // its own try/finally right below, not this outer one — so that if acquire() itself
             // throws/gets cancelled before ever incrementing the counter, release() correctly never
             // runs for a slot this worker never actually took.
+            // The job has no network condition (see DownloadDispatcher.enqueueWorkMany): it waits
+            // here, before taking a slot, until the network is usable — Wi-Fi with Wi-Fi only on.
+            // The Queue card says "Waiting for a network connection" meanwhile (NetworkStatus).
+            while (com.comfort.app.util.downloadNetwork(applicationContext) != com.comfort.app.util.DownloadNetwork.OK) {
+                kotlinx.coroutines.delay(NETWORK_POLL_MS)
+            }
             DownloadConcurrencyGate.acquire(
                 applicationContext, downloadId,
                 queueOrder = entity?.queueOrder ?: 0,
@@ -616,6 +622,10 @@ class DownloadWorker(
                 // a separate list and joined afterward.
                 // When data last arrived, and when the engine itself last reported progress (only
                 // yt-dlp does) — see the transfer monitor around the engine run below.
+                // The network went away at some point during this run (the watchdog below), and
+                // whether this run already sent the download back to wait for it (once only).
+                val networkInterrupted = AtomicBoolean(false)
+                val networkWaitRequested = AtomicBoolean(false)
                 val lastDataAt = java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis())
                 val lastProgressLineAt = java.util.concurrent.atomic.AtomicLong(0L)
                 // That monitor's measured speed (MB/s), so a file landing doesn't overwrite it with a
@@ -993,6 +1003,8 @@ class DownloadWorker(
                         })
                     }
                     val stallWatchdog = launch {
+                        // When the network went away (0: it's there), for the check below.
+                        var networkLostAt = 0L
                         var previousTotal = -1L
                         var previousAt = 0L
                         var smoothed = 0f
@@ -1001,6 +1013,28 @@ class DownloadWorker(
                             kotlinx.coroutines.delay(1_000)
                             checkScheduleWindow()
                             val now = System.currentTimeMillis()
+                            // A blink in the connection used to stop the whole job (WorkManager's
+                            // network condition); now the engines ride it out with their retries.
+                            // Gone for longer than NETWORK_GRACE_MS, or Wi-Fi only on with mobile
+                            // data taking over (which would download over it), back to waiting.
+                            when (com.comfort.app.util.downloadNetwork(applicationContext)) {
+                                com.comfort.app.util.DownloadNetwork.OK -> networkLostAt = 0L
+                                com.comfort.app.util.DownloadNetwork.NONE -> {
+                                    networkInterrupted.set(true)
+                                    if (networkLostAt == 0L) networkLostAt = now
+                                    if (now - networkLostAt > NETWORK_GRACE_MS && networkWaitRequested.compareAndSet(false, true)) {
+                                        DownloadLog.line(applicationContext, downloadId, "no network for ${NETWORK_GRACE_MS / 1000}s: waiting for it")
+                                        DownloadDispatcher.waitForNetwork(applicationContext, downloadId)
+                                    }
+                                }
+                                com.comfort.app.util.DownloadNetwork.METERED_ONLY -> {
+                                    networkInterrupted.set(true)
+                                    if (networkWaitRequested.compareAndSet(false, true)) {
+                                        DownloadLog.line(applicationContext, downloadId, "Wi-Fi only, now on mobile data: waiting for Wi-Fi")
+                                        DownloadDispatcher.waitForNetwork(applicationContext, downloadId)
+                                    }
+                                }
+                            }
                             val engineReporting = lastProgressLineAt.get() > 0L
                             val staged = if (engineReporting) currentFileBytesRef.get() else runCatching {
                                 stagingDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
@@ -1111,6 +1145,18 @@ class DownloadWorker(
                     // The staging dir is kept: its partial files are what the next run resumes.
                     requeueIfStillRunning(dao, downloadId)
                     DownloadNotifications.cancel(applicationContext, downloadId)
+                    return@withContext Result.success()
+                }
+
+                // The network went away during the run and the engines gave up on what was left
+                // (gallery-dl stops retrying after ~10 s): that's the connection, not the link, so
+                // back to waiting for it rather than failed or "some couldn't be downloaded". The
+                // staging folder stays, so the next run picks up where this one stopped.
+                if (networkInterrupted.get() && (savedCount.get() == 0 || lastErrorLine.get() != null) &&
+                    networkWaitRequested.compareAndSet(false, true)
+                ) {
+                    DownloadLog.line(applicationContext, downloadId, "the network dropped during the download: waiting for it to try again")
+                    DownloadDispatcher.waitForNetwork(applicationContext, downloadId)
                     return@withContext Result.success()
                 }
 
@@ -1262,6 +1308,13 @@ internal fun isNotItsKind(message: String): Boolean {
 
 /** No data for this long counts as stalled; see the stall watchdog in doWork(). */
 private const val STALL_AFTER_MS = 6_000L
+
+/** How often a download waiting for the network looks again. */
+private const val NETWORK_POLL_MS = 2_000L
+
+/** How long a running download rides out having no network at all before it goes back to waiting
+ * for it. About what yt-dlp's retries now cover (yt_dlp_wrapper.py's retry_sleep_functions). */
+private const val NETWORK_GRACE_MS = 180_000L
 
 /** How long the pre-download listing may take before the download goes ahead without it. 30 s, not
  * less: a real listing on a slow connection (600 ms round trips seen) takes several seconds. */

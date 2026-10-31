@@ -1164,7 +1164,15 @@ fun QueueItemCard(
                                 stringResource(R.string.fetching_info)
                             }
                         }
-                        else -> item.status.name.lowercase().replaceFirstChar { it.uppercase() }
+                        // The Queue tabs' own names, so the card reads in the app's language (it
+                        // showed the status's English code name, "Queued", in every language).
+                        DownloadStatus.QUEUED -> stringResource(R.string.queue_filter_in_queue)
+                        DownloadStatus.SCHEDULED -> stringResource(R.string.queue_filter_scheduled)
+                        DownloadStatus.PAUSED -> stringResource(R.string.queue_filter_paused)
+                        DownloadStatus.ERRORED -> stringResource(R.string.queue_filter_errored)
+                        DownloadStatus.CANCELLED -> stringResource(R.string.queue_filter_cancelled)
+                        DownloadStatus.FINISHED, DownloadStatus.SAVED -> stringResource(R.string.succeeded)
+                        DownloadStatus.DELETED -> stringResource(R.string.deleted)
                     }
                     Text(
                         text = statusText,
