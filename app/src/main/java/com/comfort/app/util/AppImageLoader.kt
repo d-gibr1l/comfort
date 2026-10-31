@@ -24,30 +24,34 @@ object AppImageLoader {
     /** Coil's default OkHttp dispatcher caps at 5 concurrent requests per host, which throttles
      * the share picker badly — a dozen-plus preview thumbnails all come from the same CDN host,
      * so most of them just queue behind the first 5 instead of loading in parallel. */
-    fun install(context: Context) {
-        val client = OkHttpClient.Builder()
-            // IPv4 addresses first. A network can hand out IPv6 addresses it can't route (the PC
-            // hotspot the phone was on: an IPv6 ping to i.ytimg.com lost every packet, IPv4 was
-            // fine), Android lists IPv6 first then, and OkHttp 4 tries each address in turn,
-            // waiting out a dead one's whole connect timeout: every YouTube thumbnail (search
-            // results, playlist and channel lists, the preview card) stayed blank. The Python
-            // side has had the same fix for its own requests (net_resilience.py). IPv6 stays in
-            // the list, so an IPv6-only network still works.
-            .dns(object : okhttp3.Dns {
-                override fun lookup(hostname: String) =
-                    okhttp3.Dns.SYSTEM.lookup(hostname).sortedBy { if (it is java.net.Inet4Address) 0 else 1 }
-            })
-            .dispatcher(
-                Dispatcher().apply {
-                    maxRequests = 32
-                    maxRequestsPerHost = 16
-                }
-            )
-            .build()
+    private fun buildClient(): OkHttpClient = OkHttpClient.Builder()
+        // IPv4 addresses first. A network can hand out IPv6 addresses it can't route (the PC
+        // hotspot the phone was on: an IPv6 ping to i.ytimg.com lost every packet, IPv4 was
+        // fine), Android lists IPv6 first then, and OkHttp 4 tries each address in turn,
+        // waiting out a dead one's whole connect timeout: every YouTube thumbnail (search
+        // results, playlist and channel lists, the preview card) stayed blank. The Python
+        // side has had the same fix for its own requests (net_resilience.py). IPv6 stays in
+        // the list, so an IPv6-only network still works.
+        .dns(object : okhttp3.Dns {
+            override fun lookup(hostname: String) =
+                okhttp3.Dns.SYSTEM.lookup(hostname).sortedBy { if (it is java.net.Inet4Address) 0 else 1 }
+        })
+        .dispatcher(
+            Dispatcher().apply {
+                maxRequests = 32
+                maxRequestsPerHost = 16
+            }
+        )
+        .build()
 
+    fun install(context: Context) {
         Coil.setImageLoader(
             ImageLoader.Builder(context)
-                .okHttpClient(client)
+                // Built on Coil's first network request (off the main thread), not here: install
+                // runs in MainActivity.onCreate before the first frame, and building an OkHttpClient
+                // loads the platform's TLS setup and trust store — a cost every cold start paid,
+                // though Library and Home thumbnails never touch the network.
+                .okHttpClient { buildClient() }
                 .components {
                     // First in line for gallery (MediaStore) items — see MediaStoreThumbnailFetcher.
                     add(MediaStoreThumbnailFetcher.Factory())
@@ -84,6 +88,23 @@ object AppImageLoader {
     }
 }
 
+/** [this] (a software bitmap from ContentResolver.loadThumbnail) as a hardware one, when the request
+ * would get one from Coil's own decoding (options.config: allowHardware, not off for this request).
+ *
+ * Coil only does that conversion for what it decodes itself; these fetchers hand it a finished
+ * bitmap, so every Library and Home thumbnail stayed a software bitmap — which the RenderThread has
+ * to upload to the GPU when it's drawn, and again whenever the GPU's texture cache has let it go.
+ * With both pages of the slide into the Library on screen (dozens of tiles), that's where its
+ * ~10-11 ms a frame went (TODO: Library opening, the rest). A hardware bitmap is uploaded once,
+ * here, on the fetcher's background thread, and drawn from GPU memory after that. */
+private fun android.graphics.Bitmap.forDrawing(options: Options): android.graphics.Bitmap {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return this
+    if (options.config != android.graphics.Bitmap.Config.HARDWARE || config == android.graphics.Bitmap.Config.HARDWARE) return this
+    val hardware = runCatching { copy(android.graphics.Bitmap.Config.HARDWARE, false) }.getOrNull() ?: return this
+    recycle()
+    return hardware
+}
+
 /** Library thumbnails point at the real saved file's MediaStore Uri. Loading that through Coil's
  * normal path decodes the full-resolution photo — or, for a video, extracts a frame with
  * MediaMetadataRetriever — for every tile that scrolls into view, which is what made scrolling
@@ -106,7 +127,7 @@ private class MediaStoreThumbnailFetcher(
             options.context.contentResolver.loadThumbnail(uri, android.util.Size(width, height), null)
         }.getOrNull() ?: return null
         return DrawableResult(
-            drawable = bitmap.toDrawable(options.context.resources),
+            drawable = bitmap.forDrawing(options).toDrawable(options.context.resources),
             isSampled = true,
             dataSource = DataSource.DISK,
         )
@@ -177,7 +198,7 @@ private class AudioCoverFetcher(
             val height = options.size.height.pxOrElse { 512 }.coerceIn(1, 1024)
             val bitmap = runCatching { resolver.loadThumbnail(audio, android.util.Size(width, height), null) }.getOrNull()
             if (bitmap != null) {
-                return DrawableResult(bitmap.toDrawable(context.resources), isSampled = true, dataSource = DataSource.DISK)
+                return DrawableResult(bitmap.forDrawing(options).toDrawable(context.resources), isSampled = true, dataSource = DataSource.DISK)
             }
         }
         val embedded = android.media.MediaMetadataRetriever().let { retriever ->
