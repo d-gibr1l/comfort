@@ -24,16 +24,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The toolchain app/build.gradle.kts asks for (jvmToolchain(17)).
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
       # Caches Gradle's downloads and build cache between runs.
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       # The runner's Android SDK has its licences accepted; the Android Gradle plugin fetches the
       # platform (compileSdk 36) and build tools itself if they're missing.
@@ -43,7 +43,7 @@ jobs:
       # What failed, when a test did.
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-reports
           path: app/build/reports/tests/
@@ -57,8 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install yt-dlp and ffmpeg
