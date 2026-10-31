@@ -40,10 +40,11 @@ class ComfortApp : Application() {
         super.onCreate()
         VideoSiteRouter.loadSiteRules(this)
         com.comfort.app.theme.ThemePreferences.applyNightMode(this)
-        removeStaleShortcuts()
         // Every process start, not just the main screen's: the app can run for days on
-        // downloads and shares alone.
+        // downloads and shares alone. The shortcut clean-up too, but off the main thread: it's
+        // binder calls to the system's ShortcutManager, before the first frame on a cold start.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            removeStaleShortcuts()
             runCatching { com.comfort.app.util.GalleryDlListing.sweepStaleCache(this@ComfortApp) }
         }
         val organize = !GalleryDlPreferences.isSavedFilesOrganized(this)
