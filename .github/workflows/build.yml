@@ -40,6 +40,16 @@ jobs:
       - name: Build debug and run unit tests
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
 
+      # Each APK's size on the run's summary page, to see what a change does to it. Debug builds
+      # (no R8), so larger than a release, but native libraries and assets count the same.
+      - name: APK sizes
+        run: |
+          echo "| APK | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for f in app/build/outputs/apk/debug/*.apk; do
+            echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
       # What failed, when a test did.
       - name: Upload test reports
         if: failure()

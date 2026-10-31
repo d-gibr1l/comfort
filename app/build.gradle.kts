@@ -77,6 +77,15 @@ android {
         // Required by datetime-wheel-picker (kotlinx-datetime under the hood) since minSdk 24 < 26.
         isCoreLibraryDesugaringEnabled = true
     }
+    // Only the app's own languages (AppLanguage.SUPPORTED / values-*): AndroidX and Material ship
+    // their few strings in ~80, which on a phone set to one the app doesn't have showed those few
+    // translated amid English. Both Hebrew/Indonesian spellings (iw/he, in/id), as aapt accepts either.
+    androidResources {
+        localeFilters += listOf(
+            "en", "es", "pt-rBR", "de", "fr", "ru", "in", "id", "ar", "iw", "he",
+            "fa", "tr", "it", "ja", "zh-rCN", "hi", "vi",
+        )
+    }
     buildFeatures {
       compose = true
       aidl = false

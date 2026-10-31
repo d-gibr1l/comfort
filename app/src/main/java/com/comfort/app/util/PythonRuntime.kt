@@ -55,7 +55,9 @@ object PythonRuntime {
     // yt-dlp, Instaloader). That re-unpacks everything, which also replaces any engine the user
     // updated in-app with the bundled one. The wrapper scripts don't need a bump: they're refreshed
     // on every app install/update (see SCRIPTS_MARKER), leaving the engines alone.
-    private const val PROVISION_VERSION = "110"
+    // 111: libpython.zip.so trimmed (tools/trim_runtime_zips.py) — unpacked again so installed
+    // copies lose the dropped files and the unstripped curl_cffi (~17 MB on arm64).
+    private const val PROVISION_VERSION = "111"
     // Which app install the wrapper scripts were copied from (versionCode + install time).
     private const val SCRIPTS_MARKER = "scripts.txt"
     private val SCRIPTS = listOf(
