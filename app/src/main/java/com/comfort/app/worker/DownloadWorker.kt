@@ -677,7 +677,8 @@ class DownloadWorker(
                         val elapsedSeconds = ((System.currentTimeMillis() - startTime) / 1000f).coerceAtLeast(0.5f)
                         val speedMbs = measuredSpeedMbs.get().takeIf { it > 0f }
                             ?: ((totalBytes / (1024f * 1024f)) / elapsedSeconds)
-                        dao.updateLiveProgress(downloadId, count, speedMbs)
+                        dao.setDownloadedItems(downloadId, count)
+                        com.comfort.app.data.LiveProgress.speed(downloadId, speedMbs)
                         // An audio file's own Uri has no frame Coil can decode, so its
                         // embedded cover art is pulled out to its own file when there
                         // is one (extractAudioArtworkUri). Only then does thumbnailPath
@@ -701,7 +702,7 @@ class DownloadWorker(
                         }
                         dao.addBytes(downloadId, fileSize)
                         // Its bytes are in totalBytes now; the card adds liveBytes on top.
-                        dao.updateLiveBytes(downloadId, 0, speedMbs)
+                        com.comfort.app.data.LiveProgress.bytes(dao, downloadId, 0, speedMbs)
                         if (hasPlaceholderTitle && !engineNamedTitle.get()) {
                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                         }
@@ -811,7 +812,7 @@ class DownloadWorker(
                             lastDataAt.set(System.currentTimeMillis())
                             lastProgressLineAt.set(System.currentTimeMillis())
                             val speedMbs = event.speedBytesPerSecond / (1024f * 1024f)
-                            dao.updateLiveBytes(downloadId, event.downloadedBytes, speedMbs)
+                            com.comfort.app.data.LiveProgress.bytes(dao, downloadId, event.downloadedBytes, speedMbs)
                             currentFileBytesRef.set(event.downloadedBytes)
                             // The wrappers already throttle these to about one a second. This is
                             // what moves the notification's bar during a single large file (the
@@ -908,7 +909,8 @@ class DownloadWorker(
                                     lastDataAt.set(System.currentTimeMillis())
                                     val count = savedCount.incrementAndGet()
                                     heldFiles += Triple(candidate, isAudioFile, count)
-                                    dao.updateLiveProgress(downloadId, count, measuredSpeedMbs.get())
+                                    dao.setDownloadedItems(downloadId, count)
+                                    com.comfort.app.data.LiveProgress.speed(downloadId, measuredSpeedMbs.get())
                                     DownloadNotifications.updateProgress(
                                         applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
                                         speedMbs = measuredSpeedMbs.get(), expectedBytes = expectedBytesRef.get(),
@@ -1053,17 +1055,17 @@ class DownloadWorker(
                                 // What's in staging is this file's bytes so far.
                                 if (staged != currentFileBytesRef.get()) {
                                     currentFileBytesRef.set(staged)
-                                    dao.updateLiveBytes(downloadId, staged, smoothed)
+                                    com.comfort.app.data.LiveProgress.bytes(dao, downloadId, staged, smoothed)
                                 }
                                 if (now - lastDataAt.get() > STALL_AFTER_MS) {
                                     smoothed = 0f
                                     measuredSpeedMbs.set(0f)
-                                    if (!zeroed) dao.resetSpeed(downloadId)
+                                    if (!zeroed) com.comfort.app.data.LiveProgress.speed(downloadId, 0f)
                                     zeroed = true
                                 } else if (smoothed > 0f) {
                                     zeroed = false
                                     measuredSpeedMbs.set(smoothed)
-                                    dao.updateSpeed(downloadId, smoothed)
+                                    com.comfort.app.data.LiveProgress.speed(downloadId, smoothed)
                                     DownloadNotifications.updateProgress(
                                         applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
                                         speedMbs = smoothed, currentBytes = total, expectedBytes = expectedBytesRef.get(),
@@ -1071,7 +1073,7 @@ class DownloadWorker(
                                 }
                             } else if (engineReporting) {
                                 val stalled = now - lastDataAt.get() > STALL_AFTER_MS
-                                if (stalled && !zeroed) dao.resetSpeed(downloadId)
+                                if (stalled && !zeroed) com.comfort.app.data.LiveProgress.speed(downloadId, 0f)
                                 zeroed = stalled
                             }
                             previousTotal = total
@@ -1087,6 +1089,10 @@ class DownloadWorker(
                         }
                     } finally {
                         stallWatchdog.cancel()
+                        // How far it got, for the paused card and the next run (see LiveProgress).
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            runCatching { com.comfort.app.data.LiveProgress.flush(dao, downloadId) }
+                        }
                     }
                 }
 
@@ -1273,6 +1279,7 @@ class DownloadWorker(
             }
         }
         } finally {
+            com.comfort.app.data.LiveProgress.clear(downloadId)
             DownloadNotifications.markForegroundStopped(applicationContext)
             // Matches the temp file created above for the cookies-normalization fix — cleaned up
             // unconditionally here (success, failure, or cancellation) rather than only on the
