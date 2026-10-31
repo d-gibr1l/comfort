@@ -48,3 +48,22 @@ jobs:
           name: test-reports
           path: app/build/reports/tests/
           retention-days: 7
+
+  # yt_dlp_wrapper.py against a local server: a stopped download resumes, a stopped conversion
+  # isn't downloaded again (tools/test_wrapper_resume.py). Against the newest yt-dlp on purpose —
+  # what users get from Settings › Updates and engines — so an upstream change that breaks resuming
+  # fails here instead of quietly on phones.
+  wrapper-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install yt-dlp and ffmpeg
+        run: |
+          python -m pip install --upgrade yt-dlp
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Resume and conversion tests
+        run: python -B tools/test_wrapper_resume.py
