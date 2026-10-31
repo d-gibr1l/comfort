@@ -63,6 +63,10 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # To add the "Lint report" check run (below) to the commit.
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -72,6 +76,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Lint
         run: ./gradlew :app:lintDebug --stacktrace
+      # Every issue as text on the commit's "Lint report" check, readable on GitHub without
+      # downloading the report.
+      - name: Lint report check
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -B tools/lint_check_run.py app/build/reports/lint-results-debug.xml "${{ github.sha }}" \
+            | gh api "repos/${{ github.repository }}/check-runs" --input - > /dev/null
       - name: Upload lint report
         if: always()
         uses: actions/upload-artifact@v5

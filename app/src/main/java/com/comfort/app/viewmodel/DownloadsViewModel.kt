@@ -93,10 +93,6 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         if (deleting.isEmpty()) deleted else deleted.filterNot { it.id in deleting }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    /** A change the user just asked for, shown before the database has it: [apply] turns the row
-     * into what it will be, for as long as the row is still in status [from]. */
-    private class PendingMove(val from: DownloadStatus, val apply: (DownloadEntity) -> DownloadEntity)
-
     // What a bulk action looks like from the moment it's tapped. Even in one pass, Retry All on 100
     // downloads takes WorkManager a moment, and the Queue used to show it as it happened: cards
     // leaving a few at a time, the list shuffling under them, the tab counts ticking over. With
@@ -111,11 +107,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     private val liveProgress = com.comfort.app.data.LiveProgress.live.throttleLatest(LIST_UPDATE_MS)
 
     val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds, _pendingMoves, liveProgress) { queue, deleting, pending, live ->
-        val shown = if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
-        val moved = if (pending.isEmpty()) shown
-        else shown.map { item -> pending[item.id]?.takeIf { it.from == item.status }?.apply?.invoke(item) ?: item }
-            .sortedWith(QUEUE_ORDER)
-        com.comfort.app.data.LiveProgress.overlay(moved, live)
+        queueRows(queue, deleting, pending, live)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
@@ -508,6 +500,28 @@ private const val LIST_UPDATE_MS = 150L
 private const val PENDING_MOVE_TIMEOUT_MS = 15_000L
 
 private val PAUSABLE = setOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
+
+/** A change the user just asked for, shown before the database has it: [apply] turns the row
+ * into what it will be, for as long as the row is still in status [from]. */
+internal class PendingMove(val from: DownloadStatus, val apply: (DownloadEntity) -> DownloadEntity)
+
+/** What the Queue shows, from the database's [queue] (in getQueueFlow's order): without the rows
+ * being deleted ([deleting], waiting for Undo), with [pending] moves applied to the rows still in
+ * the status they were made from (and re-sorted, since a move changes status or order), and with
+ * the running downloads' [live] bytes and speed (LiveProgress.overlay). DownloadsViewModel.queueFlow;
+ * a function of its own so it's unit-tested (QueueRowsTest). */
+internal fun queueRows(
+    queue: List<DownloadEntity>,
+    deleting: Set<String>,
+    pending: Map<String, PendingMove>,
+    live: Map<String, com.comfort.app.data.LiveProgress.Live>,
+): List<DownloadEntity> {
+    val shown = if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
+    val moved = if (pending.isEmpty()) shown
+    else shown.map { item -> pending[item.id]?.takeIf { it.from == item.status }?.apply?.invoke(item) ?: item }
+        .sortedWith(QUEUE_ORDER)
+    return com.comfort.app.data.LiveProgress.overlay(moved, live)
+}
 
 /** DownloadDao.getQueueFlow's ORDER BY, for the Queue while pending moves change rows the database
  * hasn't yet: failed downloads first, newest failure first; then queue order, then oldest added. */
