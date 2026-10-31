@@ -506,7 +506,6 @@
     <string name="cancel_selection">選択を解除</string>
     <string name="deselect_all">すべての選択を解除</string>
     <string name="select_all">すべて選択</string>
-    <string name="delete_selected">選択項目を削除</string>
     <string name="queue">キュー</string>
     <string name="no_paused_downloads">一時停止中のダウンロードはありません</string>
     <string name="downloads_you_pause_will_show_up">一時停止したダウンロードがここに表示されます。</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">キャンセル済み</string>
     <string name="unknown_site">不明</string>
     <string name="link">リンク</string>
-    <string name="yt_dlp_command">yt-dlp コマンド</string>
     <string name="command_copied">コマンドをコピーしました</string>
     <string name="save_audio_as">音声の保存形式</string>
     <string name="as_the_site_sends_it_not">サイトから送られたまま、再エンコードなし</string>

@@ -280,7 +280,8 @@ class DownloadWorker(
             ForegroundInfo(
                 DownloadNotifications.FOREGROUND_SERVICE_NOTIFICATION_ID,
                 DownloadNotifications.foregroundServiceNotification(applicationContext),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                // Service types are Android 10+ (WorkManager ignores one before it anyway).
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
             )
         )
         // Reproduced live: WorkManager's own teardown of the shared foreground notification once

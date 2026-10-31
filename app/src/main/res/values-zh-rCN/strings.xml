@@ -506,7 +506,6 @@
     <string name="cancel_selection">取消选择</string>
     <string name="deselect_all">全部取消选择</string>
     <string name="select_all">全选</string>
-    <string name="delete_selected">删除所选</string>
     <string name="queue">队列</string>
     <string name="no_paused_downloads">没有已暂停的下载</string>
     <string name="downloads_you_pause_will_show_up">你暂停的下载会显示在这里。</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">已取消</string>
     <string name="unknown_site">未知</string>
     <string name="link">链接</string>
-    <string name="yt_dlp_command">yt-dlp 命令</string>
     <string name="command_copied">命令已复制</string>
     <string name="save_audio_as">音频保存格式</string>
     <string name="as_the_site_sends_it_not">与网站发送的一致，不重新编码</string>

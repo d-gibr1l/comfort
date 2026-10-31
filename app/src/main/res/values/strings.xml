@@ -577,7 +577,6 @@
     <string name="cancel_selection">Cancel selection</string>
     <string name="deselect_all">Deselect all</string>
     <string name="select_all">Select all</string>
-    <string name="delete_selected">Delete selected</string>
     <string name="queue">Queue</string>
     <string name="no_paused_downloads">No paused downloads</string>
     <string name="downloads_you_pause_will_show_up">Downloads you pause will show up here.</string>
@@ -649,7 +648,6 @@
     <string name="unknown_site">Unknown</string>
     <!-- DownloadPreviewSheet.kt -->
     <string name="link">Link</string>
-    <string name="yt_dlp_command">yt-dlp command</string>
     <string name="command_copied">Command copied</string>
     <string name="save_audio_as">Save audio as</string>
     <string name="as_the_site_sends_it_not">As the site sends it, not re-encoded</string>

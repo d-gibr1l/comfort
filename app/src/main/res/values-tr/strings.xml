@@ -506,7 +506,6 @@
     <string name="cancel_selection">Seçimi iptal et</string>
     <string name="deselect_all">Tüm seçimi kaldır</string>
     <string name="select_all">Tümünü seç</string>
-    <string name="delete_selected">Seçilenleri sil</string>
     <string name="queue">Kuyruk</string>
     <string name="no_paused_downloads">Duraklatılmış indirme yok</string>
     <string name="downloads_you_pause_will_show_up">Duraklattığın indirmeler burada görünür.</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">İptal edilen</string>
     <string name="unknown_site">Bilinmiyor</string>
     <string name="link">Bağlantı</string>
-    <string name="yt_dlp_command">yt-dlp komutu</string>
     <string name="command_copied">Komut kopyalandı</string>
     <string name="save_audio_as">Sesi şu biçimde kaydet</string>
     <string name="as_the_site_sends_it_not">Sitenin gönderdiği gibi, yeniden kodlanmadan</string>

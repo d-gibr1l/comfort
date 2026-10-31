@@ -506,7 +506,6 @@
     <string name="cancel_selection">ביטול הבחירה</string>
     <string name="deselect_all">ביטול בחירת הכול</string>
     <string name="select_all">בחירת הכול</string>
-    <string name="delete_selected">מחיקת הנבחרים</string>
     <string name="queue">תור</string>
     <string name="no_paused_downloads">אין הורדות מושהות</string>
     <string name="downloads_you_pause_will_show_up">הורדות שתשהה יופיעו כאן.</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">בוטלו</string>
     <string name="unknown_site">לא ידוע</string>
     <string name="link">קישור</string>
-    <string name="yt_dlp_command">פקודת yt-dlp</string>
     <string name="command_copied">הפקודה הועתקה</string>
     <string name="save_audio_as">שמירת השמע בתור</string>
     <string name="as_the_site_sends_it_not">כפי שהאתר שולח, בלי קידוד מחדש</string>

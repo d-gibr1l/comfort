@@ -506,7 +506,6 @@
     <string name="cancel_selection">Hủy chọn</string>
     <string name="deselect_all">Bỏ chọn tất cả</string>
     <string name="select_all">Chọn tất cả</string>
-    <string name="delete_selected">Xóa mục đã chọn</string>
     <string name="queue">Hàng đợi</string>
     <string name="no_paused_downloads">Không có lượt tải tạm dừng</string>
     <string name="downloads_you_pause_will_show_up">Các lượt tải bạn tạm dừng sẽ hiện ở đây.</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">Đã hủy</string>
     <string name="unknown_site">Không rõ</string>
     <string name="link">Liên kết</string>
-    <string name="yt_dlp_command">Lệnh yt-dlp</string>
     <string name="command_copied">Đã sao chép lệnh</string>
     <string name="save_audio_as">Lưu âm thanh dạng</string>
     <string name="as_the_site_sends_it_not">Như trang gửi, không mã hóa lại</string>

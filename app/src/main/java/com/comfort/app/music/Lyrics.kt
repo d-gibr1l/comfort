@@ -89,6 +89,8 @@ data class Lyrics(val lines: List<Line>?, val plain: String?) {
                 return java.io.File(song.parentFile, song.nameWithoutExtension + ".lrc").takeIf { it.isFile }?.readText()
             }
             if (uri.scheme != "content") return null
+            // RELATIVE_PATH (and VOLUME_EXTERNAL) are Android 10+; before it the query threw.
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return null
             val resolver = context.contentResolver
             val columns = arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, android.provider.MediaStore.MediaColumns.RELATIVE_PATH)
             val (name, folder) = resolver.query(uri, columns, null, null, null)?.use { c ->

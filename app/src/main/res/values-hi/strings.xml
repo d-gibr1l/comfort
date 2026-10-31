@@ -506,7 +506,6 @@
     <string name="cancel_selection">चुनाव रद्द करें</string>
     <string name="deselect_all">सभी का चुनाव हटाएँ</string>
     <string name="select_all">सभी चुनें</string>
-    <string name="delete_selected">चुने हुए मिटाएँ</string>
     <string name="queue">कतार</string>
     <string name="no_paused_downloads">कोई रुका डाउनलोड नहीं</string>
     <string name="downloads_you_pause_will_show_up">आपके रोके गए डाउनलोड यहाँ दिखेंगे।</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">रद्द</string>
     <string name="unknown_site">अज्ञात</string>
     <string name="link">लिंक</string>
-    <string name="yt_dlp_command">yt-dlp कमांड</string>
     <string name="command_copied">कमांड कॉपी की गई</string>
     <string name="save_audio_as">ऑडियो इस रूप में सहेजें</string>
     <string name="as_the_site_sends_it_not">जैसा साइट भेजती है, दोबारा एनकोड किए बिना</string>

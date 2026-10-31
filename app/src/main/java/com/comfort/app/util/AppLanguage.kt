@@ -33,6 +33,9 @@ object AppLanguage {
 
     /** Switches the app to [tag] ("" for the phone's). On 13+ Android recreates the screens
      * itself; before it, [activity] is recreated so it picks the language up. */
+    // commit, not apply: written before recreate(), so the new screen's attachBaseContext (and a
+    // process started right after) reads the new language. A one-key write, once per change.
+    @android.annotation.SuppressLint("ApplySharedPref")
     fun set(activity: Activity, tag: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             activity.getSystemService(LocaleManager::class.java)?.applicationLocales = LocaleList.forLanguageTags(tag)

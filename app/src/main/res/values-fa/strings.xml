@@ -506,7 +506,6 @@
     <string name="cancel_selection">لغو انتخاب</string>
     <string name="deselect_all">لغو انتخاب همه</string>
     <string name="select_all">انتخاب همه</string>
-    <string name="delete_selected">حذف انتخاب‌شده‌ها</string>
     <string name="queue">صف</string>
     <string name="no_paused_downloads">دانلود متوقف‌شده‌ای نیست</string>
     <string name="downloads_you_pause_will_show_up">دانلودهایی که متوقف می‌کنید اینجا نمایش داده می‌شوند.</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">لغوشده</string>
     <string name="unknown_site">ناشناخته</string>
     <string name="link">پیوند</string>
-    <string name="yt_dlp_command">فرمان yt-dlp</string>
     <string name="command_copied">فرمان کپی شد</string>
     <string name="save_audio_as">ذخیره صدا به‌صورت</string>
     <string name="as_the_site_sends_it_not">همان‌طور که سایت می‌فرستد، بدون رمزگذاری دوباره</string>

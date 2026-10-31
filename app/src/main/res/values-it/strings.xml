@@ -506,7 +506,6 @@
     <string name="cancel_selection">Annulla selezione</string>
     <string name="deselect_all">Deseleziona tutto</string>
     <string name="select_all">Seleziona tutto</string>
-    <string name="delete_selected">Elimina selezionati</string>
     <string name="queue">Coda</string>
     <string name="no_paused_downloads">Nessun download in pausa</string>
     <string name="downloads_you_pause_will_show_up">I download che metti in pausa compariranno qui.</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">Annullati</string>
     <string name="unknown_site">Sconosciuto</string>
     <string name="link">Link</string>
-    <string name="yt_dlp_command">Comando yt-dlp</string>
     <string name="command_copied">Comando copiato</string>
     <string name="save_audio_as">Salva audio come</string>
     <string name="as_the_site_sends_it_not">Come lo invia il sito, senza ricodifica</string>
