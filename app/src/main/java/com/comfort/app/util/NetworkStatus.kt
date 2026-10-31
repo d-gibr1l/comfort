@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -33,17 +32,21 @@ fun rememberIsNetworkAvailable(): Boolean {
         if (connectivityManager == null) {
             onDispose {}
         } else {
+            // The default network's own callbacks, judged from the capabilities they carry: when
+            // Wi-Fi went off, onLost re-read activeNetwork, which still named the network being
+            // lost at that moment, so this stayed "available" and a running card never showed
+            // "No internet connection" (seen on the phone). Another network taking over arrives
+            // as onAvailable/onCapabilitiesChanged for it.
             val callback = object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) { available = hasUsableNetwork(context) }
-                override fun onLost(network: Network) { available = hasUsableNetwork(context) }
+                override fun onAvailable(network: Network) {
+                    available = connectivityManager.getNetworkCapabilities(network)?.let { usableNetwork(context, it) } ?: false
+                }
+                override fun onLost(network: Network) { available = false }
                 override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-                    available = hasUsableNetwork(context)
+                    available = usableNetwork(context, capabilities)
                 }
             }
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            connectivityManager.registerNetworkCallback(request, callback)
+            connectivityManager.registerDefaultNetworkCallback(callback)
             onDispose { connectivityManager.unregisterNetworkCallback(callback) }
         }
     }
@@ -76,6 +79,11 @@ fun hasUsableNetwork(context: Context): Boolean {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return true
     val network = connectivityManager.activeNetwork ?: return false
     val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+    return usableNetwork(context, capabilities)
+}
+
+/** [hasUsableNetwork]'s rule for a network with [capabilities]. */
+private fun usableNetwork(context: Context, capabilities: NetworkCapabilities): Boolean {
     if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
     if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return false
     if (GalleryDlPreferences.isWifiOnly(context) && !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
