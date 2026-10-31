@@ -1252,6 +1252,11 @@ class _DropUnfinishedConversionPP(PostProcessor):
         return [], info
 
 
+def _retry_sleep(n):
+    """Seconds before yt-dlp's retry number n (0-based) — see retry_sleep_functions in download()."""
+    return min(2 ** n, 30)
+
+
 def _resume_format(download_dir, chosen_format, no_playlist):
     """[chosen_format] with the streams an earlier, stopped run of this download was fetching put
     first, when their partial files are still here. Starting again later than the preview's saved
@@ -2695,6 +2700,12 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # Explicit override, kept separate from "retries" above so a user can give flaky
         # fragmented downloads (HLS/DASH) a different retry budget than whole-request retries.
         ydl_opts["fragment_retries"] = int(fragment_retries)
+    # A pause before each retry, growing 1, 2, 4, 8, 16 s then 30 s each: yt-dlp retries at once by
+    # default, so with the network gone (a Wi-Fi blink) its 10 tries were used up in a second and
+    # the download failed. Spaced like this, 10 tries span about 3 minutes — what DownloadWorker
+    # rides out (NETWORK_GRACE_MS) before sending the download back to wait for the network. Only a
+    # default: --retry-sleep among the extra arguments replaces it.
+    ydl_opts["retry_sleep_functions"] = {kind: _retry_sleep for kind in ("http", "fragment")}
     # Built once, combining every reason to prefer one format over another, rather than each
     # concern setting "format_sort" independently and silently clobbering whichever ran last.
     format_sort_terms = []

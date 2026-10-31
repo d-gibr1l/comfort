@@ -4,10 +4,8 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -425,8 +423,12 @@ object DownloadDispatcher {
                     .map { it.workRequestId },
             )
 
-            val networkType = if (GalleryDlPreferences.isWifiOnly(context)) NetworkType.UNMETERED else NetworkType.CONNECTED
-            val constraints = Constraints.Builder().setRequiredNetworkType(networkType).build()
+            // No network condition on the job: with one, WorkManager stopped a running download
+            // the moment the connection blinked (a Wi-Fi hiccup), and it started over — extracting
+            // again, and once downloading a whole song again (seen 2026-10-30). The worker itself
+            // waits for a usable network before it starts (Wi-Fi only included), and while it runs
+            // a short loss is ridden out; a long one, or mobile data taking over with Wi-Fi only
+            // on, sends it back to wait (DownloadWorker, [waitForNetwork]).
             // Imported from YTDLnis's own "Download Delay" setting — a flat pause applied to every
             // dispatch (not just ones the schedule window above is already holding back), same
             // "Start now" bypass as the schedule delay for the same reason: jumping the queue means
@@ -467,7 +469,6 @@ object DownloadDispatcher {
                     val delayMillis = windowDelayMillis + if (dispatch.forceImmediate || ownStartDelay != null) 0L else downloadDelay
                     val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
                         .setInputData(workDataOf("downloadId" to dispatch.id, "url" to dispatch.url))
-                        .setConstraints(constraints)
                         .apply {
                             if (delayMillis > 0) {
                                 setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
@@ -546,6 +547,23 @@ object DownloadDispatcher {
             dao.resetSpeed(id)
             DownloadNotifications.cancel(context, id)
             enqueueWork(context, id, entity.url)
+            repairOrphanedQueue(context)
+        }
+    }
+
+    /** Called by a running DownloadWorker when the network is gone for too long, or Wi-Fi only is on
+     * and mobile data took over: the download goes back to waiting — its job is replaced by a new
+     * one, which waits for a usable network before starting and then picks up where this one left
+     * off (its staging folder stays). Start now's override is kept. NonCancellable for the same
+     * reason as [suspendForSchedule]: replacing the job cancels the caller. */
+    suspend fun waitForNetwork(context: Context, id: String) {
+        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            val dao = AppDatabase.getDatabase(context).downloadDao()
+            val entity = dao.getById(id) ?: return@withContext
+            dao.resetSpeed(id)
+            DownloadNotifications.cancel(context, id)
+            enqueueWork(context, id, entity.url, forceImmediate = entity.forceStart, expectedStatus = setOf(DownloadStatus.RUNNING))
             repairOrphanedQueue(context)
         }
     }
