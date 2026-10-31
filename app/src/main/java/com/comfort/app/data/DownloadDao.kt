@@ -116,18 +116,15 @@ interface DownloadDao {
     @Query("UPDATE downloads SET downloadStartTime = :startTime WHERE id = :id")
     suspend fun setStartTime(id: String, startTime: Long)
 
-    @Query("UPDATE downloads SET downloadedItems = :downloadedItems, speedMbs = :speed WHERE id = :id")
-    suspend fun updateLiveProgress(id: String, downloadedItems: Int, speed: Float)
+    /** Files done so far. Once per file, so it stays in the database (see LiveProgress for the
+     * values that move every second). */
+    @Query("UPDATE downloads SET downloadedItems = :downloadedItems WHERE id = :id")
+    suspend fun setDownloadedItems(id: String, downloadedItems: Int)
 
     /** Zeroed out on pause/cancel so a resumed download doesn't show its old speed reading until
      * fresh progress actually comes in — otherwise the last-known number just sits there stale. */
     @Query("UPDATE downloads SET speedMbs = 0 WHERE id = :id")
     suspend fun resetSpeed(id: String)
-
-    /** Live speed measured from the staging folder, for engines that don't report progress
-     * themselves (gallery-dl, Instaloader) — see DownloadWorker's transfer monitor. */
-    @Query("UPDATE downloads SET speedMbs = :speed WHERE id = :id")
-    suspend fun updateSpeed(id: String, speed: Float)
 
     /** yt-dlp reports a file's total size before any bytes move — set once per item as soon as
      * it's known, so the UI can show a real size and a byte-accurate progress fraction instead of
@@ -135,10 +132,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET expectedBytes = :bytes WHERE id = :id")
     suspend fun setExpectedBytes(id: String, bytes: Long)
 
-    /** Absolute (not additive) — overwritten on every progress tick with how far into the
-     * currently-downloading file we are, unlike addBytes' running total across completed files. */
-    @Query("UPDATE downloads SET liveBytes = :bytes, speedMbs = :speed WHERE id = :id")
-    suspend fun updateLiveBytes(id: String, bytes: Long, speed: Float)
+    /** Absolute (not additive): how far into the file it's on the download is, unlike addBytes'
+     * running total across finished files. Written by LiveProgress every 15 s and at the end of a
+     * run, not on every progress tick — the live value is in LiveProgress. */
+    @Query("UPDATE downloads SET liveBytes = :bytes WHERE id = :id")
+    suspend fun setLiveBytes(id: String, bytes: Long)
 
     /** Set/cleared from yt_dlp_wrapper.py's own "[phase] audio"/"[phase] video" signal — see
      * DownloadEntity.downloadingAudioTrack's own doc comment. */

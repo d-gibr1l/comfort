@@ -106,11 +106,13 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     // apply to it, or after PENDING_MOVE_TIMEOUT_MS whatever happened.
     private val _pendingMoves = MutableStateFlow<Map<String, PendingMove>>(emptyMap())
 
-    val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds, _pendingMoves) { queue, deleting, pending ->
+    // With the running downloads' bytes and speed from memory (LiveProgress), not the database.
+    val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds, _pendingMoves, com.comfort.app.data.LiveProgress.live) { queue, deleting, pending, live ->
         val shown = if (deleting.isEmpty()) queue else queue.filterNot { it.id in deleting }
-        if (pending.isEmpty()) shown
+        val moved = if (pending.isEmpty()) shown
         else shown.map { item -> pending[item.id]?.takeIf { it.from == item.status }?.apply?.invoke(item) ?: item }
             .sortedWith(QUEUE_ORDER)
+        com.comfort.app.data.LiveProgress.overlay(moved, live)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {

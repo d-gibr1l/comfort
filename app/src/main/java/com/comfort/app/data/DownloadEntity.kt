@@ -9,7 +9,8 @@ enum class DownloadStatus {
     RUNNING, QUEUED, SCHEDULED, PAUSED, CANCELLED, ERRORED, FINISHED, SAVED, DELETED
 }
 
-// DownloadWorker calls updateLiveBytes multiple times a second while anything is RUNNING, and
+// DownloadWorker used to write live progress multiple times a second while anything was RUNNING
+// (now in memory, see LiveProgress; what's left is per file and per status change), and
 // every one of those writes invalidates every Flow query below (getQueueFlow/getHistoryFlow/
 // getDeletedFlow) regardless of which rows actually changed — Room re-runs each one to check.
 // Without an index matching a query's own status/order columns, that re-run is a full table scan
@@ -50,12 +51,12 @@ data class DownloadEntity(
 
     // YTDLnis architectural adoptions
     @ColumnInfo(defaultValue = "0")
-    var downloadStartTime: Long = 0,
-    var logID: Long? = null,
+    val downloadStartTime: Long = 0,
+    val logID: Long? = null,
     @ColumnInfo(defaultValue = "0")
-    var incognito: Boolean = false,
+    val incognito: Boolean = false,
     @ColumnInfo(defaultValue = "0")
-    var queueOrder: Int = 0,
+    val queueOrder: Int = 0,
     val downloadPath: String = "",
     @ColumnInfo(defaultValue = "0")
     val totalBytes: Long = 0,
