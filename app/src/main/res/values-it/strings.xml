@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">Download simultanei</string>
     <string name="multiple_concurrent_downloads">Più download simultanei</string>
     <string name="run_more_than_one_download_at">Esegui più di un download alla volta. Se disattivato, ne gira esattamente uno alla volta, a prescindere dal cursore qui sotto.</string>
-    <string name="x_at_once">%1$s alla volta</string>
+    <string name="x_at_once">%1$d alla volta</string>
     <string name="network">Rete</string>
     <string name="wi_fi_only">Solo Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">I download in coda attendono una connessione Wi-Fi invece di usare i dati mobili.</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">Limita la banda di tutti i download futuri.</string>
     <string name="retries">Tentativi</string>
     <string name="how_many_times_a_failed_request">Quante volte riprovare una richiesta non riuscita prima di arrendersi. Se disattivato usa il valore predefinito del motore.</string>
-    <string name="x_retries">%1$s tentativi</string>
+    <string name="x_retries">%1$d tentativi</string>
     <string name="fragment_retries">Tentativi per frammento</string>
     <string name="how_many_times_a_failed_video">Quante volte riprovare un frammento video/audio non riuscito. Se disattivato condivide il budget dei tentativi principale.</string>
     <string name="proxy">Proxy</string>
@@ -546,9 +546,9 @@
     <string name="copy">Copia</string>
     <string name="downloads_run_x_x">I download girano %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">Partenza a breve, la fascia è aperta</string>
-    <string name="x_min">%1$s min</string>
-    <string name="x_h">%1$s h</string>
-    <string name="x_h_x_min">%1$s h %2$s min</string>
+    <string name="x_min">%1$d min</string>
+    <string name="x_h">%1$d h</string>
+    <string name="x_h_x_min">%1$d h %2$d min</string>
     <string name="starts_at_x_in_x">Parte alle %1$s · tra %2$s</string>
     <string name="start_at">Avvia alle…</string>
     <string name="your_start_time">Il tuo orario di avvio</string>
@@ -1085,4 +1085,14 @@
         <item quantity="one">%1$d nuovo da %2$s</item>
         <item quantity="other">%1$d nuovi da %2$s</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

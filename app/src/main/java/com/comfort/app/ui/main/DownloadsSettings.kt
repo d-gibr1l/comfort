@@ -757,7 +757,9 @@ private fun TimePickerButton(
         else -> hour
     }
     var showPicker by remember { mutableStateOf(false) }
-    val formattedTime = String.format(Locale.getDefault(), "%d:%02d %s", displayHour, minute, amPm)
+    // The composition's locale (follows a language change), not Locale.getDefault().
+    val locale = androidx.core.os.ConfigurationCompat.getLocales(androidx.compose.ui.platform.LocalConfiguration.current)[0] ?: Locale.getDefault()
+    val formattedTime = String.format(locale, "%d:%02d %s", displayHour, minute, amPm)
 
     val timeDescription = stringResource(R.string.x_schedule_time_x, label, formattedTime)
     OutlinedButton(

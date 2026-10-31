@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Comfort</string>
+    <string name="app_name" translatable="false">Comfort</string>
     <string name="shortcut_paste_short">Paste &amp; download</string>
     <string name="shortcut_paste_long">Download the copied link</string>
     <string name="shortcut_library_short">Library</string>
@@ -18,7 +18,7 @@
     <!-- Settings > Processing: chapters and SponsorBlock. -->
     <string name="split_chapters_title">Split by chapters</string>
     <string name="split_chapters_subtitle">Saves a video that has chapters as one file per chapter instead of one long file. Not done for a trimmed download.</string>
-    <string name="sponsorblock_section">SponsorBlock</string>
+    <string name="sponsorblock_section" translatable="false">SponsorBlock</string>
     <string name="sponsorblock_title">Sponsored segments</string>
     <string name="sponsorblock_description">YouTube only. Uses SponsorBlock\'s community-submitted times. Mark adds them as chapters you can skip; Remove cuts them out of the file. Not done for a trimmed download.</string>
     <string name="sponsorblock_off">Off</string>
@@ -210,7 +210,7 @@
     <string name="advanced">Advanced</string>
     <string name="extra_arguments">Extra arguments</string>
     <string name="extra_command_line_arguments_added_to">Extra command-line arguments added to every download. For advanced users.</string>
-    <string name="youtube">YouTube</string>
+    <string name="youtube" translatable="false">YouTube</string>
     <string name="rotate_player_clients">Rotate player clients</string>
     <string name="automatically_switches_between_android_ios_and">Automatically switches between Android, iOS, and Web clients if YouTube blocks or slows down a download.</string>
     <string name="bot_detection">Bot detection</string>
@@ -358,7 +358,7 @@
     <string name="concurrent_downloads">Concurrent downloads</string>
     <string name="multiple_concurrent_downloads">Multiple concurrent downloads</string>
     <string name="run_more_than_one_download_at">Run more than one download at the same time. Off means exactly one at a time, regardless of the slider below.</string>
-    <string name="x_at_once">%1$s at once</string>
+    <string name="x_at_once">%1$d at once</string>
     <string name="network">Network</string>
     <string name="wi_fi_only">Wi-Fi only</string>
     <string name="queued_downloads_wait_for_a_wi">Queued downloads wait for a Wi-Fi connection instead of using mobile data.</string>
@@ -366,7 +366,7 @@
     <string name="caps_download_bandwidth_for_all_future">Caps download bandwidth for all future downloads.</string>
     <string name="retries">Retries</string>
     <string name="how_many_times_a_failed_request">How many times a failed request is retried before giving up. Off uses the engine\'s built-in default.</string>
-    <string name="x_retries">%1$s retries</string>
+    <string name="x_retries">%1$d retries</string>
     <string name="fragment_retries">Fragment retries</string>
     <string name="how_many_times_a_failed_video">How many times a failed video/audio fragment is retried. Off shares the main Retries budget.</string>
     <string name="proxy">Proxy</string>
@@ -420,7 +420,7 @@
     <string name="x_schedule_time_x">%1$s schedule time: %2$s</string>
     <string name="sharing_mode">Sharing mode</string>
     <string name="what_happens_when_you_share_a">What happens when you share a link to Comfort.</string>
-    <string name="cookie_count_and_expiry">%1$s · %2$s</string>
+    <string name="cookie_count_and_expiry" translatable="false">%1$s · %2$s</string>
     <plurals name="cookie_count">
         <item quantity="one">%d cookie</item>
         <item quantity="other">%d cookies</item>
@@ -507,7 +507,7 @@
     <string name="version_unknown">Version unknown</string>
     <string name="update_to_x">Update to %1$s</string>
     <string name="nightly">Nightly</string>
-    <string name="master">Master</string>
+    <string name="master" translatable="false">Master</string>
     <string name="stable">Stable</string>
     <string name="open_x_website">Open %1$s website</string>
     <string name="every_supported_site_by_engine">Every supported site, by engine</string>
@@ -515,7 +515,7 @@
         <item quantity="one">%d site changed by you</item>
         <item quantity="other">%d sites changed by you</item>
     </plurals>
-    <string name="site_count_and_meaning">%1$s · %2$s</string>
+    <string name="site_count_and_meaning" translatable="false">%1$s · %2$s</string>
     <plurals name="sites_shown_of">
         <item quantity="one">%1$s of %2$s site</item>
         <item quantity="other">%1$s of %2$s sites</item>
@@ -617,9 +617,9 @@
     <string name="copy">Copy</string>
     <string name="downloads_run_x_x">Downloads run %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">Starting soon, the window is open</string>
-    <string name="x_min">%1$s min</string>
-    <string name="x_h">%1$s h</string>
-    <string name="x_h_x_min">%1$s h %2$s min</string>
+    <string name="x_min">%1$d min</string>
+    <string name="x_h">%1$d h</string>
+    <string name="x_h_x_min">%1$d h %2$d min</string>
     <string name="starts_at_x_in_x">Starts at %1$s · in %2$s</string>
     <string name="start_at">Start at…</string>
     <string name="your_start_time">Your start time</string>
@@ -996,7 +996,7 @@
     <string name="comfort_is_downloading_in_the_background">Comfort is downloading in the background</string>
     <string name="starting">Starting…</string>
     <string name="download_failed">Download failed</string>
-    <string name="percent_and_status">%1$s%% · %2$s</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="downloading_ellipsis">Downloading…</string>
     <plurals name="items_downloaded">
         <item quantity="one">%d downloaded</item>
@@ -1059,8 +1059,8 @@
     <string name="sapphire_dusk">Sapphire Dusk</string>
     <string name="lavender">Lavender</string>
     <string name="violet_night">Violet Night</string>
-    <string name="tokyo_light">Tokyo Light</string>
-    <string name="tokyo_night">Tokyo Night</string>
+    <string name="tokyo_light" translatable="false">Tokyo Light</string>
+    <string name="tokyo_night" translatable="false">Tokyo Night</string>
     <string name="lime_fizz">Lime Fizz</string>
     <string name="flat_lime">Flat Lime</string>
     <string name="yang">Yang</string>

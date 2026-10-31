@@ -348,7 +348,7 @@
     <string name="concurrent_downloads">Одновременные загрузки</string>
     <string name="multiple_concurrent_downloads">Несколько загрузок сразу</string>
     <string name="run_more_than_one_download_at">Запускать несколько загрузок одновременно. Если выключено — строго по одной, независимо от ползунка ниже.</string>
-    <string name="x_at_once">%1$s одновременно</string>
+    <string name="x_at_once">%1$d одновременно</string>
     <string name="network">Сеть</string>
     <string name="wi_fi_only">Только Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">Загрузки в очереди ждут Wi-Fi и не расходуют мобильный интернет.</string>
@@ -356,7 +356,7 @@
     <string name="caps_download_bandwidth_for_all_future">Ограничивает скорость всех будущих загрузок.</string>
     <string name="retries">Повторы</string>
     <string name="how_many_times_a_failed_request">Сколько раз повторять неудачный запрос, прежде чем сдаться. «Выкл.» — значение движка по умолчанию.</string>
-    <string name="x_retries">Повторов: %1$s</string>
+    <string name="x_retries">Повторов: %1$d</string>
     <string name="fragment_retries">Повторы фрагментов</string>
     <string name="how_many_times_a_failed_video">Сколько раз повторять неудачный фрагмент видео/аудио. «Выкл.» — общий лимит повторов.</string>
     <string name="proxy">Прокси</string>
@@ -613,9 +613,9 @@
     <string name="copy">Копировать</string>
     <string name="downloads_run_x_x">Загрузки идут с %1$s до %2$s</string>
     <string name="starting_soon_the_window_is_open">Скоро начнётся, время уже подошло</string>
-    <string name="x_min">%1$s мин</string>
-    <string name="x_h">%1$s ч</string>
-    <string name="x_h_x_min">%1$s ч %2$s мин</string>
+    <string name="x_min">%1$d мин</string>
+    <string name="x_h">%1$d ч</string>
+    <string name="x_h_x_min">%1$d ч %2$d мин</string>
     <string name="starts_at_x_in_x">Начнётся в %1$s · через %2$s</string>
     <string name="start_at">Начать в…</string>
     <string name="your_start_time">Ваше время начала</string>
@@ -1152,4 +1152,7 @@
     <string name="audio_language">Язык аудио</string>
     <string name="audio_language_app_x">Язык приложения (%1$s)</string>
     <string name="audio_language_subtitle">Для видео с дубляжом, как многие на YouTube. Видео без этого языка скачиваются в оригинале. Песни всегда остаются в оригинале.</string>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
 </resources>

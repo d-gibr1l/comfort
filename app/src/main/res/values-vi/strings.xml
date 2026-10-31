@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">Tải đồng thời</string>
     <string name="multiple_concurrent_downloads">Nhiều lượt tải đồng thời</string>
     <string name="run_more_than_one_download_at">Chạy nhiều lượt tải cùng lúc. Khi tắt, mỗi lần chỉ chạy đúng một, bất kể thanh trượt bên dưới.</string>
-    <string name="x_at_once">%1$s cùng lúc</string>
+    <string name="x_at_once">%1$d cùng lúc</string>
     <string name="network">Mạng</string>
     <string name="wi_fi_only">Chỉ Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">Lượt tải trong hàng đợi chờ kết nối Wi-Fi thay vì dùng dữ liệu di động.</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">Giới hạn băng thông cho mọi lượt tải về sau.</string>
     <string name="retries">Thử lại</string>
     <string name="how_many_times_a_failed_request">Số lần thử lại một yêu cầu thất bại trước khi bỏ cuộc. Khi tắt sẽ dùng mặc định của công cụ.</string>
-    <string name="x_retries">Thử lại %1$s lần</string>
+    <string name="x_retries">Thử lại %1$d lần</string>
     <string name="fragment_retries">Thử lại phân đoạn</string>
     <string name="how_many_times_a_failed_video">Số lần thử lại một phân đoạn video/âm thanh thất bại. Khi tắt sẽ dùng chung số lần thử lại chính.</string>
     <string name="proxy">Proxy</string>
@@ -546,9 +546,9 @@
     <string name="copy">Sao chép</string>
     <string name="downloads_run_x_x">Tải xuống chạy từ %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">Sắp bắt đầu, khung giờ đang mở</string>
-    <string name="x_min">%1$s phút</string>
-    <string name="x_h">%1$s giờ</string>
-    <string name="x_h_x_min">%1$s giờ %2$s phút</string>
+    <string name="x_min">%1$d phút</string>
+    <string name="x_h">%1$d giờ</string>
+    <string name="x_h_x_min">%1$d giờ %2$d phút</string>
     <string name="starts_at_x_in_x">Bắt đầu lúc %1$s · sau %2$s</string>
     <string name="start_at">Bắt đầu lúc…</string>
     <string name="your_start_time">Giờ bắt đầu bạn đặt</string>
@@ -1055,4 +1055,14 @@
     <plurals name="subscription_new_downloads">
         <item quantity="other">%1$d mới từ %2$s</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

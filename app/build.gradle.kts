@@ -86,9 +86,11 @@ android {
             "fa", "tr", "it", "ja", "zh-rCN", "hi", "vi",
         )
     }
-    // Android Lint, run by CI on every push (.github/workflows/build.yml, "lint" job).
+    // Android Lint, run by CI on every push (.github/workflows/build.yml, "lint" job): any error
+    // fails it; app/lint.xml has the settings. Each issue is on the commit's "Lint report" check.
     lint {
-        abortOnError = false
+        abortOnError = true
+        lintConfig = file("lint.xml")
         textReport = true
         textOutput = file("stdout")
         xmlReport = true

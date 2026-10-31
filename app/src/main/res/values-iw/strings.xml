@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">הורדות במקביל</string>
     <string name="multiple_concurrent_downloads">כמה הורדות במקביל</string>
     <string name="run_more_than_one_download_at">הרצת יותר מהורדה אחת בו-זמנית. כשכבוי, רק הורדה אחת בכל פעם, בלי קשר למחוון שלמטה.</string>
-    <string name="x_at_once">%1$s בו-זמנית</string>
+    <string name="x_at_once">%1$d בו-זמנית</string>
     <string name="network">רשת</string>
     <string name="wi_fi_only">Wi-Fi בלבד</string>
     <string name="queued_downloads_wait_for_a_wi">הורדות בתור ממתינות לחיבור Wi-Fi במקום להשתמש בחבילת הגלישה.</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">מגביל את רוחב הפס של כל ההורדות העתידיות.</string>
     <string name="retries">ניסיונות חוזרים</string>
     <string name="how_many_times_a_failed_request">כמה פעמים לנסות שוב בקשה שנכשלה לפני ויתור. כשכבוי, נעשה שימוש בברירת המחדל של המנוע.</string>
-    <string name="x_retries">%1$s ניסיונות חוזרים</string>
+    <string name="x_retries">%1$d ניסיונות חוזרים</string>
     <string name="fragment_retries">ניסיונות חוזרים לקטעים</string>
     <string name="how_many_times_a_failed_video">כמה פעמים לנסות שוב קטע וידאו/שמע שנכשל. כשכבוי, חולק את מכסת הניסיונות הראשית.</string>
     <string name="proxy">פרוקסי</string>
@@ -546,9 +546,9 @@
     <string name="copy">העתקה</string>
     <string name="downloads_run_x_x">ההורדות רצות %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">מתחיל בקרוב, החלון פתוח</string>
-    <string name="x_min">%1$s דק׳</string>
-    <string name="x_h">%1$s שע׳</string>
-    <string name="x_h_x_min">%1$s שע׳ %2$s דק׳</string>
+    <string name="x_min">%1$d דק׳</string>
+    <string name="x_h">%1$d שע׳</string>
+    <string name="x_h_x_min">%1$d שע׳ %2$d דק׳</string>
     <string name="starts_at_x_in_x">מתחיל ב-%1$s · בעוד %2$s</string>
     <string name="start_at">התחלה ב…</string>
     <string name="your_start_time">שעת ההתחלה שבחרת</string>
@@ -1115,4 +1115,14 @@
         <item quantity="two">%1$d חדשים מ-%2$s</item>
         <item quantity="other">%1$d חדשים מ-%2$s</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

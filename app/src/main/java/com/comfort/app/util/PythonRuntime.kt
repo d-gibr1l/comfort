@@ -291,7 +291,7 @@ object PythonRuntime {
      * has failed to start). */
     private suspend fun startServer(context: Context) {
         if (!USE_FORK_SERVER) return
-        if (server?.isAlive == true || System.currentTimeMillis() - serverFailedAt < 5 * 60_000) return
+        if (server?.isRunning() == true || System.currentTimeMillis() - serverFailedAt < 5 * 60_000) return
         if (!serverStarting.compareAndSet(false, true)) return
         serverFailedAt = System.currentTimeMillis() // cleared below once it's ready
         try {
@@ -313,7 +313,7 @@ object PythonRuntime {
             val watchdog = Thread {
                 try {
                     Thread.sleep(15_000)
-                    if (process.isAlive) process.destroyForcibly()
+                    if (process.isRunning()) process.killNow()
                 } catch (_: InterruptedException) {
                 }
             }.apply { isDaemon = true; start() }
@@ -328,7 +328,7 @@ object PythonRuntime {
             }
             if (!ready) {
                 android.util.Log.w("PythonRuntime", "fork server exited or timed out before becoming ready")
-                if (process.isAlive) process.destroyForcibly()
+                if (process.isRunning()) process.killNow()
                 return
             }
             server = process
@@ -351,7 +351,7 @@ object PythonRuntime {
      * replacing an engine, whose old version the server still has in memory. Running jobs are
      * separate processes and are unaffected. */
     fun restartServer() {
-        server?.destroyForcibly()
+        server?.killNow()
         server = null
         serverFailedAt = 0L
     }
@@ -587,7 +587,7 @@ object PythonRuntime {
         if (!ensureProvisioned(context)) {
             error("Failed to provision the Python runtime")
         }
-        if (USE_FORK_SERVER && server?.isAlive == true) {
+        if (USE_FORK_SERVER && server?.isRunning() == true) {
             runViaServer(context, script, args, onLine)?.let { return@withContext it }
             restartServer() // it didn't take the job; start over below
         }
@@ -616,8 +616,8 @@ object PythonRuntime {
             groupPid.get().takeIf { it > 0 }?.let { pid ->
                 runCatching { Os.kill(-pid, android.system.OsConstants.SIGKILL) }
             }
-            if (process.isAlive) {
-                process.destroyForcibly()
+            if (process.isRunning()) {
+                process.killNow()
                 runCatching { process.waitFor() }
             }
         }
@@ -660,7 +660,7 @@ object PythonRuntime {
             }
             exitCode
         } finally {
-            if (process.isAlive) killAll()
+            if (process.isRunning()) killAll()
         }
     }
 
@@ -676,4 +676,15 @@ object PythonRuntime {
         "sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[0])))",
         "runpy.run_path(sys.argv[0], run_name='__main__')",
     ).joinToString("\n")
+}
+
+/** Process.isAlive, which is API 26: on Android 7 (minSdk 24) it threw NoSuchMethodError. Before
+ * 26, exitValue() throws while the process is still running. */
+private fun Process.isRunning(): Boolean =
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) isAlive
+    else try { exitValue(); false } catch (e: IllegalThreadStateException) { true }
+
+/** Process.destroyForcibly, also API 26. Android's destroy() already sends SIGKILL. */
+private fun Process.killNow() {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) destroyForcibly() else destroy()
 }

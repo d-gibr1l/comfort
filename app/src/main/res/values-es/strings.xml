@@ -340,7 +340,7 @@
     <string name="concurrent_downloads">Descargas simultáneas</string>
     <string name="multiple_concurrent_downloads">Varias descargas a la vez</string>
     <string name="run_more_than_one_download_at">Ejecuta más de una descarga al mismo tiempo. Desactivado significa exactamente una a la vez, sin importar el control de abajo.</string>
-    <string name="x_at_once">%1$s a la vez</string>
+    <string name="x_at_once">%1$d a la vez</string>
     <string name="network">Red</string>
     <string name="wi_fi_only">Solo Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">Las descargas en cola esperan una conexión Wi-Fi en vez de usar datos móviles.</string>
@@ -348,7 +348,7 @@
     <string name="caps_download_bandwidth_for_all_future">Limita el ancho de banda de todas las descargas futuras.</string>
     <string name="retries">Reintentos</string>
     <string name="how_many_times_a_failed_request">Cuántas veces se reintenta una solicitud fallida antes de rendirse. Desactivado usa el valor predeterminado del motor.</string>
-    <string name="x_retries">%1$s reintentos</string>
+    <string name="x_retries">%1$d reintentos</string>
     <string name="fragment_retries">Reintentos de fragmentos</string>
     <string name="how_many_times_a_failed_video">Cuántas veces se reintenta un fragmento de video/audio fallido. Desactivado comparte el límite principal de Reintentos.</string>
     <string name="force_ipv4">Forzar IPv4</string>
@@ -1102,4 +1102,27 @@
     <string name="audio_language">Idioma del audio</string>
     <string name="audio_language_app_x">Idioma de la app (%1$s)</string>
     <string name="audio_language_subtitle">Para videos con audio doblado, como muchos de YouTube. Los que no tienen este idioma se descargan en su original. Las canciones siempre conservan el suyo.</string>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="command_template_args_hint">p. ej. --sponsorblock-remove all</string>
+    <string name="backup_cookies_included">cookies</string>
+    <string name="cookies">Cookies</string>
+    <string name="proxy">Proxy</string>
+    <string name="app">App</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_min">%1$d min</string>
+    <string name="x_h">%1$d h</string>
+    <string name="x_h_x_min">%1$d h %2$d min</string>
+    <string name="audio">Audio</string>
+    <string name="audio_x">Audio · %1$s</string>
+    <string name="video">Video</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="n_0_normal">0° (Normal)</string>
+    <string name="video_x">Video (%1$s)</string>
+    <string name="flash">Flash</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="audio_format_original">Original</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
+    <string name="subscriptions_hours">%1$d h</string>
 </resources>

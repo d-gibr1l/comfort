@@ -337,7 +337,7 @@
     <string name="concurrent_downloads">Gleichzeitige Downloads</string>
     <string name="multiple_concurrent_downloads">Mehrere Downloads gleichzeitig</string>
     <string name="run_more_than_one_download_at">Mehr als einen Download gleichzeitig ausführen. Aus heißt genau einer auf einmal, egal was der Regler unten sagt.</string>
-    <string name="x_at_once">%1$s gleichzeitig</string>
+    <string name="x_at_once">%1$d gleichzeitig</string>
     <string name="network">Netzwerk</string>
     <string name="wi_fi_only">Nur WLAN</string>
     <string name="queued_downloads_wait_for_a_wi">Downloads in der Warteschlange warten auf WLAN, statt mobile Daten zu nutzen.</string>
@@ -345,7 +345,7 @@
     <string name="caps_download_bandwidth_for_all_future">Begrenzt die Bandbreite für alle künftigen Downloads.</string>
     <string name="retries">Wiederholungen</string>
     <string name="how_many_times_a_failed_request">Wie oft eine fehlgeschlagene Anfrage wiederholt wird, bevor aufgegeben wird. Aus nutzt den Standard der Engine.</string>
-    <string name="x_retries">%1$s Wiederholungen</string>
+    <string name="x_retries">%1$d Wiederholungen</string>
     <string name="fragment_retries">Fragment-Wiederholungen</string>
     <string name="how_many_times_a_failed_video">Wie oft ein fehlgeschlagenes Video-/Audiofragment wiederholt wird. Aus nutzt das allgemeine Wiederholungs-Kontingent.</string>
     <string name="proxy">Proxy</string>
@@ -587,9 +587,9 @@
     <string name="copy">Kopieren</string>
     <string name="downloads_run_x_x">Downloads laufen %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">Startet gleich, das Zeitfenster ist offen</string>
-    <string name="x_min">%1$s Min.</string>
-    <string name="x_h">%1$s Std.</string>
-    <string name="x_h_x_min">%1$s Std. %2$s Min.</string>
+    <string name="x_min">%1$d Min.</string>
+    <string name="x_h">%1$d Std.</string>
+    <string name="x_h_x_min">%1$d Std. %2$d Min.</string>
     <string name="starts_at_x_in_x">Startet um %1$s · in %2$s</string>
     <string name="start_at">Starten um…</string>
     <string name="your_start_time">Deine Startzeit</string>
@@ -1085,4 +1085,14 @@
     <string name="audio_language">Audiosprache</string>
     <string name="audio_language_app_x">App-Sprache (%1$s)</string>
     <string name="audio_language_subtitle">Für Videos mit synchronisiertem Ton, wie viele auf YouTube. Videos ohne diese Sprache werden im Original geladen. Songs behalten immer ihren.</string>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>
