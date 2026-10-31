@@ -63,7 +63,8 @@ object PythonRuntime {
     // (provisioned before it existed) counts as out of date.
     // 2: trimmed by tools/trim_runtime_zips.py (unstripped curl_cffi, test modules, Tcl/Tk… ~17 MB
     // less unpacked on arm64).
-    private const val RUNTIME_ZIP_VERSION = "2"
+    // 3: curl_cffi.libs/libc++_shared back as it was: stripped, it didn't load (no impersonation).
+    private const val RUNTIME_ZIP_VERSION = "3"
     private const val RUNTIME_ZIP_MARKER = "runtime_zip.txt"
     // Top-level site-packages entries that are engines (package, .dist-info, .data), the ones
     // EngineUpdater can replace in-app.

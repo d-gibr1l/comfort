@@ -75,6 +75,14 @@ def is_symlink(info):
     return (info.external_attr >> 16) & 0o170000 == 0o120000
 
 
+def is_vendored_lib(name):
+    """A library a wheel bundles in its "<package>.libs/" folder (auditwheel). patchelf already
+    rewrote those, and llvm-strip on top broke them: curl_cffi.libs/libc++_shared's version
+    needs ended up pointing into the wrong strings ("cannot find "operty_get"" when loaded on the
+    phone), so curl_cffi didn't import and every yt-dlp download with impersonation failed."""
+    return ".libs/" in name
+
+
 def strip_if_needed(data, tmpdir):
     """[data] stripped of debug info and the static symbol table, or None if it has neither."""
     # Shared libraries and executables only (e_type 3 / 2), not object files like config's python.o.
@@ -111,7 +119,7 @@ def trim(path, dry_run):
                     if target in names and dropped(target):
                         removed.append(info.filename)
                         continue
-                elif not info.is_dir():
+                elif not info.is_dir() and not is_vendored_lib(info.filename):
                     s = strip_if_needed(data, tmpdir)
                     if s is not None:
                         stripped.append(info.filename)
