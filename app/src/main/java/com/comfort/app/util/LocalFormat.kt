@@ -29,10 +29,16 @@ object LocalFormat {
         val measure = Measure(value, unit)
         // Shared across threads (the download notification formats off the main thread), and
         // its number format isn't thread-safe.
-        return synchronized(format) {
+        val text = synchronized(format) {
             if (perSecond) format.formatMeasurePerUnit(measure, MeasureUnit.SECOND, StringBuilder(), FieldPosition(0)).toString()
             else format.format(measure)
         }
+        // In a right-to-left language whose unit is written in Latin letters (Hebrew, Persian:
+        // "1.5 MB"), the number and the unit were reordered around the space and read "MB 1.5".
+        // A first-strong isolate keeps "1.5 MB" in one piece; Arabic's own "١٫٥ م.ب" is unchanged.
+        return if (android.text.TextUtils.getLayoutDirectionFromLocale(locale) == android.view.View.LAYOUT_DIRECTION_RTL) {
+            "\u2068$text\u2069"
+        } else text
     }
 
     /** A download speed, from MB/s: in KB/s under 1 MB/s. */
