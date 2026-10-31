@@ -344,7 +344,7 @@
     <string name="concurrent_downloads">Téléchargements simultanés</string>
     <string name="multiple_concurrent_downloads">Plusieurs téléchargements à la fois</string>
     <string name="run_more_than_one_download_at">Lance plusieurs téléchargements en même temps. Désactivé, il n\'y en a qu\'un à la fois, quel que soit le curseur ci-dessous.</string>
-    <string name="x_at_once">%1$s à la fois</string>
+    <string name="x_at_once">%1$d à la fois</string>
     <string name="network">Réseau</string>
     <string name="wi_fi_only">Wi-Fi uniquement</string>
     <string name="queued_downloads_wait_for_a_wi">Les téléchargements en attente attendent une connexion Wi-Fi au lieu d\'utiliser les données mobiles.</string>
@@ -352,7 +352,7 @@
     <string name="caps_download_bandwidth_for_all_future">Limite la bande passante de tous les prochains téléchargements.</string>
     <string name="retries">Tentatives</string>
     <string name="how_many_times_a_failed_request">Nombre de nouvelles tentatives pour une requête échouée avant d\'abandonner. Désactivé, la valeur par défaut du moteur s\'applique.</string>
-    <string name="x_retries">%1$s tentatives</string>
+    <string name="x_retries">%1$d tentatives</string>
     <string name="fragment_retries">Tentatives par fragment</string>
     <string name="how_many_times_a_failed_video">Nombre de nouvelles tentatives pour un fragment vidéo/audio échoué. Désactivé, il partage le nombre de Tentatives principal.</string>
     <string name="proxy">Proxy</string>
@@ -600,9 +600,9 @@
     <string name="copy">Copier</string>
     <string name="downloads_run_x_x">Téléchargements de %1$s à %2$s</string>
     <string name="starting_soon_the_window_is_open">Démarrage imminent, la plage horaire est ouverte</string>
-    <string name="x_min">%1$s min</string>
-    <string name="x_h">%1$s h</string>
-    <string name="x_h_x_min">%1$s h %2$s min</string>
+    <string name="x_min">%1$d min</string>
+    <string name="x_h">%1$d h</string>
+    <string name="x_h_x_min">%1$d h %2$d min</string>
     <string name="starts_at_x_in_x">Démarre à %1$s · dans %2$s</string>
     <string name="start_at">Démarrer à…</string>
     <string name="your_start_time">Votre heure de début</string>
@@ -846,7 +846,7 @@
     <string name="download_failed_named">Échec\u00A0: %1$s</string>
     <string name="download_failed_named_reason">Échec de %1$s\u00A0: %2$s</string>
     <plurals name="downloads_removed">
-        <item quantity="one">Téléchargement supprimé</item>
+        <item quantity="one">%d téléchargement supprimé</item>
         <item quantity="many">%d téléchargements supprimés</item>
         <item quantity="other">%d téléchargements supprimés</item>
     </plurals>
@@ -971,7 +971,7 @@
     <string name="comfort_is_downloading_in_the_background">Comfort télécharge en arrière-plan</string>
     <string name="starting">Démarrage…</string>
     <string name="download_failed">Échec du téléchargement</string>
-    <string name="percent_and_status">%1$s\u00A0%% · %2$s</string>
+    <string name="percent_and_status">%1$d\u00A0%% · %2$s</string>
     <string name="downloading_ellipsis">Téléchargement…</string>
     <plurals name="items_downloaded">
         <item quantity="one">%d téléchargé</item>
@@ -1120,4 +1120,9 @@
     <string name="audio_language">Langue audio</string>
     <string name="audio_language_app_x">Langue de l\'app (%1$s)</string>
     <string name="audio_language_subtitle">Pour les vidéos doublées, comme beaucoup sur YouTube. Celles sans cette langue sont téléchargées en version originale. Les chansons gardent toujours la leur.</string>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="nightly">Nightly</string>
+    <string name="stable">Stable</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">同時ダウンロード</string>
     <string name="multiple_concurrent_downloads">複数の同時ダウンロード</string>
     <string name="run_more_than_one_download_at">複数のダウンロードを同時に実行します。オフにすると、下のスライダーに関係なく 1 件ずつ実行します。</string>
-    <string name="x_at_once">同時に %1$s 件</string>
+    <string name="x_at_once">同時に %1$d 件</string>
     <string name="network">ネットワーク</string>
     <string name="wi_fi_only">Wi-Fi のみ</string>
     <string name="queued_downloads_wait_for_a_wi">キュー内のダウンロードはモバイルデータを使わずに Wi-Fi 接続を待ちます。</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">今後のすべてのダウンロードの帯域を制限します。</string>
     <string name="retries">再試行</string>
     <string name="how_many_times_a_failed_request">失敗したリクエストを諦めるまでに再試行する回数。オフではエンジンの既定値を使います。</string>
-    <string name="x_retries">%1$s 回再試行</string>
+    <string name="x_retries">%1$d 回再試行</string>
     <string name="fragment_retries">断片の再試行</string>
     <string name="how_many_times_a_failed_video">失敗した動画・音声の断片を再試行する回数。オフではメインの再試行回数を共有します。</string>
     <string name="proxy">プロキシ</string>
@@ -546,9 +546,9 @@
     <string name="copy">コピー</string>
     <string name="downloads_run_x_x">ダウンロードの時間帯: %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">まもなく開始(時間帯に入っています)</string>
-    <string name="x_min">%1$s 分</string>
-    <string name="x_h">%1$s 時間</string>
-    <string name="x_h_x_min">%1$s 時間 %2$s 分</string>
+    <string name="x_min">%1$d 分</string>
+    <string name="x_h">%1$d 時間</string>
+    <string name="x_h_x_min">%1$d 時間 %2$d 分</string>
     <string name="starts_at_x_in_x">%1$s に開始 · あと %2$s</string>
     <string name="start_at">開始時刻を設定…</string>
     <string name="your_start_time">設定した開始時刻</string>
@@ -1055,4 +1055,14 @@
     <plurals name="subscription_new_downloads">
         <item quantity="other">%2$s の新着 %1$d 件</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

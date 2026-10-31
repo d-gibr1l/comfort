@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">同时下载</string>
     <string name="multiple_concurrent_downloads">多个同时下载</string>
     <string name="run_more_than_one_download_at">同时运行多个下载。关闭时一次只运行一个，与下方滑块无关。</string>
-    <string name="x_at_once">同时 %1$s 个</string>
+    <string name="x_at_once">同时 %1$d 个</string>
     <string name="network">网络</string>
     <string name="wi_fi_only">仅 Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">队列中的下载会等待 Wi-Fi 连接，而不使用移动数据。</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">限制以后所有下载的带宽。</string>
     <string name="retries">重试</string>
     <string name="how_many_times_a_failed_request">失败的请求在放弃前重试的次数。关闭时使用引擎默认值。</string>
-    <string name="x_retries">重试 %1$s 次</string>
+    <string name="x_retries">重试 %1$d 次</string>
     <string name="fragment_retries">分片重试</string>
     <string name="how_many_times_a_failed_video">失败的视频/音频分片重试的次数。关闭时共用主重试次数。</string>
     <string name="proxy">代理</string>
@@ -546,9 +546,9 @@
     <string name="copy">复制</string>
     <string name="downloads_run_x_x">下载时间段：%1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">即将开始，时间段已开启</string>
-    <string name="x_min">%1$s 分钟</string>
-    <string name="x_h">%1$s 小时</string>
-    <string name="x_h_x_min">%1$s 小时 %2$s 分钟</string>
+    <string name="x_min">%1$d 分钟</string>
+    <string name="x_h">%1$d 小时</string>
+    <string name="x_h_x_min">%1$d 小时 %2$d 分钟</string>
     <string name="starts_at_x_in_x">%1$s 开始 · 还有 %2$s</string>
     <string name="start_at">定时开始…</string>
     <string name="your_start_time">你设定的开始时间</string>
@@ -1055,4 +1055,14 @@
     <plurals name="subscription_new_downloads">
         <item quantity="other">来自 %2$s 的 %1$d 个新内容</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

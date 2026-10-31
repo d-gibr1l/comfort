@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">एक साथ डाउनलोड</string>
     <string name="multiple_concurrent_downloads">कई डाउनलोड एक साथ</string>
     <string name="run_more_than_one_download_at">एक समय में एक से ज़्यादा डाउनलोड चलाएँ। बंद होने पर एक बार में ठीक एक चलता है, नीचे के स्लाइडर से कोई फ़र्क़ नहीं पड़ता।</string>
-    <string name="x_at_once">एक साथ %1$s</string>
+    <string name="x_at_once">एक साथ %1$d</string>
     <string name="network">नेटवर्क</string>
     <string name="wi_fi_only">केवल Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">कतार के डाउनलोड मोबाइल डेटा के बजाय Wi-Fi कनेक्शन का इंतज़ार करते हैं।</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">आगे के सभी डाउनलोड की बैंडविड्थ सीमित करता है।</string>
     <string name="retries">दोबारा कोशिशें</string>
     <string name="how_many_times_a_failed_request">हार मानने से पहले विफल अनुरोध को कितनी बार दोबारा आज़माया जाए। बंद होने पर इंजन का डिफ़ॉल्ट इस्तेमाल होता है।</string>
-    <string name="x_retries">%1$s बार दोबारा</string>
+    <string name="x_retries">%1$d बार दोबारा</string>
     <string name="fragment_retries">टुकड़ों की दोबारा कोशिशें</string>
     <string name="how_many_times_a_failed_video">विफल वीडियो/ऑडियो टुकड़े को कितनी बार दोबारा आज़माया जाए। बंद होने पर मुख्य दोबारा-कोशिश सीमा साझा करता है।</string>
     <string name="proxy">प्रॉक्सी</string>
@@ -546,9 +546,9 @@
     <string name="copy">कॉपी करें</string>
     <string name="downloads_run_x_x">डाउनलोड %1$s–%2$s चलते हैं</string>
     <string name="starting_soon_the_window_is_open">जल्द शुरू होगा, समय सीमा खुली है</string>
-    <string name="x_min">%1$s मिनट</string>
-    <string name="x_h">%1$s घंटे</string>
-    <string name="x_h_x_min">%1$s घंटे %2$s मिनट</string>
+    <string name="x_min">%1$d मिनट</string>
+    <string name="x_h">%1$d घंटे</string>
+    <string name="x_h_x_min">%1$d घंटे %2$d मिनट</string>
     <string name="starts_at_x_in_x">%1$s पर शुरू · %2$s में</string>
     <string name="start_at">इस समय शुरू करें…</string>
     <string name="your_start_time">आपका शुरू होने का समय</string>
@@ -1042,7 +1042,7 @@
         <item quantity="other">%d मिले, सबसे अच्छा मेल पहले</item>
     </plurals>
     <plurals name="downloads_removed">
-        <item quantity="one">डाउनलोड हटाया गया</item>
+        <item quantity="one">%d डाउनलोड हटाया गया</item>
         <item quantity="other">%d डाउनलोड हटाए गए</item>
     </plurals>
     <plurals name="active_downloads_count">
@@ -1085,4 +1085,14 @@
         <item quantity="one">%2$s से %1$d नए</item>
         <item quantity="other">%2$s से %1$d नए</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

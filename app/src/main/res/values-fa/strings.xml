@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">دانلودهای هم‌زمان</string>
     <string name="multiple_concurrent_downloads">چند دانلود هم‌زمان</string>
     <string name="run_more_than_one_download_at">اجرای بیش از یک دانلود در یک زمان. خاموش یعنی دقیقاً یکی در هر زمان، صرف‌نظر از لغزنده زیر.</string>
-    <string name="x_at_once">%1$s هم‌زمان</string>
+    <string name="x_at_once">%1$d هم‌زمان</string>
     <string name="network">شبکه</string>
     <string name="wi_fi_only">فقط Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">دانلودهای صف به‌جای استفاده از داده همراه منتظر اتصال Wi-Fi می‌مانند.</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">پهنای باند دانلود را برای همه دانلودهای آینده محدود می‌کند.</string>
     <string name="retries">تلاش‌های دوباره</string>
     <string name="how_many_times_a_failed_request">یک درخواست ناموفق چند بار پیش از منصرف شدن دوباره تلاش شود. خاموش از پیش‌فرض موتور استفاده می‌کند.</string>
-    <string name="x_retries">%1$s تلاش دوباره</string>
+    <string name="x_retries">%1$d تلاش دوباره</string>
     <string name="fragment_retries">تلاش دوباره قطعه‌ها</string>
     <string name="how_many_times_a_failed_video">یک قطعه ویدیو/صدای ناموفق چند بار دوباره تلاش شود. خاموش از سهمیه اصلی تلاش‌ها استفاده می‌کند.</string>
     <string name="proxy">پروکسی</string>
@@ -546,9 +546,9 @@
     <string name="copy">کپی</string>
     <string name="downloads_run_x_x">دانلودها %1$s تا %2$s اجرا می‌شوند</string>
     <string name="starting_soon_the_window_is_open">به‌زودی شروع می‌شود، بازه باز است</string>
-    <string name="x_min">%1$s دقیقه</string>
-    <string name="x_h">%1$s ساعت</string>
-    <string name="x_h_x_min">%1$s ساعت و %2$s دقیقه</string>
+    <string name="x_min">%1$d دقیقه</string>
+    <string name="x_h">%1$d ساعت</string>
+    <string name="x_h_x_min">%1$d ساعت و %2$d دقیقه</string>
     <string name="starts_at_x_in_x">ساعت %1$s شروع می‌شود · %2$s دیگر</string>
     <string name="start_at">شروع در…</string>
     <string name="your_start_time">زمان شروع شما</string>
@@ -1042,7 +1042,7 @@
         <item quantity="other">%d مورد پیدا شد، بهترین تطابق اول</item>
     </plurals>
     <plurals name="downloads_removed">
-        <item quantity="one">دانلود حذف شد</item>
+        <item quantity="one">%d دانلود حذف شد</item>
         <item quantity="other">%d دانلود حذف شد</item>
     </plurals>
     <plurals name="active_downloads_count">
@@ -1085,4 +1085,14 @@
         <item quantity="one">%1$d مورد جدید از %2$s</item>
         <item quantity="other">%1$d مورد جدید از %2$s</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

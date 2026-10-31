@@ -324,7 +324,7 @@
     <string name="concurrent_downloads">التنزيلات المتزامنة</string>
     <string name="multiple_concurrent_downloads">تنزيلات متزامنة متعددة</string>
     <string name="run_more_than_one_download_at">تشغيل أكثر من تنزيل في الوقت نفسه. عند الإيقاف يعمل تنزيل واحد فقط في كل مرة، بغض النظر عن شريط التمرير أدناه.</string>
-    <string name="x_at_once">%1$s في وقت واحد</string>
+    <string name="x_at_once">%1$d في وقت واحد</string>
     <string name="network">الشبكة</string>
     <string name="wi_fi_only">Wi-Fi فقط</string>
     <string name="queued_downloads_wait_for_a_wi">تنتظر التنزيلات في القائمة اتصال Wi-Fi بدلًا من استخدام بيانات الجوال.</string>
@@ -332,7 +332,7 @@
     <string name="caps_download_bandwidth_for_all_future">يحدّ عرض نطاق التنزيل لكل التنزيلات القادمة.</string>
     <string name="retries">إعادة المحاولات</string>
     <string name="how_many_times_a_failed_request">عدد مرات إعادة محاولة الطلب الفاشل قبل الاستسلام. عند الإيقاف تُستخدم القيمة الافتراضية للمحرك.</string>
-    <string name="x_retries">%1$s محاولات</string>
+    <string name="x_retries">%1$d محاولات</string>
     <string name="fragment_retries">إعادة محاولة الأجزاء</string>
     <string name="how_many_times_a_failed_video">عدد مرات إعادة محاولة جزء فيديو/صوت فاشل. عند الإيقاف يشارك رصيد إعادة المحاولات الرئيسي.</string>
     <string name="proxy">الوكيل</string>
@@ -546,9 +546,9 @@
     <string name="copy">نسخ</string>
     <string name="downloads_run_x_x">تعمل التنزيلات %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">يبدأ قريبًا، الفترة مفتوحة</string>
-    <string name="x_min">%1$s د</string>
-    <string name="x_h">%1$s س</string>
-    <string name="x_h_x_min">%1$s س %2$s د</string>
+    <string name="x_min">%1$d د</string>
+    <string name="x_h">%1$d س</string>
+    <string name="x_h_x_min">%1$d س %2$d د</string>
     <string name="starts_at_x_in_x">يبدأ في %1$s · بعد %2$s</string>
     <string name="start_at">البدء في…</string>
     <string name="your_start_time">وقت البدء الذي اخترته</string>
@@ -1205,4 +1205,14 @@
         <item quantity="many">%1$d جديد من %2$s</item>
         <item quantity="other">%1$d جديد من %2$s</item>
     </plurals>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="nightly">Nightly</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="spot">Spot</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>

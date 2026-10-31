@@ -344,7 +344,7 @@
     <string name="concurrent_downloads">Downloads simultâneos</string>
     <string name="multiple_concurrent_downloads">Vários downloads ao mesmo tempo</string>
     <string name="run_more_than_one_download_at">Faz mais de um download ao mesmo tempo. Desligado, é exatamente um por vez, independente do controle abaixo.</string>
-    <string name="x_at_once">%1$s por vez</string>
+    <string name="x_at_once">%1$d por vez</string>
     <string name="network">Rede</string>
     <string name="wi_fi_only">Só Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">Downloads na fila esperam uma conexão Wi-Fi em vez de usar dados móveis.</string>
@@ -352,7 +352,7 @@
     <string name="caps_download_bandwidth_for_all_future">Limita a banda de todos os próximos downloads.</string>
     <string name="retries">Tentativas</string>
     <string name="how_many_times_a_failed_request">Quantas vezes uma requisição que falhou é tentada de novo antes de desistir. Desligado usa o padrão do motor.</string>
-    <string name="x_retries">%1$s tentativas</string>
+    <string name="x_retries">%1$d tentativas</string>
     <string name="fragment_retries">Tentativas por fragmento</string>
     <string name="how_many_times_a_failed_video">Quantas vezes um fragmento de vídeo/áudio que falhou é tentado de novo. Desligado usa o mesmo limite de Tentativas.</string>
     <string name="proxy">Proxy</string>
@@ -843,7 +843,7 @@
     <string name="download_failed_named">%1$s falhou</string>
     <string name="download_failed_named_reason">%1$s falhou: %2$s</string>
     <plurals name="downloads_removed">
-        <item quantity="one">Download removido</item>
+        <item quantity="one">%d download removido</item>
         <item quantity="many">%d de downloads removidos</item>
         <item quantity="other">%d downloads removidos</item>
     </plurals>
@@ -1115,4 +1115,14 @@
     <string name="audio_language">Idioma do áudio</string>
     <string name="audio_language_app_x">Idioma do app (%1$s)</string>
     <string name="audio_language_subtitle">Para vídeos com áudio dublado, como muitos do YouTube. Os que não têm este idioma são baixados no original. Músicas sempre mantêm o seu.</string>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="nightly">Nightly</string>
+    <string name="x_min">%1$d min</string>
+    <string name="x_h">%1$d h</string>
+    <string name="x_h_x_min">%1$d h %2$d min</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
+    <string name="subscriptions_hours">%1$d h</string>
 </resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Android Lint settings (CI's "lint" job fails on any error). -->
+<lint>
+    <!-- Media3's @UnstableApi: the app uses ExoPlayer/MediaSession APIs Media3 marks unstable, on
+         purpose and pinned to one Media3 version. This is the opt-in Media3's docs give for it. -->
+    <issue id="UnsafeOptInUsageError">
+        <option name="opt-in" value="androidx.media3.common.util.UnstableApi" />
+    </issue>
+    <!-- getString through LocalContext.current in composables. The rule is about values that change
+         with a configuration change the activity handles itself: MainActivity handles orientation,
+         screen size and uiMode (configChanges), and no string differs by those (no values-land/-night
+         strings); a language change recreates the activity. So these can't show stale text here.
+         Kept as a warning, so new code still sees it. -->
+    <issue id="LocalContextGetResourceValueCall" severity="warning" />
+</lint>

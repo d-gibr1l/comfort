@@ -334,7 +334,7 @@
     <string name="concurrent_downloads">Unduhan bersamaan</string>
     <string name="multiple_concurrent_downloads">Beberapa unduhan sekaligus</string>
     <string name="run_more_than_one_download_at">Jalankan lebih dari satu unduhan sekaligus. Jika mati, hanya satu per satu, apa pun nilai penggeser di bawah.</string>
-    <string name="x_at_once">%1$s sekaligus</string>
+    <string name="x_at_once">%1$d sekaligus</string>
     <string name="network">Jaringan</string>
     <string name="wi_fi_only">Hanya Wi-Fi</string>
     <string name="queued_downloads_wait_for_a_wi">Unduhan dalam antrean menunggu koneksi Wi-Fi, bukan memakai data seluler.</string>
@@ -342,7 +342,7 @@
     <string name="caps_download_bandwidth_for_all_future">Membatasi bandwidth untuk semua unduhan berikutnya.</string>
     <string name="retries">Percobaan ulang</string>
     <string name="how_many_times_a_failed_request">Berapa kali permintaan yang gagal dicoba lagi sebelum menyerah. Jika mati, memakai bawaan mesin.</string>
-    <string name="x_retries">%1$s kali coba ulang</string>
+    <string name="x_retries">%1$d kali coba ulang</string>
     <string name="fragment_retries">Percobaan ulang fragmen</string>
     <string name="how_many_times_a_failed_video">Berapa kali fragmen video/audio yang gagal dicoba lagi. Jika mati, memakai jatah Percobaan ulang utama.</string>
     <string name="proxy">Proksi</string>
@@ -584,9 +584,9 @@
     <string name="copy">Salin</string>
     <string name="downloads_run_x_x">Unduhan berjalan %1$s–%2$s</string>
     <string name="starting_soon_the_window_is_open">Segera dimulai, rentang waktunya sudah tiba</string>
-    <string name="x_min">%1$s mnt</string>
-    <string name="x_h">%1$s jam</string>
-    <string name="x_h_x_min">%1$s jam %2$s mnt</string>
+    <string name="x_min">%1$d mnt</string>
+    <string name="x_h">%1$d jam</string>
+    <string name="x_h_x_min">%1$d jam %2$d mnt</string>
     <string name="starts_at_x_in_x">Mulai pukul %1$s · dalam %2$s</string>
     <string name="start_at">Mulai pada…</string>
     <string name="your_start_time">Waktu mulai Anda</string>
@@ -1070,4 +1070,29 @@
     <string name="audio_language">Bahasa audio</string>
     <string name="audio_language_app_x">Bahasa aplikasi (%1$s)</string>
     <string name="audio_language_subtitle">Untuk video dengan audio sulih suara, seperti banyak video di YouTube. Video tanpa bahasa ini diunduh dalam bahasa aslinya. Lagu selalu memakai aslinya.</string>
+    <!-- The same as English in this language (names, units, words it uses as they are). -->
+    <string name="sponsorblock_cat_sponsor">Sponsor</string>
+    <string name="sponsorblock_cat_intro">Intro</string>
+    <string name="sponsorblock_cat_outro">Outro</string>
+    <string name="search_live">LIVE</string>
+    <string name="cache_x_kb">Cache: %1$s KB</string>
+    <string name="cache_x_mb">Cache: %1$s MB</string>
+    <string name="nightly">Nightly</string>
+    <string name="audio">Audio</string>
+    <string name="audio_x">Audio · %1$s</string>
+    <string name="album">Album</string>
+    <string name="video">Video</string>
+    <string name="x_x">%1$s • %2$s</string>
+    <string name="item_x">item %1$s</string>
+    <string name="item_x_2">Item %1$s</string>
+    <string name="info">Info</string>
+    <string name="edit">Edit</string>
+    <string name="media">Media</string>
+    <string name="n_0_normal">0° (Normal)</string>
+    <string name="video_x">Video (%1$s)</string>
+    <string name="info_metadata">Info &amp; Metadata</string>
+    <string name="white_balance">White Balance</string>
+    <string name="percent_and_status">%1$d%% · %2$s</string>
+    <string name="yang">Yang</string>
+    <string name="yin">Yin</string>
 </resources>
