@@ -187,6 +187,8 @@ object AppUpdater {
      * specifically — call when [canInstall] is false, then have the user retry [installApk] once
      * they're back. */
     fun requestInstallPermission(context: Context) {
+        // Android 8+ only: before it there's no per-app permission (canInstall is always true).
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val intent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)

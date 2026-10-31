@@ -573,7 +573,6 @@
     <string name="cancel_selection">Отменить выбор</string>
     <string name="deselect_all">Снять выделение</string>
     <string name="select_all">Выбрать все</string>
-    <string name="delete_selected">Удалить выбранные</string>
     <string name="queue">Очередь</string>
     <string name="no_paused_downloads">Нет приостановленных загрузок</string>
     <string name="downloads_you_pause_will_show_up">Здесь появятся загрузки, которые вы приостановите.</string>
@@ -648,7 +647,6 @@
     <string name="queue_filter_cancelled">Отменённые</string>
     <string name="unknown_site">Неизвестно</string>
     <string name="link">Ссылка</string>
-    <string name="yt_dlp_command">Команда yt-dlp</string>
     <string name="command_copied">Команда скопирована</string>
     <string name="save_audio_as">Сохранить аудио как</string>
     <string name="as_the_site_sends_it_not">Как отдаёт сайт, без перекодирования</string>

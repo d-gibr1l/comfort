@@ -544,7 +544,6 @@
     <string name="cancel_selection">Batalkan pilihan</string>
     <string name="deselect_all">Batalkan semua pilihan</string>
     <string name="select_all">Pilih semua</string>
-    <string name="delete_selected">Hapus yang dipilih</string>
     <string name="queue">Antrean</string>
     <string name="no_paused_downloads">Tidak ada unduhan yang dijeda</string>
     <string name="downloads_you_pause_will_show_up">Unduhan yang Anda jeda akan muncul di sini.</string>
@@ -615,7 +614,6 @@
     <string name="queue_filter_cancelled">Dibatalkan</string>
     <string name="unknown_site">Tidak diketahui</string>
     <string name="link">Tautan</string>
-    <string name="yt_dlp_command">Perintah yt-dlp</string>
     <string name="command_copied">Perintah disalin</string>
     <string name="save_audio_as">Simpan audio sebagai</string>
     <string name="as_the_site_sends_it_not">Seperti yang dikirim situs, tanpa encode ulang</string>

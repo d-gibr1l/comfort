@@ -560,7 +560,6 @@
     <string name="cancel_selection">Annuler la sélection</string>
     <string name="deselect_all">Tout désélectionner</string>
     <string name="select_all">Tout sélectionner</string>
-    <string name="delete_selected">Supprimer la sélection</string>
     <string name="queue">File d\'attente</string>
     <string name="no_paused_downloads">Aucun téléchargement en pause</string>
     <string name="downloads_you_pause_will_show_up">Les téléchargements mis en pause apparaîtront ici.</string>
@@ -633,7 +632,6 @@
     <string name="queue_filter_cancelled">Annulés</string>
     <string name="unknown_site">Inconnu</string>
     <string name="link">Lien</string>
-    <string name="yt_dlp_command">Commande yt-dlp</string>
     <string name="command_copied">Commande copiée</string>
     <string name="save_audio_as">Enregistrer l\'audio en</string>
     <string name="as_the_site_sends_it_not">Tel que le site l\'envoie, sans réencodage</string>

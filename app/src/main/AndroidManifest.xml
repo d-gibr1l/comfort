@@ -167,14 +167,14 @@
             </intent-filter>
         </receiver>
 
-        <!-- WorkManager's own service, declared here only to add the foregroundServiceType that
-             DownloadWorker's ForegroundInfo requires on API 34+; without a matching declaration
-             here, setForeground() throws "foregroundServiceType is not a subset of ... manifest". -->
         <!-- The music player: plays Library songs in the background, with the media notification
              and lock-screen / Bluetooth / headset controls of its MediaSession. -->
+        <!-- Exported with no permission on purpose, as Media3 requires; what other apps may do
+             through it is limited in MusicService's onConnect (transport controls only). -->
         <service
             android:name=".music.MusicService"
             android:exported="true"
+            tools:ignore="ExportedService"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
@@ -205,6 +205,9 @@
                 android:resource="@xml/widget_music_info" />
         </receiver>
 
+        <!-- WorkManager's own service, declared here only to add the foregroundServiceType that
+             DownloadWorker's ForegroundInfo requires on API 34+; without a matching declaration
+             here, setForeground() throws "foregroundServiceType is not a subset of ... manifest". -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

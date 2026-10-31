@@ -12,4 +12,8 @@
          strings); a language change recreates the activity. So these can't show stale text here.
          Kept as a warning, so new code still sees it. -->
     <issue id="LocalContextGetResourceValueCall" severity="warning" />
+    <!-- Play's policy on asking for the battery-optimization exemption directly. The app isn't on
+         Play (GitHub releases), it's asked for only from Settings › Downloads by a button under a
+         text saying why, and a download manager is one of the uses that policy allows anyway. -->
+    <issue id="BatteryLife" severity="ignore" />
 </lint>

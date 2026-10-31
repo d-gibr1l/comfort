@@ -82,6 +82,24 @@ class MusicService : MediaSessionService() {
 
     // A media key (the widget, headphones, a car) with nothing loaded: the saved queue, to resume.
     private val sessionCallback = object : MediaSession.Callback {
+        /** The service is exported (MediaSessionService has to be: the system's media controls,
+         * Bluetooth, cars and watches connect to it), and Media3's default lets any app that
+         * connects replace the queue with whatever media items it likes — any installed app could
+         * make the player load and play a URL of its choosing. Other apps get the transport
+         * controls (play/pause, skip, seek, shuffle, repeat, volume) and no more; this app's own
+         * controllers (MusicPlayer, the media notification, the widget) keep everything. */
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): MediaSession.ConnectionResult {
+            val result = super.onConnect(session, controller)
+            if (controller.packageName == packageName || !result.isAccepted) return result
+            val transportOnly = result.availablePlayerCommands.buildUpon()
+                .removeAll(Player.COMMAND_SET_MEDIA_ITEM, Player.COMMAND_CHANGE_MEDIA_ITEMS)
+                .build()
+            return MediaSession.ConnectionResult.accept(result.availableSessionCommands, transportOnly)
+        }
+
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,

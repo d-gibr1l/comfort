@@ -118,6 +118,9 @@ object BackupRestore {
                     if (key in SKIPPED_SETTINGS) return@forEach
                     if (decodeSetting(editor, key, values.optJSONObject(key))) settingsCount++
                 }
+                // On disk before "Restored" is reported (this runs on Dispatchers.IO): the app may
+                // be closed right after, and apply()'s background write lost with it.
+                @android.annotation.SuppressLint("ApplySharedPref")
                 editor.commit()
             }
         }

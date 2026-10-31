@@ -506,7 +506,6 @@
     <string name="cancel_selection">إلغاء التحديد</string>
     <string name="deselect_all">إلغاء تحديد الكل</string>
     <string name="select_all">تحديد الكل</string>
-    <string name="delete_selected">حذف المحدد</string>
     <string name="queue">القائمة</string>
     <string name="no_paused_downloads">لا توجد تنزيلات متوقفة مؤقتًا</string>
     <string name="downloads_you_pause_will_show_up">ستظهر هنا التنزيلات التي توقفها مؤقتًا.</string>
@@ -569,7 +568,6 @@
     <string name="queue_filter_cancelled">ملغى</string>
     <string name="unknown_site">غير معروف</string>
     <string name="link">الرابط</string>
-    <string name="yt_dlp_command">أمر yt-dlp</string>
     <string name="command_copied">تم نسخ الأمر</string>
     <string name="save_audio_as">حفظ الصوت بصيغة</string>
     <string name="as_the_site_sends_it_not">كما يرسله الموقع، دون إعادة ترميز</string>
