@@ -236,19 +236,36 @@ class MusicService : MediaSessionService() {
     }
 
     /** The song's cover, small (a widget's bitmap travels between processes): the pulled-out
-     * cover file, else the one embedded in the song. */
-    private fun coverBitmap(song: Song): android.graphics.Bitmap? = runCatching {
-        val art = (song.cover as? com.comfort.app.util.AudioCover)
-        val bytes = art?.storedArt?.let { a -> contentResolver.openInputStream(android.net.Uri.parse(a))?.use { it.readBytes() } }
-            ?: android.media.MediaMetadataRetriever().run {
+     * cover file, else the system thumbnail of the song, else the one embedded in it. */
+    private fun coverBitmap(song: Song): android.graphics.Bitmap? {
+        val art = song.cover as? com.comfort.app.util.AudioCover
+        // The cover pulled out when it was saved — kept in the cache folder, which Android clears
+        // when space runs low (most songs' covers were gone on the phone, and the widget showed
+        // none: this read threw and nothing else was tried). Then, like the Library's
+        // AudioCoverFetcher, the system's thumbnail of the song, then its embedded cover.
+        art?.storedArt?.let { a ->
+            runCatching { contentResolver.openInputStream(android.net.Uri.parse(a))?.use { it.readBytes() } }
+                .getOrNull()?.let { decodeSmall(it) }?.let { return it }
+        }
+        val audio = art?.audioUri?.let(android.net.Uri::parse) ?: song.uri
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && audio.authority == android.provider.MediaStore.AUTHORITY) {
+            runCatching { contentResolver.loadThumbnail(audio, android.util.Size(256, 256), null) }.getOrNull()?.let { return it }
+        }
+        val embedded = runCatching {
+            android.media.MediaMetadataRetriever().run {
                 try {
-                    setDataSource(this@MusicService, song.uri)
+                    setDataSource(this@MusicService, audio)
                     embeddedPicture
                 } finally {
                     release()
                 }
             }
-            ?: return null
+        }.getOrNull() ?: return null
+        return decodeSmall(embedded)
+    }
+
+    /** [bytes] decoded at about 192 px (a widget's bitmap travels between processes). */
+    private fun decodeSmall(bytes: ByteArray): android.graphics.Bitmap? = runCatching {
         val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
         android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         var sample = 1
