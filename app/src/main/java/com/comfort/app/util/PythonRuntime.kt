@@ -51,13 +51,22 @@ object PythonRuntime {
     private const val RUNTIME_DIR_NAME = "python_runtime"
     private const val PROVISION_MARKER = "provisioned.txt"
 
-    // Bump when the runtime itself changes: libpython.zip.so or a bundled engine wheel (gallery-dl,
-    // yt-dlp, Instaloader). That re-unpacks everything, which also replaces any engine the user
-    // updated in-app with the bundled one. The wrapper scripts don't need a bump: they're refreshed
-    // on every app install/update (see SCRIPTS_MARKER), leaving the engines alone.
-    // 111: libpython.zip.so trimmed (tools/trim_runtime_zips.py) — unpacked again so installed
-    // copies lose the dropped files and the unstripped curl_cffi (~17 MB on arm64).
-    private const val PROVISION_VERSION = "111"
+    // Bump when a bundled engine wheel changes (gallery-dl, yt-dlp, Instaloader). That re-unpacks
+    // everything, which also replaces any engine the user updated in-app with the bundled one. The
+    // wrapper scripts don't need a bump: they're refreshed on every app install/update (see
+    // SCRIPTS_MARKER), leaving the engines alone. Nor does libpython.zip.so: see RUNTIME_ZIP_VERSION.
+    private const val PROVISION_VERSION = "110"
+    // Bump when libpython.zip.so changes and the engine wheels don't. The runtime is unpacked again
+    // with the installed engines moved aside and put back (refreshRuntimeKeepingEngines), so an
+    // engine updated in-app isn't rolled back to the bundled one. An install without the marker
+    // (provisioned before it existed) counts as out of date.
+    // 2: trimmed by tools/trim_runtime_zips.py (unstripped curl_cffi, test modules, Tcl/Tk… ~17 MB
+    // less unpacked on arm64).
+    private const val RUNTIME_ZIP_VERSION = "2"
+    private const val RUNTIME_ZIP_MARKER = "runtime_zip.txt"
+    // Top-level site-packages entries that are engines (package, .dist-info, .data), the ones
+    // EngineUpdater can replace in-app.
+    private val ENGINE_PREFIXES = listOf("yt_dlp", "gallery_dl", "instaloader")
     // Which app install the wrapper scripts were copied from (versionCode + install time).
     private const val SCRIPTS_MARKER = "scripts.txt"
     private val SCRIPTS = listOf(
@@ -99,13 +108,23 @@ object PythonRuntime {
         val nativeLibDir = helperNativeLibDir(context) ?: return@withLock false
         val root = runtimeRoot(context)
         val marker = File(root, PROVISION_MARKER)
-        if (marker.exists() && runCatching { marker.readText() }.getOrNull() == PROVISION_VERSION) {
+        val zipMarker = File(root, RUNTIME_ZIP_MARKER)
+        val zipSo = File(nativeLibDir, "libpython.zip.so")
+        // Also when a refresh was stopped part-way: the root may be gone, the engines in keptEnginesDir.
+        val provisioned = runCatching { marker.readText() }.getOrNull() == PROVISION_VERSION ||
+            runCatching { File(keptEnginesDir(context), KEPT_MARKER).readText() }.getOrNull() == PROVISION_VERSION
+        if (provisioned) {
+            if (!marker.exists() || runCatching { zipMarker.readText() }.getOrNull() != RUNTIME_ZIP_VERSION) {
+                if (!zipSo.exists()) return@withLock false
+                refreshRuntimeKeepingEngines(context, root, zipSo)
+            }
             copyScriptsIfStale(context, root)
             return@withLock true
         }
 
-        val zipSo = File(nativeLibDir, "libpython.zip.so")
         if (!zipSo.exists()) return@withLock false
+        // Engines kept from a refresh for an older PROVISION_VERSION: the bundled ones replace them.
+        keptEnginesDir(context).deleteRecursively()
 
         val provisionStarted = System.currentTimeMillis()
         root.deleteRecursively()
@@ -132,12 +151,49 @@ object PythonRuntime {
 
         copyScriptsIfStale(context, root, force = true)
 
+        zipMarker.writeText(RUNTIME_ZIP_VERSION)
         marker.writeText(PROVISION_VERSION)
         // The engines are the bundled ones again, whatever was installed in-app before: check for
         // updates on the next launch instead of whenever the last check's interval runs out.
         GalleryDlPreferences.setEngineUpdateLastCheckMs(context, 0L)
         android.util.Log.i("PythonRuntime", "provisioned $PROVISION_VERSION in ${System.currentTimeMillis() - provisionStarted}ms")
         true
+    }
+
+    private fun keptEnginesDir(context: Context) = File(context.noBackupFilesDir, "python_engines_kept")
+    private const val KEPT_MARKER = ".provisioned"
+
+    /** Unpacks a changed libpython.zip.so (see RUNTIME_ZIP_VERSION) without touching the engines:
+     * they're moved out of site-packages into [keptEnginesDir] first and back in after, so one
+     * updated in-app stays at its version. The scripts, PySocks and yt-dlp-ejs are copied again
+     * (the root is new). Resumable: the PROVISION_VERSION marker goes into [keptEnginesDir] before
+     * the root is deleted, and the root's markers are written last, so a stop part-way does it
+     * again on the next start, from the engines already moved. */
+    private fun refreshRuntimeKeepingEngines(context: Context, root: File, zipSo: File) {
+        val started = System.currentTimeMillis()
+        val sitePackages = sitePackagesDir(context)
+        val keep = keptEnginesDir(context).apply { mkdirs() }
+        val keptMarker = File(keep, KEPT_MARKER)
+        if (!keptMarker.exists()) keptMarker.writeText(PROVISION_VERSION)
+        sitePackages.listFiles { f -> ENGINE_PREFIXES.any { f.name.startsWith(it) } }?.forEach { entry ->
+            val dest = File(keep, entry.name)
+            if (!dest.exists() && !entry.renameTo(dest)) entry.copyRecursively(dest, overwrite = true)
+        }
+        root.deleteRecursively()
+        root.mkdirs()
+        zipSo.inputStream().use { unzipStreamTo(it, root) }
+        fixBrokenSymlinks(File(root, "usr/lib"))
+        sitePackages.mkdirs()
+        keep.listFiles { f -> f.name != KEPT_MARKER }?.forEach { entry ->
+            val dest = File(sitePackages, entry.name)
+            dest.deleteRecursively()
+            if (!entry.renameTo(dest)) entry.copyRecursively(dest, overwrite = true)
+        }
+        copyScriptsIfStale(context, root, force = true)
+        File(root, RUNTIME_ZIP_MARKER).writeText(RUNTIME_ZIP_VERSION)
+        File(root, PROVISION_MARKER).writeText(keptMarker.readText())
+        keep.deleteRecursively()
+        android.util.Log.i("PythonRuntime", "runtime zip $RUNTIME_ZIP_VERSION unpacked, engines kept, in ${System.currentTimeMillis() - started}ms")
     }
 
     private const val PRECOMPILE_MARKER = "precompiled.txt"

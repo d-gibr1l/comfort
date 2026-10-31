@@ -19,41 +19,70 @@ import java.util.concurrent.ConcurrentHashMap
  * The worker and the screens share one process (no android:process anywhere), so this is seen by
  * both. The bytes still reach the database every [PERSIST_EVERY_MS] and when the run ends
  * ([flush]): a paused card shows how far it got from there, and the next run's notification
- * starts from it. The speed doesn't need to — a download that isn't running has none. */
+ * starts from it. The speed doesn't need to — a download that isn't running has none.
+ *
+ * Each worker run reports through its own [Run] ([begin]). A download can be enqueued again while
+ * its previous run is still winding down (DownloadDispatcher.waitForNetwork, Start now): the new
+ * run takes over at [begin], and the old one's late lines, [flush] and [end] are ignored — before,
+ * its clean-up wiped the new run's values and wrote its older bytes over the new run's. */
 object LiveProgress {
     /** [bytes] null: only the speed is known yet this run (the card keeps the database's bytes). */
     data class Live(val bytes: Long?, val speedMbs: Float)
 
+    /** One worker run of download [id]; only the latest one for an id is listened to. */
+    class Run internal constructor(val id: String)
+
     private val _live = MutableStateFlow<Map<String, Live>>(emptyMap())
     val live: StateFlow<Map<String, Live>> = _live.asStateFlow()
 
+    private val runs = ConcurrentHashMap<String, Run>()
     private val persistedAt = ConcurrentHashMap<String, Long>()
     private const val PERSIST_EVERY_MS = 15_000L
 
-    /** The current file's [bytes] so far and the [speedMbs]. 0 bytes (a file just saved, its
-     * bytes now counted in totalBytes) goes to the database at once, so it never adds them twice. */
-    suspend fun bytes(dao: DownloadDao, id: String, bytes: Long, speedMbs: Float) {
-        _live.update { it + (id to Live(bytes, speedMbs)) }
-        val now = System.currentTimeMillis()
-        val last = persistedAt[id]
-        if (bytes == 0L || last == null || now - last >= PERSIST_EVERY_MS) {
-            persistedAt[id] = now
-            dao.setLiveBytes(id, bytes)
-        }
+    /** For tests. */
+    internal var clock: () -> Long = System::currentTimeMillis
+
+    /** A new run of download [id], replacing any earlier one still winding down. */
+    fun begin(id: String): Run {
+        val run = Run(id)
+        runs[id] = run
+        persistedAt.remove(id)
+        _live.update { it - id }
+        return run
     }
 
-    fun speed(id: String, speedMbs: Float) {
-        _live.update { it + (id to Live(it[id]?.bytes, speedMbs)) }
+    private fun Run.current() = runs[id] === this
+
+    /** The current file's [bytes] so far and the [speedMbs]. 0 bytes (a file just saved, its
+     * bytes now counted in totalBytes) goes to the database at once, so it never adds them twice. */
+    suspend fun bytes(dao: DownloadDao, run: Run, bytes: Long, speedMbs: Float) {
+        if (!run.current()) return
+        _live.update { it + (run.id to Live(bytes, speedMbs)) }
+        // Decided atomically: the engine's lines and the watchdog can report at the same moment.
+        val now = clock()
+        var due = false
+        persistedAt.compute(run.id) { _, last ->
+            if (bytes == 0L || last == null || now - last >= PERSIST_EVERY_MS) { due = true; now } else last
+        }
+        if (due) dao.setLiveBytes(run.id, bytes)
+    }
+
+    fun speed(run: Run, speedMbs: Float) {
+        if (!run.current()) return
+        _live.update { it + (run.id to Live(it[run.id]?.bytes, speedMbs)) }
     }
 
     /** Writes the latest bytes to the database: the run is ending. */
-    suspend fun flush(dao: DownloadDao, id: String) {
-        _live.value[id]?.bytes?.let { dao.setLiveBytes(id, it) }
+    suspend fun flush(dao: DownloadDao, run: Run) {
+        if (!run.current()) return
+        _live.value[run.id]?.bytes?.let { dao.setLiveBytes(run.id, it) }
     }
 
-    fun clear(id: String) {
-        _live.update { it - id }
-        persistedAt.remove(id)
+    /** The run is over; its values leave the map, unless a newer run has taken over. */
+    fun end(run: Run) {
+        if (!runs.remove(run.id, run)) return
+        _live.update { it - run.id }
+        persistedAt.remove(run.id)
     }
 
     /** [items] with the running ones' live bytes and speed. Only RUNNING rows: a card just paused

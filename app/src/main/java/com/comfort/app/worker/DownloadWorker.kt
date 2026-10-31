@@ -237,6 +237,9 @@ class DownloadWorker(
         val url = inputData.getString("url") ?: return Result.success()
 
         val dao = AppDatabase.getDatabase(applicationContext).downloadDao()
+        // This run's live bytes and speed (see LiveProgress): a run of the same download still
+        // winding down from before stops counting from here.
+        val liveRun = com.comfort.app.data.LiveProgress.begin(downloadId)
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
         DownloadLog.line(applicationContext, downloadId, "start $url")
@@ -678,7 +681,7 @@ class DownloadWorker(
                         val speedMbs = measuredSpeedMbs.get().takeIf { it > 0f }
                             ?: ((totalBytes / (1024f * 1024f)) / elapsedSeconds)
                         dao.setDownloadedItems(downloadId, count)
-                        com.comfort.app.data.LiveProgress.speed(downloadId, speedMbs)
+                        com.comfort.app.data.LiveProgress.speed(liveRun, speedMbs)
                         // An audio file's own Uri has no frame Coil can decode, so its
                         // embedded cover art is pulled out to its own file when there
                         // is one (extractAudioArtworkUri). Only then does thumbnailPath
@@ -702,7 +705,7 @@ class DownloadWorker(
                         }
                         dao.addBytes(downloadId, fileSize)
                         // Its bytes are in totalBytes now; the card adds liveBytes on top.
-                        com.comfort.app.data.LiveProgress.bytes(dao, downloadId, 0, speedMbs)
+                        com.comfort.app.data.LiveProgress.bytes(dao, liveRun, 0, speedMbs)
                         if (hasPlaceholderTitle && !engineNamedTitle.get()) {
                             derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
                         }
@@ -812,7 +815,7 @@ class DownloadWorker(
                             lastDataAt.set(System.currentTimeMillis())
                             lastProgressLineAt.set(System.currentTimeMillis())
                             val speedMbs = event.speedBytesPerSecond / (1024f * 1024f)
-                            com.comfort.app.data.LiveProgress.bytes(dao, downloadId, event.downloadedBytes, speedMbs)
+                            com.comfort.app.data.LiveProgress.bytes(dao, liveRun, event.downloadedBytes, speedMbs)
                             currentFileBytesRef.set(event.downloadedBytes)
                             // The wrappers already throttle these to about one a second. This is
                             // what moves the notification's bar during a single large file (the
@@ -910,7 +913,7 @@ class DownloadWorker(
                                     val count = savedCount.incrementAndGet()
                                     heldFiles += Triple(candidate, isAudioFile, count)
                                     dao.setDownloadedItems(downloadId, count)
-                                    com.comfort.app.data.LiveProgress.speed(downloadId, measuredSpeedMbs.get())
+                                    com.comfort.app.data.LiveProgress.speed(liveRun, measuredSpeedMbs.get())
                                     DownloadNotifications.updateProgress(
                                         applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
                                         speedMbs = measuredSpeedMbs.get(), expectedBytes = expectedBytesRef.get(),
@@ -1055,17 +1058,17 @@ class DownloadWorker(
                                 // What's in staging is this file's bytes so far.
                                 if (staged != currentFileBytesRef.get()) {
                                     currentFileBytesRef.set(staged)
-                                    com.comfort.app.data.LiveProgress.bytes(dao, downloadId, staged, smoothed)
+                                    com.comfort.app.data.LiveProgress.bytes(dao, liveRun, staged, smoothed)
                                 }
                                 if (now - lastDataAt.get() > STALL_AFTER_MS) {
                                     smoothed = 0f
                                     measuredSpeedMbs.set(0f)
-                                    if (!zeroed) com.comfort.app.data.LiveProgress.speed(downloadId, 0f)
+                                    if (!zeroed) com.comfort.app.data.LiveProgress.speed(liveRun, 0f)
                                     zeroed = true
                                 } else if (smoothed > 0f) {
                                     zeroed = false
                                     measuredSpeedMbs.set(smoothed)
-                                    com.comfort.app.data.LiveProgress.speed(downloadId, smoothed)
+                                    com.comfort.app.data.LiveProgress.speed(liveRun, smoothed)
                                     DownloadNotifications.updateProgress(
                                         applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
                                         speedMbs = smoothed, currentBytes = total, expectedBytes = expectedBytesRef.get(),
@@ -1073,7 +1076,7 @@ class DownloadWorker(
                                 }
                             } else if (engineReporting) {
                                 val stalled = now - lastDataAt.get() > STALL_AFTER_MS
-                                if (stalled && !zeroed) com.comfort.app.data.LiveProgress.speed(downloadId, 0f)
+                                if (stalled && !zeroed) com.comfort.app.data.LiveProgress.speed(liveRun, 0f)
                                 zeroed = stalled
                             }
                             previousTotal = total
@@ -1091,7 +1094,7 @@ class DownloadWorker(
                         stallWatchdog.cancel()
                         // How far it got, for the paused card and the next run (see LiveProgress).
                         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                            runCatching { com.comfort.app.data.LiveProgress.flush(dao, downloadId) }
+                            runCatching { com.comfort.app.data.LiveProgress.flush(dao, liveRun) }
                         }
                     }
                 }
@@ -1279,7 +1282,7 @@ class DownloadWorker(
             }
         }
         } finally {
-            com.comfort.app.data.LiveProgress.clear(downloadId)
+            com.comfort.app.data.LiveProgress.end(liveRun)
             DownloadNotifications.markForegroundStopped(applicationContext)
             // Matches the temp file created above for the cookies-normalization fix — cleaned up
             // unconditionally here (success, failure, or cancellation) rather than only on the

@@ -17,8 +17,8 @@ PythonRuntime.RUNTIME_VERSION so installed copies are unpacked again:
 Needs llvm-strip (any target architecture) on PATH. Running it twice changes nothing.
 """
 import argparse
-import fnmatch
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -28,31 +28,47 @@ import zipfile
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app", "src", "main", "jniLibs")
 ZIPS = ("libpython.zip.so", "libaria2c.zip.so")
 
+# Matched against each entry's path: "*" stays within one path segment, a trailing "/**" is that
+# directory and everything in it, and a pattern with no "/" matches a file name at any depth.
 DROP = [
     # CPython's test and example extension modules.
     "usr/lib/python3.*/lib-dynload/_test*",
     "usr/lib/python3.*/lib-dynload/_ctypes_test*",
     "usr/lib/python3.*/lib-dynload/_xxtestfuzz*",
     "usr/lib/python3.*/lib-dynload/xx*",
-    "usr/lib/python3.*/__phello__/*",
+    "usr/lib/python3.*/__phello__/**",
     # pycryptodome's own test suite (Cryptodome.SelfTest; nothing imports it).
-    "usr/lib/python3.*/site-packages/Cryptodome/SelfTest/*",
+    "usr/lib/python3.*/site-packages/Cryptodome/SelfTest/**",
     # Type stubs: only read by type checkers.
     "*.pyi",
     # Tcl/Tk and Tcl's database drivers (no tkinter here).
-    "usr/lib/tcl8/*", "usr/lib/tdbc*", "usr/lib/thread2.*", "usr/lib/pkgIndex.tcl",
+    "usr/lib/tcl8/**", "usr/lib/tdbc*/**", "usr/lib/thread2.*/**", "usr/lib/pkgIndex.tcl",
     "usr/lib/libtk.so", "usr/lib/libtclstub*", "usr/lib/libtkstub*",
-    # Build-time files.
-    "usr/lib/*Config.sh", "usr/lib/*.la", "usr/lib/*.a", "usr/lib/cmake/*", "usr/lib/pkgconfig/*",
+    # Build-time files, at usr/lib's top level.
+    "usr/lib/*Config.sh", "usr/lib/*.la", "usr/lib/*.a", "usr/lib/cmake/**", "usr/lib/pkgconfig/**",
     # A Java trust store, irrelevant to Python.
-    "usr/lib/jvm/*",
+    "usr/lib/jvm/**",
 ]
 
 
+def _compile(pattern):
+    if "/" not in pattern:
+        return re.compile(r"(?:.*/)?" + _segments(pattern) + r"/?")
+    if pattern.endswith("/**"):
+        return re.compile(_segments(pattern[:-3]) + r"(?:/.*)?")
+    return re.compile(_segments(pattern) + r"/?")
+
+
+def _segments(pattern):
+    """[pattern] as a regex where "*" and "?" don't cross a "/"."""
+    return "".join("[^/]*" if c == "*" else "[^/]" if c == "?" else re.escape(c) for c in pattern)
+
+
+_DROP_RX = [_compile(p) for p in DROP]
+
+
 def dropped(name):
-    path = name.rstrip("/")
-    return any(fnmatch.fnmatchcase(path, p) or fnmatch.fnmatchcase(name, p) or
-               (p.endswith("/*") and path == p[:-2]) for p in DROP)
+    return any(rx.fullmatch(name) for rx in _DROP_RX)
 
 
 def is_symlink(info):
