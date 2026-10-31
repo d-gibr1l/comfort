@@ -55,7 +55,8 @@ object PythonRuntime {
     // everything, which also replaces any engine the user updated in-app with the bundled one. The
     // wrapper scripts don't need a bump: they're refreshed on every app install/update (see
     // SCRIPTS_MARKER), leaving the engines alone. Nor does libpython.zip.so: see RUNTIME_ZIP_VERSION.
-    private const val PROVISION_VERSION = "110"
+    // 111: yt-dlp 2026.10.26, gallery-dl 1.32.19, Instaloader 4.16 (from 2026.08.19, 1.32.9, 4.15.3).
+    private const val PROVISION_VERSION = "111"
     // Bump when libpython.zip.so changes and the engine wheels don't. The runtime is unpacked again
     // with the installed engines moved aside and put back (refreshRuntimeKeepingEngines), so an
     // engine updated in-app isn't rolled back to the bundled one. An install without the marker
