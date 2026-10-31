@@ -386,6 +386,12 @@ object PythonRuntime {
                 environment()["PYTHONHOME"] = File(root, "usr").absolutePath
                 environment()["LD_LIBRARY_PATH"] = File(root, "usr/lib").absolutePath
                 environment()["PYTHONPATH"] = sitePackagesDir(context).absolutePath
+                // The engines' own caches (yt-dlp's YouTube player functions, gallery-dl's): with
+                // no HOME they went to the Termux home the bundled Python was built for,
+                // /data/data/com.termux/files/home/.cache, which can't be written, so yt-dlp
+                // worked YouTube's player out again on every extraction. The fork server's jobs
+                // inherit it.
+                environment()["XDG_CACHE_HOME"] = File(context.cacheDir, "engine_cache").absolutePath
             }
     }
 
