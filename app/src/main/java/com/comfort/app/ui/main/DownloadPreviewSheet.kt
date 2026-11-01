@@ -1194,7 +1194,8 @@ private fun MainPreviewScreen(
     onDownload: () -> Unit,
     /** Shown as a Subscribe button beside Download when non-null — a YouTube channel/playlist. */
     onSubscribe: (() -> Unit)? = null,
-    /** The "Start at…" chip: the time picked (null: none) and what tapping it opens. */
+    /** "Start at…" (the Download button's trailing half): the time picked (null: none) and what
+     * tapping it opens. */
     startAt: Long? = null,
     onOpenStartAt: () -> Unit = {},
 ) {
@@ -1415,16 +1416,8 @@ private fun MainPreviewScreen(
                             label = if (commandCount > 0) stringResource(R.string.commands_x, commandCount) else stringResource(R.string.add_extra_commands),
                             selected = commandCount > 0,
                             icon = Icons.Outlined.Terminal,
-                            shape = MIDDLE_CHIP_SHAPE,
-                            onClick = onOpenCommands,
-                        )
-                        // Added now, started later (StartAtDialog).
-                        PreviewChip(
-                            label = startAtLabel,
-                            selected = startAt != null,
-                            icon = Icons.Outlined.Schedule,
                             shape = LAST_CHIP_SHAPE,
-                            onClick = onOpenStartAt,
+                            onClick = onOpenCommands,
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                     }
@@ -1510,13 +1503,6 @@ private fun MainPreviewScreen(
                             onClick = onOpenCommands,
                         )
                         PreviewChip(
-                            label = startAtLabel,
-                            selected = startAt != null,
-                            icon = Icons.Outlined.Schedule,
-                            shape = MIDDLE_CHIP_SHAPE,
-                            onClick = onOpenStartAt,
-                        )
-                        PreviewChip(
                             label = stringResource(R.string.filename_templates),
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
@@ -1565,23 +1551,47 @@ private fun MainPreviewScreen(
                     Text(stringResource(R.string.subscribe))
                 }
             }
-            Button(
-                onClick = onDownload,
-                enabled = downloadEnabled,
-                modifier = Modifier.weight(1f).height(56.dp),
-                shape = MaterialTheme.shapes.extraLarge,
-            ) {
-                Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
-                // only after tapping — replaces the old flow where this always said "Download" and a
-                // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
-                // action to confirm.
-                Text(
-                    stringResource(if (isDuplicate) R.string.redownload else R.string.download_action) + countSuffix,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
+            // Download and, on its trailing half, "Start at…" (StartAtDialog): added now, started
+            // at the time picked. The leading half says when once one is picked. It was a chip at
+            // the end of a chip row, where it ran off the screen.
+            // Full width like the button it replaced: SplitButtonLayout sizes its halves to their
+            // content, so the halves are laid out here (its look: rounded outer ends, small inner
+            // corners, a 2 dp gap).
+            val outer = 28.dp
+            val inner = 4.dp
+            Row(modifier = Modifier.weight(1f).height(56.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                Button(
+                    onClick = onDownload,
+                    enabled = downloadEnabled,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+                ) {
+                    Icon(
+                        if (startAt != null) Icons.Outlined.Schedule else Icons.Outlined.ArrowDownward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    // Known ahead of time (DownloadPreviewSheet's own isDuplicate check), not discovered
+                    // only after tapping — replaces the old flow where this always said "Download" and a
+                    // duplicate only surfaced afterward via a Snackbar with its own separate "Redownload"
+                    // action to confirm.
+                    Text(
+                        if (startAt != null) startAtLabel + countSuffix
+                        else stringResource(if (isDuplicate) R.string.redownload else R.string.download_action) + countSuffix,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+                Button(
+                    onClick = onOpenStartAt,
+                    enabled = downloadEnabled,
+                    modifier = Modifier.width(64.dp).fillMaxHeight(),
+                    shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.start_at), modifier = Modifier.size(22.dp))
+                }
             }
         }
     }
