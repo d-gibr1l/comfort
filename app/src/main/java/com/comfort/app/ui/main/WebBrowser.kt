@@ -1100,7 +1100,8 @@ private fun PageError(message: String, onRetry: () -> Unit) {
 }
 
 /** Links that aren't web pages. An intent:// link loads its web fallback when it has one (the
- * page's own "open in the app" redirect otherwise blanks the browser); mailto:, tel:, market: and
+ * page's own "open in the app" redirect otherwise blanks the browser), unless an iframe sent it
+ * without a tap; mailto:, tel:, market: and
  * the like open in their app, but only from a tap — a page can't send you off to an app by itself.
  * Web links stay in the browser. */
 private fun handleNonWebLink(context: Context, view: WebView, request: WebResourceRequest): Boolean {
@@ -1108,6 +1109,9 @@ private fun handleNonWebLink(context: Context, view: WebView, request: WebResour
     return when (uri.scheme?.lowercase()) {
         "http", "https", "about", "data", "blob", "javascript" -> false
         "intent" -> {
+            // The page itself, or a tap: an iframe's own intent:// (this is called for frames too)
+            // loaded its fallback over the whole page — an ad sending the browser elsewhere.
+            if (!request.isForMainFrame && !request.hasGesture()) return true
             val fallback = runCatching { Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME) }
                 .getOrNull()?.getStringExtra("browser_fallback_url")
             if (fallback != null && (fallback.startsWith("https://") || fallback.startsWith("http://"))) view.loadUrl(fallback)
