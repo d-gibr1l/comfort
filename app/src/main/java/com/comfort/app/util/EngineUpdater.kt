@@ -363,6 +363,12 @@ object EngineUpdater {
                     // Shares PythonRuntime's provisioning Mutex, so the swap can't race a concurrent
                     // ensureProvisioned() (a first-ever provision, or a job starting right now).
                     PythonRuntime.withProvisionLock {
+                        // Checked again here, right before the swap: the check above came before the
+                        // artifact's download (up to a minute for gallery-dl's zip), and a queued
+                        // download that got its slot meanwhile would lose its engine mid-run.
+                        if (AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()) {
+                            error(context.getString(com.comfort.app.R.string.engine_update_download_running))
+                        }
                         // The old install goes entirely: a file the previous version shipped that the
                         // new one doesn't (a removed submodule) would otherwise linger forever.
                         sitePackages.listFiles { f ->

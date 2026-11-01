@@ -229,6 +229,26 @@ class DownloadWorker(
         }
     }
 
+    /** Whether [dir] holds a file still being downloaded (yt-dlp's .part / .ytdl / fragment files,
+     * aria2c's .aria2). */
+    private fun hasPartialFiles(dir: File): Boolean = runCatching {
+        dir.walkTopDown().any { f ->
+            f.isFile && (f.name.endsWith(".part") || f.name.endsWith(".ytdl") || f.name.endsWith(".aria2") || ".part-Frag" in f.name)
+        }
+    }.getOrDefault(false)
+
+    /** Whether [title] is still the "Downloading from X" placeholder a link is added with
+     * (LinkRouterViewModel), or the bare link: then the engine's title replaces it. In the app's
+     * language as well as English (the language may have changed since): only the English word
+     * was checked, so in every other language a download kept "Lädt von Instagram" for good. */
+    private fun isPlaceholderTitle(title: String, url: String): Boolean {
+        if (title.isBlank() || title == url || title.startsWith("Downloading")) return true
+        val format = applicationContext.getString(com.comfort.app.R.string.downloading_from_x)
+        val parts = format.split("%1\$s")
+        if (parts.size != 2) return false
+        return title.startsWith(parts[0]) && title.endsWith(parts[1]) && title.length > parts[0].length + parts[1].length
+    }
+
     override suspend fun doWork(): Result {
         // Result.success() here too (never expected to actually trigger — WorkManager's own input
         // is always set by DownloadDispatcher) — same reasoning throughout this file: failure()
@@ -498,14 +518,15 @@ class DownloadWorker(
                 // behavior instead of breaking every download regardless of whether that particular
                 // site even needs cookies.
                 val normalizedCookiesPath = if (cookiesPath.exists() && cookiesPath.length() > 0) {
+                    // Always this download's own copy, filtered or not: the engines write their
+                    // cookie jar back to the file they were given when they finish (yt-dlp with a
+                    // plain truncating open), so handing every run the shared cookies.txt let one
+                    // run empty it while another was reading it — the same 0-byte loss as above,
+                    // only when no site was switched off (the default).
                     val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(applicationContext)
-                    if (disabledDomains.isNotEmpty()) {
-                        File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
-                            val normalized = cookiesPath.readText().replace("\r\n", "\n")
-                            writeText(GalleryDlPreferences.filterCookiesByDisabledDomains(normalized, disabledDomains))
-                        }
-                    } else {
-                        cookiesPath
+                    File(applicationContext.cacheDir, "cookies-normalized-$downloadId.txt").apply {
+                        val normalized = cookiesPath.readText().replace("\r\n", "\n")
+                        writeText(GalleryDlPreferences.filterCookiesByDisabledDomains(normalized, disabledDomains))
                     }
                 } else null
 
@@ -536,6 +557,8 @@ class DownloadWorker(
                 // gets saved, so a real cause (blocked, login required, no formats found, ...) is
                 // visible instead of every failure looking identical.
                 val lastErrorLine = java.util.concurrent.atomic.AtomicReference<String?>(null)
+                // Files the engines downloaded that couldn't be saved to the gallery.
+                val saveFailures = AtomicInteger(0)
                 // Each engine's own error, for the errored card's info sheet (lastErrorLine above is
                 // the one-line summary). Keyed by engine name in the order the engines ran; an
                 // engine that ran without an error is listed too (see errorDetailsJson below).
@@ -579,7 +602,7 @@ class DownloadWorker(
                 // this way — used below to tell "still showing the placeholder" apart from "the
                 // user already renamed this" so a real poster/caption title only ever replaces the
                 // former, never clobbers a deliberate rename.
-                val hasPlaceholderTitle = entity?.title?.startsWith("Downloading") != false
+                val hasPlaceholderTitle = entity?.title?.let { isPlaceholderTitle(it, url) } != false
                 // Set once an engine has named the download itself (EngineEvent.Title). Its title is
                 // the real one; the filename-derived one would replace it with restricted-filename
                 // underscores ("jawed - Me_at_the_zoo"). First one wins: Spotify's own beats the
@@ -669,8 +692,13 @@ class DownloadWorker(
                     // Where it went, in the post's order: what the media viewer pages through.
                     if (savedUri != null) dao.recordSavedFile(com.comfort.app.data.SavedFile(downloadId, savedUri.toString(), position))
                     if (savedUri == null) {
-                        // Counted when it arrived; it didn't make it to the gallery.
+                        // Counted when it arrived; it didn't make it to the gallery (storage full,
+                        // the chosen folder's permission gone). Counted as missing, not dropped
+                        // without a word, and forgotten so a retry saves it (see saveFailures).
                         savedCount.decrementAndGet()
+                        saveFailures.incrementAndGet()
+                        lastErrorLine.compareAndSet(null, "Couldn't save ${original.name} to the gallery")
+                        dao.forgetDownloadedFile(downloadId, original.name)
                     } else {
                         candidate.delete()
                         val count = savedCount.get()
@@ -737,13 +765,31 @@ class DownloadWorker(
                     // Under the staging lock: a cancel waits for these copies to finish before it
                     // deletes the staging dir (DownloadDispatcher.withStagingLock).
                     DownloadDispatcher.withStagingLock(downloadId) {
-                    for ((index, held) in batch.withIndex().reversed()) {
+                    val ordered = batch.withIndex().reversed()
+                    for ((n, entry) in ordered.withIndex()) {
+                        val (index, held) = entry
+                        // Stopped (pause, Start now, the window or the network) between two files:
+                        // the ones not saved yet go back in the list for the stop's own final save
+                        // (doWork's finally). They used to be dropped with the batch, left unsaved
+                        // in staging though already counted.
+                        if (kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive == false) {
+                            val rest = ordered.drop(n).map { it.value }
+                            synchronized(heldFiles) { heldFiles.addAll(rest) }
+                            throw CancellationException("stopped while saving")
+                        }
                         val (file, isAudio, position) = held
                         try {
-                            if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0, position = position) else savedCount.decrementAndGet()
+                            // One file is saved whole (gallery copy and its record together): a
+                            // stop part-way left a file in the gallery with no record of it.
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                                if (file.isFile) saveFile(file, isAudio, firstOfDownload = firstBatch && index == 0, position = position) else savedCount.decrementAndGet()
+                            }
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
                             savedCount.decrementAndGet()
+                            saveFailures.incrementAndGet()
+                            lastErrorLine.compareAndSet(null, "Couldn't save ${file.name} to the gallery")
+                            runCatching { dao.forgetDownloadedFile(downloadId, file.name) }
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
                         }
                     }
@@ -758,7 +804,15 @@ class DownloadWorker(
                     // saving are what's left): it finishes. Sent back to wait, its finished file was
                     // saved and it was downloaded all over again when the window reopened (seen
                     // live: a song saved at 17:05:41, then left "Scheduled").
-                    if (savedCount.get() >= totalItemsRef.get().coerceAtLeast(1)) return
+                    // With the total unknown (yt-dlp doesn't count a playlist up front, nor a single
+                    // video), "done" is: something saved and nothing being downloaded right now (no
+                    // partial file in staging). Counting the first file as all of it let a playlist
+                    // run on past the window for good; this lets at most the next item start
+                    // before the check a minute later stops it.
+                    val total = totalItemsRef.get()
+                    val saved = savedCount.get()
+                    if (total > 0 && saved >= total) return
+                    if (total <= 0 && saved > 0 && !hasPartialFiles(stagingDir)) return
                     if (!scheduleClosedPauseRequested.get() && !startedViaStartNow) {
                         val now = System.currentTimeMillis()
                         val last = lastScheduleCheckMs.get()
@@ -929,6 +983,8 @@ class DownloadWorker(
                                     }
                                 }
                             } catch (e: Exception) {
+                                // A stop is passed on, not logged away as a bad line.
+                                if (e is CancellationException) throw e
                                 android.util.Log.e("DownloadEngine", "Failed to process output line: $line", e)
                             }
                         }
@@ -1202,9 +1258,23 @@ class DownloadWorker(
                 // Only with a real error: fewer files than listed items alone can be one file holding
                 // several items. A later complete run clears the mark.
                 val totalItems = totalItemsRef.get()
-                val missingItems = if (lastErrorLine.get() != null && totalItems > savedCount.get()) totalItems - savedCount.get() else 0
+                // A file that couldn't be saved is missing too, whatever the engines said. Its id
+                // is in the engines' archives (they downloaded it), which would make a retry skip
+                // it: they go, and the files already saved are kept from a second copy by
+                // downloaded_files.
+                val unsaved = saveFailures.get()
+                if (unsaved > 0) {
+                    java.io.File(applicationContext.filesDir, "archives/$downloadId.sqlite3").delete()
+                    java.io.File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt").delete()
+                    java.io.File(applicationContext.filesDir, "archives/$downloadId.instaloader.txt").delete()
+                }
+                val missingItems = maxOf(
+                    if (lastErrorLine.get() != null && totalItems > savedCount.get()) totalItems - savedCount.get() else 0,
+                    unsaved,
+                )
                 val incompleteMessage = if (missingItems > 0) {
-                    applicationContext.resources.getQuantityString(R.plurals.items_couldnt_be_downloaded, missingItems, missingItems, totalItems)
+                    val outOf = maxOf(totalItems, savedCount.get() + missingItems)
+                    applicationContext.resources.getQuantityString(R.plurals.items_couldnt_be_downloaded, missingItems, missingItems, outOf)
                 } else null
                 DownloadLog.line(applicationContext, downloadId, "finished: ${savedCount.get()} saved" + (incompleteMessage?.let { ", $it" } ?: ""))
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
@@ -1216,8 +1286,16 @@ class DownloadWorker(
                     // Imported from YTDLnis's own Incognito setting (see
                     // GalleryDlPreferences.isIncognitoDefault's doc comment): the real file is
                     // already saved to the gallery/Downloads folder by this point (savedCount > 0
-                    // is what got here at all) — only this row, the record of the download ever
-                    // having happened in this app's own Library/queue, is removed.
+                    // is what got here at all) — only the app's own record of the download ever
+                    // having happened is removed: the row, and with it what DownloadDispatcher.
+                    // deleteDownload also clears (the files' names and saved Uris, the engines'
+                    // archives of item ids). Only the row went before, the rest stayed for good.
+                    // (Not the shared app log: Settings › Advanced › Logs clears that.)
+                    java.io.File(applicationContext.filesDir, "archives/$downloadId.sqlite3").delete()
+                    java.io.File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt").delete()
+                    java.io.File(applicationContext.filesDir, "archives/$downloadId.instaloader.txt").delete()
+                    dao.clearDownloadedFileRecords(downloadId)
+                    dao.clearSavedFiles(downloadId)
                     dao.delete(downloadId)
                 } else {
                     dao.updateError(downloadId, DownloadStatus.FINISHED, incompleteMessage)

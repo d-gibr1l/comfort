@@ -455,10 +455,12 @@ object PythonRuntime {
                         }
                         line = reader.readLine()
                     }
+                    // Only a job that ran to its end counts as finished. Set in a finally, a
+                    // failure in onLine (a Room write on a full disk, a stop mid-write) also
+                    // counted, so the killer left the job and its ffmpeg/aria2c running.
+                    finished.set(true)
                 } catch (e: java.io.IOException) {
                     // The socket was closed under us by the killer (cancellation, rethrown below).
-                } finally {
-                    finished.set(true)
                 }
                 killer.cancel()
             }

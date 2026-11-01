@@ -177,4 +177,22 @@ class CookieStoreTest {
         assertEquals(existingNoBackup, result)
         assertEquals("nobackup-cookie-content", result.readText())
     }
+
+    @Test
+    fun `registrableDomain follows the public suffix list`() {
+        assertEquals("reddit.com", CookieStore.registrableDomain(".www.reddit.com"))
+        assertEquals("bbc.co.uk", CookieStore.registrableDomain(".bbc.co.uk"))
+        assertEquals("amazon.co.uk", CookieStore.registrableDomain("www.amazon.co.uk"))
+        assertEquals("example.com.au", CookieStore.registrableDomain(".shop.example.com.au"))
+        assertEquals("localhost", CookieStore.registrableDomain("localhost"))
+        assertEquals("192.168.1.10", CookieStore.registrableDomain("192.168.1.10"))
+    }
+
+    @Test
+    fun `pasting one co_uk site keeps another co_uk site's cookies`() {
+        val existing = listOf(CookieStore.HEADER, row(".amazon.co.uk", "session-id", "keep")).joinToString("\n")
+        val merged = CookieStore.mergePasted(existing, row(".bbc.co.uk", "ckns", "new"))!!
+        assertTrue(merged.contains("keep"))
+        assertTrue(merged.contains("new"))
+    }
 }

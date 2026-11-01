@@ -707,7 +707,10 @@ object DownloadDispatcher {
      * still genuinely ENQUEUED/RUNNING/BLOCKED) untouched. */
     private suspend fun repairIfJobDead(context: Context, entities: List<DownloadEntity>) {
         val workManager = WorkManager.getInstance(context)
-        val dead = entities.filter { entity ->
+        // Off the main thread: getWorkInfoById(..).get() blocks, once per row, and this runs from
+        // MainActivity's start-up and from Start now / Start at… taps (viewModelScope, Main) — a
+        // long queue froze the app there.
+        val dead = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { entities.filter { entity ->
             val uuid = entity.workRequestId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
             // No job ever recorded, or WorkManager reports it in a terminal state (CANCELLED from
             // the chain cascade, or FAILED/SUCCEEDED with the DB row never updated to match) — any
@@ -715,7 +718,7 @@ object DownloadDispatcher {
             // ENQUEUED/RUNNING/BLOCKED means it's healthy and must not be touched.
             val info = uuid?.let { runCatching { workManager.getWorkInfoById(it).get() }.getOrNull() }
             info == null || info.state.isFinished
-        }
+        } }
         // forceStart is startNow()'s own marker for "the user explicitly jumped this past the
         // schedule window" (see its doc comment) — re-submitting through the normal delayed path
         // here would silently drop that override the moment a forced download's process dies

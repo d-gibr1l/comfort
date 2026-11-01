@@ -75,11 +75,18 @@ object CookieStore {
     /** [cookies] as a whole file, header first. */
     fun render(cookies: List<ParsedCookie>): String = (listOf(HEADER) + cookies.map { it.rawLine }).joinToString("\n")
 
-    /** Extracts the registrable domain (e.g. "reddit.com" from "www.reddit.com" or ".reddit.com"). */
+    /** Extracts the registrable domain (e.g. "reddit.com" from "www.reddit.com" or ".reddit.com",
+     * "bbc.co.uk" from "www.bbc.co.uk"). From the public suffix list (OkHttp's copy): the last two
+     * labels made "amazon.co.uk" and "bbc.co.uk" one site, "co.uk", so pasting cookies for one
+     * deleted the other's saved login (mergePasted) and one toggle switched both off. */
     fun registrableDomain(domain: String): String {
-        val bare = domain.removePrefix(".")
+        val bare = domain.trim().removePrefix(".").lowercase()
+        runCatching {
+            okhttp3.HttpUrl.Builder().scheme("https").host(bare).build().topPrivateDomain()
+        }.getOrNull()?.let { return it }
+        // Not under a known suffix (an IP address, "localhost", a typo): the name as it is.
         val parts = bare.split(".")
-        return if (parts.size <= 2) bare else parts.takeLast(2).joinToString(".")
+        return if (parts.size <= 2 || bare.all { it.isDigit() || it == '.' }) bare else parts.takeLast(2).joinToString(".")
     }
 
     /** A pasted cookies.txt merged into [existing]: only the registrable domains the paste touches

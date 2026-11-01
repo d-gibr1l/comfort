@@ -622,7 +622,7 @@ object GalleryDlPreferences {
     }
 
     /** Filters raw Netscape cookies.txt content down to only the domains NOT in [disabledDomains]
-     * — same registrable-domain extraction (last two dot-separated labels of a cookie's own
+     * — same registrable-domain extraction (CookieStore.registrableDomain, from a cookie's own
      * domain field, minus any leading ".") the Cookies & Login screen's own per-site grouping
      * uses for its rows, kept here rather than imported from the UI since this is a plain data
      * transform DownloadWorker needs at download time, not a UI concern. Comment lines and

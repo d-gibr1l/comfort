@@ -161,14 +161,13 @@ object GalleryDlListing {
      * exists()/length()>0 check for why "empty" counts as "absent") — but filtered through the
      * Cookies & Login screen's per-site toggle first, same as DownloadWorker's own per-download
      * normalized copy, so a preview never shows content a toggled-off site's cookies would have
-     * unlocked when the real download wouldn't actually send them either. Writes a temp filtered
-     * copy only when something's actually disabled; otherwise just hands back the real file's own
-     * path, avoiding pointless I/O on every listing when nothing's toggled off. */
+     * unlocked when the real download wouldn't actually send them either. Always a temp copy, even
+     * with nothing toggled off: the engines write their cookie jar back to the file they're given,
+     * and a preview running beside a download could empty the shared cookies.txt. */
     internal fun effectiveCookiesPath(context: Context): Pair<String, java.io.File?> {
         val cookiesPath = CookieStore.file(context)
         if (!cookiesPath.exists() || cookiesPath.length() <= 0) return "" to null
         val disabledDomains = GalleryDlPreferences.getDisabledCookieDomains(context)
-        if (disabledDomains.isEmpty()) return cookiesPath.absolutePath to null
         val filtered = GalleryDlPreferences.filterCookiesByDisabledDomains(
             cookiesPath.readText().replace("\r\n", "\n"), disabledDomains,
         )

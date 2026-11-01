@@ -286,6 +286,10 @@ interface DownloadDao {
     @Query("DELETE FROM downloaded_files WHERE downloadId = :downloadId")
     suspend fun clearDownloadedFileRecords(downloadId: String)
 
+    /** Forgets one file of [downloadId]: it couldn't be saved, so a retry may save it after all. */
+    @Query("DELETE FROM downloaded_files WHERE downloadId = :downloadId AND filename = :filename")
+    suspend fun forgetDownloadedFile(downloadId: String, filename: String)
+
     /** The source names of a download's files, in the order they arrived (rows are inserted as
      * each one does) — the media viewer's fallback for a download saved before [SavedFile]. */
     @Query("SELECT filename FROM downloaded_files WHERE downloadId = :downloadId ORDER BY rowid")
