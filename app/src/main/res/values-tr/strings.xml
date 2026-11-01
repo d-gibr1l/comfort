@@ -236,6 +236,8 @@
     <string name="folders">Klasörler</string>
     <string name="filename_format">Dosya adı biçimi</string>
     <string name="filename_format_applied_to_every_downloaded">İndirilen her dosyaya uygulanan dosya adı biçimi.</string>
+    <string name="filename_format_placeholders">Yer tutucular: {uploader} {title} {id} {extension} ve daha fazlası — gallery-dl biçim dizesi belgelerine bakın.</string>
+    <string name="making_a_x_p_copy">%1$dp kopya oluşturuluyor. Orijinal olduğu gibi kalır.</string>
     <string name="save_format">Biçimi kaydet</string>
     <string name="filename_format_saved">Dosya adı biçimi kaydedildi</string>
     <string name="restrict_filenames">Dosya adlarını kısıtla</string>

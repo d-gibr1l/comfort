@@ -249,6 +249,8 @@
     <string name="folders">Ordner</string>
     <string name="filename_format">Dateinamenformat</string>
     <string name="filename_format_applied_to_every_downloaded">Dateinamenformat für jede heruntergeladene Datei.</string>
+    <string name="filename_format_placeholders">Platzhalter: {uploader} {title} {id} {extension} und mehr — siehe die Dokumentation zu den Formatangaben von gallery-dl.</string>
+    <string name="making_a_x_p_copy">Eine %1$dp-Kopie wird erstellt. Das Original bleibt unverändert.</string>
     <string name="save_format">Format speichern</string>
     <string name="filename_format_saved">Dateinamenformat gespeichert</string>
     <string name="restrict_filenames">Dateinamen einschränken</string>

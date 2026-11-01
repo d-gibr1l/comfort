@@ -236,6 +236,8 @@
     <string name="folders">फ़ोल्डर</string>
     <string name="filename_format">फ़ाइल-नाम फ़ॉर्मेट</string>
     <string name="filename_format_applied_to_every_downloaded">हर डाउनलोड की गई फ़ाइल पर लागू होने वाला फ़ाइल-नाम फ़ॉर्मेट।</string>
+    <string name="filename_format_placeholders">प्लेसहोल्डर: {uploader} {title} {id} {extension} और भी — gallery-dl के फ़ॉर्मैट स्ट्रिंग दस्तावेज़ देखें।</string>
+    <string name="making_a_x_p_copy">%1$dp की कॉपी बनाई जा रही है। मूल फ़ाइल वैसी ही रहती है।</string>
     <string name="save_format">फ़ॉर्मेट सहेजें</string>
     <string name="filename_format_saved">फ़ाइल-नाम फ़ॉर्मेट सहेजा गया</string>
     <string name="restrict_filenames">फ़ाइल नाम सीमित करें</string>

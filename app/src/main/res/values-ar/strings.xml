@@ -236,6 +236,8 @@
     <string name="folders">المجلدات</string>
     <string name="filename_format">صيغة اسم الملف</string>
     <string name="filename_format_applied_to_every_downloaded">صيغة اسم الملف المطبَّقة على كل ملف يُنزَّل.</string>
+    <string name="filename_format_placeholders">العناصر النائبة: {uploader} {title} {id} {extension} وغيرها — راجع توثيق صيغ الأسماء في gallery-dl.</string>
+    <string name="making_a_x_p_copy">جارٍ إنشاء نسخة بدقة %1$dp. يبقى الأصل كما هو.</string>
     <string name="save_format">حفظ الصيغة</string>
     <string name="filename_format_saved">تم حفظ صيغة اسم الملف</string>
     <string name="restrict_filenames">تقييد أسماء الملفات</string>

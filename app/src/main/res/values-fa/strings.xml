@@ -236,6 +236,8 @@
     <string name="folders">پوشه‌ها</string>
     <string name="filename_format">قالب نام فایل</string>
     <string name="filename_format_applied_to_every_downloaded">قالب نام فایلی که روی هر فایل دانلودشده اعمال می‌شود.</string>
+    <string name="filename_format_placeholders">جای‌نگهدارها: {uploader} {title} {id} {extension} و بیشتر — راهنمای قالب نام gallery-dl را ببینید.</string>
+    <string name="making_a_x_p_copy">در حال ساخت یک نسخهٔ %1$dp. نسخهٔ اصلی دست نمی‌خورد.</string>
     <string name="save_format">ذخیره قالب</string>
     <string name="filename_format_saved">قالب نام فایل ذخیره شد</string>
     <string name="restrict_filenames">محدود کردن نام فایل‌ها</string>

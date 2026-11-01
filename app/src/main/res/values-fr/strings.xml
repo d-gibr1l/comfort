@@ -256,6 +256,8 @@
     <string name="folders">Dossiers</string>
     <string name="filename_format">Format des noms de fichier</string>
     <string name="filename_format_applied_to_every_downloaded">Format de nom appliqué à chaque fichier téléchargé.</string>
+    <string name="filename_format_placeholders">Variables : {uploader} {title} {id} {extension} et d’autres — voir la documentation des formats de gallery-dl.</string>
+    <string name="making_a_x_p_copy">Création d’une copie en %1$dp. L’original reste tel quel.</string>
     <string name="save_format">Enregistrer le format</string>
     <string name="filename_format_saved">Format des noms enregistré</string>
     <string name="restrict_filenames">Restreindre les noms de fichier</string>

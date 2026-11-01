@@ -236,6 +236,8 @@
     <string name="folders">文件夹</string>
     <string name="filename_format">文件名格式</string>
     <string name="filename_format_applied_to_every_downloaded">应用于每个下载文件的文件名格式。</string>
+    <string name="filename_format_placeholders">占位符：{uploader} {title} {id} {extension} 等 — 请参阅 gallery-dl 的格式字符串文档。</string>
+    <string name="making_a_x_p_copy">正在制作 %1$dp 副本。原文件保持不变。</string>
     <string name="save_format">保存格式</string>
     <string name="filename_format_saved">文件名格式已保存</string>
     <string name="restrict_filenames">限制文件名</string>

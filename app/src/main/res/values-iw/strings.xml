@@ -236,6 +236,8 @@
     <string name="folders">תיקיות</string>
     <string name="filename_format">פורמט שם קובץ</string>
     <string name="filename_format_applied_to_every_downloaded">פורמט שם הקובץ שחל על כל קובץ שמורד.</string>
+    <string name="filename_format_placeholders">מצייני מקום: {uploader} {title} {id} {extension} ועוד — ראו את התיעוד של תבניות השמות ב־gallery-dl.</string>
+    <string name="making_a_x_p_copy">יוצר עותק ב־%1$dp. המקור נשאר כמו שהוא.</string>
     <string name="save_format">שמירת פורמט</string>
     <string name="filename_format_saved">פורמט שם הקובץ נשמר</string>
     <string name="restrict_filenames">הגבלת שמות קבצים</string>

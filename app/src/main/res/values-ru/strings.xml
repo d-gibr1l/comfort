@@ -260,6 +260,8 @@
     <string name="folders">Папки</string>
     <string name="filename_format">Формат имени файла</string>
     <string name="filename_format_applied_to_every_downloaded">Формат имени для каждого скачанного файла.</string>
+    <string name="filename_format_placeholders">Подстановки: {uploader} {title} {id} {extension} и другие — см. документацию по форматам имён gallery-dl.</string>
+    <string name="making_a_x_p_copy">Создаётся копия %1$dp. Оригинал остаётся как есть.</string>
     <string name="save_format">Сохранить формат</string>
     <string name="filename_format_saved">Формат имени файла сохранён</string>
     <string name="restrict_filenames">Ограничить имена файлов</string>

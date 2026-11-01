@@ -123,7 +123,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Placeholders: {uploader} {title} {id} {extension} and more — see gallery-dl's format string docs.",
+                stringResource(R.string.filename_format_placeholders),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

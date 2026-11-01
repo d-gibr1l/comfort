@@ -734,7 +734,14 @@ internal fun SizeSheetField(
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = numberText,
-                    onValueChange = { numberText = it.filter { c -> c.isDigit() || c == '.' } },
+                    // One decimal point at most: "1.2.3m" was saved, and the engines read it as no
+                    // limit at all. A comma is one too (German, French… type "1,5"): dropped, it
+                    // made "1,5" a limit ten times as high.
+                    onValueChange = {
+                        val kept = it.replace(',', '.').filter { c -> c.isDigit() || c == '.' }
+                        val dot = kept.indexOf('.')
+                        numberText = if (dot < 0) kept else kept.substring(0, dot + 1) + kept.substring(dot + 1).replace(".", "")
+                    },
                     modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
                     placeholder = { Text(stringResource(R.string.unlimited)) },
                     singleLine = true,
@@ -766,7 +773,9 @@ internal fun SizeSheetField(
                 }
                 Spacer(Modifier.height(24.dp))
                 val commitTyped = {
-                    onValueChange(if (numberText.isBlank()) "" else "$numberText${units[unitIndex].second}")
+                    // A lone "." (or "5.") is no number: kept as unlimited, or without its dot.
+                    val number = numberText.trimEnd('.')
+                    onValueChange(if (number.isBlank()) "" else "$number${units[unitIndex].second}")
                     showSheet = false
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

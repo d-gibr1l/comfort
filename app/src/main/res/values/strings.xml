@@ -266,6 +266,8 @@
     <string name="folders">Folders</string>
     <string name="filename_format">Filename format</string>
     <string name="filename_format_applied_to_every_downloaded">Filename format applied to every downloaded file.</string>
+    <string name="filename_format_placeholders">Placeholders: {uploader} {title} {id} {extension} and more — see gallery-dl\'s format string docs.</string>
+    <string name="making_a_x_p_copy">Making a %1$dp copy. The original stays as it is.</string>
     <string name="save_format">Save format</string>
     <string name="filename_format_saved">Filename format saved</string>
     <string name="restrict_filenames">Restrict filenames</string>

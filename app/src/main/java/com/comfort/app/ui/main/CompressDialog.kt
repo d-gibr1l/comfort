@@ -49,7 +49,7 @@ internal fun CompressDialog(item: DownloadEntity, fileUri: Uri, onDismiss: () ->
                 when {
                     running -> {
                         Text(
-                            "Making a ${target}p copy. The original stays as it is.",
+                            stringResource(R.string.making_a_x_p_copy, target ?: 0),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(16.dp))

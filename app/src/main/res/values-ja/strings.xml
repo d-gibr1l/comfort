@@ -236,6 +236,8 @@
     <string name="folders">フォルダ</string>
     <string name="filename_format">ファイル名の形式</string>
     <string name="filename_format_applied_to_every_downloaded">ダウンロードしたすべてのファイルに適用されるファイル名の形式。</string>
+    <string name="filename_format_placeholders">プレースホルダー: {uploader} {title} {id} {extension} など — gallery-dl のフォーマット文字列のドキュメントを参照してください。</string>
+    <string name="making_a_x_p_copy">%1$dp のコピーを作成しています。元のファイルはそのままです。</string>
     <string name="save_format">形式を保存</string>
     <string name="filename_format_saved">ファイル名の形式を保存しました</string>
     <string name="restrict_filenames">ファイル名を制限</string>

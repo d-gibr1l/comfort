@@ -236,6 +236,8 @@
     <string name="folders">Thư mục</string>
     <string name="filename_format">Định dạng tên tệp</string>
     <string name="filename_format_applied_to_every_downloaded">Định dạng tên tệp áp dụng cho mọi tệp tải xuống.</string>
+    <string name="filename_format_placeholders">Biến giữ chỗ: {uploader} {title} {id} {extension} và nhiều hơn — xem tài liệu chuỗi định dạng của gallery-dl.</string>
+    <string name="making_a_x_p_copy">Đang tạo bản sao %1$dp. Bản gốc vẫn giữ nguyên.</string>
     <string name="save_format">Lưu định dạng</string>
     <string name="filename_format_saved">Đã lưu định dạng tên tệp</string>
     <string name="restrict_filenames">Giới hạn tên tệp</string>
