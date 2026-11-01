@@ -1049,6 +1049,9 @@
     <plurals name="downloads_started">
         <item quantity="other">Đã bắt đầu %d lượt tải</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="other">Tải xuống %d liên kết?</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="other">Đã bắt đầu %1$d lượt tải, %2$d đã tải trước đó</item>
     </plurals>

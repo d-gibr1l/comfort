@@ -1077,6 +1077,10 @@
         <item quantity="one">%d دانلود شروع شد</item>
         <item quantity="other">%d دانلود شروع شد</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">%d پیوند دانلود شود؟</item>
+        <item quantity="other">%d پیوند دانلود شود؟</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d دانلود شروع شد، %2$d قبلاً دانلود شده</item>
         <item quantity="other">%1$d دانلود شروع شد، %2$d قبلاً دانلود شده</item>

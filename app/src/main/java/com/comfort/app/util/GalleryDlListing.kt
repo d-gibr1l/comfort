@@ -89,8 +89,10 @@ data class PreviewInfo(
  * [PreviewInfo.collectionThumbnail]) rather than fetching one image per track, which doesn't
  * scale to a long playlist. [isVideo] marks a picture vs a video in a mixed listing (an
  * Instagram carousel, say) for the row's badge; null when the listing doesn't say (a song, or a
- * flat playlist entry with no extension), which shows no badge rather than a guess. */
-data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null, val isVideo: Boolean? = null, val sizeBytes: Long? = null)
+ * flat playlist entry with no extension), which shows no badge rather than a guess. [key] is the
+ * entry's own link when the listing gives one: what a selection follows when the list is fetched
+ * again and the numbers move (PreviewSheetViewModel.loadMore). */
+data class TrackPreview(val num: Int, val title: String?, val artist: String?, val durationMs: Long?, val thumbnail: String? = null, val isVideo: Boolean? = null, val sizeBytes: Long? = null, val key: String? = null)
 
 /** [items] is only ever non-empty when [errorMessage] is null and vice versa — a genuinely empty
  * gallery (no error, nothing found) and a real failure (login required, network error, ...) are
@@ -767,9 +769,12 @@ object GalleryDlListing {
         // selecting the wrong song once a checkbox filter is built from it.
         val collectionThumbnail = json.optString("collection_thumbnail").blankToNull()
         val tracks = entriesArray?.let { entries ->
-            (0 until entries.length()).mapNotNull { i -> entries.optJSONObject(i) }.mapIndexed { i, e ->
+            // Numbered by place in the whole list, nulls (an entry yt-dlp couldn't read) included:
+            // numbering only the readable ones put every later number one off yt-dlp's own.
+            (0 until entries.length()).mapNotNull { i -> entries.optJSONObject(i)?.let { i to it } }.map { (i, e) ->
                 TrackPreview(
                     num = i + 1,
+                    key = e.optString("url").blankToNull(),
                     title = e.optString("title").blankToNull(),
                     artist = (e.optString("artist").blankToNull() ?: e.optString("uploader").blankToNull()),
                     durationMs = e.optDouble("duration", -1.0).takeIf { it > 0.0 }?.let { (it * 1000).toLong() },

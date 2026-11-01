@@ -1077,6 +1077,10 @@
         <item quantity="one">%d indirme başladı</item>
         <item quantity="other">%d indirme başladı</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">%d bağlantı indirilsin mi?</item>
+        <item quantity="other">%d bağlantı indirilsin mi?</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d indirme başladı, %2$d zaten indirilmişti</item>
         <item quantity="other">%1$d indirme başladı, %2$d zaten indirilmişti</item>

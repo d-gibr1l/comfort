@@ -1049,6 +1049,9 @@
     <plurals name="downloads_started">
         <item quantity="other">%d 件のダウンロードを開始しました</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="other">%d 件のリンクをダウンロードしますか？</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="other">%1$d 件のダウンロードを開始、%2$d 件はダウンロード済み</item>
     </plurals>

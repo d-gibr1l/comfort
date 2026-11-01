@@ -110,8 +110,9 @@ class PreviewSheetViewModel(
     }
 
     /** The next [CHANNEL_PAGE] of a channel's videos, or all the rest ([all]). The list is fetched
-     * again from the top (a flat listing, so mostly paging through YouTube's list); entries keep
-     * their numbers, so what's checked stays checked, and the new ones come in unchecked. */
+     * again from the top (a flat listing, so mostly paging through YouTube's list); what's checked
+     * stays checked by each video's link, and the new ones come in unchecked. By number, a video
+     * uploaded in between moved every number by one, and the checks onto the videos next to them. */
     fun loadMore(all: Boolean) {
         val current = _preview.value ?: return
         if (_loadingMore.value || !current.hasMore) return
@@ -124,6 +125,11 @@ class PreviewSheetViewModel(
                 )
                 // A failed fetch keeps what's shown (and the button, to try again).
                 if (more != null && more.tracks.size >= current.tracks.size) {
+                    val oldKeys = current.tracks.associate { it.num to it.key }
+                    if (current.tracks.all { it.key != null } && more.tracks.all { it.key != null }) {
+                        val checked = _selectedNums.value.mapNotNullTo(HashSet()) { oldKeys[it] }
+                        _selectedNums.value = more.tracks.filter { it.key in checked }.mapTo(HashSet()) { it.num }
+                    }
                     _preview.value = more.copy(hasMore = if (all) false else more.hasMore && more.tracks.size > current.tracks.size)
                 }
             } catch (e: Exception) {

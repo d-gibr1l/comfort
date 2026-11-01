@@ -1049,6 +1049,9 @@
     <plurals name="downloads_started">
         <item quantity="other">已开始 %d 个下载</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="other">要下载 %d 个链接吗？</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="other">已开始 %1$d 个下载，%2$d 个已下载过</item>
     </plurals>

@@ -1077,6 +1077,11 @@
         <item quantity="one">%d download avviato</item>
         <item quantity="other">%d download avviati</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">Scaricare %d link?</item>
+        <item quantity="many">Scaricare %d link?</item>
+        <item quantity="other">Scaricare %d link?</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d download avviato, %2$d già scaricati</item>
         <item quantity="other">%1$d download avviati, %2$d già scaricati</item>

@@ -1010,6 +1010,11 @@
         <item quantity="many">%d téléchargements lancés</item>
         <item quantity="other">%d téléchargements lancés</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">Télécharger %d lien ?</item>
+        <item quantity="many">Télécharger %d liens ?</item>
+        <item quantity="other">Télécharger %d liens ?</item>
+    </plurals>
     <string name="already_downloaded_see_duplicates">Déjà téléchargé — voir Bibliothèque &gt; Doublons</string>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d téléchargement lancé, %2$d déjà téléchargé(s)</item>

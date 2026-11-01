@@ -962,6 +962,9 @@
         <item quantity="one">%d unduhan dimulai</item>
         <item quantity="other">%d unduhan dimulai</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="other">Unduh %d tautan?</item>
+    </plurals>
     <string name="already_downloaded_see_duplicates">Sudah diunduh — lihat Pustaka > Duplikat</string>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d unduhan dimulai, %2$d sudah diunduh</item>

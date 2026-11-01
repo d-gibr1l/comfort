@@ -1006,6 +1006,11 @@
         <item quantity="many">%d de downloads iniciados</item>
         <item quantity="other">%d downloads iniciados</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">Baixar %d link?</item>
+        <item quantity="many">Baixar %d links?</item>
+        <item quantity="other">Baixar %d links?</item>
+    </plurals>
     <string name="already_downloaded_see_duplicates">Já baixado — veja em Biblioteca &gt; Duplicatas</string>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d download iniciado, %2$d já baixado</item>

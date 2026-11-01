@@ -977,6 +977,10 @@
         <item quantity="one">%d Download gestartet</item>
         <item quantity="other">%d Downloads gestartet</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">%d Link herunterladen?</item>
+        <item quantity="other">%d Links herunterladen?</item>
+    </plurals>
     <string name="already_downloaded_see_duplicates">Bereits geladen – siehe Mediathek > Duplikate</string>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d Download gestartet, %2$d bereits geladen</item>

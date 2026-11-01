@@ -1038,6 +1038,12 @@
         <item quantity="many">%d загрузок запущено</item>
         <item quantity="other">%d загрузки запущено</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="one">Скачать %d ссылку?</item>
+        <item quantity="few">Скачать %d ссылки?</item>
+        <item quantity="many">Скачать %d ссылок?</item>
+        <item quantity="other">Скачать %d ссылки?</item>
+    </plurals>
     <string name="already_downloaded_see_duplicates">Уже скачано — см. Медиатека > Дубликаты</string>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="one">%1$d загрузка запущена, уже скачано: %2$d</item>

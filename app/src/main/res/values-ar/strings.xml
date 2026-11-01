@@ -1189,6 +1189,14 @@
         <item quantity="many">بدأ %d تنزيلًا</item>
         <item quantity="other">بدأ %d تنزيل</item>
     </plurals>
+    <plurals name="download_n_links">
+        <item quantity="zero">تنزيل %d روابط؟</item>
+        <item quantity="one">تنزيل رابط واحد؟</item>
+        <item quantity="two">تنزيل رابطين؟</item>
+        <item quantity="few">تنزيل %d روابط؟</item>
+        <item quantity="many">تنزيل %d رابطًا؟</item>
+        <item quantity="other">تنزيل %d رابط؟</item>
+    </plurals>
     <plurals name="downloads_started_some_duplicates">
         <item quantity="zero">بدأ %1$d من التنزيلات، و%2$d نُزِّلت مسبقًا</item>
         <item quantity="one">بدأ %1$d من التنزيلات، و%2$d نُزِّلت مسبقًا</item>

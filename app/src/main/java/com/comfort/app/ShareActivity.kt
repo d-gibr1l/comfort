@@ -1,5 +1,6 @@
 package com.comfort.app
 
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -8,6 +9,7 @@ import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 import com.comfort.app.viewmodel.LinkRouterViewModel
 import com.comfort.app.viewmodel.LinkRoute
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Patterns
 import android.view.WindowManager
@@ -191,7 +193,12 @@ class ShareActivity : ComponentActivity() {
                             // per link would be terrible UX — so this bypasses them (and the
                             // Sharing mode setting, which only ever gated whether *one* link's
                             // sheet appears) and just enqueues every link found.
-                            urls.size > 1 -> MultiLinkHandler(urls = urls, router = router, onFinished = { finish() })
+                            urls.size > 1 -> MultiLinkShare(
+                                urls = urls,
+                                router = router,
+                                ask = GalleryDlPreferences.getShareMode(context) != ShareMode.INSTANT,
+                                onFinished = { finish() },
+                            )
                             GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
                                 url = urls[0],
                                 router = router,
@@ -240,6 +247,32 @@ class ShareActivity : ComponentActivity() {
             return
         }
         sharedUrls = urls
+    }
+}
+
+/** Several links shared at once: asked first ("Download 3 links?", with their sites) unless the
+ * Sharing mode is Instant — they used to download straight away whatever the mode, so a message
+ * with a few links in it started them all without a word. The picker and preview sheets are for
+ * one link, so the answer is all of them or none. */
+@Composable
+private fun MultiLinkShare(urls: List<String>, router: LinkRouterViewModel, ask: Boolean, onFinished: () -> Unit) {
+    var confirmed by remember { mutableStateOf(!ask) }
+    if (confirmed) {
+        MultiLinkHandler(urls = urls, router = router, onFinished = onFinished)
+    } else {
+        val sites = remember(urls) {
+            urls.joinToString("\n") { url ->
+                runCatching { Uri.parse(if ("://" in url) url else "https://$url").host }.getOrNull()
+                    ?.removePrefix("www.") ?: url
+            }
+        }
+        ShareChoiceSheet(
+            title = pluralStringResource(R.plurals.download_n_links, urls.size, urls.size),
+            details = sites,
+            start = ShareChoice(stringResource(R.string.action_cancel), Icons.Outlined.Close) { dismiss -> dismiss() },
+            end = ShareChoice(stringResource(R.string.search_download), Icons.Outlined.Download) { confirmed = true },
+            onDismiss = onFinished,
+        )
     }
 }
 
@@ -293,15 +326,23 @@ private fun AskShareModeHandler(url: String, router: LinkRouterViewModel, onFini
     when (choice) {
         ShareMode.INSTANT -> InstantShareHandler(url = url, router = router, onFinished = onFinished)
         ShareMode.CONFIGURE -> ShareRouter(url = url, router = router, onFinished = onFinished)
-        ShareMode.ALWAYS_ASK, null -> AskShareModeSheet(
+        ShareMode.ALWAYS_ASK, null -> ShareChoiceSheet(
+            title = stringResource(R.string.download_this_how),
+            start = ShareChoice(stringResource(R.string.configure), Icons.Outlined.Tune) { choice = ShareMode.CONFIGURE },
+            end = ShareChoice(stringResource(R.string.instant), Icons.Outlined.Bolt) { choice = ShareMode.INSTANT },
             onDismiss = onFinished,
-            onChoose = { choice = it },
         )
     }
 }
 
+/** One of a [ShareChoiceSheet]'s two buttons; [onClick] gets the sheet's own dismiss (slides it
+ * away, then onDismiss) for a choice that just closes it. */
+private class ShareChoice(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val onClick: (dismiss: () -> Unit) -> Unit)
+
+/** A question at the bottom of the screen with two answers side by side, [end] the highlighted
+ * one: "Download this how?" (Configure | Instant), and several links' "Download N links?". */
 @Composable
-private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Unit) {
+private fun ShareChoiceSheet(title: String, start: ShareChoice, end: ShareChoice, onDismiss: () -> Unit, details: String? = null) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
     BackHandler { visible = false }
@@ -332,7 +373,11 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                 // Above the navigation bar: the window is edge to edge, and the buttons sat under
                 // the bar's own buttons. The sheet's colour still runs down behind it.
                 Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-                    Text(stringResource(R.string.download_this_how), style = MaterialTheme.typography.titleMedium)
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    if (details != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Spacer(Modifier.height(16.dp))
                     // Same connected-group AssistChip pair as the Queue card's Pause/Cancel
                     // chips — two real, independent actions (not a mutually-exclusive selection),
@@ -342,10 +387,11 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                     // without a sources jar — not worth guessing blind at an unstable API's
                     // contract a second time (see groupedChipShape's own doc comment for the
                     // first attempt).
-                    // Configure left, Instant right — same order as Home's Configure/Download pair.
+                    // Configure left, Instant right — same order as Home's Configure/Download pair
+                    // (and Cancel left, Download right).
                     Row(modifier = Modifier.fillMaxWidth()) {
                         AssistChip(
-                            onClick = { onChoose(ShareMode.CONFIGURE) },
+                            onClick = { start.onClick { visible = false } },
                             modifier = Modifier.weight(1f).height(52.dp),
                             shape = groupedChipShape(0, 2, height = 52.dp),
                             border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = MaterialTheme.colorScheme.outline),
@@ -353,11 +399,11 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                                 labelColor = MaterialTheme.colorScheme.onSurface,
                                 leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
                             ),
-                            leadingIcon = { Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.configure)) } },
+                            leadingIcon = { Icon(start.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(start.label) } },
                         )
                         AssistChip(
-                            onClick = { onChoose(ShareMode.INSTANT) },
+                            onClick = { end.onClick { visible = false } },
                             modifier = Modifier.weight(1f).height(52.dp),
                             shape = groupedChipShape(1, 2, height = 52.dp),
                             colors = AssistChipDefaults.assistChipColors(
@@ -366,8 +412,8 @@ private fun AskShareModeSheet(onDismiss: () -> Unit, onChoose: (ShareMode) -> Un
                                 leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),
                             border = null,
-                            leadingIcon = { Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.instant)) } },
+                            leadingIcon = { Icon(end.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            label = { Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Text(end.label) } },
                         )
                     }
                     Spacer(Modifier.height(8.dp))
