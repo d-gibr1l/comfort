@@ -304,6 +304,9 @@ interface DownloadDao {
     @Query("SELECT * FROM saved_files WHERE downloadId IN (:downloadIds) ORDER BY downloadId, position")
     suspend fun savedFiles(downloadIds: List<String>): List<SavedFile>
 
+    @Query("SELECT position FROM saved_files WHERE downloadId = :downloadId")
+    suspend fun savedFilePositions(downloadId: String): List<Int>
+
     @Query("DELETE FROM saved_files WHERE downloadId = :downloadId")
     suspend fun clearSavedFiles(downloadId: String)
 

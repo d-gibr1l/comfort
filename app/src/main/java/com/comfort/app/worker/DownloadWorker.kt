@@ -557,10 +557,21 @@ class DownloadWorker(
                 // gets saved, so a real cause (blocked, login required, no formats found, ...) is
                 // visible instead of every failure looking identical.
                 val lastErrorLine = java.util.concurrent.atomic.AtomicReference<String?>(null)
-                // Files the engines downloaded that couldn't be saved to the gallery.
-                // By name: the end-of-run sweep tries a file that failed again, and one saved then
-                // isn't missing any more (it was still counted, "1 of 10" for a post of 9).
-                val saveFailures = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+                // Files the engines downloaded that couldn't be saved to the gallery, with their
+                // place in the download. By name: the end-of-run sweep tries a file that failed
+                // again, and one saved then isn't missing any more (it was still counted, "1 of 10"
+                // for a post of 9) and keeps its place.
+                val saveFailures = java.util.concurrent.ConcurrentHashMap<String, Int>()
+                // Each file's place in the download (SavedFile.position), apart from savedCount:
+                // that goes down when a save fails, so a later file took the same place, and a file
+                // a retry fetched went last. Places an earlier run left empty (files it couldn't
+                // save) are filled first, in the engine's order: the retried file goes back where
+                // it was.
+                val usedPositions = dao.savedFilePositions(downloadId).toSet()
+                val lastUsedPosition = usedPositions.maxOrNull() ?: 0
+                val lastPosition = AtomicInteger(maxOf(lastUsedPosition, savedCount.get()))
+                val emptyPositions = java.util.ArrayDeque((1..lastUsedPosition).filter { it !in usedPositions })
+                fun nextPosition(): Int = synchronized(emptyPositions) { emptyPositions.pollFirst() } ?: lastPosition.incrementAndGet()
                 // Each engine's own error, for the errored card's info sheet (lastErrorLine above is
                 // the one-line summary). Keyed by engine name in the order the engines ran; an
                 // engine that ran without an error is listed too (see errorDetailsJson below).
@@ -698,13 +709,13 @@ class DownloadWorker(
                         // the chosen folder's permission gone). Counted as missing, not dropped
                         // without a word, and forgotten so a retry saves it (see saveFailures).
                         savedCount.decrementAndGet()
-                        saveFailures += original.name
+                        saveFailures[original.name] = position
                         lastErrorLine.compareAndSet(null, "Couldn't save ${original.name} to the gallery")
                         dao.forgetDownloadedFile(downloadId, original.name)
                     } else {
                         candidate.delete()
                         // Saved on a second try (the sweep): no longer missing.
-                        if (saveFailures.remove(original.name) && saveFailures.isEmpty() &&
+                        if (saveFailures.remove(original.name) != null && saveFailures.isEmpty() &&
                             lastErrorLine.get()?.startsWith("Couldn't save ") == true
                         ) {
                             lastErrorLine.set(null)
@@ -795,7 +806,7 @@ class DownloadWorker(
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
                             savedCount.decrementAndGet()
-                            saveFailures += file.name
+                            saveFailures[file.name] = position
                             lastErrorLine.compareAndSet(null, "Couldn't save ${file.name} to the gallery")
                             runCatching { dao.forgetDownloadedFile(downloadId, file.name) }
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
@@ -974,7 +985,7 @@ class DownloadWorker(
                                     // Counted now, so progress still moves file by file.
                                     lastDataAt.set(System.currentTimeMillis())
                                     val count = savedCount.incrementAndGet()
-                                    heldFiles += Triple(candidate, isAudioFile, count)
+                                    heldFiles += Triple(candidate, isAudioFile, nextPosition())
                                     dao.setDownloadedItems(downloadId, count)
                                     com.comfort.app.data.LiveProgress.speed(liveRun, measuredSpeedMbs.get())
                                     DownloadNotifications.updateProgress(
@@ -1184,7 +1195,8 @@ class DownloadWorker(
                         val ext = f.extension.lowercase()
                         val isAudio = ext in AUDIO_EXTENSIONS || engine == DownloadEngine.SPOTIFY ||
                             (ext in AUDIO_OR_VIDEO_EXTENSIONS && isAudioOnlyContainer(f))
-                        heldFiles += Triple(f, isAudio, savedCount.incrementAndGet())
+                        savedCount.incrementAndGet()
+                        heldFiles += Triple(f, isAudio, saveFailures[f.name] ?: nextPosition())
                         swept++
                     }
                     if (swept > 0) {
