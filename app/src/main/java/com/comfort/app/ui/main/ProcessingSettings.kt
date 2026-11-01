@@ -739,7 +739,7 @@ private fun AudioLanguageSetting() {
             )
         }
         Spacer(Modifier.width(12.dp))
-        Text(label(current), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        PickerValueButton(label(current)) { picking = true }
     }
     if (picking) {
         val options = listOf(com.comfort.app.data.AudioLanguage.ORIGINAL, com.comfort.app.data.AudioLanguage.APP) +
@@ -777,6 +777,20 @@ private fun AudioLanguageSetting() {
     }
 }
 
+/** The value of a row that opens a list of choices (Audio language, Subtitle languages), as a
+ * button: it read as plain coloured text, nothing that looked tappable. */
+@Composable
+private fun PickerValueButton(text: String, onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(start = 16.dp, end = 8.dp),
+        modifier = Modifier.widthIn(max = 180.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Icon(Icons.Outlined.ArrowDropDown, contentDescription = null, modifier = Modifier.size(20.dp))
+    }
+}
+
 /** Settings > Processing > Subtitle languages: your language and the original (the default), one
  * of them, or codes typed by hand ([onPick] null: the field below the row). */
 @Composable
@@ -803,7 +817,7 @@ private fun SubtitleLanguagesSetting(current: String?, customLabel: String?, onP
     ) {
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        Text(label(current), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        PickerValueButton(label(current)) { picking = true }
     }
     if (picking) {
         val options = listOf(
