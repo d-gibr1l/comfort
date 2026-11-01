@@ -262,6 +262,8 @@ class DownloadWorker(
         val liveRun = com.comfort.app.data.LiveProgress.begin(downloadId)
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
+        val incognito = entity?.incognito == true
+        DownloadLog.setIncognito(downloadId, incognito)
         DownloadLog.line(applicationContext, downloadId, "start $url")
         // The song preview sheet's own editable title/artist (SongPreviewCard) — see
         // DownloadEntity.overrideTitle/overrideArtist's own doc comment. Empty string (not null)
@@ -854,7 +856,8 @@ class DownloadWorker(
                 }
 
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
-                    android.util.Log.d("DownloadEngine", "Python output: $line")
+                    // Not in the system log either for an incognito one: Export logs includes it.
+                    if (!incognito) android.util.Log.d("DownloadEngine", "Python output: $line")
                     DownloadLog.line(applicationContext, downloadId, line)
                     checkScheduleWindow()
 

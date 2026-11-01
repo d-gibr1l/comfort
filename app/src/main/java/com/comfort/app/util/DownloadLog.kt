@@ -27,10 +27,19 @@ object DownloadLog {
     private var writer: BufferedWriter? = null
     private var size = 0L
     private val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    // Incognito downloads: nothing of theirs is written. Their lines stayed here (the link, the
+    // title, the file names) after the download itself was gone, until the log was cleared.
+    private val incognito = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** Whether [downloadId] is incognito: its lines aren't kept (see [line]). */
+    fun setIncognito(downloadId: String, on: Boolean) {
+        if (on) incognito.add(downloadId) else incognito.remove(downloadId)
+    }
 
     /** Adds [text] for download [downloadId]. Never throws: a log that can't be written mustn't
      * fail the download. */
     fun line(context: Context, downloadId: String, text: String) {
+        if (downloadId in incognito) return
         // Without the 0x1E an engine's report line starts with (comfort_events.py): it's only there
         // to tell those apart on the pipe.
         val entry = "${time.format(Date())} ${downloadId.take(8)} ${text.trimStart('\u001E').replace('\n', ' ')}\n"
