@@ -95,6 +95,14 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
     /** The preview sheet's Download. forceDuplicate: its button already said "Redownload" if this
      * was one, so tapping it is the confirmation. */
     fun download(url: String, options: DownloadOptions, onDone: (EnqueueResult) -> Unit = {}): Job = enqueue(onDone) {
+        // A channel's checked videos: each its own download, by its own link (see itemUrls).
+        options.itemUrls?.let { links ->
+            return@enqueue links.map { link -> enqueueWith(link, options.copy(itemFilter = null, totalItems = 0, itemUrls = null)) }.last()
+        }
+        enqueueWith(url, options)
+    }
+
+    private suspend fun enqueueWith(url: String, options: DownloadOptions): EnqueueResult =
         DownloadDispatcher.enqueueDownload(
             context = context,
             url = url,
@@ -116,7 +124,6 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
             scheduledAt = options.scheduledAt,
             forceDuplicate = true,
         )
-    }
 
     /** The item picker's Download, or a plain whole-link download (the Download/Instant buttons,
      * the loading sheet's "Download now") with the defaults from Settings. */

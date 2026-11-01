@@ -229,6 +229,11 @@ data class DownloadOptions(
     /** "Start at…" picked in the sheet (epoch millis) — see DownloadEntity.scheduledAt; null starts
      * it as usual (now, or when the schedule window opens). */
     val scheduledAt: Long? = null,
+    /** A channel's checked videos by their own links: each is queued as a download of its own
+     * (LinkRouterViewModel.download). Picked by number ([itemFilter]), the channel listed again
+     * when the download started, and a video uploaded in between moved every pick onto the next
+     * video. Null for anything else. */
+    val itemUrls: List<String>? = null,
 )
 
 /** The engines the Configure sheet offers for [url]: only links more than one engine can download
@@ -707,7 +712,14 @@ fun DownloadPreviewSheet(
             itemFilter = itemFilter,
             selectedTrackCount = selectedNums.size,
             onDismiss = onDismiss,
-            onDownload = onDownload,
+            onDownload = { options ->
+                val picked = tracks.filter { it.num in selectedNums }
+                val links = picked.mapNotNull { it.key }
+                onDownload(
+                    if (sheet.isChannel && links.isNotEmpty() && links.size == picked.size) options.copy(itemUrls = links)
+                    else options,
+                )
+            },
             onSubscribe = if (canSubscribe) onSubscribe else null,
         )
     }
