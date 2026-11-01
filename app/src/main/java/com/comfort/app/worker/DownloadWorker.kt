@@ -558,7 +558,9 @@ class DownloadWorker(
                 // visible instead of every failure looking identical.
                 val lastErrorLine = java.util.concurrent.atomic.AtomicReference<String?>(null)
                 // Files the engines downloaded that couldn't be saved to the gallery.
-                val saveFailures = AtomicInteger(0)
+                // By name: the end-of-run sweep tries a file that failed again, and one saved then
+                // isn't missing any more (it was still counted, "1 of 10" for a post of 9).
+                val saveFailures = java.util.Collections.synchronizedSet(mutableSetOf<String>())
                 // Each engine's own error, for the errored card's info sheet (lastErrorLine above is
                 // the one-line summary). Keyed by engine name in the order the engines ran; an
                 // engine that ran without an error is listed too (see errorDetailsJson below).
@@ -696,11 +698,17 @@ class DownloadWorker(
                         // the chosen folder's permission gone). Counted as missing, not dropped
                         // without a word, and forgotten so a retry saves it (see saveFailures).
                         savedCount.decrementAndGet()
-                        saveFailures.incrementAndGet()
+                        saveFailures += original.name
                         lastErrorLine.compareAndSet(null, "Couldn't save ${original.name} to the gallery")
                         dao.forgetDownloadedFile(downloadId, original.name)
                     } else {
                         candidate.delete()
+                        // Saved on a second try (the sweep): no longer missing.
+                        if (saveFailures.remove(original.name) && saveFailures.isEmpty() &&
+                            lastErrorLine.get()?.startsWith("Couldn't save ") == true
+                        ) {
+                            lastErrorLine.set(null)
+                        }
                         val count = savedCount.get()
                         val totalBytes = bytesSoFar.addAndGet(fileSize)
                         // This file's bytes now live in bytesSoFar — without resetting
@@ -787,7 +795,7 @@ class DownloadWorker(
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e
                             savedCount.decrementAndGet()
-                            saveFailures.incrementAndGet()
+                            saveFailures += file.name
                             lastErrorLine.compareAndSet(null, "Couldn't save ${file.name} to the gallery")
                             runCatching { dao.forgetDownloadedFile(downloadId, file.name) }
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
@@ -1156,6 +1164,36 @@ class DownloadWorker(
                     }
                 }
 
+                // Finished files whose "file" line was never read: a stop came while a batch save
+                // held up the reading (it runs inside it), the engine had already finished the next
+                // file and put it in its archive, and the run that picked up again skipped it as
+                // done — it sat in staging unseen and went with the folder below (seen: image 3 of
+                // 9 lost after a pause). Saved here like any other, unless already recorded.
+                if (!isStopped) {
+                    val leftovers = stagingDir.walkTopDown().filter { f ->
+                        val ext = f.extension.lowercase()
+                        f.isFile && ext in SWEEP_MEDIA_EXTENSIONS &&
+                            // yt-dlp's own images are thumbnails (embedded, or the sidecar sweep's).
+                            !(engine == DownloadEngine.YT_DLP && ext in SWEEP_IMAGE_EXTENSIONS) &&
+                            // A stream still to be merged, or a file being written.
+                            !YTDLP_PART_STREAM.containsMatchIn(f.name) && ".temp." !in f.name && ".part" !in f.name
+                    }.toList()
+                    var swept = 0
+                    for (f in leftovers) {
+                        if (dao.recordDownloadedFile(DownloadedFileRecord(downloadId, f.name)) == -1L) continue
+                        val ext = f.extension.lowercase()
+                        val isAudio = ext in AUDIO_EXTENSIONS || engine == DownloadEngine.SPOTIFY ||
+                            (ext in AUDIO_OR_VIDEO_EXTENSIONS && isAudioOnlyContainer(f))
+                        heldFiles += Triple(f, isAudio, savedCount.incrementAndGet())
+                        swept++
+                    }
+                    if (swept > 0) {
+                        DownloadLog.line(applicationContext, downloadId, "saved $swept file(s) left in staging by an earlier run")
+                        withContext(NonCancellable) { saveHeldFiles() }
+                        dao.setDownloadedItems(downloadId, savedCount.get())
+                    }
+                }
+
                 if (commands.writeInfoFiles || commands.saveThumbnail || commands.saveSubtitleFiles || commands.extrasWriteSidecars) {
                     // gallery-dl's --write-metadata, yt-dlp's --write-description/--write-info-json,
                     // and yt-dlp's own --write-thumbnail (this sheet's "Save thumbnail" chip, see
@@ -1262,7 +1300,7 @@ class DownloadWorker(
                 // is in the engines' archives (they downloaded it), which would make a retry skip
                 // it: they go, and the files already saved are kept from a second copy by
                 // downloaded_files.
-                val unsaved = saveFailures.get()
+                val unsaved = saveFailures.size
                 if (unsaved > 0) {
                     java.io.File(applicationContext.filesDir, "archives/$downloadId.sqlite3").delete()
                     java.io.File(applicationContext.filesDir, "archives/$downloadId.ytdlp.txt").delete()
@@ -1408,6 +1446,12 @@ private const val NETWORK_GRACE_MS = 180_000L
 /** How long the pre-download listing may take before the download goes ahead without it. 30 s, not
  * less: a real listing on a slow connection (600 ms round trips seen) takes several seconds. */
 private const val LISTING_CAP_MS = 30_000L
+
+/** What the end-of-run staging sweep saves: media, never sidecars or partial files. */
+private val SWEEP_IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "gif", "avif", "heic")
+private val SWEEP_MEDIA_EXTENSIONS = SWEEP_IMAGE_EXTENSIONS + setOf("mp4", "mkv", "webm", "mov", "m4v", "mp3", "m4a", "opus", "ogg", "flac", "wav", "aac")
+// yt-dlp's separate streams before merging: "Title [id].f137.mp4", "….f251.webm".
+private val YTDLP_PART_STREAM = Regex("""\.f[\w-]+\.(mp4|webm|m4a|mkv|mp3|opus|ogg|flac|wav|aac|mov|m4v)$""")
 
 /** How many finished files a download holds back before saving them (see saveHeldFiles), and
  * how many bytes: a carousel saves at once, a whole profile in batches. */
