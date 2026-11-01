@@ -436,8 +436,12 @@ fun DownloadPreviewSheet(
                     }
                     false
                 } else if (target == SheetValue.Hidden) {
+                    // A drag must go far enough to close it; Back (and the scrim) ask with the
+                    // sheet where it sits, not dragged at all, and close it. The distance rule
+                    // alone also refused those: Back did nothing (reported).
                     val offset = sheetStateRef[0]?.let { runCatching { it.requireOffset() }.getOrNull() }
-                    offset == null || expandedOffsetPx.isNaN() || offset - expandedOffsetPx >= minDismissDragPx
+                    val dragged = if (offset == null || expandedOffsetPx.isNaN()) null else offset - expandedOffsetPx
+                    dragged == null || dragged < 1f || dragged >= minDismissDragPx
                 } else {
                     true
                 }
@@ -767,6 +771,13 @@ private fun PreviewSheetOverlayHost(
     // "Start at…": the time this download waits for, if one was picked (StartAtDialog, shared
     // with the Queue's cards). Only this sheet's: a new opening starts without one.
     var startAt by remember { mutableStateOf<Long?>(null) }
+    // Dropped once it's passed: the button kept saying "Starts at 3:00 PM" at 3:07, for a
+    // download that would start at once (a time gone by isn't sent, see currentOptions).
+    LaunchedEffect(startAt) {
+        val at = startAt ?: return@LaunchedEffect
+        kotlinx.coroutines.delay((at - System.currentTimeMillis()).coerceAtLeast(0L))
+        startAt = null
+    }
     var showStartAt by remember { mutableStateOf(false) }
     if (showStartAt) {
         StartAtDialog(

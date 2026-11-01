@@ -26,6 +26,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
@@ -250,6 +251,7 @@ internal fun nextOccurrence(minutesOfDay: Int, now: Long): Long = java.util.Cale
  * tomorrow once it's passed — said underneath as it turns ("Starts at 7:00 AM · in 9 h 10 min").
  * [initial]: the time already set, if any (else the next full hour). [onRemove], when a time is
  * set: back to waiting for the window like the rest. */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun StartAtDialog(
     initial: Long?,
@@ -272,7 +274,6 @@ internal fun StartAtDialog(
         c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)
     }
     var minutes by remember { mutableStateOf(startMinutes) }
-    val startTime = remember { kotlinx.datetime.LocalTime(hour = startMinutes / 60, minute = startMinutes % 60) }
     val now by produceState(System.currentTimeMillis()) {
         while (true) {
             kotlinx.coroutines.delay(30_000)
@@ -280,45 +281,104 @@ internal fun StartAtDialog(
         }
     }
     val summary = remember(minutes, now) { ownStartText(context, nextOccurrence(minutes, now), now) }
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Card(shape = MaterialTheme.shapes.large) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+    // A few likely times to pick with one tap, written in the phone's own time format (no words
+    // to translate): the next whole hour, two hours on, 11 PM tonight, 8 AM tomorrow.
+    val quickPicks = remember {
+        val c = java.util.Calendar.getInstance()
+        val nowMin = c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)
+        val nextHour = ((nowMin / 60 + 1) % 24) * 60
+        listOf(nextHour, (nextHour + 120) % 1440, 23 * 60, 8 * 60).distinct()
+    }
+    // Picking a chip turns the wheel to it: the wheel only takes a start time, so it's rebuilt.
+    var wheelSeed by remember { mutableStateOf(startMinutes) }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val timeFormat = remember { android.text.format.DateFormat.getTimeFormat(context) }
+    fun label(m: Int): String {
+        val c = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, m / 60); set(java.util.Calendar.MINUTE, m % 60)
+        }
+        return timeFormat.format(c.time)
+    }
+    // A sheet like the app's others (shared header, the Done | ✕ split button), not a bare
+    // dialog in the middle of the screen.
+    // Open all the way: half open, Done | ✕ sat under the navigation bar.
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
+            SheetHeader(
+                icon = Icons.Outlined.Schedule,
+                title = stringResource(R.string.start_at),
+                subtitle = note,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(R.string.start_at), style = MaterialTheme.typography.titleMedium)
-                note?.let {
-                    Spacer(Modifier.height(8.dp))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                quickPicks.forEach { m ->
+                    FilterChip(
+                        selected = minutes == m,
+                        onClick = { minutes = m; wheelSeed = m },
+                        label = { Text(label(m)) },
+                        shape = RoundedCornerShape(12.dp),
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
-                dev.darkokoa.datetimewheelpicker.WheelTimePicker(
-                    modifier = Modifier.size(280.dp, 160.dp),
-                    startTime = startTime,
-                    // The phone's own 12/24-hour setting.
-                    timeFormatter = dev.darkokoa.datetimewheelpicker.core.format.timeFormatter(
-                        timeFormat = if (android.text.format.DateFormat.is24HourFormat(context)) {
-                            dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.HOUR_24
-                        } else {
-                            dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.AM_PM
-                        },
-                    ),
-                    textStyle = MaterialTheme.typography.headlineSmall,
-                    selectedTextStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    onSnappedTime = { snapped -> minutes = snapped.hour * 60 + snapped.minute },
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(summary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    if (onRemove != null) {
-                        TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_start_time)) }
-                        Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    key(wheelSeed) {
+                        dev.darkokoa.datetimewheelpicker.WheelTimePicker(
+                            modifier = Modifier.size(280.dp, 140.dp),
+                            startTime = kotlinx.datetime.LocalTime(hour = wheelSeed / 60, minute = wheelSeed % 60),
+                            // The phone's own 12/24-hour setting.
+                            timeFormatter = dev.darkokoa.datetimewheelpicker.core.format.timeFormatter(
+                                timeFormat = if (android.text.format.DateFormat.is24HourFormat(context)) {
+                                    dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.HOUR_24
+                                } else {
+                                    dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.AM_PM
+                                },
+                            ),
+                            textStyle = MaterialTheme.typography.headlineSmall,
+                            selectedTextStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            // A tick as each hour or minute passes the middle, like a clock app's wheel.
+                            onSnappedTimeChanged = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentFrequentTick) },
+                            onSnappedTime = { snapped -> minutes = snapped.hour * 60 + snapped.minute },
+                        )
                     }
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-                    TextButton(onClick = { onPicked(nextOccurrence(minutes, System.currentTimeMillis())) }) { Text(stringResource(R.string.done)) }
+                    Spacer(Modifier.height(8.dp))
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                            Spacer(Modifier.width(6.dp))
+                            Text(summary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        }
+                    }
                 }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (onRemove != null) {
+                    TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_start_time)) }
+                }
+                Spacer(Modifier.weight(1f))
+                ConfirmCancelSplitButton(
+                    label = stringResource(R.string.done),
+                    icon = Icons.Outlined.Check,
+                    onConfirm = { onPicked(nextOccurrence(minutes, System.currentTimeMillis())) },
+                    onCancel = onDismiss,
+                    outlinedConfirm = false,
+                )
             }
         }
     }
