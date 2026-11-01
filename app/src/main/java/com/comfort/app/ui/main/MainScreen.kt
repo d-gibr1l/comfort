@@ -366,7 +366,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         ).value,
     ) {
     Box(modifier = Modifier.fillMaxSize()) {
-    Row(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // No background of its own: MainActivity's Surface paints it, and every page paints its own
+    // over that — a third full-screen fill under each frame for nothing.
+    Row(modifier = Modifier.fillMaxSize()) {
     if (useNavRail) {
         SideNavRail(
             selectedTab = selectedTab,

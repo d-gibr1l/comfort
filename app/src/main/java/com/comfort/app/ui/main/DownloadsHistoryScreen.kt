@@ -429,7 +429,7 @@ fun DownloadsHistoryScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            // No background: the page's box in MainScreen paints it (one full-screen fill, not two).
             .nestedScroll(libraryHeaderScrollConnection),
     ) {
         val subtitle = if (showDuplicatesOnly) {
