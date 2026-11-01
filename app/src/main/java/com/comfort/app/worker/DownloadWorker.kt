@@ -262,6 +262,15 @@ class DownloadWorker(
         val liveRun = com.comfort.app.data.LiveProgress.begin(downloadId)
         val entity = dao.getById(downloadId)
         val displayTitle = entity?.title?.ifBlank { url } ?: url
+        // The title the notifications show, kept to the download's own: it starts as the
+        // "Downloading from X" placeholder, which the engine's name for it (or its first file's)
+        // replaces — the finished notice still said "Downloading from Wikimedia" when the Library
+        // card had the file's name.
+        val liveTitle = java.util.concurrent.atomic.AtomicReference(displayTitle)
+        suspend fun updateTitle(title: String) {
+            dao.updateTitle(downloadId, title)
+            liveTitle.set(title)
+        }
         val incognito = entity?.incognito == true
         DownloadLog.setIncognito(downloadId, incognito)
         DownloadLog.line(applicationContext, downloadId, "start $url")
@@ -355,7 +364,7 @@ class DownloadWorker(
             // throws between there and the finally's release() — this notification call included —
             // would otherwise leak it permanently and starve every other queued download.
             try {
-            DownloadNotifications.updateProgress(applicationContext, downloadId, displayTitle, entity?.downloadedItems ?: 0, initialPercent)
+            DownloadNotifications.updateProgress(applicationContext, downloadId, liveTitle.get(), entity?.downloadedItems ?: 0, initialPercent)
             return withContext(Dispatchers.IO) {
                 try {
                 // Re-checked fresh here, not the `entity` snapshot fetched before this worker ever
@@ -757,7 +766,7 @@ class DownloadWorker(
                         // Its bytes are in totalBytes now; the card adds liveBytes on top.
                         com.comfort.app.data.LiveProgress.bytes(dao, liveRun, 0, speedMbs)
                         if (hasPlaceholderTitle && !engineNamedTitle.get()) {
-                            derivePosterCaptionTitle(candidate.name)?.let { dao.updateTitle(downloadId, it) }
+                            derivePosterCaptionTitle(candidate.name)?.let { updateTitle(it) }
                         }
                         // The merged file is the video: show its tags again, and stop
                         // saying "downloading audio". (Audio-only downloads have no
@@ -767,10 +776,10 @@ class DownloadWorker(
                         // The song preview sheet's editable title/artist — applied
                         // last, unconditionally, so the user's edit always wins in the
                         // Library, matching what the wrappers embedded in the file's tags.
-                        if (overrideTitle.isNotBlank()) dao.updateTitle(downloadId, overrideTitle)
+                        if (overrideTitle.isNotBlank()) updateTitle(overrideTitle)
                         if (overrideArtist.isNotBlank()) dao.setArtist(downloadId, overrideArtist)
                         DownloadNotifications.updateProgress(
-                            applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
+                            applicationContext, downloadId, liveTitle.get(), count, computeProgressPercent(),
                             speedMbs = speedMbs, currentBytes = totalBytes, expectedBytes = expectedBytesRef.get(),
                         )
                     }
@@ -898,7 +907,7 @@ class DownloadWorker(
                             // what moves the notification's bar during a single large file (the
                             // other updateProgress call only fires once per finished file).
                             DownloadNotifications.updateProgress(
-                                applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
+                                applicationContext, downloadId, liveTitle.get(), savedCount.get(), computeProgressPercent(),
                                 speedMbs = speedMbs, currentBytes = bytesSoFar.get() + event.downloadedBytes, expectedBytes = expectedBytesRef.get(),
                             )
                         }
@@ -910,7 +919,7 @@ class DownloadWorker(
                         // "Downloading from X" placeholder. gallery-dl has no such early hook — its
                         // downloads rely on derivePosterCaptionTitle once a file lands instead.
                         is EngineEvent.Title -> if (hasPlaceholderTitle && engineNamedTitle.compareAndSet(false, true)) {
-                            dao.updateTitle(downloadId, event.title)
+                            updateTitle(event.title)
                         }
                         // yt-dlp's info_dict metadata or Spotify's scraped metadata — see
                         // DownloadEntity.artist/album/track.
@@ -992,7 +1001,7 @@ class DownloadWorker(
                                     dao.setDownloadedItems(downloadId, count)
                                     com.comfort.app.data.LiveProgress.speed(liveRun, measuredSpeedMbs.get())
                                     DownloadNotifications.updateProgress(
-                                        applicationContext, downloadId, displayTitle, count, computeProgressPercent(),
+                                        applicationContext, downloadId, liveTitle.get(), count, computeProgressPercent(),
                                         speedMbs = measuredSpeedMbs.get(), expectedBytes = expectedBytesRef.get(),
                                     )
                                     // A big download (a whole profile) saves in batches rather than
@@ -1149,7 +1158,7 @@ class DownloadWorker(
                                     measuredSpeedMbs.set(smoothed)
                                     com.comfort.app.data.LiveProgress.speed(liveRun, smoothed)
                                     DownloadNotifications.updateProgress(
-                                        applicationContext, downloadId, displayTitle, savedCount.get(), computeProgressPercent(),
+                                        applicationContext, downloadId, liveTitle.get(), savedCount.get(), computeProgressPercent(),
                                         speedMbs = smoothed, currentBytes = total, expectedBytes = expectedBytesRef.get(),
                                     )
                                 }
@@ -1295,7 +1304,7 @@ class DownloadWorker(
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
                     DownloadLog.line(applicationContext, downloadId, "failed: $errorMsg")
                     dao.setErrorDetails(downloadId, errorDetailsJson())
-                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, errorMsg)
+                    DownloadNotifications.notifyFailed(applicationContext, downloadId, liveTitle.get(), errorMsg)
                     DownloadDispatcher.forgetLock(downloadId)
                     // Result.success(), not failure() — see the isStopped branch above for why:
                     // this download's own ERRORED status is already recorded in our DB; returning
@@ -1332,7 +1341,7 @@ class DownloadWorker(
                 DownloadLog.line(applicationContext, downloadId, "finished: ${savedCount.get()} saved" + (incompleteMessage?.let { ", $it" } ?: ""))
                 val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
                 DownloadNotifications.notifyFinished(
-                    applicationContext, downloadId, displayTitle, savedCount.get(), finalThumbnail, missingItems,
+                    applicationContext, downloadId, liveTitle.get(), savedCount.get(), finalThumbnail, missingItems,
                     notes = synchronized(extraNotes) { extraNotes.toList() },
                 )
                 if (entity?.incognito == true) {
@@ -1386,7 +1395,7 @@ class DownloadWorker(
                     // Not an engine's error (the app itself failed), and the per-engine record is out
                     // of scope here: clear any older details so the sheet shows this message.
                     dao.setErrorDetails(downloadId, null)
-                    DownloadNotifications.notifyFailed(applicationContext, downloadId, displayTitle, sanitized)
+                    DownloadNotifications.notifyFailed(applicationContext, downloadId, liveTitle.get(), sanitized)
                     // Imported from YTDLnis's own "Cleanup leftover downloads" setting — a genuine
                     // failure here (unlike the savedCount==0 branch above, which already ran the
                     // unconditional deleteRecursively() before this catch could ever see it) leaves
