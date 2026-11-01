@@ -988,6 +988,8 @@
     <string name="instant">Сразу</string>
     <string name="download_started">Загрузка началась</string>
     <string name="shows_download_progress_and_completion">Показывает ход и завершение загрузок</string>
+    <string name="download_results_channel">Завершённые загрузки</string>
+    <string name="download_results_channel_description">Сообщает, когда загрузка завершилась или не удалась</string>
     <string name="comfort_is_downloading_in_the_background">Comfort скачивает в фоне</string>
     <string name="starting">Запуск…</string>
     <string name="download_failed">Ошибка загрузки</string>

@@ -860,6 +860,8 @@
     <string name="instant">तुरंत</string>
     <string name="download_started">डाउनलोड शुरू हुआ</string>
     <string name="shows_download_progress_and_completion">डाउनलोड की प्रगति और पूरा होना दिखाता है</string>
+    <string name="download_results_channel">पूरे हुए डाउनलोड</string>
+    <string name="download_results_channel_description">डाउनलोड पूरा होने या विफल होने पर बताता है</string>
     <string name="comfort_is_downloading_in_the_background">Comfort बैकग्राउंड में डाउनलोड कर रहा है</string>
     <string name="starting">शुरू हो रहा है…</string>
     <string name="download_failed">डाउनलोड विफल हुआ</string>

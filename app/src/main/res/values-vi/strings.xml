@@ -860,6 +860,8 @@
     <string name="instant">Ngay lập tức</string>
     <string name="download_started">Đã bắt đầu tải</string>
     <string name="shows_download_progress_and_completion">Hiển thị tiến trình và khi tải xong</string>
+    <string name="download_results_channel">Tải xuống đã xong</string>
+    <string name="download_results_channel_description">Báo khi một lượt tải xong hoặc thất bại</string>
     <string name="comfort_is_downloading_in_the_background">Comfort đang tải xuống trong nền</string>
     <string name="starting">Đang bắt đầu…</string>
     <string name="download_failed">Tải xuống thất bại</string>

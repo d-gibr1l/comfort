@@ -963,6 +963,8 @@
     <string name="instant">Instantâneo</string>
     <string name="download_started">Download iniciado</string>
     <string name="shows_download_progress_and_completion">Mostra o progresso e a conclusão dos downloads</string>
+    <string name="download_results_channel">Downloads concluídos</string>
+    <string name="download_results_channel_description">Avisa quando um download termina ou falha</string>
     <string name="comfort_is_downloading_in_the_background">O Comfort está baixando em segundo plano</string>
     <string name="starting">Iniciando…</string>
     <string name="download_failed">O download falhou</string>

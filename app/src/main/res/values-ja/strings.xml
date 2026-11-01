@@ -860,6 +860,8 @@
     <string name="instant">即時</string>
     <string name="download_started">ダウンロードを開始しました</string>
     <string name="shows_download_progress_and_completion">ダウンロードの進行状況と完了を表示します</string>
+    <string name="download_results_channel">完了したダウンロード</string>
+    <string name="download_results_channel_description">ダウンロードの完了や失敗をお知らせします</string>
     <string name="comfort_is_downloading_in_the_background">Comfort がバックグラウンドでダウンロード中です</string>
     <string name="starting">開始中…</string>
     <string name="download_failed">ダウンロードに失敗しました</string>

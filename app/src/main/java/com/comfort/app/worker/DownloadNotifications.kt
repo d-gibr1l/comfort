@@ -23,6 +23,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 object DownloadNotifications {
     const val CHANNEL_ID = "downloads"
+    // Finished and failed: they sound and pop up, unlike progress (a channel's importance can't be
+    // raised once it exists, so this is a channel of its own). Silenced in the system settings
+    // separately from progress.
+    const val RESULTS_CHANNEL_ID = "download_results"
 
     // How many DownloadWorkers currently have the shared foreground notification "checked out" —
     // see FOREGROUND_SERVICE_NOTIFICATION_ID's doc comment. Only cancel that notification once
@@ -68,15 +72,20 @@ object DownloadNotifications {
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.downloads),
-            NotificationManager.IMPORTANCE_LOW,
-        ).apply {
-            description = context.getString(R.string.shows_download_progress_and_completion)
+        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, context.getString(R.string.downloads), NotificationManager.IMPORTANCE_LOW).apply {
+                    description = context.getString(R.string.shows_download_progress_and_completion)
+                },
+            )
         }
-        manager.createNotificationChannel(channel)
+        if (manager.getNotificationChannel(RESULTS_CHANNEL_ID) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(RESULTS_CHANNEL_ID, context.getString(R.string.download_results_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = context.getString(R.string.download_results_channel_description)
+                },
+            )
+        }
     }
 
     fun notificationId(downloadId: String): Int = downloadId.hashCode()
@@ -266,7 +275,7 @@ object DownloadNotifications {
             safeDownloadedItems > 0 -> context.resources.getQuantityString(R.plurals.items_saved, safeDownloadedItems, safeDownloadedItems)
             else -> context.getString(R.string.nothing_new_to_download)
         }
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, RESULTS_CHANNEL_ID)
             // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
             // still uses — so "this one finished" is visible at a glance in the shade/status bar
             // without having to read the text.
@@ -274,7 +283,7 @@ object DownloadNotifications {
             .setContentTitle(title)
             .setContentText(if (notes.isEmpty()) text else "$text · ${context.getString(R.string.extra_notes_title)}")
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
         if (notes.isNotEmpty()) {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText((listOf(text) + notes).joinToString("\n")))
         }
@@ -350,14 +359,14 @@ object DownloadNotifications {
     }
 
     fun notifyFailed(context: Context, downloadId: String, title: String, errorMessage: String? = null) {
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, RESULTS_CHANNEL_ID)
             // Same idea as notifyFinished's checkmark, mirrored — a distinct error glyph instead
             // of the plain app icon, so a failure reads as clearly wrong at a glance.
             .setSmallIcon(R.drawable.ic_notif_error)
             .setContentTitle(title)
             .setContentText(errorMessage?.takeIf { it.isNotBlank() } ?: context.getString(R.string.download_failed))
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
         notifySafe(context, downloadId, notification)
     }

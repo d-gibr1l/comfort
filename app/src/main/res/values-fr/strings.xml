@@ -966,6 +966,8 @@
     <string name="instant">Immédiat</string>
     <string name="download_started">Téléchargement lancé</string>
     <string name="shows_download_progress_and_completion">Affiche la progression et la fin des téléchargements</string>
+    <string name="download_results_channel">Téléchargements terminés</string>
+    <string name="download_results_channel_description">Prévient quand un téléchargement se termine ou échoue</string>
     <string name="comfort_is_downloading_in_the_background">Comfort télécharge en arrière-plan</string>
     <string name="starting">Démarrage…</string>
     <string name="download_failed">Échec du téléchargement</string>

@@ -860,6 +860,8 @@
     <string name="instant">Anında</string>
     <string name="download_started">İndirme başladı</string>
     <string name="shows_download_progress_and_completion">İndirmenin ilerlemesini ve tamamlanmasını gösterir</string>
+    <string name="download_results_channel">Biten indirmeler</string>
+    <string name="download_results_channel_description">Bir indirme bittiğinde veya başarısız olduğunda bildirir</string>
     <string name="comfort_is_downloading_in_the_background">Comfort arka planda indiriyor</string>
     <string name="starting">Başlatılıyor…</string>
     <string name="download_failed">İndirme başarısız oldu</string>

@@ -860,6 +860,8 @@
     <string name="instant">מיידי</string>
     <string name="download_started">ההורדה התחילה</string>
     <string name="shows_download_progress_and_completion">מציג את התקדמות ההורדה והשלמתה</string>
+    <string name="download_results_channel">הורדות שהסתיימו</string>
+    <string name="download_results_channel_description">מודיע כשהורדה מסתיימת או נכשלת</string>
     <string name="comfort_is_downloading_in_the_background">Comfort מוריד ברקע</string>
     <string name="starting">מתחיל…</string>
     <string name="download_failed">ההורדה נכשלה</string>

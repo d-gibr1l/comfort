@@ -941,6 +941,8 @@
     <string name="instant">Sofort</string>
     <string name="download_started">Download gestartet</string>
     <string name="shows_download_progress_and_completion">Zeigt Fortschritt und Abschluss von Downloads</string>
+    <string name="download_results_channel">Fertige Downloads</string>
+    <string name="download_results_channel_description">Meldet, wenn ein Download fertig ist oder fehlschlägt</string>
     <string name="comfort_is_downloading_in_the_background">Comfort lädt im Hintergrund herunter</string>
     <string name="starting">Startet…</string>
     <string name="download_failed">Download fehlgeschlagen</string>

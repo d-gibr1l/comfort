@@ -860,6 +860,8 @@
     <string name="instant">فوری</string>
     <string name="download_started">دانلود شروع شد</string>
     <string name="shows_download_progress_and_completion">پیشرفت و پایان دانلود را نشان می‌دهد</string>
+    <string name="download_results_channel">دانلودهای تمام‌شده</string>
+    <string name="download_results_channel_description">وقتی دانلودی تمام شود یا ناموفق باشد خبر می‌دهد</string>
     <string name="comfort_is_downloading_in_the_background">Comfort در پس‌زمینه دانلود می‌کند</string>
     <string name="starting">در حال شروع…</string>
     <string name="download_failed">دانلود ناموفق بود</string>

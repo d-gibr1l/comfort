@@ -926,6 +926,8 @@
     <string name="instant">Langsung</string>
     <string name="download_started">Unduhan dimulai</string>
     <string name="shows_download_progress_and_completion">Menampilkan progres dan penyelesaian unduhan</string>
+    <string name="download_results_channel">Unduhan selesai</string>
+    <string name="download_results_channel_description">Memberi tahu saat unduhan selesai atau gagal</string>
     <string name="comfort_is_downloading_in_the_background">Comfort sedang mengunduh di latar belakang</string>
     <string name="starting">Memulai…</string>
     <string name="download_failed">Unduhan gagal</string>

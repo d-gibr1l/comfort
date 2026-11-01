@@ -991,6 +991,8 @@
     <string name="download_started">Download started</string>
     <!-- DownloadNotifications.kt -->
     <string name="shows_download_progress_and_completion">Shows download progress and completion</string>
+    <string name="download_results_channel">Finished downloads</string>
+    <string name="download_results_channel_description">Says when a download finishes or fails</string>
     <string name="comfort_is_downloading_in_the_background">Comfort is downloading in the background</string>
     <string name="starting">Starting…</string>
     <string name="download_failed">Download failed</string>
