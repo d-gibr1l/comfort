@@ -289,11 +289,15 @@ fun DownloadEventSnackbars(
     }
 
     var seenErroredIds by remember { mutableStateOf<Set<String>?>(null) }
+    // Every download in the queue at the last look: one that wasn't there (an errored download
+    // brought back by the removal's Undo) didn't just fail — it said "X failed" again on Undo.
+    var seenQueueIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     LaunchedEffect(queueItems) {
         val erroredNow = queueItems.filter { it.status == DownloadStatus.ERRORED }.map { it.id }.toSet()
         val previous = seenErroredIds
         if (previous != null) {
-            val failed = (erroredNow - previous).mapNotNull { id -> queueItems.firstOrNull { it.id == id } }
+            val failed = (erroredNow - previous).filter { it in seenQueueIds }
+                .mapNotNull { id -> queueItems.firstOrNull { it.id == id } }
             val message = when (failed.size) {
                 0 -> null
                 1 -> failed[0].title.ifBlank { eventsContext.getString(R.string.download_untitled) }.let { title ->
@@ -308,6 +312,7 @@ fun DownloadEventSnackbars(
             }
         }
         seenErroredIds = erroredNow
+        seenQueueIds = queueItems.map { it.id }.toSet()
     }
 }
 

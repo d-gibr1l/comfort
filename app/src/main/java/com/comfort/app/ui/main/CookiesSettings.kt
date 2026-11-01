@@ -323,7 +323,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             val text = site.cookies.joinToString("\n") { it.rawLine }
                             scope.launch {
                                 runCatching {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(context.getString(R.string.x_cookies, site.label), text)))
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip(context.getString(R.string.x_cookies, site.label), text)))
                                     Toast.makeText(context, context.getString(R.string.copied_x_cookies_to_clipboard, site.label), Toast.LENGTH_SHORT).show()
                                 }
                             }
@@ -366,7 +366,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             scope.launch {
                                 runCatching {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText("cookies.txt", savedCookiesContent)))
+                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip("cookies.txt", savedCookiesContent)))
                                     Toast.makeText(context, context.getString(R.string.copied_all_cookies_to_clipboard), Toast.LENGTH_SHORT).show()
                                 }
                             }
@@ -402,7 +402,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             onCopy = { label, text ->
                 scope.launch {
                     runCatching {
-                        clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(android.content.ClipData.newPlainText(label, text)))
+                        clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip(label, text)))
                         Toast.makeText(context, context.getString(R.string.copied_x_to_clipboard, label), Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -448,6 +448,14 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
 private sealed class PendingCookieDelete {
     data class Site(val site: SiteCookies) : PendingCookieDelete()
     data object All : PendingCookieDelete()
+}
+
+/** A clip of logins, marked sensitive (Android 13+): the system's copy preview hides it, and
+ * keyboards keep it out of their clipboard history, where the cookies stayed readable. */
+private fun sensitiveClip(label: String, text: String) = android.content.ClipData.newPlainText(label, text).apply {
+    description.extras = android.os.PersistableBundle().apply {
+        putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+    }
 }
 
 /** Viewer/editor for one site's saved cookies: each cookie's name with its value in an editable
