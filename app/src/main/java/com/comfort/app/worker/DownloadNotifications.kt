@@ -28,6 +28,15 @@ object DownloadNotifications {
     // separately from progress.
     const val RESULTS_CHANNEL_ID = "download_results"
 
+    /** The finished/failed notice's channel: the quiet one while Comfort is on screen, where the
+     * download's card and the Library already show it — a pop-up over the app said it twice. */
+    private fun resultsChannel(context: Context): String {
+        val state = android.app.ActivityManager.RunningAppProcessInfo()
+        android.app.ActivityManager.getMyMemoryState(state)
+        // FOREGROUND only with an activity showing: a download's foreground service alone is less.
+        return if (state.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) CHANNEL_ID else RESULTS_CHANNEL_ID
+    }
+
     // How many DownloadWorkers currently have the shared foreground notification "checked out" —
     // see FOREGROUND_SERVICE_NOTIFICATION_ID's doc comment. Only cancel that notification once
     // this drops back to zero, so one download finishing doesn't wipe it out from under sibling
@@ -275,7 +284,7 @@ object DownloadNotifications {
             safeDownloadedItems > 0 -> context.resources.getQuantityString(R.plurals.items_saved, safeDownloadedItems, safeDownloadedItems)
             else -> context.getString(R.string.nothing_new_to_download)
         }
-        val builder = NotificationCompat.Builder(context, RESULTS_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, resultsChannel(context))
             // A distinct checkmark icon, not the plain app icon the ongoing/progress notification
             // still uses — so "this one finished" is visible at a glance in the shade/status bar
             // without having to read the text.
@@ -359,7 +368,7 @@ object DownloadNotifications {
     }
 
     fun notifyFailed(context: Context, downloadId: String, title: String, errorMessage: String? = null) {
-        val notification = NotificationCompat.Builder(context, RESULTS_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, resultsChannel(context))
             // Same idea as notifyFinished's checkmark, mirrored — a distinct error glyph instead
             // of the plain app icon, so a failure reads as clearly wrong at a glance.
             .setSmallIcon(R.drawable.ic_notif_error)
