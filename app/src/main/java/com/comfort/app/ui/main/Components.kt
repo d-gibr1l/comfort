@@ -234,20 +234,41 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
     }
 }
 
-/** The snackbar job each host is showing or waiting to show: [showReplacing] cancels it, so a new
- * snackbar replaces the current one instead of queueing behind it. Main thread only. */
-private val currentSnackbarJobs = java.util.WeakHashMap<SnackbarHostState, kotlinx.coroutines.Job>()
+/** What a host is showing or waiting to show: [job], and [undo], the delete-Undo snackbar's job
+ * pending on that host (the same job when the Undo is what's showing). Main thread only. */
+private class ShownSnackbar(val job: kotlinx.coroutines.Job, val undo: kotlinx.coroutines.Job?)
+
+private val currentSnackbarJobs = java.util.WeakHashMap<SnackbarHostState, ShownSnackbar>()
 
 /** Launches [show] (a showSnackbar call on [host]) in place of whatever [host] is showing or still
  * has waiting. SnackbarHostState shows one at a time and queues the rest, so after a burst (Retry
  * All, several deletes) each dismissed snackbar made an older one appear — reported as "old
  * snackbars keep appearing". A replaced delete-undo snackbar ends its Undo window (its finally
  * runs), the same as letting it time out. */
-fun kotlinx.coroutines.CoroutineScope.showReplacing(host: SnackbarHostState, show: suspend () -> Unit): kotlinx.coroutines.Job {
-    currentSnackbarJobs[host]?.cancel()
-    val job = launch { show() }
-    currentSnackbarJobs[host] = job
-    job.invokeOnCompletion { if (currentSnackbarJobs[host] === job) currentSnackbarJobs.remove(host) }
+fun kotlinx.coroutines.CoroutineScope.showReplacing(
+    host: SnackbarHostState,
+    isUndo: Boolean = false,
+    show: suspend () -> Unit,
+): kotlinx.coroutines.Job {
+    val current = currentSnackbarJobs[host]
+    val pendingUndo = current?.undo?.takeIf { it.isActive }
+    // A pending delete-Undo is only replaced by another delete (which commits the first, as
+    // before). Anything else — a download finished/failed, an engine update — waits behind it:
+    // replacing it ended its Undo window early and committed the delete (with "Delete from
+    // phone", the file), two seconds in, because some other download happened to fail.
+    if (isUndo) {
+        current?.job?.cancel()
+        pendingUndo?.cancel()
+    } else if (current != null && current.job !== pendingUndo) {
+        current.job.cancel()
+    }
+    lateinit var job: kotlinx.coroutines.Job
+    job = launch {
+        if (!isUndo) pendingUndo?.join()
+        show()
+    }
+    currentSnackbarJobs[host] = ShownSnackbar(job, if (isUndo) job else pendingUndo)
+    job.invokeOnCompletion { if (currentSnackbarJobs[host]?.job === job) currentSnackbarJobs.remove(host) }
     return job
 }
 
@@ -269,12 +290,20 @@ fun DownloadEventSnackbars(
     val eventsContext = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Every download seen in the queue while this screen is open: only those can "finish" here. An
+    // entry reaching the history any other way (the deleted-files scan finding a file again, a
+    // restore) was announced as "Download finished" for something done weeks ago. Kept, not
+    // replaced on each queue change: the two lists update separately, so a download can already
+    // have left the queue when the history shows it.
+    var everQueuedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(queueItems) { everQueuedIds = everQueuedIds + queueItems.map { it.id } }
     var seenFinishedIds by remember { mutableStateOf<Set<String>?>(null) }
     LaunchedEffect(historyItems) {
         val currentIds = historyItems.map { it.id }.toSet()
         val previous = seenFinishedIds
         if (previous != null) {
-            val finished = (currentIds - previous).mapNotNull { id -> historyItems.firstOrNull { it.id == id } }
+            val finished = (currentIds - previous).filter { it in everQueuedIds }
+                .mapNotNull { id -> historyItems.firstOrNull { it.id == id } }
             // Several at once read as one snackbar ("3 downloads finished"), not a row of them.
             val message = when (finished.size) {
                 0 -> null
@@ -480,7 +509,7 @@ fun rememberUndoableDelete(
     return { ids ->
         if (ids.isNotEmpty()) {
             viewModel.hideForDeletion(ids)
-            scope.showReplacing(snackbarHostState) {
+            scope.showReplacing(snackbarHostState, isUndo = true) {
                 var undone = false
                 try {
                     val result = snackbarHostState.showSnackbar(
