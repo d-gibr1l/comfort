@@ -847,6 +847,12 @@
         <item quantity="many">%d de downloads removidos</item>
         <item quantity="other">%d downloads removidos</item>
     </plurals>
+    <string name="delete_from_phone">Apagar do celular</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="one">%d download apagado do celular</item>
+        <item quantity="many">%d downloads apagados do celular</item>
+        <item quantity="other">%d downloads apagados do celular</item>
+    </plurals>
     <string name="item_a11y_selected">%1$s %2$s, selecionado</string>
     <string name="item_a11y_not_selected">%1$s %2$s, não selecionado</string>
     <string name="saved_the_p_copy">Cópia em %1$sp salva</string>
@@ -1053,6 +1059,7 @@
     <string name="failed_to_load_link">Não foi possível carregar o link</string>
     <string name="downloading_from_x">Baixando de %1$s</string>
     <string name="couldn_t_update_engine">Não foi possível atualizar o %1$s: %2$s</string>
+    <string name="engine_updated_to">%1$s atualizado para %2$s</string>
     <string name="listing_couldnt_check">Não foi possível verificar este link — o download ainda pode funcionar, mas o conteúdo não pôde ser pré-visualizado.</string>
     <string name="listing_couldnt_check_spotify">Não foi possível verificar este link do Spotify — o download ainda pode funcionar, mas o conteúdo não pôde ser pré-visualizado.</string>
     <string name="couldnt_download_update">Não foi possível baixar a atualização: %1$s</string>

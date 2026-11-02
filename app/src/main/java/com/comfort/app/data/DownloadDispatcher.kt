@@ -729,6 +729,18 @@ object DownloadDispatcher {
     }
 
     /** Cancels any in-flight job, drops the row, and cleans up its download-archive file. */
+    /** The files download [id] saved to the phone, for "Delete from phone": each one it recorded
+     * (SavedFile, every file of a post) and its main file. A song's thumbnailPath is a copy of its
+     * cover art in the app's cache, not one of them; its mediaUri is the song. */
+    suspend fun savedFileUris(context: Context, id: String): Set<android.net.Uri> {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        val entity = dao.getById(id) ?: return emptySet()
+        val main = if (entity.isAudio) entity.mediaUri else (entity.mediaUri ?: entity.thumbnailPath)
+        return (dao.savedFiles(id).map { it.uri } + listOfNotNull(main))
+            .filter { it.startsWith("content://") }
+            .mapTo(LinkedHashSet()) { android.net.Uri.parse(it) }
+    }
+
     suspend fun deleteDownload(context: Context, id: String) {
         if (id.isBlank()) return
         withDownloadLock(id) {

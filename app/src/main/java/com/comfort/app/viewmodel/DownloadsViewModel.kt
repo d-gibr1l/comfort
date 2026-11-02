@@ -439,6 +439,36 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** Gallery files Android wants the user's OK to delete (see confirmDeleteFromPhone): MainScreen
+     * shows the system's own dialog for them. */
+    private val _deleteConsent = kotlinx.coroutines.flow.MutableSharedFlow<android.content.IntentSender>(extraBufferCapacity = 1)
+    val deleteConsent: kotlinx.coroutines.flow.SharedFlow<android.content.IntentSender> = _deleteConsent
+
+    /** [confirmDelete], and the downloads' files deleted from the phone too ("Delete from phone").
+     * For good: they're deleted once the Undo window has passed, like the rows. Files the app may
+     * not delete on its own are asked about in the system's dialog (Android 11+); turned down,
+     * they stay, as they would with Remove. */
+    fun confirmDeleteFromPhone(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            try {
+                val needConsent = withContext(Dispatchers.IO) {
+                    val uris = ids.flatMap { DownloadDispatcher.savedFileUris(context, it) }
+                    MediaStoreHelper.deleteSavedFiles(context, uris)
+                }
+                ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
+                if (needConsent.isNotEmpty() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    runCatching {
+                        _deleteConsent.emit(android.provider.MediaStore.createDeleteRequest(context.contentResolver, needConsent).intentSender)
+                    }
+                }
+            } finally {
+                _deletingIds.update { it - ids }
+            }
+        }
+    }
+
     /** Reverses [hideForDeletion] — the user tapped Undo before [confirmDelete] ever ran, so
      * nothing was actually deleted and this just un-hides the ids. */
     fun cancelDeletion(ids: Set<String>) {

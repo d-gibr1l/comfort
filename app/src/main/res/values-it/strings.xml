@@ -905,6 +905,7 @@
     <string name="failed_to_load_link">Caricamento del link non riuscito</string>
     <string name="downloading_from_x">Download da %1$s</string>
     <string name="couldn_t_update_engine">Impossibile aggiornare %1$s: %2$s</string>
+    <string name="engine_updated_to">%1$s aggiornato alla %2$s</string>
     <string name="listing_couldnt_check">Impossibile controllare questo link — il download potrebbe comunque funzionare, ma non è stato possibile mostrarne l\'anteprima.</string>
     <string name="listing_couldnt_check_spotify">Impossibile controllare questo link di Spotify — il download potrebbe comunque funzionare, ma non è stato possibile mostrarne l\'anteprima.</string>
     <string name="couldnt_download_update">Impossibile scaricare l\'aggiornamento: %1$s</string>
@@ -1046,6 +1047,12 @@
     <plurals name="downloads_removed">
         <item quantity="one">Download rimosso</item>
         <item quantity="other">%d download rimossi</item>
+    </plurals>
+    <string name="delete_from_phone">Elimina dal telefono</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="one">%d download eliminato dal telefono</item>
+        <item quantity="many">%d download eliminati dal telefono</item>
+        <item quantity="other">%d download eliminati dal telefono</item>
     </plurals>
     <plurals name="active_downloads_count">
         <item quantity="one">%d download attivo</item>

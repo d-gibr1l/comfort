@@ -59,6 +59,15 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
     val anyUpdateAvailable: StateFlow<Boolean> = combine(engineUpdateAvailable, appUpdateAvailable) { e, a -> e || a }
         .stateIn(viewModelScope, SharingStarted.Eagerly, engineUpdateAvailable.value || appUpdateAvailable.value)
 
+    /** "yt-dlp updated to 2026.10.31", once each engine update finishes — tapped or automatic.
+     * MainScreen shows it as a snackbar, on whichever tab is open. */
+    private val _engineUpdated = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val engineUpdated: kotlinx.coroutines.flow.SharedFlow<String> = _engineUpdated
+
+    private fun announceUpdate(status: EngineUpdater.VersionStatus, newVersion: String) {
+        _engineUpdated.tryEmit(context.getString(com.comfort.app.R.string.engine_updated_to, status.engine.displayName, newVersion))
+    }
+
     private var launchChecked = false
 
     /** Home's once-per-launch checks, each rate-limited by its own interval so relaunching doesn't
@@ -72,7 +81,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             withContext(Dispatchers.IO) { PythonRuntime.ensureProvisioned(context) }
             val lastEngineCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
             if (System.currentTimeMillis() - lastEngineCheck >= GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) {
-                publishEngines(EngineUpdater.checkAndAutoUpdate(context))
+                publishEngines(EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate))
             }
         }
         viewModelScope.launch {
@@ -88,7 +97,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
         _checkingEngines.value = true
         viewModelScope.launch {
             try {
-                publishEngines(EngineUpdater.checkAndAutoUpdate(context))
+                publishEngines(EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate))
             } finally {
                 _checkingEngines.value = false
             }
@@ -111,6 +120,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val result = EngineUpdater.update(context, status)
                 result.onSuccess { newVersion ->
+                    announceUpdate(status, newVersion)
                     val updated = _engineStatuses.value.orEmpty().map {
                         if (it.engine == status.engine) it.copy(installedVersion = newVersion) else it
                     }

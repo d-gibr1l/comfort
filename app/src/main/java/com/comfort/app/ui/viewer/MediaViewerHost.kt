@@ -84,6 +84,7 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
     }
     val snackbar = remember { SnackbarHostState() }
     val requestDelete = rememberUndoableDelete(viewModel, snackbar)
+    val requestDeleteFromPhone = rememberUndoableDelete(viewModel, snackbar, fromPhone = true)
 
     BackHandler(onBack = onClose)
 
@@ -139,6 +140,15 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
                             scope.launch {
                                 clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.post_link), download.url)))
                             }
+                        },
+                    )
+                    // The whole post's files, like the Library's (its Delete removes the entry only).
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete_from_phone), color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_delete), contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            close()
+                            requestDeleteFromPhone(setOf(download.id))
                         },
                     )
                 },

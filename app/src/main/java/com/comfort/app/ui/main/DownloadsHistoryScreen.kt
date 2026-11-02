@@ -173,6 +173,7 @@ fun DownloadsHistoryScreen(
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
     // see rememberUndoableDelete.
     val requestDelete = rememberUndoableDelete(viewModel, snackbarHostState)
+    val requestDeleteFromPhone = rememberUndoableDelete(viewModel, snackbarHostState, fromPhone = true)
 
     // MainScreen keeps this screen composed underneath the Download Queue overlay now (needed for
     // the predictive-back reveal animation), where it used to fully unmount and remount — which
@@ -649,6 +650,7 @@ fun DownloadsHistoryScreen(
                             onLongPress = { selectedIds = selectedIds + item.id },
                             onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
                             onDelete = { requestDelete(setOf(item.id)) },
+                            onDeleteFromPhone = { requestDeleteFromPhone(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
@@ -680,6 +682,7 @@ fun DownloadsHistoryScreen(
                             onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
                             durationMs = shapes[item.id]?.durationMs,
                             onDelete = { requestDelete(setOf(item.id)) },
+                            onDeleteFromPhone = { requestDeleteFromPhone(setOf(item.id)) },
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
@@ -827,6 +830,13 @@ fun DownloadsHistoryScreen(
                         selectedIds = emptySet()
                     }) {
                         Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.remove_selected))
+                    }
+                    // The selected downloads' files too (Remove leaves them in the gallery).
+                    IconButton(onClick = {
+                        requestDeleteFromPhone(selectedIds)
+                        selectedIds = emptySet()
+                    }) {
+                        Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.delete_from_phone), tint = MaterialTheme.colorScheme.error)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

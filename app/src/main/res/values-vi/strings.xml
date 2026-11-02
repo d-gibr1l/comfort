@@ -905,6 +905,7 @@
     <string name="failed_to_load_link">Không tải được liên kết</string>
     <string name="downloading_from_x">Đang tải từ %1$s</string>
     <string name="couldn_t_update_engine">Không thể cập nhật %1$s: %2$s</string>
+    <string name="engine_updated_to">Đã cập nhật %1$s lên %2$s</string>
     <string name="listing_couldnt_check">Không thể kiểm tra liên kết này — lượt tải có thể vẫn chạy được, nhưng không xem trước được nội dung.</string>
     <string name="listing_couldnt_check_spotify">Không thể kiểm tra liên kết Spotify này — lượt tải có thể vẫn chạy được, nhưng không xem trước được nội dung.</string>
     <string name="couldnt_download_update">Không thể tải bản cập nhật: %1$s</string>
@@ -1026,6 +1027,10 @@
     </plurals>
     <plurals name="downloads_removed">
         <item quantity="other">Đã xóa %d lượt tải</item>
+    </plurals>
+    <string name="delete_from_phone">Xóa khỏi điện thoại</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="other">Đã xóa %d lượt tải khỏi điện thoại</item>
     </plurals>
     <plurals name="active_downloads_count">
         <item quantity="other">%d lượt tải đang chạy</item>

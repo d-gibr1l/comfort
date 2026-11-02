@@ -905,6 +905,7 @@
     <string name="failed_to_load_link">लिंक लोड नहीं हुआ</string>
     <string name="downloading_from_x">%1$s से डाउनलोड हो रहा है</string>
     <string name="couldn_t_update_engine">%1$s अपडेट नहीं हो सका: %2$s</string>
+    <string name="engine_updated_to">%1$s को %2$s में अपडेट किया गया</string>
     <string name="listing_couldnt_check">यह लिंक जाँचा नहीं जा सका — डाउनलोड फिर भी चल सकता है, पर इसकी सामग्री का प्रीव्यू नहीं हो सका।</string>
     <string name="listing_couldnt_check_spotify">यह Spotify लिंक जाँचा नहीं जा सका — डाउनलोड फिर भी चल सकता है, पर इसकी सामग्री का प्रीव्यू नहीं हो सका।</string>
     <string name="couldnt_download_update">अपडेट डाउनलोड नहीं हो सका: %1$s</string>
@@ -1046,6 +1047,11 @@
     <plurals name="downloads_removed">
         <item quantity="one">%d डाउनलोड हटाया गया</item>
         <item quantity="other">%d डाउनलोड हटाए गए</item>
+    </plurals>
+    <string name="delete_from_phone">फ़ोन से हटाएँ</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="one">%d डाउनलोड फ़ोन से हटाया गया</item>
+        <item quantity="other">%d डाउनलोड फ़ोन से हटाए गए</item>
     </plurals>
     <plurals name="active_downloads_count">
         <item quantity="one">%d चल रहे डाउनलोड</item>

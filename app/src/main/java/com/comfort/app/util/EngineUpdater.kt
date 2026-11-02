@@ -251,16 +251,21 @@ object EngineUpdater {
     // One install at a time, so an auto-update and a tapped Update can't swap the same engine twice.
     private val installMutex = Mutex()
 
-    suspend fun checkAndAutoUpdate(context: Context): List<VersionStatus> = autoUpdateMutex.withLock { checkAndAutoUpdateLocked(context) }
+    /** [onUpdated] hears about each engine it installs a new version of (name, new version). */
+    suspend fun checkAndAutoUpdate(context: Context, onUpdated: (VersionStatus, String) -> Unit = { _, _ -> }): List<VersionStatus> =
+        autoUpdateMutex.withLock { checkAndAutoUpdateLocked(context, onUpdated) }
 
-    private suspend fun checkAndAutoUpdateLocked(context: Context): List<VersionStatus> = withContext(Dispatchers.IO) {
+    private suspend fun checkAndAutoUpdateLocked(context: Context, onUpdated: (VersionStatus, String) -> Unit): List<VersionStatus> = withContext(Dispatchers.IO) {
         PythonRuntime.ensureProvisioned(context)
         var statuses = checkAll(context)
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
             statuses = statuses.map { status ->
                 // A turned-off engine never runs, so it isn't worth the data to keep updated.
                 if (status.updateAvailable && status.artifactUrl != null && isOn(context, status.engine)) {
-                    update(context, status).getOrNull()?.let { newVersion -> status.copy(installedVersion = newVersion) } ?: status
+                    update(context, status).getOrNull()?.let { newVersion ->
+                        onUpdated(status, newVersion)
+                        status.copy(installedVersion = newVersion)
+                    } ?: status
                 } else {
                     status
                 }

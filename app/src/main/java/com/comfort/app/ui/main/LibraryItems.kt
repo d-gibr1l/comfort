@@ -213,6 +213,7 @@ internal fun HistoryGridItem(
     onOpen: () -> Unit,
     onLongPress: () -> Unit,
     onDelete: () -> Unit,
+    onDeleteFromPhone: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRename: (String) -> Unit,
     onRedownload: () -> Unit,
@@ -335,6 +336,7 @@ internal fun HistoryGridItem(
                     onRedownload = onRedownload,
                     onDownloadMissing = onDownloadMissing,
                     onDelete = onDelete,
+                    onDeleteFromPhone = onDeleteFromPhone,
                 )
             }
         }
@@ -467,6 +469,7 @@ internal fun HistoryRow(
     onLongPress: () -> Unit,
     durationMs: Long?,
     onDelete: () -> Unit,
+    onDeleteFromPhone: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRename: (String) -> Unit,
     onRedownload: () -> Unit,
@@ -650,6 +653,7 @@ internal fun HistoryRow(
                 onRedownload = onRedownload,
                 onDownloadMissing = onDownloadMissing,
                 onDelete = onDelete,
+                onDeleteFromPhone = onDeleteFromPhone,
             )
         }
     }
@@ -668,6 +672,7 @@ private fun DownloadActionsMenu(
     onRedownload: () -> Unit,
     onDownloadMissing: () -> Unit,
     onDelete: () -> Unit,
+    onDeleteFromPhone: () -> Unit,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -766,6 +771,15 @@ private fun DownloadActionsMenu(
             leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
             onClick = { onDismiss(); onDelete() },
         )
+        // The files as well as the entry, for good (once the snackbar's Undo has passed). Not for a
+        // download whose file is already gone: Remove is all there is to do then.
+        if (!fileGone) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.delete_from_phone), color = MaterialTheme.colorScheme.error) },
+                leadingIcon = { Icon(Icons.Outlined.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                onClick = { onDismiss(); onDeleteFromPhone() },
+            )
+        }
     }
 }
 

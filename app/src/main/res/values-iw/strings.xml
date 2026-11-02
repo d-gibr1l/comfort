@@ -905,6 +905,7 @@
     <string name="failed_to_load_link">טעינת הקישור נכשלה</string>
     <string name="downloading_from_x">מוריד מ-%1$s</string>
     <string name="couldn_t_update_engine">עדכון %1$s נכשל: %2$s</string>
+    <string name="engine_updated_to">%1$s עודכן לגרסה %2$s</string>
     <string name="listing_couldnt_check">לא ניתן לבדוק את הקישור הזה — ייתכן שההורדה עדיין תעבוד, אבל לא ניתן היה להציג את התוכן שלו.</string>
     <string name="listing_couldnt_check_spotify">לא ניתן לבדוק את קישור ה-Spotify הזה — ייתכן שההורדה עדיין תעבוד, אבל לא ניתן היה להציג את התוכן שלו.</string>
     <string name="couldnt_download_update">הורדת העדכון נכשלה: %1$s</string>
@@ -1066,6 +1067,12 @@
         <item quantity="one">ההורדה הוסרה</item>
         <item quantity="two">%d הורדות הוסרו</item>
         <item quantity="other">%d הורדות הוסרו</item>
+    </plurals>
+    <string name="delete_from_phone">מחיקה מהטלפון</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="one">הורדה אחת נמחקה מהטלפון</item>
+        <item quantity="two">%d הורדות נמחקו מהטלפון</item>
+        <item quantity="other">%d הורדות נמחקו מהטלפון</item>
     </plurals>
     <plurals name="active_downloads_count">
         <item quantity="one">הורדה פעילה אחת</item>

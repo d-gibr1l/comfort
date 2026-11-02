@@ -194,6 +194,16 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     val updates = updatesViewModel()
     val anyUpdateAvailable by updates.anyUpdateAvailable.collectAsState()
     LaunchedEffect(Unit) { updates.runLaunchChecks() }
+    // "Delete from phone" on gallery files Android won't let the app delete on its own (made
+    // before a reinstall, say): the system's own dialog asks the user (DownloadsViewModel.deleteConsent).
+    val deleteConsentLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
+    ) {}
+    LaunchedEffect(viewModel) {
+        viewModel.deleteConsent.collect { sender ->
+            runCatching { deleteConsentLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build()) }
+        }
+    }
 
     // Deliberately not Scaffold's own bottomBar slot: Scaffold reserves that whole slot's
     // measured region — pill height plus FloatingNavBar's own 24dp/16dp padding — and paints
@@ -524,6 +534,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
             librarySnackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance()),
         )
+        // An engine update finishing (tapped in Settings, or automatic at launch), on any tab.
+        LaunchedEffect(updates) {
+            updates.engineUpdated.collect { message ->
+                librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = message))
+            }
+        }
 
         // Rendered on top of (not instead of) the tab content above, specifically so the tab
         // underneath is actually visible while mid-swipe — an early-return here (the previous

@@ -850,6 +850,12 @@
         <item quantity="many">%d téléchargements supprimés</item>
         <item quantity="other">%d téléchargements supprimés</item>
     </plurals>
+    <string name="delete_from_phone">Supprimer du téléphone</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="one">%d téléchargement supprimé du téléphone</item>
+        <item quantity="many">%d téléchargements supprimés du téléphone</item>
+        <item quantity="other">%d téléchargements supprimés du téléphone</item>
+    </plurals>
     <string name="item_a11y_selected">%1$s %2$s, sélectionné</string>
     <string name="item_a11y_not_selected">%1$s %2$s, non sélectionné</string>
     <string name="saved_the_p_copy">Copie en %1$sp enregistrée</string>
@@ -1057,6 +1063,7 @@
     <string name="failed_to_load_link">Impossible de charger le lien</string>
     <string name="downloading_from_x">Téléchargement depuis %1$s</string>
     <string name="couldn_t_update_engine">Impossible de mettre à jour %1$s\u00A0: %2$s</string>
+    <string name="engine_updated_to">%1$s mis à jour vers %2$s</string>
     <string name="listing_couldnt_check">Impossible de vérifier ce lien — le téléchargement peut quand même marcher, mais son contenu n\'a pas pu être prévisualisé.</string>
     <string name="listing_couldnt_check_spotify">Impossible de vérifier ce lien Spotify — le téléchargement peut quand même marcher, mais son contenu n\'a pas pu être prévisualisé.</string>
     <string name="couldnt_download_update">Impossible de télécharger la mise à jour\u00A0: %1$s</string>

@@ -819,6 +819,10 @@
         <item quantity="one">%d unduhan dihapus</item>
         <item quantity="other">%d unduhan dihapus</item>
     </plurals>
+    <string name="delete_from_phone">Hapus dari ponsel</string>
+    <plurals name="downloads_deleted_from_phone">
+        <item quantity="other">%d unduhan dihapus dari ponsel</item>
+    </plurals>
     <string name="item_a11y_selected">%1$s %2$s, dipilih</string>
     <string name="item_a11y_not_selected">%1$s %2$s, tidak dipilih</string>
     <string name="saved_the_p_copy">Salinan %1$sp disimpan</string>
@@ -1006,6 +1010,7 @@
     <string name="failed_to_load_link">Gagal memuat tautan</string>
     <string name="downloading_from_x">Mengunduh dari %1$s</string>
     <string name="couldn_t_update_engine">Tidak bisa memperbarui %1$s: %2$s</string>
+    <string name="engine_updated_to">%1$s diperbarui ke %2$s</string>
     <string name="listing_couldnt_check">Tidak bisa memeriksa tautan ini — unduhan mungkin tetap berhasil, tapi isinya tidak bisa dipratinjau.</string>
     <string name="listing_couldnt_check_spotify">Tidak bisa memeriksa tautan Spotify ini — unduhan mungkin tetap berhasil, tapi isinya tidak bisa dipratinjau.</string>
     <string name="couldnt_download_update">Tidak bisa mengunduh pembaruan: %1$s</string>

@@ -152,6 +152,29 @@ object MediaStoreHelper {
         }.getOrDefault(failOpen)
     }
 
+    /** Deletes saved files from the phone (the Library's "Delete from phone"): a gallery file
+     * through MediaStore, one in a folder the user picked through that folder's grant. Returns the
+     * gallery files Android won't let the app delete on its own — ones it didn't create, such as
+     * from before a reinstall — which need the user's OK (MediaStore.createDeleteRequest). A file
+     * that's already gone, or in a folder whose grant was taken back, is left as it is. */
+    fun deleteSavedFiles(context: Context, uris: Collection<Uri>): List<Uri> {
+        val needConsent = mutableListOf<Uri>()
+        for (uri in uris) {
+            try {
+                if (uri.authority == MediaStore.AUTHORITY) {
+                    context.contentResolver.delete(uri, null, null)
+                } else if (android.provider.DocumentsContract.isDocumentUri(context, uri)) {
+                    android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri)
+                }
+            } catch (e: SecurityException) {
+                if (uri.authority == MediaStore.AUTHORITY) needConsent += uri
+            } catch (e: Exception) {
+                android.util.Log.w("MediaStoreHelper", "Couldn't delete $uri", e)
+            }
+        }
+        return needConsent
+    }
+
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if
      * one is set, otherwise Download/Comfort's subfolder for its type — and returns its
      * content Uri. */

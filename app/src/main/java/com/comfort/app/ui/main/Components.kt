@@ -472,6 +472,8 @@ fun thumbnailShape(): Shape = androidx.compose.material3.MaterialShapes.Cookie4S
 fun rememberUndoableDelete(
     viewModel: com.comfort.app.viewmodel.DownloadsViewModel,
     snackbarHostState: SnackbarHostState,
+    // "Delete from phone": the files go too, once the Undo window has passed.
+    fromPhone: Boolean = false,
 ): (Set<String>) -> Unit {
     val scope = rememberCoroutineScope()
     val removeContext = androidx.compose.ui.platform.LocalContext.current
@@ -482,14 +484,20 @@ fun rememberUndoableDelete(
                 var undone = false
                 try {
                     val result = snackbarHostState.showSnackbar(
-                        message = removeContext.resources.getQuantityString(R.plurals.downloads_removed, ids.size, ids.size),
+                        message = removeContext.resources.getQuantityString(
+                            if (fromPhone) R.plurals.downloads_deleted_from_phone else R.plurals.downloads_removed, ids.size, ids.size,
+                        ),
                         actionLabel = removeContext.getString(R.string.undo),
                         duration = SnackbarDuration.Short,
                     )
                     undone = (result == androidx.compose.material3.SnackbarResult.ActionPerformed)
                 } finally {
                     withContext(NonCancellable) {
-                        if (undone) viewModel.cancelDeletion(ids) else viewModel.confirmDelete(ids)
+                        when {
+                            undone -> viewModel.cancelDeletion(ids)
+                            fromPhone -> viewModel.confirmDeleteFromPhone(ids)
+                            else -> viewModel.confirmDelete(ids)
+                        }
                     }
                 }
             }
