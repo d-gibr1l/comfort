@@ -3,6 +3,7 @@ package com.comfort.app.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
@@ -40,15 +41,7 @@ fun GalleryDLTheme(
     }
 
     if (isDark && pureBlack) {
-        colorScheme = colorScheme.copy(
-            background = Color.Black,
-            surface = Color.Black,
-            surfaceContainerLowest = Color.Black,
-            surfaceContainerLow = Color(0xFF0A0A0A),
-            surfaceContainer = Color(0xFF0D0D0D),
-            surfaceContainerHigh = Color(0xFF141414),
-            surfaceContainerHighest = Color(0xFF1A1A1A),
-        )
+        colorScheme = pureBlack(colorScheme)
     }
 
     val view = LocalView.current
@@ -65,3 +58,16 @@ fun GalleryDLTheme(
         content = content,
     )
 }
+
+/** [scheme] on pure black (Settings › Appearance › Pure black dark mode): black pages, and cards a
+ * few steps up. surfaceContainerHighest (unselected chips and options on a card) is a clear step
+ * above the cards: at #1A1A1A on #141414 they all but vanished. */
+fun pureBlack(scheme: ColorScheme): ColorScheme = scheme.copy(
+    background = Color.Black,
+    surface = Color.Black,
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF0A0A0A),
+    surfaceContainer = Color(0xFF0D0D0D),
+    surfaceContainerHigh = Color(0xFF141414),
+    surfaceContainerHighest = Color(0xFF2A2A2A),
+)

@@ -88,7 +88,8 @@ internal fun CompressDialog(item: DownloadEntity, fileUri: Uri, onDismiss: () ->
                                         }
                                     },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        // A step above the dialog's own surfaceContainerHigh: in it, unselected chips vanished.
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                         labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                         selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,

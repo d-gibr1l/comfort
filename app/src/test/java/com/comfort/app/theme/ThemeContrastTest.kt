@@ -14,11 +14,6 @@ class ThemeContrastTest {
         return maxOf(la, lb) / minOf(la, lb)
     }
 
-    private fun pureBlack(s: ColorScheme) = s.copy(
-        background = Color.Black, surface = Color.Black, surfaceContainerLowest = Color.Black,
-        surfaceContainerLow = Color(0xFF0A0A0A), surfaceContainer = Color(0xFF0D0D0D),
-        surfaceContainerHigh = Color(0xFF141414), surfaceContainerHighest = Color(0xFF1A1A1A),
-    )
 
     private fun pairs(s: ColorScheme) = listOf(
         "onBackground/background" to (s.onBackground to s.background),
@@ -47,7 +42,7 @@ class ThemeContrastTest {
         val bad = mutableListOf<String>()
         for (t in AppTheme.entries.filter { !it.isDynamic }) {
             val schemes = listOfNotNull(
-                t.light?.let { "light" to it }, t.dark?.let { "dark" to it }, t.dark?.let { "dark+black" to pureBlack(it) },
+                t.light?.let { "light" to it }, t.dark?.let { "dark" to it }, t.dark?.let { "dark+black" to com.comfort.app.theme.pureBlack(it) },
             )
             for ((mode, s) in schemes) for ((name, p) in pairs(s)) {
                 val r = ratio(p.first, p.second)
@@ -71,16 +66,19 @@ class ThemeContrastTest {
     fun containersStandOutOnCards() {
         val bad = mutableListOf<String>()
         for (t in AppTheme.entries.filter { !it.isDynamic }) {
-            for ((mode, s) in listOfNotNull(t.light?.let { "light" to it }, t.dark?.let { "dark" to it })) {
+            for ((mode, s) in listOfNotNull(t.light?.let { "light" to it }, t.dark?.let { "dark" to it }, t.dark?.let { "black" to pureBlack(it) })) {
                 for ((name, c) in listOf("primaryContainer" to s.primaryContainer, "secondaryContainer" to s.secondaryContainer,
                     "tertiaryContainer" to s.tertiaryContainer, "surfaceContainerHighest" to s.surfaceContainerHighest)) {
                     val d = distance(c, s.surfaceContainerHigh)
                     if (d < MIN_DISTANCE) bad += "%-11s %-6s %-24s %.1f".format(t.name, mode, name, d)
                 }
+                // A selected chip (primaryContainer) next to unselected ones (surfaceContainerHighest).
+                val sel = distance(s.primaryContainer, s.surfaceContainerHighest)
+                if (sel < MIN_SELECTED_DISTANCE) bad += "%-11s %-6s %-24s %.1f".format(t.name, mode, "selected/unselected", sel)
             }
         }
         org.junit.Assert.assertTrue("Too close to the cards:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
 
-    private companion object { const val MIN_DISTANCE = 28.0 }
+    private companion object { const val MIN_DISTANCE = 28.0; const val MIN_SELECTED_DISTANCE = 40.0 }
 }

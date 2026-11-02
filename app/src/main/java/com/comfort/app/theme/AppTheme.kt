@@ -300,13 +300,15 @@ enum class AppTheme(
         darkLabel = R.string.yin,
         lightScheme = buildLight(
             primary = Color(0xFF1A1A1A), onPrimary = Color.White,
-            primaryContainer = Color(0xFFE0E0E0), onPrimaryContainer = Color(0xFF1A1A1A),
+            // Greys a clear step from the unselected chips beside them (ThemeContrastTest): #E0E0E0 and
+            // #3D3D3D made a selected chip hard to tell apart in a theme with no hue to help.
+            primaryContainer = Color(0xFFB8B8B8), onPrimaryContainer = Color(0xFF1A1A1A),
             secondary = Color(0xFF4D4D4D),
             background = Neutral99, surface = Color.White,
         ),
         darkScheme = buildDark(
             primary = Color(0xFFF2F2F2), onPrimary = Color(0xFF1A1A1A),
-            primaryContainer = Color(0xFF3D3D3D), onPrimaryContainer = Color(0xFFF2F2F2),
+            primaryContainer = Color(0xFF5C5C5C), onPrimaryContainer = Color(0xFFF2F2F2),
             secondary = Color(0xFFB3B3B3),
             background = Color(0xFF000000), surface = Color(0xFF0A0A0A),
         ),
