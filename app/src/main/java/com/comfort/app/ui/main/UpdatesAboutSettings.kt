@@ -839,7 +839,8 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
                 progress = { downloadProgress },
                 modifier = Modifier.size(20.dp),
                 strokeWidth = 2.dp,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                // Not surfaceVariant: in the light themes that's the card's own colour, and the track vanished.
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
             status.updateAvailable -> Button(
                 onClick = onUpdate,

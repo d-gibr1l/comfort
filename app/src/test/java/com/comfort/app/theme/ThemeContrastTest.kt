@@ -57,4 +57,30 @@ class ThemeContrastTest {
         }
         org.junit.Assert.assertTrue("Below target:\n" + bad.joinToString("\n"), bad.isEmpty())
     }
+
+    /** How far apart two colours are (0-441, RGB distance). */
+    private fun distance(a: Color, b: Color): Double {
+        val dr = (a.red - b.red) * 255.0; val dg = (a.green - b.green) * 255.0; val db = (a.blue - b.blue) * 255.0
+        return Math.sqrt(dr * dr + dg * dg + db * db)
+    }
+
+    /** The tints things are filled with on a card — a selected chip, a status tile, a split button's
+     * half — stand apart from the card (surfaceContainerHigh). In the light themes they were ~90%
+     * lightness like the cards, and the Queue's delete buttons all but vanished. */
+    @Test
+    fun containersStandOutOnCards() {
+        val bad = mutableListOf<String>()
+        for (t in AppTheme.entries.filter { !it.isDynamic }) {
+            for ((mode, s) in listOfNotNull(t.light?.let { "light" to it }, t.dark?.let { "dark" to it })) {
+                for ((name, c) in listOf("primaryContainer" to s.primaryContainer, "secondaryContainer" to s.secondaryContainer,
+                    "tertiaryContainer" to s.tertiaryContainer, "surfaceContainerHighest" to s.surfaceContainerHighest)) {
+                    val d = distance(c, s.surfaceContainerHigh)
+                    if (d < MIN_DISTANCE) bad += "%-11s %-6s %-24s %.1f".format(t.name, mode, name, d)
+                }
+            }
+        }
+        org.junit.Assert.assertTrue("Too close to the cards:\n" + bad.joinToString("\n"), bad.isEmpty())
+    }
+
+    private companion object { const val MIN_DISTANCE = 28.0 }
 }
