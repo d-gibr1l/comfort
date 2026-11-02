@@ -235,12 +235,19 @@ fun groupCookiesBySite(cookies: List<ParsedCookie>): List<SiteCookies> {
 /** CookieManager.getCookie() returns an HTTP-header-style string ("name1=value1; name2=value2"),
  * not the Netscape cookies.txt format gallery-dl/yt-dlp's --cookies flag actually parses (tab-
  * separated: domain, includeSubdomains, path, secure, expiry, name, value). Converts and merges
- * into [existing], dropping any prior lines for [host] first so re-extracting replaces rather than
- * duplicates/conflicts with them. */
+ * into [existing], dropping any prior lines for the site (and for [host] itself) first so
+ * re-extracting replaces rather than duplicates/conflicts with them.
+ *
+ * Written for the site's registrable domain (".youtube.com"), not [host]: CookieManager gives the
+ * cookies a page can see with no domain of their own, and a login that ended on a subdomain —
+ * m.youtube.com, where the WebView's YouTube lands, or accounts.google.com — was saved for that
+ * subdomain only, so the engines sent none of it to www.youtube.com and stayed logged out. Lines
+ * for the site's other subdomains (from a pasted cookies.txt) are kept: this page didn't show them. */
 fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): String {
-    val cleanHost = host.removePrefix(".").removePrefix("www.").substringBefore(':')
-    val domain = if (cleanHost.startsWith(".")) cleanHost else ".$cleanHost"
-    val bareDomain = domain.removePrefix(".")
+    val cleanHost = host.removePrefix(".").removePrefix("www.").substringBefore(':').lowercase()
+    val site = CookieStore.registrableDomain(cleanHost)
+    val domain = ".$site"
+    val replaced = setOf(site, cleanHost)
     // Five years out — CookieManager doesn't expose each cookie's real expiry, and a long-lived
     // session cookie being treated as farther in the future than it really is just means it stops
     // working when the site itself expires it, same as any other stale-cookie failure.
@@ -261,8 +268,8 @@ fun mergeNetscapeCookies(existing: String, host: String, cookieHeader: String): 
             if (isComment) return@filter true
             val dataLine = trimmed.removePrefix("#HttpOnly_")
             val lineDomain = dataLine.split(Regex("\\s+"), limit = 2).firstOrNull().orEmpty()
-            val lineBare = lineDomain.removePrefix(".").removePrefix("www.")
-            lineBare != bareDomain
+            val lineBare = lineDomain.removePrefix(".").removePrefix("www.").lowercase()
+            lineBare !in replaced
         }
         .toList()
     val header = if (keptExisting.any { it.startsWith("# Netscape") }) emptyList() else listOf("# Netscape HTTP Cookie File")

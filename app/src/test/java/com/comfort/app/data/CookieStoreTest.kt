@@ -148,6 +148,26 @@ class CookieStoreTest {
         assertFalse(merged.contains("old_csrf"))
     }
 
+    @Test
+    fun `browser merge on a subdomain saves the cookies for the whole site`() {
+        // A login that ended on m.example.com (YouTube's mobile pages) must reach www.example.com.
+        val existing = listOf(
+            CookieStore.HEADER,
+            row(".example.com", "session", "old"),
+            row("m.example.com", "pref", "old_pref"),
+            row(".shop.example.com", "cart", "keep"),
+            row(".other.org", "id", "ccc"),
+        ).joinToString("\n")
+        val merged = mergeNetscapeCookies(existing, "m.example.com", "session=fresh; theme=dark")
+        val cookies = parseCookiesFile(merged)
+        assertEquals(".example.com", cookies.single { it.name == "session" }.domain)
+        assertEquals("fresh", cookies.single { it.name == "session" }.value)
+        assertEquals(".example.com", cookies.single { it.name == "theme" }.domain)
+        assertFalse("the page host's old lines are replaced", cookies.any { it.name == "pref" })
+        assertEquals("another subdomain's line stays", "keep", cookies.single { it.name == "cart" }.value)
+        assertEquals("ccc", cookies.single { it.name == "id" }.value)
+    }
+
     @get:Rule
     val tempFolder = TemporaryFolder()
 
