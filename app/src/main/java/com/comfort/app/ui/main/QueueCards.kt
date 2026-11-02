@@ -228,7 +228,7 @@ internal fun StoppedRow(
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.large)
                 // Selected: tinted and outlined, so the selection reads from the whole card.
-                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
                 .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large) else Modifier)
                 // Always present, not just once selectionMode is already true — this is what
                 // actually *enters* selection mode via a long-press anywhere on the row (not just
@@ -255,7 +255,7 @@ internal fun StoppedRow(
                 selectionMode = selectionMode,
                 selected = selected,
                 size = 76.dp,
-                modifier = Modifier.size(76.dp).clip(thumbnailShape()).background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.size(76.dp).clip(thumbnailShape()).background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
                 if (hasThumbnail) {
                     QueueThumbnail(item = item, modifier = Modifier.fillMaxSize())
@@ -421,7 +421,7 @@ fun QueueItemCard(
         shape = MaterialTheme.shapes.medium,
         // Selected: tinted and outlined, so the selection reads from the whole card.
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
         ),
         border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
     ) {

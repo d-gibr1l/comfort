@@ -428,7 +428,7 @@ fun EmptyState(
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)

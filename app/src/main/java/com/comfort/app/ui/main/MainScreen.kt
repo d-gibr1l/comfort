@@ -1094,7 +1094,7 @@ fun HomeScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -1162,7 +1162,7 @@ fun HomeScreen(
                             Surface(
                                 modifier = Modifier.weight(1f),
                                 shape = MaterialTheme.shapes.large,
-                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             ) {
                                 Row(
                                     modifier = Modifier.padding(14.dp),
@@ -1382,7 +1382,7 @@ private fun ActiveDownloadCard(item: com.comfort.app.data.DownloadEntity, onClic
         // shapes.medium (12dp) — the spec's own card token; shapes.large (16dp) is for FABs/nav
         // drawers, same finding as the Queue screen's own running card had.
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
             // 16dp, not 14dp — MD3's spacing system is built on an 8dp grid.
@@ -1577,7 +1577,7 @@ private fun HomeTipsCarousel() {
                 index = (index + 1) % HOME_TIPS.size
             },
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         AnimatedContent(
             targetState = index,
