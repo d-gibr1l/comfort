@@ -110,6 +110,9 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     onClick = {
                         val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
                         GalleryDlPreferences.setExtractorArgs(context, cleaned)
+                        // The field shows what was saved (one line): left as typed over several, it
+                        // never matched the saved text and the button stayed in its unsaved state.
+                        extractorArgs = cleaned
                         extractorArgsSaved = true
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -124,6 +127,9 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
                     onClick = {
                         val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
                         GalleryDlPreferences.setExtractorArgs(context, cleaned)
+                        // The field shows what was saved (one line): left as typed over several, it
+                        // never matched the saved text and the button stayed in its unsaved state.
+                        extractorArgs = cleaned
                         extractorArgsSaved = true
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
