@@ -321,6 +321,15 @@ internal fun LibraryHeader(
                 )
                 TextButton(onClick = onClearDeleted) { Text(stringResource(R.string.clear_all)) }
             }
+            // A file put back from the gallery's recycle bin isn't seen again: the gallery gives it a
+            // new identity Comfort has no access to (it would need permission to read all your
+            // photos). Download again is the way back.
+            Text(
+                stringResource(R.string.restored_files_stay_deleted),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
+            )
         }
         }
     }

@@ -122,7 +122,6 @@
     <string name="restore_not_backup">Diese Datei ist keine Comfort-Sicherung.</string>
     <string name="restore_dialog_title">Sicherung wiederherstellen</string>
     <string name="restore_dialog_contains">Diese Sicherung enthält %1$s. Wiederherstellen:</string>
-    <string name="restore_cookies_replace">Cookies (ersetzt deine)</string>
     <string name="restore_confirm">Wiederherstellen</string>
     <string name="restore_done">%1$s wiederhergestellt.</string>
     <string name="restore_failed">Wiederherstellen fehlgeschlagen: %1$s</string>
@@ -678,6 +677,7 @@
     <string name="nothing_here_yet">Noch nichts hier</string>
     <string name="try_a_different_search">Versuch eine andere Suche.</string>
     <string name="pictures_you_remove_from_your_device">Bilder, die du aus der Galerie deines Geräts entfernst, erscheinen hier.</string>
+    <string name="restored_files_stay_deleted">Dateien, die du aus dem Papierkorb deiner Galerie wiederherstellst, bleiben hier: Mit „Erneut herunterladen“ kommen sie zurück in die Mediathek.</string>
     <string name="star_a_download_to_pin_it">Markiere einen Download mit Stern, um ihn hier anzuheften.</string>
     <string name="downloaded_pictures_will_show_up_in">Heruntergeladene Bilder erscheinen in dieser Galerie.</string>
     <string name="scroll_to_top">Nach oben scrollen</string>

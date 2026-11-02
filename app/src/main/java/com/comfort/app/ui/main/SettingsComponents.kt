@@ -526,7 +526,7 @@ internal fun SettingsSection(title: String, icon: ImageVector? = null, onClick: 
         Surface(
             modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             onClick = onClick ?: {},
             enabled = onClick != null,
         ) {
@@ -602,7 +602,7 @@ internal fun IconToggleRow(
             // color wasn't enough contrast in this app's dark theme specifically.
             colors = SwitchDefaults.colors(
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
             ),
         )

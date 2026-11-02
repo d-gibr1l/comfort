@@ -113,7 +113,6 @@
     <string name="restore_not_backup">הקובץ הזה אינו גיבוי של Comfort.</string>
     <string name="restore_dialog_title">שחזור גיבוי</string>
     <string name="restore_dialog_contains">בגיבוי הזה יש %1$s. לשחזר:</string>
-    <string name="restore_cookies_replace">עוגיות (מחליפות את שלך)</string>
     <string name="restore_confirm">שחזור</string>
     <string name="restore_done">שוחזר: %1$s.</string>
     <string name="restore_failed">השחזור נכשל: %1$s</string>
@@ -625,6 +624,7 @@
     <string name="nothing_here_yet">עדיין אין כאן כלום</string>
     <string name="try_a_different_search">נסה חיפוש אחר.</string>
     <string name="pictures_you_remove_from_your_device">תמונות שתסיר מהגלריה במכשיר יופיעו כאן.</string>
+    <string name="restored_files_stay_deleted">קבצים שמשחזרים מסל המיחזור של הגלריה נשארים כאן: אפשר להוריד שוב כדי להחזיר אותם לספרייה.</string>
     <string name="star_a_download_to_pin_it">סמן הורדה בכוכב כדי להצמיד אותה כאן.</string>
     <string name="downloaded_pictures_will_show_up_in">תמונות שהורדו יופיעו בגלריה הזו.</string>
     <string name="scroll_to_top">גלילה למעלה</string>

@@ -127,7 +127,6 @@
     <string name="restore_not_backup">Ce fichier n\'est pas une sauvegarde Comfort.</string>
     <string name="restore_dialog_title">Restaurer la sauvegarde</string>
     <string name="restore_dialog_contains">Cette sauvegarde contient %1$s. Restaurer\u00A0:</string>
-    <string name="restore_cookies_replace">Cookies (remplacent les tiens)</string>
     <string name="restore_confirm">Restaurer</string>
     <string name="restore_done">Restauré\u00A0: %1$s.</string>
     <string name="restore_failed">Échec de la restauration\u00A0: %1$s</string>
@@ -694,6 +693,7 @@
     <string name="nothing_here_yet">Rien ici pour l\'instant</string>
     <string name="try_a_different_search">Essaie une autre recherche.</string>
     <string name="pictures_you_remove_from_your_device">Les images que tu supprimes de la galerie de ton appareil apparaîtront ici.</string>
+    <string name="restored_files_stay_deleted">Les fichiers restaurés depuis la corbeille de votre galerie restent ici : utilisez Télécharger à nouveau pour les remettre dans la bibliothèque.</string>
     <string name="star_a_download_to_pin_it">Ajoute une étoile à un téléchargement pour l\'épingler ici.</string>
     <string name="downloaded_pictures_will_show_up_in">Les images téléchargées apparaîtront dans cette galerie.</string>
     <string name="scroll_to_top">Remonter en haut</string>

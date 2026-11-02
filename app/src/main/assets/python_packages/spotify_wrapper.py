@@ -281,6 +281,40 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
 
 
 _MATCH_CANDIDATES = 5
+_RUN_DURATION_RE = re.compile(r"(?:(\d+):)?(\d{1,2}):(\d{2})")
+
+
+def _add_search_durations():
+    """yt-dlp's YouTube Music search results carry only an id and a title; the length a song row
+    shows ("Eagles • Legacy • 6:32", its second column's last part) is dropped, and without it
+    _pick_match always fell back to the top hit. Wraps the method that makes those results so
+    each also gets its "duration". If YouTube or yt-dlp changes the layout, results just come
+    back without one, as before."""
+    try:
+        from yt_dlp.extractor.youtube._tab import YoutubeTabBaseInfoExtractor as tab
+        original = tab._music_reponsive_list_entry
+    except Exception:
+        return
+    if getattr(original, "_comfort_durations", False):
+        return
+
+    def with_duration(self, renderer):
+        result = original(self, renderer)
+        try:
+            runs = renderer["flexColumns"][1]["musicResponsiveListItemFlexColumnRenderer"]["text"]["runs"]
+            m = _RUN_DURATION_RE.fullmatch(runs[-1]["text"].strip())
+            if result and m:
+                h, mins, secs = m.groups()
+                result["duration"] = int(h or 0) * 3600 + int(mins) * 60 + int(secs)
+        except Exception:
+            pass
+        return result
+
+    with_duration._comfort_durations = True
+    tab._music_reponsive_list_entry = with_duration
+
+
+_add_search_durations()
 
 
 def _pick_match(entries, duration):

@@ -130,7 +130,6 @@
     <string name="restore_not_backup">Этот файл не является резервной копией Comfort.</string>
     <string name="restore_dialog_title">Восстановить копию</string>
     <string name="restore_dialog_contains">В копии: %1$s. Восстановить:</string>
-    <string name="restore_cookies_replace">Cookie (заменят ваши)</string>
     <string name="restore_confirm">Восстановить</string>
     <string name="restore_done">Восстановлено: %1$s.</string>
     <string name="restore_failed">Не удалось восстановить: %1$s</string>
@@ -710,6 +709,7 @@
     <string name="nothing_here_yet">Здесь пока пусто</string>
     <string name="try_a_different_search">Попробуйте другой запрос.</string>
     <string name="pictures_you_remove_from_your_device">Здесь появятся изображения, которые вы удалите из галереи устройства.</string>
+    <string name="restored_files_stay_deleted">Файлы, восстановленные из корзины галереи, остаются здесь: чтобы вернуть их в библиотеку, скачайте их снова.</string>
     <string name="star_a_download_to_pin_it">Отметьте загрузку звёздочкой, чтобы закрепить её здесь.</string>
     <string name="downloaded_pictures_will_show_up_in">Скачанные изображения появятся в этой галерее.</string>
     <string name="scroll_to_top">Наверх</string>

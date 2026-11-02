@@ -132,7 +132,6 @@
     <string name="restore_not_backup">That file isn\'t a Comfort backup.</string>
     <string name="restore_dialog_title">Restore backup</string>
     <string name="restore_dialog_contains">This backup has %1$s. Restore:</string>
-    <string name="restore_cookies_replace">Cookies (replaces yours)</string>
     <string name="restore_confirm">Restore</string>
     <string name="restore_done">Restored %1$s.</string>
     <string name="restore_failed">Couldn\'t restore: %1$s</string>
@@ -710,6 +709,7 @@
     <string name="nothing_here_yet">Nothing here yet</string>
     <string name="try_a_different_search">Try a different search.</string>
     <string name="pictures_you_remove_from_your_device">Pictures you remove from your device gallery will show up here.</string>
+    <string name="restored_files_stay_deleted">Files you restore from your gallery’s recycle bin stay here: use Download again on one to get it back in the Library.</string>
     <string name="star_a_download_to_pin_it">Star a download to pin it here.</string>
     <string name="downloaded_pictures_will_show_up_in">Downloaded pictures will show up in this gallery.</string>
     <string name="scroll_to_top">Scroll to top</string>

@@ -113,7 +113,6 @@
     <string name="restore_not_backup">यह फ़ाइल Comfort का बैकअप नहीं है।</string>
     <string name="restore_dialog_title">बैकअप रीस्टोर करें</string>
     <string name="restore_dialog_contains">इस बैकअप में %1$s है। रीस्टोर करें:</string>
-    <string name="restore_cookies_replace">कुकी (आपकी कुकी की जगह लेंगी)</string>
     <string name="restore_confirm">रीस्टोर करें</string>
     <string name="restore_done">रीस्टोर किया गया: %1$s।</string>
     <string name="restore_failed">रीस्टोर नहीं हो सका: %1$s</string>
@@ -625,6 +624,7 @@
     <string name="nothing_here_yet">यहाँ अभी कुछ नहीं</string>
     <string name="try_a_different_search">कोई दूसरी खोज आज़माएँ।</string>
     <string name="pictures_you_remove_from_your_device">डिवाइस गैलरी से हटाई गई तस्वीरें यहाँ दिखेंगी।</string>
+    <string name="restored_files_stay_deleted">गैलरी के रीसायकल बिन से वापस लाई गई फ़ाइलें यहीं रहती हैं: लाइब्रेरी में वापस लाने के लिए फिर से डाउनलोड करें।</string>
     <string name="star_a_download_to_pin_it">किसी डाउनलोड को यहाँ पिन करने के लिए उस पर स्टार लगाएँ।</string>
     <string name="downloaded_pictures_will_show_up_in">डाउनलोड की गई तस्वीरें इस गैलरी में दिखेंगी।</string>
     <string name="scroll_to_top">सबसे ऊपर जाएँ</string>

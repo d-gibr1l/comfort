@@ -64,7 +64,9 @@ private fun buildLight(primary: Color, onPrimary: Color, primaryContainer: Color
     onPrimaryContainer = onPrimaryContainer,
     secondary = secondary,
     onSecondary = Color.White,
-    secondaryContainer = containerToneOf(secondary, containerLightness = 90f, containerSaturationScale = 0.45f),
+    // 82% lightness, not 90%: the cards (surfaceContainerHigh) are ~90% too, and the selected chips
+    // and split buttons' ✕ halves on them in this colour all but vanished.
+    secondaryContainer = containerToneOf(secondary, containerLightness = 82f, containerSaturationScale = 0.7f),
     onSecondaryContainer = containerToneOf(secondary, containerLightness = 20f, containerSaturationScale = 0.9f),
     tertiary = secondary,
     onTertiary = Color.White,
@@ -73,7 +75,7 @@ private fun buildLight(primary: Color, onPrimary: Color, primaryContainer: Color
     // Compose's lightColorScheme() falls back to a hardcoded stock-M3 purple/pink tertiaryContainer
     // that has nothing to do with the active theme (surfaced by the Settings screen redesign,
     // which reads tertiaryContainer for one of its list-row colors).
-    tertiaryContainer = containerToneOf(secondary, containerLightness = 90f, containerSaturationScale = 0.45f),
+    tertiaryContainer = containerToneOf(secondary, containerLightness = 82f, containerSaturationScale = 0.7f),
     onTertiaryContainer = containerToneOf(secondary, containerLightness = 20f, containerSaturationScale = 0.9f),
     background = background,
     onBackground = Neutral10,
@@ -87,7 +89,7 @@ private fun buildLight(primary: Color, onPrimary: Color, primaryContainer: Color
     surfaceContainerLow = background,
     surfaceContainer = Neutral95,
     surfaceContainerHigh = Neutral90,
-    surfaceContainerHighest = Neutral80,
+    surfaceContainerHighest = Neutral85,
     // Were Neutral80/Neutral90 — Material's outlineVariant/next tone, not outline: ~1.5:1 and ~1.2:1
     // on these pages, so chip and button outlines barely showed (reported live on Yang). Now
     // ~4.5-4.8:1 and ~2.3-2.5:1, in line with Expressive Purple's hand-made scheme.
@@ -139,12 +141,39 @@ private fun buildDark(primary: Color, onPrimary: Color, primaryContainer: Color,
 // carries both a light and dark ColorScheme so it can appear in either row; DYNAMIC has neither —
 // its scheme is derived on the fly from the device wallpaper (Android 12+ only), so callers must
 // special-case `isDynamic` rather than reading `light`/`dark` for it.
+/** How far apart two colours are (0-441, RGB distance). */
+private fun distance(a: Color, b: Color): Float {
+    val dr = (a.red - b.red) * 255f; val dg = (a.green - b.green) * 255f; val db = (a.blue - b.blue) * 255f
+    return kotlin.math.sqrt(dr * dr + dg * dg + db * db)
+}
+
+/** [scheme] with every tint that fills things on a card (a selected chip, a status tile, a split
+ * button's half, the step above a card) far enough from the card (surfaceContainerHigh) to show:
+ * one too close is moved 8 lightness points away from it, darker on a light theme, lighter on a
+ * dark one. Several light themes' tints were ~90% lightness like their cards, and the Queue's
+ * delete buttons all but vanished (ThemeContrastTest.containersStandOutOnCards). */
+private fun cardSafe(scheme: ColorScheme, dark: Boolean): ColorScheme {
+    val card = scheme.surfaceContainerHigh
+    val cardL = card.toHsl().third
+    fun apart(c: Color): Color {
+        if (distance(c, card) >= 28f) return c
+        val (h, s, _) = c.toHsl()
+        return hslToColor(h, (s * 1.15f).coerceAtMost(100f), if (dark) cardL + 8f else cardL - 8f)
+    }
+    return scheme.copy(
+        primaryContainer = apart(scheme.primaryContainer),
+        secondaryContainer = apart(scheme.secondaryContainer),
+        tertiaryContainer = apart(scheme.tertiaryContainer),
+        surfaceContainerHighest = apart(scheme.surfaceContainerHighest),
+    )
+}
+
 enum class AppTheme(
     @androidx.annotation.StringRes val lightLabel: Int,
     @androidx.annotation.StringRes val darkLabel: Int,
     val isDynamic: Boolean = false,
-    val light: ColorScheme? = null,
-    val dark: ColorScheme? = null,
+    lightScheme: ColorScheme? = null,
+    darkScheme: ColorScheme? = null,
 ) {
     DYNAMIC(
         lightLabel = R.string.dynamic_from_wallpaper,
@@ -154,20 +183,20 @@ enum class AppTheme(
     DEFAULT(
         lightLabel = R.string.pure_white,
         darkLabel = R.string.dark,
-        light = LightColorScheme,
-        dark = DarkColorScheme,
+        lightScheme = LightColorScheme,
+        darkScheme = DarkColorScheme,
     ),
     SUNSET(
         lightLabel = R.string.sunset_coral,
         darkLabel = R.string.ember_night,
-        light = buildLight(
+        lightScheme = buildLight(
             // Slightly darker than AccentRed (same hue): as link/accent text it was 4.13:1 on cards.
             primary = Color(0xFFA85523), onPrimary = Color.White,
             primaryContainer = AccentCream, onPrimaryContainer = AccentRedDark,
             secondary = AccentRedDark,
             background = Color(0xFFFFF6F0), surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = AccentSalmon, onPrimary = Color(0xFF3D0D0D),
             primaryContainer = AccentRedDark, onPrimaryContainer = AccentCream,
             secondary = AccentCream,
@@ -177,7 +206,7 @@ enum class AppTheme(
     BLOSSOM(
         lightLabel = R.string.spring_blossom,
         darkLabel = R.string.midnight_dusk,
-        light = buildLight(
+        lightScheme = buildLight(
             // Was 0xFFC43C97 (same hue): 4.18:1 as accent text on cards, now 4.61.
             primary = Color(0xFFB9388E), onPrimary = Color.White,
             primaryContainer = Color(0xFFFCDCF0), onPrimaryContainer = Color(0xFF5C1147),
@@ -187,7 +216,7 @@ enum class AppTheme(
             secondary = Color(0xFFE61065),
             background = Color(0xFFFAF3F8), surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = Color(0xFFFF8AD1), onPrimary = Color(0xFF4A0A38),
             primaryContainer = Color(0xFF6B1D53), onPrimaryContainer = Color(0xFFFCDCF0),
             secondary = Color(0xFFFF6FA0),
@@ -197,14 +226,14 @@ enum class AppTheme(
     OCEAN(
         lightLabel = R.string.teal_tide,
         darkLabel = R.string.sapphire_dusk,
-        light = buildLight(
+        lightScheme = buildLight(
             // Slightly darker than Teal40 (same hue): 4.04:1 as accent text on cards, now 4.72.
             primary = Color(0xFF0B786E), onPrimary = Color.White,
             primaryContainer = Teal90, onPrimaryContainer = Color(0xFF00201C),
             secondary = Color(0xFF0369A1),
             background = Color(0xFFEFF8F7), surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = Teal80, onPrimary = Color(0xFF00201C),
             primaryContainer = Color(0xFF0B4A42), onPrimaryContainer = Teal90,
             secondary = Color(0xFF7DD3FC),
@@ -214,13 +243,13 @@ enum class AppTheme(
     LAVENDER(
         lightLabel = R.string.lavender,
         darkLabel = R.string.violet_night,
-        light = buildLight(
+        lightScheme = buildLight(
             primary = Color(0xFF7B46AF), onPrimary = Color.White,
             primaryContainer = Color(0xFFEBDDFB), onPrimaryContainer = Color(0xFF350A64),
             secondary = Color(0xFF9333EA),
             background = Color(0xFFF6F1FB), surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = Color(0xFFB69DFF), onPrimary = Color(0xFF2C0A5C),
             primaryContainer = Color(0xFF4A2585), onPrimaryContainer = Color(0xFFEBDDFB),
             secondary = Color(0xFFC4B5FD),
@@ -230,7 +259,7 @@ enum class AppTheme(
     TOKYO(
         lightLabel = R.string.tokyo_light,
         darkLabel = R.string.tokyo_night,
-        light = buildLight(
+        lightScheme = buildLight(
             primary = Color(0xFF0072B2), onPrimary = Color.White,
             primaryContainer = Color(0xFFD6E9F8), onPrimaryContainer = Color(0xFF00304D),
             // Darkened from 0xFF3B82F6 (same hue) — better-colors review: paired with fixed-white
@@ -239,7 +268,7 @@ enum class AppTheme(
             secondary = Color(0xFF1E6FF5),
             background = Color(0xFFF1F5FA), surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = Color(0xFF82AAFF), onPrimary = Color(0xFF00234A),
             primaryContainer = Color(0xFF1B3A73), onPrimaryContainer = Color(0xFFD6E9F8),
             secondary = Color(0xFF7DCFFF),
@@ -249,7 +278,7 @@ enum class AppTheme(
     LIME(
         lightLabel = R.string.lime_fizz,
         darkLabel = R.string.flat_lime,
-        light = buildLight(
+        lightScheme = buildLight(
             // Was 0xFF12803B (same hue): 4.44:1 as accent text on cards, now 4.68.
             primary = Color(0xFF117C39), onPrimary = Color.White,
             primaryContainer = Color(0xFFD9F2DF), onPrimaryContainer = Color(0xFF0A3D1D),
@@ -259,7 +288,7 @@ enum class AppTheme(
             secondary = Color(0xFF52840B),
             background = Color(0xFFF1F8F0), surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = Color(0xFF7CF7A5), onPrimary = Color(0xFF0A3D1D),
             primaryContainer = Color(0xFF19542C), onPrimaryContainer = Color(0xFFD9F2DF),
             secondary = Color(0xFFA3E635),
@@ -269,15 +298,17 @@ enum class AppTheme(
     MONOCHROME(
         lightLabel = R.string.yang,
         darkLabel = R.string.yin,
-        light = buildLight(
+        lightScheme = buildLight(
             primary = Color(0xFF1A1A1A), onPrimary = Color.White,
-            primaryContainer = Color(0xFFE0E0E0), onPrimaryContainer = Color(0xFF1A1A1A),
+            // Greys a clear step from the unselected chips beside them (ThemeContrastTest): #E0E0E0 and
+            // #3D3D3D made a selected chip hard to tell apart in a theme with no hue to help.
+            primaryContainer = Color(0xFFB8B8B8), onPrimaryContainer = Color(0xFF1A1A1A),
             secondary = Color(0xFF4D4D4D),
             background = Neutral99, surface = Color.White,
         ),
-        dark = buildDark(
+        darkScheme = buildDark(
             primary = Color(0xFFF2F2F2), onPrimary = Color(0xFF1A1A1A),
-            primaryContainer = Color(0xFF3D3D3D), onPrimaryContainer = Color(0xFFF2F2F2),
+            primaryContainer = Color(0xFF5C5C5C), onPrimaryContainer = Color(0xFFF2F2F2),
             secondary = Color(0xFFB3B3B3),
             background = Color(0xFF000000), surface = Color(0xFF0A0A0A),
         ),
@@ -290,7 +321,7 @@ enum class AppTheme(
     CUSTOM(
         lightLabel = R.string.custom,
         darkLabel = R.string.custom,
-        light = lightColorScheme(
+        lightScheme = lightColorScheme(
             primary = Color(0xFF3E6700),
             onPrimary = Color(0xFFFFFFFF),
             primaryContainer = Color(0xFF4F8200),
@@ -339,7 +370,7 @@ enum class AppTheme(
             surfaceContainerHigh = Color(0xFFE6EADA),
             surfaceContainerHighest = Color(0xFFE0E4D4)
         ),
-        dark = darkColorScheme(
+        darkScheme = darkColorScheme(
             primary = Color(0xFF97D945),
             onPrimary = Color(0xFF1F3700),
             primaryContainer = Color(0xFF64A104),
@@ -395,7 +426,7 @@ enum class AppTheme(
         // Medium-contrast M3 purple: a deeper primary (#4C3889) and darker onSurfaceVariant/outline
         // than the baseline scheme this started from, which is what the download preview sheet's
         // own design was drawn against.
-        light = lightColorScheme(
+        lightScheme = lightColorScheme(
             primary = Color(0xFF4C3889), onPrimary = Color(0xFFFFFFFF),
             primaryContainer = Color(0xFFE9DDFF), onPrimaryContainer = Color(0xFF32226F),
             secondary = Color(0xFF625B71), onSecondary = Color(0xFFFFFFFF),
@@ -413,7 +444,7 @@ enum class AppTheme(
             error = Color(0xFFB3261E), onError = Color(0xFFFFFFFF),
             errorContainer = Color(0xFFF9DEDC), onErrorContainer = Color(0xFF410E0B),
         ),
-        dark = darkColorScheme(
+        darkScheme = darkColorScheme(
             primary = Color(0xFFD0BCFF), onPrimary = Color(0xFF381E72),
             primaryContainer = Color(0xFF4F378B), onPrimaryContainer = Color(0xFFEADDFF),
             secondary = Color(0xFFCCC2DC), onSecondary = Color(0xFF332D41),
@@ -432,4 +463,8 @@ enum class AppTheme(
             errorContainer = Color(0xFF8C1D18), onErrorContainer = Color(0xFFF9DEDC),
         ),
     ),
+    ;
+
+    val light: ColorScheme? = lightScheme?.let { cardSafe(it, dark = false) }
+    val dark: ColorScheme? = darkScheme?.let { cardSafe(it, dark = true) }
 }

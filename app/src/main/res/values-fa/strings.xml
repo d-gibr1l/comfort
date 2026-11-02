@@ -113,7 +113,6 @@
     <string name="restore_not_backup">این فایل پشتیبان Comfort نیست.</string>
     <string name="restore_dialog_title">بازیابی پشتیبان</string>
     <string name="restore_dialog_contains">این پشتیبان شامل %1$s است. بازیابی:</string>
-    <string name="restore_cookies_replace">کوکی‌ها (جایگزین کوکی‌های شما)</string>
     <string name="restore_confirm">بازیابی</string>
     <string name="restore_done">بازیابی شد: %1$s.</string>
     <string name="restore_failed">بازیابی ناموفق بود: %1$s</string>
@@ -625,6 +624,7 @@
     <string name="nothing_here_yet">هنوز اینجا چیزی نیست</string>
     <string name="try_a_different_search">جستجوی دیگری امتحان کنید.</string>
     <string name="pictures_you_remove_from_your_device">تصاویری که از گالری دستگاه حذف می‌کنید اینجا نمایش داده می‌شوند.</string>
+    <string name="restored_files_stay_deleted">فایل‌هایی که از سطل زبالهٔ گالری بازیابی می‌کنید اینجا می‌مانند: با «دانلود دوباره» آن‌ها را به کتابخانه برگردانید.</string>
     <string name="star_a_download_to_pin_it">به یک دانلود ستاره بدهید تا اینجا سنجاق شود.</string>
     <string name="downloaded_pictures_will_show_up_in">تصاویر دانلودشده در این گالری نمایش داده می‌شوند.</string>
     <string name="scroll_to_top">رفتن به بالا</string>

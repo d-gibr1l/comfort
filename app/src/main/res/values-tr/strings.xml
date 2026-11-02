@@ -113,7 +113,6 @@
     <string name="restore_not_backup">Bu dosya bir Comfort yedeği değil.</string>
     <string name="restore_dialog_title">Yedeği geri yükle</string>
     <string name="restore_dialog_contains">Bu yedekte %1$s var. Geri yükle:</string>
-    <string name="restore_cookies_replace">Çerezler (seninkilerin yerini alır)</string>
     <string name="restore_confirm">Geri yükle</string>
     <string name="restore_done">Geri yüklendi: %1$s.</string>
     <string name="restore_failed">Geri yüklenemedi: %1$s</string>
@@ -625,6 +624,7 @@
     <string name="nothing_here_yet">Henüz burada bir şey yok</string>
     <string name="try_a_different_search">Farklı bir arama dene.</string>
     <string name="pictures_you_remove_from_your_device">Cihaz galerinden kaldırdığın resimler burada görünür.</string>
+    <string name="restored_files_stay_deleted">Galerinin geri dönüşüm kutusundan geri yüklediğiniz dosyalar burada kalır: kitaplığa geri almak için Yeniden indir’i kullanın.</string>
     <string name="star_a_download_to_pin_it">Bir indirmeyi buraya sabitlemek için yıldızla.</string>
     <string name="downloaded_pictures_will_show_up_in">İndirilen resimler bu galeride görünür.</string>
     <string name="scroll_to_top">En üste kaydır</string>

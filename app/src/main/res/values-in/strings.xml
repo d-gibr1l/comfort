@@ -121,7 +121,6 @@
     <string name="restore_not_backup">File itu bukan cadangan Comfort.</string>
     <string name="restore_dialog_title">Pulihkan cadangan</string>
     <string name="restore_dialog_contains">Cadangan ini berisi %1$s. Pulihkan:</string>
-    <string name="restore_cookies_replace">Cookie (menggantikan milik Anda)</string>
     <string name="restore_confirm">Pulihkan</string>
     <string name="restore_done">%1$s dipulihkan.</string>
     <string name="restore_failed">Tidak bisa memulihkan: %1$s</string>
@@ -671,6 +670,7 @@
     <string name="nothing_here_yet">Belum ada apa-apa di sini</string>
     <string name="try_a_different_search">Coba pencarian lain.</string>
     <string name="pictures_you_remove_from_your_device">Gambar yang Anda hapus dari galeri perangkat akan muncul di sini.</string>
+    <string name="restored_files_stay_deleted">File yang Anda pulihkan dari tempat sampah galeri tetap di sini: gunakan Unduh lagi untuk mengembalikannya ke Pustaka.</string>
     <string name="star_a_download_to_pin_it">Beri bintang pada unduhan untuk menyematkannya di sini.</string>
     <string name="downloaded_pictures_will_show_up_in">Gambar yang diunduh akan muncul di galeri ini.</string>
     <string name="scroll_to_top">Gulir ke atas</string>

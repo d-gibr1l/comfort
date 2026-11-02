@@ -46,7 +46,9 @@ val SuccessGreen40 = Color(0xFF22C55E)
 val FavoriteGold = Color(0xFFFACC15)
 
 // Error
-val Red40 = Color(0xFFDC2626)
+// Deep enough for error text on the light themes' cards: #DC2626 read 4.27:1 on surfaceContainer,
+// under the 4.5:1 text needs (ThemeContrastTest).
+val Red40 = Color(0xFFB91C1C)
 val Red80 = Color(0xFFF87171)
 val Red10 = Color(0xFF450A0A)
 val Red90 = Color(0xFFFEE2E2)
@@ -56,14 +58,19 @@ val Neutral99 = Color(0xFFFAFAFC)
 val Neutral95 = Color(0xFFF1F0F7)
 val Neutral90 = Color(0xFFE4E2ED)
 val Neutral80 = Color(0xFFC9C7D6)
+// Light themes' surfaceContainerHighest: a step darker than surfaceContainerHigh (Neutral90), for
+// what sits on Settings' and the Library's cards. Neutral80 was a jump that left secondary text on
+// it at 3.58:1.
+val Neutral85 = Color(0xFFD2D0DD)
 // Between Neutral80 and Neutral60: light themes' faint outlines (outlineVariant), ~2.3-2.5:1 on
 // their pages and cards, like Expressive Purple's; Neutral80 was ~1.2 (chip borders vanished).
 val Neutral70 = Color(0xFFA4A2B2)
 val Neutral60 = Color(0xFF908E9F)
 val Neutral50 = Color(0xFF706E7E)
 // Light themes' secondary text (onSurfaceVariant): Neutral50 was 4.39:1 on cards and 3.89 on
-// surfaceVariant pills, under WCAG AA's 4.5; this is 5.26 and 4.66.
-val Neutral45 = Color(0xFF646270)
+// surfaceVariant pills, under WCAG AA's 4.5; #646270 then was 3.58 on surfaceContainerHighest (the
+// chips on Settings' cards). This is 6.0+ on cards and 4.9 there (ThemeContrastTest).
+val Neutral45 = Color(0xFF55535F)
 val Neutral30 = Color(0xFF423F52)
 val Neutral20 = Color(0xFF2A2836)
 val Neutral10 = Color(0xFF1B1A24)
@@ -97,7 +104,7 @@ val LightColorScheme = lightColorScheme(
     surfaceContainerLow = Neutral99,
     surfaceContainer = Neutral95,
     surfaceContainerHigh = Neutral90,
-    surfaceContainerHighest = Neutral80,
+    surfaceContainerHighest = Neutral85,
 
     outline = Neutral50,
     outlineVariant = Neutral70,

@@ -310,6 +310,7 @@ interface DownloadDao {
     @Query("DELETE FROM saved_files WHERE downloadId = :downloadId")
     suspend fun clearSavedFiles(downloadId: String)
 
+
     @Query("SELECT * FROM downloads")
     suspend fun getAllOnce(): List<DownloadEntity>
 

@@ -350,7 +350,7 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                             // gray blob instead of a working control resting in its off position.
                             colors = SwitchDefaults.colors(
                                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
                             ),
                         )

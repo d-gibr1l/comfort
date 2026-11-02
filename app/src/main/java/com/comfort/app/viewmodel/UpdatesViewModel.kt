@@ -93,16 +93,23 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
     /** A fresh engine check — installs what it finds when auto-update is on (EngineUpdater
      * serializes overlapping checks, so a second caller just finds everything current). */
     fun checkEngines() {
-        if (_checkingEngines.value) return
+        // Asked again while one runs (a channel switched right after the Updates page opened, which
+        // starts a check): one more check once it's done, or the page kept the old channel's result.
+        if (_checkingEngines.value) { recheckEngines = true; return }
         _checkingEngines.value = true
         viewModelScope.launch {
             try {
-                publishEngines(EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate))
+                do {
+                    recheckEngines = false
+                    publishEngines(EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate))
+                } while (recheckEngines)
             } finally {
                 _checkingEngines.value = false
             }
         }
     }
+
+    @Volatile private var recheckEngines = false
 
     /** Checks once per ViewModel unless [checkEngines] is called again (the Updates page's button). */
     fun ensureEnginesChecked() {

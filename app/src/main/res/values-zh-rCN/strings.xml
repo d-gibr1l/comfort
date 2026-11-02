@@ -113,7 +113,6 @@
     <string name="restore_not_backup">该文件不是 Comfort 备份。</string>
     <string name="restore_dialog_title">恢复备份</string>
     <string name="restore_dialog_contains">此备份包含 %1$s。恢复：</string>
-    <string name="restore_cookies_replace">Cookie（替换你当前的）</string>
     <string name="restore_confirm">恢复</string>
     <string name="restore_done">已恢复：%1$s。</string>
     <string name="restore_failed">无法恢复：%1$s</string>
@@ -625,6 +624,7 @@
     <string name="nothing_here_yet">这里还没有内容</string>
     <string name="try_a_different_search">换个关键词试试。</string>
     <string name="pictures_you_remove_from_your_device">你从设备图库中删除的图片会显示在这里。</string>
+    <string name="restored_files_stay_deleted">从相册回收站恢复的文件会留在这里：使用“重新下载”可将其放回媒体库。</string>
     <string name="star_a_download_to_pin_it">为下载加星标即可固定在这里。</string>
     <string name="downloaded_pictures_will_show_up_in">下载的图片会显示在这个图库中。</string>
     <string name="scroll_to_top">回到顶部</string>

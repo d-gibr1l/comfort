@@ -113,7 +113,6 @@
     <string name="restore_not_backup">このファイルは Comfort のバックアップではありません。</string>
     <string name="restore_dialog_title">バックアップを復元</string>
     <string name="restore_dialog_contains">このバックアップには %1$s が含まれています。復元する項目:</string>
-    <string name="restore_cookies_replace">Cookie(現在のものを置き換え)</string>
     <string name="restore_confirm">復元</string>
     <string name="restore_done">復元しました: %1$s。</string>
     <string name="restore_failed">復元できませんでした: %1$s</string>
@@ -625,6 +624,7 @@
     <string name="nothing_here_yet">まだ何もありません</string>
     <string name="try_a_different_search">別のキーワードで検索してください。</string>
     <string name="pictures_you_remove_from_your_device">端末のギャラリーから削除した画像がここに表示されます。</string>
+    <string name="restored_files_stay_deleted">ギャラリーのごみ箱から復元したファイルはここに残ります。ライブラリに戻すには「もう一度ダウンロード」を使ってください。</string>
     <string name="star_a_download_to_pin_it">ダウンロードにスターを付けるとここに固定されます。</string>
     <string name="downloaded_pictures_will_show_up_in">ダウンロードした画像がこのギャラリーに表示されます。</string>
     <string name="scroll_to_top">一番上へ</string>
