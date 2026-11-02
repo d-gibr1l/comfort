@@ -35,8 +35,8 @@ sealed interface LinkRoute {
 /** Opening a link and starting its download — shared by Home's paste flow (one per activity) and
  * the share sheet (one per share, so a second share starts fresh).
  *
- * Every enqueue here goes through viewModelScope, so it isn't cancelled when the sheet that asked
- * for it closes; [onDone] runs on the main thread once the row is in the queue. */
+ * Every enqueue here runs in enqueueScope, so it isn't cancelled when the sheet, or the share
+ * screen, that asked for it closes; [onDone] runs on the main thread once the row is in the queue. */
 class LinkRouterViewModel(application: Application) : AndroidViewModel(application) {
     private val context get() = getApplication<Application>()
 
@@ -140,7 +140,7 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
 
     /** Several shared links at once — each enqueued with the defaults; [onDone] gets how many were
      * already downloaded. */
-    fun downloadAll(urls: List<String>, onDone: (duplicates: Int) -> Unit): Job = viewModelScope.launch {
+    fun downloadAll(urls: List<String>, onDone: (duplicates: Int) -> Unit): Job = enqueueScope.launch {
         var duplicates = 0
         urls.forEach { url ->
             if (DownloadDispatcher.enqueueDownload(context, url, titleFor(url)) is EnqueueResult.Duplicate) duplicates++
@@ -149,12 +149,18 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun enqueue(onDone: (EnqueueResult) -> Unit, block: suspend () -> EnqueueResult): Job =
-        viewModelScope.launch { onDone(block()) }
+        enqueueScope.launch { onDone(block()) }
 
     private fun PreviewInfo.hasContent() = title != null || thumbnail != null || streamUrls.isNotEmpty()
 
     private companion object {
         const val YT_DLP_PREVIEW_CAP_MS = 30_000L
+
+        /** Where downloads are enqueued: not viewModelScope, so the share screen can close the
+         * moment one is handed off. Enqueueing can take seconds — a Reddit share link is looked
+         * up online to check for a duplicate — and the share screen used to wait it out, a dimmed
+         * window over the app it was shared from that took no taps. */
+        val enqueueScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate)
     }
 
     private fun titleFor(url: String) = getApplication<Application>().getString(com.comfort.app.R.string.downloading_from_x, VideoSiteRouter.siteName(url, getApplication<Application>().getString(com.comfort.app.R.string.this_link)))

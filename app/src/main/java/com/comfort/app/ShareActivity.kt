@@ -296,16 +296,18 @@ private fun MultiLinkShare(urls: List<String>, router: LinkRouterViewModel, ask:
 private fun MultiLinkHandler(urls: List<String>, router: LinkRouterViewModel, onFinished: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(urls) {
+        val app = context.applicationContext
         router.downloadAll(urls) { duplicateCount ->
             val startedCount = urls.size - duplicateCount
             val message = when {
-                duplicateCount == 0 -> context.resources.getQuantityString(R.plurals.downloads_started, urls.size, urls.size)
-                startedCount == 0 -> context.getString(R.string.already_downloaded_see_duplicates)
-                else -> context.resources.getQuantityString(R.plurals.downloads_started_some_duplicates, startedCount, startedCount, duplicateCount)
+                duplicateCount == 0 -> app.resources.getQuantityString(R.plurals.downloads_started, urls.size, urls.size)
+                startedCount == 0 -> app.getString(R.string.already_downloaded_see_duplicates)
+                else -> app.resources.getQuantityString(R.plurals.downloads_started_some_duplicates, startedCount, startedCount, duplicateCount)
             }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            onFinished()
+            Toast.makeText(app, message, Toast.LENGTH_SHORT).show()
         }
+        // Not after it: enqueueing outlives this screen (LinkRouterViewModel), the Toast follows.
+        onFinished()
     }
 }
 
@@ -320,10 +322,11 @@ private fun MultiLinkHandler(urls: List<String>, router: LinkRouterViewModel, on
 private fun InstantShareHandler(url: String, router: LinkRouterViewModel, onFinished: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(url) {
+        val app = context.applicationContext
         router.download(url) { result ->
-            Toast.makeText(context, startedMessage(context, result), Toast.LENGTH_SHORT).show()
-            onFinished()
+            Toast.makeText(app, startedMessage(app, result), Toast.LENGTH_SHORT).show()
         }
+        onFinished()
     }
 }
 
@@ -465,10 +468,11 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             // instead of waiting it out, the same fire-and-forget shape Instant Share uses.
             onDownloadNow = {
                 router.close()
+                val app = context.applicationContext
                 router.download(url, forceDuplicate = true) {
-                    Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
-                    onFinished()
+                    Toast.makeText(app, app.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                 }
+                onFinished()
             },
         )
         // The sheet's item checklist and edited title/artist go through too (found live,
@@ -478,10 +482,11 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             preloadedPreview = current.preloaded,
             onDismiss = onFinished,
             onDownload = { options ->
+                val app = context.applicationContext
                 router.download(url, options) {
-                    Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
-                    onFinished()
+                    Toast.makeText(app, app.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                 }
+                onFinished()
             },
         )
         is LinkRoute.Picker -> SharePickerSheet(url = url, preloadedResult = current.listing, router = router, onFinished = onFinished)
@@ -590,10 +595,6 @@ private fun SharePickerSheet(
 ) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(false) }
-    // Set the moment a download is actually kicked off — the exit-animation effect below awaits
-    // it before finishing the Activity, so the "Download started"/"Already downloaded" Toast still
-    // gets a moment to show even though the sheet itself has already slid away.
-    var downloadJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(Unit) { visible = true }
     BackHandler { visible = false }
@@ -603,7 +604,6 @@ private fun SharePickerSheet(
     LaunchedEffect(visible) {
         if (!visible) {
             delay(SHEET_ANIM_MS.toLong())
-            downloadJob?.join()
             onFinished()
         }
     }
@@ -666,8 +666,9 @@ private fun SharePickerSheet(
                         // relabels accordingly, so forceDuplicate here is just that same
                         // already-shown confirmation carried through, same reasoning as
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
-                        downloadJob = router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
-                            Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                        val app = context.applicationContext
+                        router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
+                            Toast.makeText(app, app.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
                         }
                         visible = false
                     },
