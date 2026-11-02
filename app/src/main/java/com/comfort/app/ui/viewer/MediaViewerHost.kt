@@ -17,7 +17,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +35,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.comfort.app.R
 import com.comfort.app.data.DownloadEntity
 import com.comfort.app.data.DownloadStatus
-import com.comfort.app.ui.main.rememberUndoableDelete
 import com.comfort.app.viewmodel.DownloadsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,7 +57,17 @@ val LocalOpenMediaViewer = staticCompositionLocalOf<(MediaViewerRequest) -> Unit
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, onClose: () -> Unit) {
+fun MediaViewerHost(
+    request: MediaViewerRequest,
+    viewModel: DownloadsViewModel,
+    /** The Library's delete with Undo (MainScreen's rememberUndoableDelete): owned out there so
+     * it outlives the viewer — deleting the viewer's last item closes it, and an Undo run in the
+     * viewer's own scope was cancelled with it, committing the delete (from the phone too) with no
+     * Undo ever shown. */
+    requestDelete: (Set<String>) -> Unit,
+    requestDeleteFromPhone: (Set<String>) -> Unit,
+    onClose: () -> Unit,
+) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
@@ -82,9 +90,6 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
             value = all.await()
         }
     }
-    val snackbar = remember { SnackbarHostState() }
-    val requestDelete = rememberUndoableDelete(viewModel, snackbar)
-    val requestDeleteFromPhone = rememberUndoableDelete(viewModel, snackbar, fromPhone = true)
 
     BackHandler(onBack = onClose)
 
@@ -155,10 +160,6 @@ fun MediaViewerHost(request: MediaViewerRequest, viewModel: DownloadsViewModel, 
                 onBack = onClose,
             )
         }
-        com.comfort.app.ui.main.DownloadEventSnackbarHost(
-            snackbar,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp),
-        )
     }
 }
 
