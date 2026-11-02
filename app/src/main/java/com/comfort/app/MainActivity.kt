@@ -148,6 +148,10 @@ class MainActivity : ComponentActivity() {
       val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
       ) {}
+      // Android 7-9: saving to the Downloads folder needs this (see needsLegacyStoragePermission).
+      val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+      ) {}
 
       val context = LocalContext.current
       var themeMode by remember { mutableStateOf(ThemePreferences.getThemeMode(context)) }
@@ -176,6 +180,9 @@ class MainActivity : ComponentActivity() {
           ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
           notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (com.comfort.app.util.MediaStoreHelper.needsLegacyStoragePermission(this@MainActivity)) {
+          storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
       }
 

@@ -98,7 +98,19 @@ _MATCH_CACHE_DIR = os.path.join(
 _MATCH_MAX_AGE_SECONDS = 30 * 24 * 3600  # a match is looked up again after this; details never
 
 
+_TRACK_ID_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def _cacheable(track_id):
+    """A Spotify id as the cache's file name: letters and digits only. An album's track ids come
+    from its page's JSON, not the link (which _SPOTIFY_URL_RE already limits), and a malformed one
+    ("../..") would otherwise name a file outside the cache folder."""
+    return bool(track_id) and _TRACK_ID_RE.fullmatch(track_id) is not None
+
+
 def _cache_get(track_id):
+    if not _cacheable(track_id):
+        return {}
     try:
         with open(os.path.join(_MATCH_CACHE_DIR, f"{track_id}.json"), encoding="utf-8") as f:
             return json.load(f)
@@ -107,6 +119,8 @@ def _cache_get(track_id):
 
 
 def _cache_put(track_id, **fields):
+    if not _cacheable(track_id):
+        return
     try:
         os.makedirs(_MATCH_CACHE_DIR, exist_ok=True)
         entry = _cache_get(track_id)
@@ -130,12 +144,12 @@ def _track_metadata(track_id):
     return title, artist, duration, thumbnail
 
 
-def _youtube_match(track_id, artist, title, js_runtime_path):
+def _youtube_match(track_id, artist, title, js_runtime_path, duration=None):
     """_resolve_youtube_match, from the cache when it has a recent one."""
     c = _cache_get(track_id)
     if c.get("youtube_url") and time.time() - c.get("matched_at", 0) < _MATCH_MAX_AGE_SECONDS:
         return c["youtube_url"]
-    url = _resolve_youtube_match(artist, title, js_runtime_path)
+    url = _resolve_youtube_match(artist, title, js_runtime_path, duration)
     if url:
         _cache_put(track_id, youtube_url=url, matched_at=time.time())
     return url
@@ -149,9 +163,9 @@ def prefetch(url, js_runtime_path=None):
         match = _SPOTIFY_URL_RE.search(_resolve_redirect(url))
         if not match or match.group(1) != "track":
             return
-        title, artist, _duration, _thumbnail = _track_metadata(match.group(2))
+        title, artist, duration, _thumbnail = _track_metadata(match.group(2))
         if title and artist:
-            _youtube_match(match.group(2), artist, title, js_runtime_path)
+            _youtube_match(match.group(2), artist, title, js_runtime_path, duration)
     except Exception:
         pass
 
@@ -241,7 +255,7 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         entries = []
         for track in entity.get("trackList") or []:
             track_id = (track.get("uri") or "").rsplit(":", 1)[-1]
-            if not track_id:
+            if not _cacheable(track_id):
                 continue
             duration_ms = track.get("duration")
             track_artist = track.get("subtitle")
@@ -266,7 +280,27 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None):
         return json.dumps({"error": str(e)})
 
 
-def _resolve_youtube_match(artist, title, js_runtime_path):
+_MATCH_CANDIDATES = 5
+
+
+def _pick_match(entries, duration):
+    """Which of a search's [entries] is the song: the one closest to the Spotify track's [duration]
+    (seconds) among the first few, if it's within 15 s or 10% of it; else the top hit, as before.
+    The top hit alone was sometimes a live version, a long "extended" cut or another song with the
+    same name, then tagged with the Spotify track's details so it looked right in the Library."""
+    entries = [e for e in (entries or [])[:_MATCH_CANDIDATES] if e]
+    if not entries:
+        return None
+    if duration:
+        timed = [e for e in entries if isinstance(e.get("duration"), (int, float)) and e["duration"] > 0]
+        if timed:
+            best = min(timed, key=lambda e: abs(e["duration"] - duration))
+            if abs(best["duration"] - duration) <= max(15.0, duration * 0.10):
+                return best
+    return entries[0]
+
+
+def _resolve_youtube_match(artist, title, js_runtime_path, duration=None):
     """Top hit of a YouTube Music "songs" search for "<artist> <title>" — yt-dlp's own
     YoutubeMusicSearchURLIE (extractor/youtube/_search.py), invoked via the real
     music.youtube.com/search URL it matches (this extractor has no "ytmsearchN:" pseudo-URL
@@ -281,7 +315,8 @@ def _resolve_youtube_match(artist, title, js_runtime_path):
     or None if nothing resolved."""
     ydl_opts = {
         "quiet": True, "no_warnings": True, "skip_download": True,
-        "extract_flat": "in_playlist", "playlist_items": "1",
+        # The first few, not just the top hit, so _pick_match can compare their lengths.
+        "extract_flat": "in_playlist", "playlist_items": f"1-{_MATCH_CANDIDATES}",
     }
     if js_runtime_path:
         ydl_opts["js_runtimes"] = {"quickjs": {"path": js_runtime_path}}
@@ -297,8 +332,8 @@ def _resolve_youtube_match(artist, title, js_runtime_path):
         return None
     if not info:
         return None
-    entries = info.get("entries")
-    entry = entries[0] if entries else info
+    entries = list(info.get("entries") or [])
+    entry = _pick_match(entries, duration) if entries else info
     if not entry:
         return None
     return entry.get("webpage_url") or entry.get("original_url") or entry.get("url")
@@ -439,7 +474,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
         any_success = False
         for track_id in track_ids:
-            title, artist, _duration, thumbnail_url = _track_metadata(track_id)
+            title, artist, duration, thumbnail_url = _track_metadata(track_id)
             if not title or not artist:
                 if callback:
                     callback(event("error", message="Couldn't resolve metadata for a track — skipping"))
@@ -471,7 +506,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 if album_name:
                     callback(event("album", album=album_name[:200]))
 
-            matched_url = _youtube_match(track_id, artist, title, js_runtime_path)
+            matched_url = _youtube_match(track_id, artist, title, js_runtime_path, duration)
             if not matched_url:
                 if callback:
                     callback(f'[error] No YouTube match found for "{artist} - {title}"')

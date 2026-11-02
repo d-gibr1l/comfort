@@ -320,7 +320,8 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                                         // Extracted audio album art - preserve for any downloads currently in the library
                                         item.isDirectory && item.name == "audio_art" -> {
                                             item.listFiles()?.forEach { artFile ->
-                                                val artId = artFile.nameWithoutExtension
+                                                // "<downloadId>_<song>.jpg" (one per song) or the older "<downloadId>.jpg".
+                                                val artId = artFile.nameWithoutExtension.substringBefore('_')
                                                 if (artId !in allKnownIds) {
                                                     artFile.delete()
                                                 }

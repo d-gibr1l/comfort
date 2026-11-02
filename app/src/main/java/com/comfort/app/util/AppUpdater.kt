@@ -27,6 +27,12 @@ import kotlinx.coroutines.withContext
  * "Comfort-1.2.0-universal.apk" — see fetchLatest for how one is picked. */
 object AppUpdater {
     private const val REPO = "d-gibr1l/comfort"
+    private val KNOWN_ABIS = listOf("arm64-v8a", "armeabi-v7a", "armeabi", "x86_64", "x86")
+
+    /** The release's version as a file-name part: digits, letters, dots and dashes only. A tag
+     * with a "/" (release/1.3.0) named a folder that doesn't exist and every download failed. */
+    private fun fileVersion(version: String?): String =
+        version.orEmpty().filter { it.isLetterOrDigit() || it == '.' || it == '-' }.ifEmpty { "latest" }
 
     data class UpdateStatus(
         val installedVersion: String,
@@ -86,7 +92,9 @@ object AppUpdater {
         // first .apk alone could be another CPU's build, which the installer rejects.
         val preferred = android.os.Build.SUPPORTED_ABIS.firstNotNullOfOrNull { abi -> apks.entries.firstOrNull { it.key.endsWith("-$abi.apk") } }
             ?: apks.entries.firstOrNull { it.key.endsWith("-universal.apk") }
-            ?: apks.entries.firstOrNull()
+            // An APK with no ABI in its name (an older release's single build) is universal too.
+            // Not just any APK: one built for another CPU downloads and then won't install.
+            ?: apks.entries.firstOrNull { e -> KNOWN_ABIS.none { e.key.endsWith("-$it.apk") } }
         preferred?.let { Triple(version, it.value, notes) }
     }.getOrNull()
 
@@ -110,9 +118,9 @@ object AppUpdater {
         val downloadUrl = status.downloadUrl ?: return
         
         // Clean up any old updates (both incomplete .tmp and old .apk files) so they don't waste space
-        context.cacheDir.listFiles()?.filter { it.name.startsWith("Comfort-") && it.name != "Comfort-${status.latestVersion}.apk" }?.forEach { it.delete() }
+        context.cacheDir.listFiles()?.filter { it.name.startsWith("Comfort-") && it.name != "Comfort-${fileVersion(status.latestVersion)}.apk" }?.forEach { it.delete() }
         
-        val apkFile = File(context.cacheDir, "Comfort-${status.latestVersion}.apk")
+        val apkFile = File(context.cacheDir, "Comfort-${fileVersion(status.latestVersion)}.apk")
         
         if (apkFile.exists() && apkFile.length() > 0L) {
             promptInstall(context, apkFile)
@@ -126,12 +134,12 @@ object AppUpdater {
         
         scope.launch {
             runCatching {
-                val tempFile = File(appContext.cacheDir, "Comfort-${status.latestVersion}.apk.tmp")
+                val tempFile = File(appContext.cacheDir, "Comfort-${fileVersion(status.latestVersion)}.apk.tmp")
                 (URL(downloadUrl).openConnection() as HttpURLConnection).run {
                     connectTimeout = 10_000
                     readTimeout = 30_000
                     try {
-                        val totalBytes = contentLength
+                        val totalBytes = contentLengthLong
                         var downloadedBytes = 0L
                         inputStream.use { input ->
                             tempFile.outputStream().use { output -> 
@@ -147,11 +155,21 @@ object AppUpdater {
                                 }
                             }
                         }
+                        // A connection closed early (a proxy, a captive portal) can just end the
+                        // stream: kept, the truncated APK failed to install and, being there, was
+                        // reused by every later tap of Update.
+                        if (totalBytes > 0 && downloadedBytes != totalBytes) {
+                            tempFile.delete()
+                            error("incomplete download ($downloadedBytes of $totalBytes bytes)")
+                        }
                     } finally {
                         disconnect()
                     }
                 }
-                tempFile.renameTo(apkFile)
+                if (!tempFile.renameTo(apkFile)) {
+                    tempFile.delete()
+                    error("couldn't save the update")
+                }
                 downloadProgress.value = null
                 withContext(kotlinx.coroutines.Dispatchers.Main) {
                     promptInstall(appContext, apkFile)

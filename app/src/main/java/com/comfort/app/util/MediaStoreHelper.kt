@@ -24,6 +24,45 @@ object MediaStoreHelper {
      * in it. */
     const val RELATIVE_DIR = "Download/Comfort"
 
+    /** Android 7-9 save into the public Downloads folder directly ([saveToMediaStore]'s legacy
+     * path), which needs WRITE_EXTERNAL_STORAGE — a runtime permission there, declared in the
+     * manifest (maxSdkVersion 28) but never asked for, so every save failed and every download
+     * ended with nothing saved. True when it still has to be asked for; the app's screens ask
+     * (MainActivity, ShareActivity). A custom download folder doesn't need it, but the default
+     * one, the audio/video folders' fallback, does. */
+    fun needsLegacyStoragePermission(context: Context): Boolean =
+        Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /** Whether [uriString] is a file this app saved, as far as the gallery can tell: true for
+     * anything that isn't a gallery (MediaStore) Uri — a custom folder's document, the app's own
+     * cached cover — and for a gallery file under Download/Comfort (or the older Pictures/,
+     * Movies/, Music/Comfort folders). False for a gallery Uri that's missing or elsewhere.
+     *
+     * For a restored backup's history (BackupRestore): gallery ids are per phone, so on a new phone
+     * an old entry's content://media/.../1234 is whatever unrelated file has that id there — the
+     * Library showed it, opened it and offered to delete it. By folder, not owner: Android clears
+     * a file's owner when the app is uninstalled, so after a reinstall on the same phone the app's
+     * own files would fail an owner check. */
+    fun isComfortMediaFile(context: Context, uriString: String): Boolean {
+        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return false
+        if (uri.authority != MediaStore.AUTHORITY) return true
+        val path = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            } else {
+                @Suppress("DEPRECATION")
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                    ?.substringAfter("/0/", "")
+            }
+        }.getOrNull() ?: return false
+        val folder = path.trimStart('/')
+        return folder.startsWith("$RELATIVE_DIR/") || OLD_RELATIVE_DIRS.any { folder.startsWith(it) }
+    }
+
     /** Where downloads went before they moved to [RELATIVE_DIR] — [organizeSavedFiles] moves them. */
     private val OLD_RELATIVE_DIRS = listOf("Pictures/Comfort/", "Movies/Comfort/", "Music/Comfort/", "Download/Comfort/")
 
@@ -282,7 +321,12 @@ object MediaStoreHelper {
             retriever.setDataSource(context, savedUri)
             val art = retriever.embeddedPicture ?: return null
             val dir = File(context.cacheDir, "audio_art").apply { mkdirs() }
-            val file = File(dir, "$downloadId.jpg")
+            // One per song, not per download: a playlist's songs used to share "<id>.jpg", each
+            // overwriting the last, so the Library tile ended up showing the last song's cover.
+            // "<downloadId>_<song>": FoldersSettings' Clear cache keeps it by the part before "_"
+            // (download ids are UUIDs, no "_").
+            val song = savedUri.lastPathSegment?.filter { it.isLetterOrDigit() }?.takeIf { it.isNotEmpty() }
+            val file = File(dir, if (song != null) "${downloadId}_$song.jpg" else "$downloadId.jpg")
             file.writeBytes(art)
             androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         } catch (e: Exception) {
@@ -298,10 +342,17 @@ object MediaStoreHelper {
 
         val name = uniqueName(dir, sourceFile.name)
         val doc = dir.createFile(mimeType, name) ?: return null
-        val copied = context.contentResolver.openOutputStream(doc.uri)?.use { out ->
-            sourceFile.inputStream().use { it.copyTo(out) }
-            true
-        } ?: false
+        // A copy that fails part-way (storage full, the folder's access taken back) mustn't leave a
+        // truncated file in the user's folder: it's removed, and the failure still goes up.
+        val copied = try {
+            context.contentResolver.openOutputStream(doc.uri)?.use { out ->
+                sourceFile.inputStream().use { it.copyTo(out) }
+                true
+            } ?: false
+        } catch (e: Exception) {
+            runCatching { doc.delete() }
+            throw e
+        }
         if (!copied) {
             doc.delete()
             return null
@@ -371,8 +422,14 @@ object MediaStoreHelper {
             val publicDir = File(publicRoot, "Comfort/${subfolderFor(sourceFile.name, mimeType)}")
             if (!publicDir.exists()) publicDir.mkdirs()
             val destFile = uniqueFile(publicDir, sourceFile.name)
-            sourceFile.inputStream().use { input ->
-                destFile.outputStream().use { output -> input.copyTo(output) }
+            try {
+                sourceFile.inputStream().use { input ->
+                    destFile.outputStream().use { output -> input.copyTo(output) }
+                }
+            } catch (e: Exception) {
+                // No truncated file left in Downloads (see saveToCustomTree).
+                runCatching { destFile.delete() }
+                throw e
             }
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, destFile.name)

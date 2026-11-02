@@ -164,6 +164,17 @@ class ShareActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
+            // Android 7-9: a share can start a download without the main screen ever opening, so
+            // the storage permission saving needs is asked for here too (see
+            // MediaStoreHelper.needsLegacyStoragePermission).
+            val storagePermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            ) {}
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                if (com.comfort.app.util.MediaStoreHelper.needsLegacyStoragePermission(context)) {
+                    storagePermissionLauncher.launch(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }
             // Reads the same named theme/dynamic-color/pure-black selections MainActivity's own
             // GalleryDLTheme call does — this used to build its own plain MaterialTheme here with
             // only the hardcoded default light/dark ColorScheme, silently ignoring whichever named
