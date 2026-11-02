@@ -356,20 +356,6 @@ fun VideoPlayerItemWithResolvedUri(
             }
         }
 
-        // Dim Scrim overlay
-        AnimatedVisibility(
-            visible = showControls && isCurrentPage,
-            enter = fadeIn(MotionTokens.snappySpring()),
-            exit = fadeOut(MotionTokens.gentleSpring()),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(androidx.compose.material3.MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f))
-            )
-        }
-
         // Center Play/Pause button
         AnimatedVisibility(
             visible = showControls && isCurrentPage,
