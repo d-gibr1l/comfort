@@ -1074,6 +1074,7 @@
     <string name="unknown_title">Inconnu</string>
     <string name="engine_update_download_running">Impossible de mettre à jour pendant un téléchargement — attends qu\'il se termine</string>
     <string name="engine_update_checksum_mismatch">Le fichier téléchargé ne correspond pas à la somme de contrôle publiée — annulé, rien n\'a été installé</string>
+    <string name="engine_update_no_checksum">Impossible de vérifier le téléchargement (sa somme de contrôle n\'était pas disponible) : il n\'a pas été installé. Réessayez plus tard.</string>
     <string name="engine_update_missing_package">Le téléchargement ne contenait pas %1$s — rien n\'a été modifié</string>
     <string name="engine_update_version_unreadable">Mise à jour installée, mais sa version n\'a pas pu être relue</string>
     <string name="backup_couldnt_open_file">Impossible d\'ouvrir le fichier</string>

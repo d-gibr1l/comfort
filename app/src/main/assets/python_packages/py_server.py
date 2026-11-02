@@ -194,7 +194,15 @@ def main():
             conn.close()
             continue
         last_job = time.monotonic()
-        if os.fork() == 0:
+        try:
+            pid = os.fork()
+        except OSError:
+            # No process for it (EAGAIN/ENOMEM under memory pressure): this job is dropped, its
+            # EOF without an exit line reads as a failed job, and the server stays up for the next
+            # one instead of exiting and sending every job to the slow direct path.
+            conn.close()
+            continue
+        if pid == 0:
             server.close()
             _run_job(conn, script, args, env)
         conn.close()

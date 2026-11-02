@@ -916,6 +916,7 @@
     <string name="unknown_title">Bilinmiyor</string>
     <string name="engine_update_download_running">Bir indirme çalışırken güncellenemez — önce bitmesini bekle</string>
     <string name="engine_update_checksum_mismatch">İndirilen dosya, yayımlanan sağlama toplamıyla eşleşmedi — iptal edildi, hiçbir şey kurulmadı</string>
+    <string name="engine_update_no_checksum">İndirme doğrulanamadı (sağlama toplamı alınamadı), bu yüzden yüklenmedi. Daha sonra yeniden deneyin.</string>
     <string name="engine_update_missing_package">İndirme %1$s içermiyordu — hiçbir şey değişmedi</string>
     <string name="engine_update_version_unreadable">Güncelleme kuruldu ama sürümü okunamadı</string>
     <string name="backup_couldnt_open_file">Dosya açılamadı</string>

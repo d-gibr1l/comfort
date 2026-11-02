@@ -916,6 +916,7 @@
     <string name="unknown_title">לא ידוע</string>
     <string name="engine_update_download_running">לא ניתן לעדכן בזמן שהורדה רצה — חכה קודם שתסתיים</string>
     <string name="engine_update_checksum_mismatch">הקובץ שהורד לא תאם את סכום הביקורת שפורסם עבורו — בוטל, ושום דבר לא הותקן</string>
+    <string name="engine_update_no_checksum">לא ניתן היה לאמת את ההורדה (סכום הביקורת שלה לא היה זמין), ולכן היא לא הותקנה. נסה שוב מאוחר יותר.</string>
     <string name="engine_update_missing_package">ההורדה לא הכילה את %1$s — שום דבר לא השתנה</string>
     <string name="engine_update_version_unreadable">העדכון הותקן אבל לא ניתן היה לקרוא את הגרסה שלו</string>
     <string name="backup_couldnt_open_file">לא ניתן לפתוח את הקובץ</string>

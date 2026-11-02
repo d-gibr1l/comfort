@@ -916,6 +916,7 @@
     <string name="unknown_title">अज्ञात</string>
     <string name="engine_update_download_running">डाउनलोड चलते समय अपडेट नहीं हो सकता — पहले उसके पूरा होने का इंतज़ार करें</string>
     <string name="engine_update_checksum_mismatch">डाउनलोड की गई फ़ाइल उसके प्रकाशित चेकसम से मेल नहीं खाई — रोका गया, कुछ भी इंस्टॉल नहीं हुआ</string>
+    <string name="engine_update_no_checksum">डाउनलोड की जाँच नहीं हो सकी (उसका चेकसम उपलब्ध नहीं था), इसलिए इसे इंस्टॉल नहीं किया गया। बाद में फिर से कोशिश करें।</string>
     <string name="engine_update_missing_package">डाउनलोड में %1$s नहीं था — कुछ नहीं बदला</string>
     <string name="engine_update_version_unreadable">अपडेट इंस्टॉल हुआ पर उसका संस्करण पढ़ा नहीं जा सका</string>
     <string name="backup_couldnt_open_file">फ़ाइल खोली नहीं जा सकी</string>

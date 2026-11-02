@@ -1097,6 +1097,7 @@
     <string name="unknown_title">Unknown</string>
     <string name="engine_update_download_running">Can\'t update while a download is running — wait for it to finish first</string>
     <string name="engine_update_checksum_mismatch">Downloaded file didn\'t match the checksum published for it — aborted, nothing was installed</string>
+    <string name="engine_update_no_checksum">Couldn\'t verify the download (its checksum wasn\'t available), so it wasn\'t installed. Try again later.</string>
     <string name="engine_update_missing_package">The download didn\'t contain %1$s — nothing was changed</string>
     <string name="engine_update_version_unreadable">Update installed but its version couldn\'t be read back</string>
     <string name="backup_couldnt_open_file">Couldn\'t open the file</string>

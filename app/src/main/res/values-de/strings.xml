@@ -1038,6 +1038,7 @@
     <string name="unknown_title">Unbekannt</string>
     <string name="engine_update_download_running">Während ein Download läuft, ist kein Update möglich – warte, bis er fertig ist</string>
     <string name="engine_update_checksum_mismatch">Die geladene Datei passt nicht zur veröffentlichten Prüfsumme – abgebrochen, nichts wurde installiert</string>
+    <string name="engine_update_no_checksum">Der Download konnte nicht geprüft werden (seine Prüfsumme war nicht verfügbar) und wurde daher nicht installiert. Versuch es später noch einmal.</string>
     <string name="engine_update_missing_package">Der Download enthielt %1$s nicht – nichts wurde geändert</string>
     <string name="engine_update_version_unreadable">Update installiert, aber seine Version konnte nicht gelesen werden</string>
     <string name="backup_couldnt_open_file">Datei konnte nicht geöffnet werden</string>
