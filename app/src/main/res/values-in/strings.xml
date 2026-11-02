@@ -931,6 +931,8 @@
     <string name="download_this_how">Unduh dengan cara apa?</string>
     <string name="instant">Langsung</string>
     <string name="download_started">Unduhan dimulai</string>
+    <string name="download_added_paused">Ditambahkan · unduhan dijeda</string>
+    <string name="download_starts_at_x">Dijadwalkan · mulai pukul %1$s</string>
     <string name="couldnt_start_download">Tidak dapat memulai unduhan</string>
     <string name="shows_download_progress_and_completion">Menampilkan progres dan penyelesaian unduhan</string>
     <string name="download_results_channel">Unduhan selesai</string>

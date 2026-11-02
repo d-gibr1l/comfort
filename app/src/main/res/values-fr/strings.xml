@@ -973,6 +973,8 @@
     <string name="download_this_how">Comment télécharger\u00A0?</string>
     <string name="instant">Immédiat</string>
     <string name="download_started">Téléchargement lancé</string>
+    <string name="download_added_paused">Ajouté · les téléchargements sont en pause</string>
+    <string name="download_starts_at_x">Programmé · commence à %1$s</string>
     <string name="couldnt_start_download">Impossible de lancer le téléchargement</string>
     <string name="shows_download_progress_and_completion">Affiche la progression et la fin des téléchargements</string>
     <string name="download_results_channel">Téléchargements terminés</string>

@@ -861,6 +861,8 @@
     <string name="download_this_how">इसे कैसे डाउनलोड करें?</string>
     <string name="instant">तुरंत</string>
     <string name="download_started">डाउनलोड शुरू हुआ</string>
+    <string name="download_added_paused">जोड़ा गया · डाउनलोड रुके हुए हैं</string>
+    <string name="download_starts_at_x">शेड्यूल किया गया · %1$s पर शुरू होगा</string>
     <string name="couldnt_start_download">डाउनलोड शुरू नहीं हो सका</string>
     <string name="shows_download_progress_and_completion">डाउनलोड की प्रगति और पूरा होना दिखाता है</string>
     <string name="download_results_channel">पूरे हुए डाउनलोड</string>

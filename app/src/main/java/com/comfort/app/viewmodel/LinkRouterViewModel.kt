@@ -177,8 +177,21 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
 }
 
 /** The Toast after a one-tap download: duplicates are skipped and recorded under Library >
- * Duplicates (DownloadDispatcher's "Prevent duplicate downloads"). */
-fun startedMessage(context: android.content.Context, result: EnqueueResult): String = context.getString(startedMessageRes(result))
+ * Duplicates (DownloadDispatcher's "Prevent duplicate downloads"). One that waits — Pause all, the
+ * schedule window, its own "Start at…" — says so: "Download started" read as if it had. */
+fun startedMessage(context: android.content.Context, result: EnqueueResult): String {
+    if (result is EnqueueResult.Started) {
+        if (result.paused) return context.getString(com.comfort.app.R.string.download_added_paused)
+        result.startsAt?.let { at ->
+            val sameDay = android.text.format.DateUtils.isToday(at) ||
+                at - System.currentTimeMillis() < 12 * android.text.format.DateUtils.HOUR_IN_MILLIS
+            val flags = android.text.format.DateUtils.FORMAT_SHOW_TIME or
+                (if (sameDay) 0 else android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or android.text.format.DateUtils.FORMAT_ABBREV_ALL)
+            return context.getString(com.comfort.app.R.string.download_starts_at_x, android.text.format.DateUtils.formatDateTime(context, at, flags))
+        }
+    }
+    return context.getString(startedMessageRes(result))
+}
 
 /** Which message [startedMessage] shows, as a string resource. */
 @androidx.annotation.StringRes

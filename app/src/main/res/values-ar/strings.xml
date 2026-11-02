@@ -861,6 +861,8 @@
     <string name="download_this_how">كيف تريد تنزيل هذا؟</string>
     <string name="instant">فوري</string>
     <string name="download_started">بدأ التنزيل</string>
+    <string name="download_added_paused">أُضيف · التنزيلات متوقفة مؤقتًا</string>
+    <string name="download_starts_at_x">مجدول · يبدأ في %1$s</string>
     <string name="couldnt_start_download">تعذّر بدء التنزيل</string>
     <string name="shows_download_progress_and_completion">يعرض تقدم التنزيل واكتماله</string>
     <string name="download_results_channel">التنزيلات المكتملة</string>

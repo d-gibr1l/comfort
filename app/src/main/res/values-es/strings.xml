@@ -958,6 +958,8 @@
     <string name="download_this_how">¿Cómo quieres descargarlo?</string>
     <string name="instant">Instantáneo</string>
     <string name="download_started">Descarga iniciada</string>
+    <string name="download_added_paused">Añadida · las descargas están en pausa</string>
+    <string name="download_starts_at_x">Programada · empieza a las %1$s</string>
     <string name="couldnt_start_download">No se pudo iniciar la descarga</string>
     <string name="shows_download_progress_and_completion">Muestra el progreso y el final de las descargas</string>
     <string name="download_results_channel">Descargas terminadas</string>

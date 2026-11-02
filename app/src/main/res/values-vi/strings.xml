@@ -861,6 +861,8 @@
     <string name="download_this_how">Tải xuống thế nào?</string>
     <string name="instant">Ngay lập tức</string>
     <string name="download_started">Đã bắt đầu tải</string>
+    <string name="download_added_paused">Đã thêm · các lượt tải đang tạm dừng</string>
+    <string name="download_starts_at_x">Đã lên lịch · bắt đầu lúc %1$s</string>
     <string name="couldnt_start_download">Không thể bắt đầu tải xuống</string>
     <string name="shows_download_progress_and_completion">Hiển thị tiến trình và khi tải xong</string>
     <string name="download_results_channel">Tải xuống đã xong</string>

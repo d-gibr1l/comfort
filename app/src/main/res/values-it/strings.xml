@@ -861,6 +861,8 @@
     <string name="download_this_how">Come vuoi scaricarlo?</string>
     <string name="instant">Immediato</string>
     <string name="download_started">Download avviato</string>
+    <string name="download_added_paused">Aggiunto · i download sono in pausa</string>
+    <string name="download_starts_at_x">Programmato · inizia alle %1$s</string>
     <string name="couldnt_start_download">Impossibile avviare il download</string>
     <string name="shows_download_progress_and_completion">Mostra l\'avanzamento e il completamento dei download</string>
     <string name="download_results_channel">Download completati</string>

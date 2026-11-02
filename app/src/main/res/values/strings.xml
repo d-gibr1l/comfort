@@ -996,6 +996,8 @@
     <string name="download_this_how">Download this how?</string>
     <string name="instant">Instant</string>
     <string name="download_started">Download started</string>
+    <string name="download_added_paused">Added · downloads are paused</string>
+    <string name="download_starts_at_x">Scheduled · starts at %1$s</string>
     <string name="couldnt_start_download">Couldn\'t start the download</string>
     <!-- DownloadNotifications.kt -->
     <string name="shows_download_progress_and_completion">Shows download progress and completion</string>

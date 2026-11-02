@@ -996,6 +996,8 @@
     <string name="download_this_how">Как скачать?</string>
     <string name="instant">Сразу</string>
     <string name="download_started">Загрузка началась</string>
+    <string name="download_added_paused">Добавлено · загрузки приостановлены</string>
+    <string name="download_starts_at_x">Запланировано · начнётся в %1$s</string>
     <string name="couldnt_start_download">Не удалось начать загрузку</string>
     <string name="shows_download_progress_and_completion">Показывает ход и завершение загрузок</string>
     <string name="download_results_channel">Завершённые загрузки</string>

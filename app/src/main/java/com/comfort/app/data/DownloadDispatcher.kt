@@ -30,7 +30,9 @@ import kotlinx.coroutines.sync.withLock
  * branches carry one, so `.id` works regardless), but the share sheet specifically needs to tell
  * the two apart to show its own duplicate-detected Snackbar only when [Duplicate] comes back. */
 sealed class EnqueueResult(val id: String) {
-    class Started(id: String) : EnqueueResult(id)
+    /** [startsAt]: when it will start, if not right away (the schedule window, or its own "Start
+     * at…"); [paused]: Pause all is on, so it waits for Resume. */
+    class Started(id: String, val startsAt: Long? = null, val paused: Boolean = false) : EnqueueResult(id)
     class Duplicate(id: String) : EnqueueResult(id)
     /** Couldn't be queued (the database or WorkManager threw): nothing was started. */
     class Failed(val error: Throwable) : EnqueueResult("")
@@ -325,7 +327,10 @@ object DownloadDispatcher {
         if (!globallyPaused) {
             enqueueWork(context, id, trimmedUrl)
         }
-        return EnqueueResult.Started(id)
+        val now = System.currentTimeMillis()
+        val windowStart = scheduleDelayMillis(context).takeIf { it > 0 }?.let { now + it }
+        val ownStart = scheduledAt?.takeIf { it > now }
+        return EnqueueResult.Started(id, listOfNotNull(windowStart, ownStart).maxOrNull(), globallyPaused)
     }
 
     /** (Re-)submits a WorkManager job for an existing download entry. gallery-dl's own download
