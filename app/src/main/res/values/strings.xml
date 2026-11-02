@@ -132,7 +132,6 @@
     <string name="restore_not_backup">That file isn\'t a Comfort backup.</string>
     <string name="restore_dialog_title">Restore backup</string>
     <string name="restore_dialog_contains">This backup has %1$s. Restore:</string>
-    <string name="restore_cookies_replace">Cookies (replaces yours)</string>
     <string name="restore_confirm">Restore</string>
     <string name="restore_done">Restored %1$s.</string>
     <string name="restore_failed">Couldn\'t restore: %1$s</string>

@@ -113,7 +113,6 @@
     <string name="restore_not_backup">Bu dosya bir Comfort yedeği değil.</string>
     <string name="restore_dialog_title">Yedeği geri yükle</string>
     <string name="restore_dialog_contains">Bu yedekte %1$s var. Geri yükle:</string>
-    <string name="restore_cookies_replace">Çerezler (seninkilerin yerini alır)</string>
     <string name="restore_confirm">Geri yükle</string>
     <string name="restore_done">Geri yüklendi: %1$s.</string>
     <string name="restore_failed">Geri yüklenemedi: %1$s</string>

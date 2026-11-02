@@ -113,7 +113,6 @@
     <string name="restore_not_backup">هذا الملف ليس نسخة احتياطية من Comfort.</string>
     <string name="restore_dialog_title">استعادة النسخة الاحتياطية</string>
     <string name="restore_dialog_contains">تحتوي هذه النسخة الاحتياطية على %1$s. استعادة:</string>
-    <string name="restore_cookies_replace">ملفات تعريف الارتباط (تحل محل ملفاتك)</string>
     <string name="restore_confirm">استعادة</string>
     <string name="restore_done">تمت الاستعادة: %1$s.</string>
     <string name="restore_failed">تعذّرت الاستعادة: %1$s</string>

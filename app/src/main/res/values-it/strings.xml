@@ -113,7 +113,6 @@
     <string name="restore_not_backup">Questo file non è un backup di Comfort.</string>
     <string name="restore_dialog_title">Ripristina backup</string>
     <string name="restore_dialog_contains">Questo backup contiene %1$s. Ripristina:</string>
-    <string name="restore_cookies_replace">Cookie (sostituiscono i tuoi)</string>
     <string name="restore_confirm">Ripristina</string>
     <string name="restore_done">Ripristinato: %1$s.</string>
     <string name="restore_failed">Ripristino non riuscito: %1$s</string>

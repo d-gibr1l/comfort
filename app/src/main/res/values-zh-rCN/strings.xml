@@ -113,7 +113,6 @@
     <string name="restore_not_backup">该文件不是 Comfort 备份。</string>
     <string name="restore_dialog_title">恢复备份</string>
     <string name="restore_dialog_contains">此备份包含 %1$s。恢复：</string>
-    <string name="restore_cookies_replace">Cookie（替换你当前的）</string>
     <string name="restore_confirm">恢复</string>
     <string name="restore_done">已恢复：%1$s。</string>
     <string name="restore_failed">无法恢复：%1$s</string>

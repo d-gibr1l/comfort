@@ -113,7 +113,6 @@
     <string name="restore_not_backup">このファイルは Comfort のバックアップではありません。</string>
     <string name="restore_dialog_title">バックアップを復元</string>
     <string name="restore_dialog_contains">このバックアップには %1$s が含まれています。復元する項目:</string>
-    <string name="restore_cookies_replace">Cookie(現在のものを置き換え)</string>
     <string name="restore_confirm">復元</string>
     <string name="restore_done">復元しました: %1$s。</string>
     <string name="restore_failed">復元できませんでした: %1$s</string>

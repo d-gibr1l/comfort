@@ -113,7 +113,6 @@
     <string name="restore_not_backup">यह फ़ाइल Comfort का बैकअप नहीं है।</string>
     <string name="restore_dialog_title">बैकअप रीस्टोर करें</string>
     <string name="restore_dialog_contains">इस बैकअप में %1$s है। रीस्टोर करें:</string>
-    <string name="restore_cookies_replace">कुकी (आपकी कुकी की जगह लेंगी)</string>
     <string name="restore_confirm">रीस्टोर करें</string>
     <string name="restore_done">रीस्टोर किया गया: %1$s।</string>
     <string name="restore_failed">रीस्टोर नहीं हो सका: %1$s</string>

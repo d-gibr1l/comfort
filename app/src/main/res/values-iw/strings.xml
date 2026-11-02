@@ -113,7 +113,6 @@
     <string name="restore_not_backup">הקובץ הזה אינו גיבוי של Comfort.</string>
     <string name="restore_dialog_title">שחזור גיבוי</string>
     <string name="restore_dialog_contains">בגיבוי הזה יש %1$s. לשחזר:</string>
-    <string name="restore_cookies_replace">עוגיות (מחליפות את שלך)</string>
     <string name="restore_confirm">שחזור</string>
     <string name="restore_done">שוחזר: %1$s.</string>
     <string name="restore_failed">השחזור נכשל: %1$s</string>

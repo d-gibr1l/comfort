@@ -121,7 +121,6 @@
     <string name="restore_not_backup">File itu bukan cadangan Comfort.</string>
     <string name="restore_dialog_title">Pulihkan cadangan</string>
     <string name="restore_dialog_contains">Cadangan ini berisi %1$s. Pulihkan:</string>
-    <string name="restore_cookies_replace">Cookie (menggantikan milik Anda)</string>
     <string name="restore_confirm">Pulihkan</string>
     <string name="restore_done">%1$s dipulihkan.</string>
     <string name="restore_failed">Tidak bisa memulihkan: %1$s</string>

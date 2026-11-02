@@ -130,7 +130,6 @@
     <string name="restore_not_backup">Этот файл не является резервной копией Comfort.</string>
     <string name="restore_dialog_title">Восстановить копию</string>
     <string name="restore_dialog_contains">В копии: %1$s. Восстановить:</string>
-    <string name="restore_cookies_replace">Cookie (заменят ваши)</string>
     <string name="restore_confirm">Восстановить</string>
     <string name="restore_done">Восстановлено: %1$s.</string>
     <string name="restore_failed">Не удалось восстановить: %1$s</string>

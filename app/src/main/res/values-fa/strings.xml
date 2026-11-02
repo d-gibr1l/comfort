@@ -113,7 +113,6 @@
     <string name="restore_not_backup">این فایل پشتیبان Comfort نیست.</string>
     <string name="restore_dialog_title">بازیابی پشتیبان</string>
     <string name="restore_dialog_contains">این پشتیبان شامل %1$s است. بازیابی:</string>
-    <string name="restore_cookies_replace">کوکی‌ها (جایگزین کوکی‌های شما)</string>
     <string name="restore_confirm">بازیابی</string>
     <string name="restore_done">بازیابی شد: %1$s.</string>
     <string name="restore_failed">بازیابی ناموفق بود: %1$s</string>

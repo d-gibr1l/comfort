@@ -127,7 +127,6 @@
     <string name="restore_not_backup">Ce fichier n\'est pas une sauvegarde Comfort.</string>
     <string name="restore_dialog_title">Restaurer la sauvegarde</string>
     <string name="restore_dialog_contains">Cette sauvegarde contient %1$s. Restaurer\u00A0:</string>
-    <string name="restore_cookies_replace">Cookies (remplacent les tiens)</string>
     <string name="restore_confirm">Restaurer</string>
     <string name="restore_done">Restauré\u00A0: %1$s.</string>
     <string name="restore_failed">Échec de la restauration\u00A0: %1$s</string>

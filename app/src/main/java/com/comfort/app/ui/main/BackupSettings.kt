@@ -163,7 +163,7 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
                     if (contents.settings > 0) RestoreChoice(stringResource(R.string.backup_part_settings), takeSettings) { takeSettings = it }
                     if (contents.history > 0) RestoreChoice(stringResource(R.string.backup_part_history), takeHistory) { takeHistory = it }
                     if (contents.subscriptions > 0) RestoreChoice(stringResource(R.string.backup_part_subscriptions), takeSubscriptions) { takeSubscriptions = it }
-                    if (contents.hasCookies) RestoreChoice(stringResource(R.string.restore_cookies_replace), takeCookies) { takeCookies = it }
+                    if (contents.hasCookies) RestoreChoice(stringResource(R.string.backup_part_cookies), takeCookies) { takeCookies = it }
                 }
             },
             confirmButton = {

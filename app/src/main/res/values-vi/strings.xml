@@ -113,7 +113,6 @@
     <string name="restore_not_backup">Tệp này không phải bản sao lưu của Comfort.</string>
     <string name="restore_dialog_title">Khôi phục bản sao lưu</string>
     <string name="restore_dialog_contains">Bản sao lưu này có %1$s. Khôi phục:</string>
-    <string name="restore_cookies_replace">Cookie (thay cho cookie của bạn)</string>
     <string name="restore_confirm">Khôi phục</string>
     <string name="restore_done">Đã khôi phục %1$s.</string>
     <string name="restore_failed">Không thể khôi phục: %1$s</string>
