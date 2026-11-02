@@ -143,13 +143,23 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
     fun downloadAll(urls: List<String>, onDone: (duplicates: Int) -> Unit): Job = enqueueScope.launch {
         var duplicates = 0
         urls.forEach { url ->
-            if (DownloadDispatcher.enqueueDownload(context, url, titleFor(url)) is EnqueueResult.Duplicate) duplicates++
+            if (runEnqueue { DownloadDispatcher.enqueueDownload(context, url, titleFor(url)) } is EnqueueResult.Duplicate) duplicates++
         }
         onDone(duplicates)
     }
 
     private fun enqueue(onDone: (EnqueueResult) -> Unit, block: suspend () -> EnqueueResult): Job =
-        enqueueScope.launch { onDone(block()) }
+        enqueueScope.launch { onDone(runEnqueue(block)) }
+
+    /** [block], with a failure as [EnqueueResult.Failed] instead of an exception: thrown out of
+     * the scope, it crashed the app, and its caller (the share sheet) never heard back. */
+    private suspend fun runEnqueue(block: suspend () -> EnqueueResult): EnqueueResult = try {
+        block()
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        android.util.Log.e("LinkRouter", "Couldn't queue the download", e)
+        EnqueueResult.Failed(e)
+    }
 
     private fun PreviewInfo.hasContent() = title != null || thumbnail != null || streamUrls.isNotEmpty()
 
@@ -172,5 +182,8 @@ fun startedMessage(context: android.content.Context, result: EnqueueResult): Str
 
 /** Which message [startedMessage] shows, as a string resource. */
 @androidx.annotation.StringRes
-fun startedMessageRes(result: EnqueueResult): Int =
-    if (result is EnqueueResult.Duplicate) com.comfort.app.R.string.already_downloaded_see_duplicates else com.comfort.app.R.string.download_started
+fun startedMessageRes(result: EnqueueResult): Int = when (result) {
+    is EnqueueResult.Duplicate -> com.comfort.app.R.string.already_downloaded_see_duplicates
+    is EnqueueResult.Failed -> com.comfort.app.R.string.couldnt_start_download
+    else -> com.comfort.app.R.string.download_started
+}

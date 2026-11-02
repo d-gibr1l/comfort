@@ -719,14 +719,14 @@ object GalleryDlPreferences {
         prefs(context).edit().putBoolean(KEY_WRITE_INFO_FILES, enabled).apply()
     }
 
-    /** Whether a link that's technically part of a playlist/channel downloads just that one
-     * video (true) or the whole playlist (false, the default). Off by default because actually
-     * setting this on a yt-dlp download — not just the preference existing — has a real cost:
-     * verified live that it turns a ~6s extraction into 60-250+s in the currently-bundled yt-dlp
-     * version (see yt_dlp_wrapper.py's own comment on this), so it's opt-in rather than paid by
-     * every download by default. */
+    /** Whether a link to a video inside a playlist (watch?v=…&list=…) downloads just that video
+     * (true, the default) or the whole playlist. On by default since 2026-11-02: a video shared
+     * from inside a playlist, with Sharing mode on Instant, downloaded every video in it without a
+     * word. It was off because, with the then-broken YouTube challenge solver, it made extraction
+     * take 60-250 s instead of ~6 s (see yt_dlp_wrapper.py); yt-dlp-ejs is bundled since. A plain
+     * playlist or channel link isn't affected (there's no single video in it). */
     fun isNoPlaylist(context: Context): Boolean {
-        return prefs(context).getBoolean(KEY_NO_PLAYLIST, false)
+        return prefs(context).getBoolean(KEY_NO_PLAYLIST, true)
     }
 
     fun setNoPlaylist(context: Context, enabled: Boolean) {

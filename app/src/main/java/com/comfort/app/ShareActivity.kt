@@ -198,6 +198,8 @@ class ShareActivity : ComponentActivity() {
                     key(urls) {
                         val routerOwner = rememberSheetViewModelStoreOwner()
                         val router: LinkRouterViewModel = viewModel(viewModelStoreOwner = routerOwner)
+                        // Read once per share, not in every branch on every recomposition.
+                        val shareMode = remember { GalleryDlPreferences.getShareMode(context) }
                         when {
                             // Multiple links: the picker/preview sheets below are built around
                             // reviewing/filtering exactly one link's own gallery, and stacking one
@@ -207,15 +209,15 @@ class ShareActivity : ComponentActivity() {
                             urls.size > 1 -> MultiLinkShare(
                                 urls = urls,
                                 router = router,
-                                ask = GalleryDlPreferences.getShareMode(context) != ShareMode.INSTANT,
+                                ask = shareMode != ShareMode.INSTANT,
                                 onFinished = { finish() },
                             )
-                            GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
+                            shareMode == ShareMode.INSTANT -> InstantShareHandler(
                                 url = urls[0],
                                 router = router,
                                 onFinished = { finish() },
                             )
-                            GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
+                            shareMode == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
                                 router = router,
                                 onFinished = { finish() },
@@ -470,7 +472,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
                 router.close()
                 val app = context.applicationContext
                 router.download(url, forceDuplicate = true) {
-                    Toast.makeText(app, app.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(app, startedMessage(app, it), Toast.LENGTH_SHORT).show()
                 }
                 onFinished()
             },
@@ -484,7 +486,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             onDownload = { options ->
                 val app = context.applicationContext
                 router.download(url, options) {
-                    Toast.makeText(app, app.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(app, startedMessage(app, it), Toast.LENGTH_SHORT).show()
                 }
                 onFinished()
             },
@@ -668,7 +670,7 @@ private fun SharePickerSheet(
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
                         val app = context.applicationContext
                         router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
-                            Toast.makeText(app, app.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(app, startedMessage(app, it), Toast.LENGTH_SHORT).show()
                         }
                         visible = false
                     },

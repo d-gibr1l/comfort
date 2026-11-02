@@ -861,6 +861,7 @@
     <string name="download_this_how">Bu nasıl indirilsin?</string>
     <string name="instant">Anında</string>
     <string name="download_started">İndirme başladı</string>
+    <string name="couldnt_start_download">İndirme başlatılamadı</string>
     <string name="shows_download_progress_and_completion">İndirmenin ilerlemesini ve tamamlanmasını gösterir</string>
     <string name="download_results_channel">Biten indirmeler</string>
     <string name="download_results_channel_description">Bir indirme bittiğinde veya başarısız olduğunda bildirir</string>

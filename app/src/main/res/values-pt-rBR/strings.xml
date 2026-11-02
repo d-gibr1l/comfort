@@ -970,6 +970,7 @@
     <string name="download_this_how">Como baixar isto?</string>
     <string name="instant">Instantâneo</string>
     <string name="download_started">Download iniciado</string>
+    <string name="couldnt_start_download">Não foi possível iniciar o download</string>
     <string name="shows_download_progress_and_completion">Mostra o progresso e a conclusão dos downloads</string>
     <string name="download_results_channel">Downloads concluídos</string>
     <string name="download_results_channel_description">Avisa quando um download termina ou falha</string>

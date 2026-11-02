@@ -32,6 +32,8 @@ import kotlinx.coroutines.sync.withLock
 sealed class EnqueueResult(val id: String) {
     class Started(id: String) : EnqueueResult(id)
     class Duplicate(id: String) : EnqueueResult(id)
+    /** Couldn't be queued (the database or WorkManager threw): nothing was started. */
+    class Failed(val error: Throwable) : EnqueueResult("")
 }
 
 /** Enqueue logic shared between the in-app ViewModel and the instant-share path (which runs
