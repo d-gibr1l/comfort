@@ -149,12 +149,34 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun enqueue(onDone: (EnqueueResult) -> Unit, block: suspend () -> EnqueueResult): Job =
-        viewModelScope.launch { onDone(block()) }
+        viewModelScope.launch { onDone(runEnqueue(block)) }
+
+    /** A share's Instant download: queued outside this ViewModel, so backing out of the share
+     * sheet while it's still being queued (the duplicate check can take a while) doesn't cancel
+     * it — part-way, that dropped it silently or left a queued row with no job until the app was
+     * next opened. [onDone] runs on the main thread. */
+    fun downloadDetached(url: String, onDone: (EnqueueResult) -> Unit): Job = detachedScope.launch {
+        val result = runEnqueue { DownloadDispatcher.enqueueDownload(context, url, titleFor(url)) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onDone(result) }
+    }
+
+    /** [block], with a failure as [EnqueueResult.Failed] instead of an exception: thrown out of
+     * the scope, it crashed the app, and its caller (the share sheet) never heard back and stayed
+     * on screen. */
+    private suspend fun runEnqueue(block: suspend () -> EnqueueResult): EnqueueResult = try {
+        block()
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        android.util.Log.e("LinkRouter", "Couldn't queue the download", e)
+        EnqueueResult.Failed(e)
+    }
 
     private fun PreviewInfo.hasContent() = title != null || thumbnail != null || streamUrls.isNotEmpty()
 
     private companion object {
         const val YT_DLP_PREVIEW_CAP_MS = 30_000L
+        /** Outlives any one share sheet; see [downloadDetached]. */
+        val detachedScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
     }
 
     private fun titleFor(url: String) = getApplication<Application>().getString(com.comfort.app.R.string.downloading_from_x, VideoSiteRouter.siteName(url, getApplication<Application>().getString(com.comfort.app.R.string.this_link)))
@@ -166,5 +188,8 @@ fun startedMessage(context: android.content.Context, result: EnqueueResult): Str
 
 /** Which message [startedMessage] shows, as a string resource. */
 @androidx.annotation.StringRes
-fun startedMessageRes(result: EnqueueResult): Int =
-    if (result is EnqueueResult.Duplicate) com.comfort.app.R.string.already_downloaded_see_duplicates else com.comfort.app.R.string.download_started
+fun startedMessageRes(result: EnqueueResult): Int = when (result) {
+    is EnqueueResult.Duplicate -> com.comfort.app.R.string.already_downloaded_see_duplicates
+    is EnqueueResult.Failed -> com.comfort.app.R.string.couldnt_start_download
+    else -> com.comfort.app.R.string.download_started
+}

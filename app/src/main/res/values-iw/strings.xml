@@ -861,6 +861,7 @@
     <string name="download_this_how">איך להוריד את זה?</string>
     <string name="instant">מיידי</string>
     <string name="download_started">ההורדה התחילה</string>
+    <string name="couldnt_start_download">לא ניתן היה להתחיל את ההורדה</string>
     <string name="shows_download_progress_and_completion">מציג את התקדמות ההורדה והשלמתה</string>
     <string name="download_results_channel">הורדות שהסתיימו</string>
     <string name="download_results_channel_description">מודיע כשהורדה מסתיימת או נכשלת</string>

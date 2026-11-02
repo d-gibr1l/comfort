@@ -2764,9 +2764,9 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # yt-dlp version, seemingly by forcing a much more expensive resolution path that compounds
         # with this build's now-failing JS-challenge solver (yt-dlp recently moved to a "remote
         # components" challenge-solver model our bundled quickjs config predates — see the
-        # "[jsc] ... was skipped" warning some downloads log now). Defaulting the "Single video
-        # only" preference to off (see GalleryDlPreferences) keeps that cost opt-in rather than
-        # paid by every download.
+        # "[jsc] ... was skipped" warning some downloads log now). That was before yt-dlp-ejs was
+        # bundled (the solver's missing part); "Single video only" is on by default since
+        # 2026-11-02 (see GalleryDlPreferences.isNoPlaylist).
         ydl_opts["noplaylist"] = True
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path

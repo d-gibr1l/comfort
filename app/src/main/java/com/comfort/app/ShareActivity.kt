@@ -198,6 +198,8 @@ class ShareActivity : ComponentActivity() {
                     key(urls) {
                         val routerOwner = rememberSheetViewModelStoreOwner()
                         val router: LinkRouterViewModel = viewModel(viewModelStoreOwner = routerOwner)
+                        // Read once per share, not in every branch on every recomposition.
+                        val shareMode = remember { GalleryDlPreferences.getShareMode(context) }
                         when {
                             // Multiple links: the picker/preview sheets below are built around
                             // reviewing/filtering exactly one link's own gallery, and stacking one
@@ -207,15 +209,15 @@ class ShareActivity : ComponentActivity() {
                             urls.size > 1 -> MultiLinkShare(
                                 urls = urls,
                                 router = router,
-                                ask = GalleryDlPreferences.getShareMode(context) != ShareMode.INSTANT,
+                                ask = shareMode != ShareMode.INSTANT,
                                 onFinished = { finish() },
                             )
-                            GalleryDlPreferences.getShareMode(context) == ShareMode.INSTANT -> InstantShareHandler(
+                            shareMode == ShareMode.INSTANT -> InstantShareHandler(
                                 url = urls[0],
                                 router = router,
                                 onFinished = { finish() },
                             )
-                            GalleryDlPreferences.getShareMode(context) == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
+                            shareMode == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
                                 router = router,
                                 onFinished = { finish() },
@@ -320,8 +322,11 @@ private fun MultiLinkHandler(urls: List<String>, router: LinkRouterViewModel, on
 private fun InstantShareHandler(url: String, router: LinkRouterViewModel, onFinished: () -> Unit) {
     val context = LocalContext.current
     LaunchedEffect(url) {
-        router.download(url) { result ->
-            Toast.makeText(context, startedMessage(context, result), Toast.LENGTH_SHORT).show()
+        // Detached from this sheet (see downloadDetached), and the toast on the app's context:
+        // it outlives this activity, which finishes right away.
+        val appContext = context.applicationContext
+        router.downloadDetached(url) { result ->
+            Toast.makeText(appContext, startedMessage(appContext, result), Toast.LENGTH_SHORT).show()
             onFinished()
         }
     }
@@ -466,7 +471,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             onDownloadNow = {
                 router.close()
                 router.download(url, forceDuplicate = true) {
-                    Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, startedMessage(context, it), Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
@@ -479,7 +484,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             onDismiss = onFinished,
             onDownload = { options ->
                 router.download(url, options) {
-                    Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, startedMessage(context, it), Toast.LENGTH_SHORT).show()
                     onFinished()
                 }
             },
@@ -667,7 +672,7 @@ private fun SharePickerSheet(
                         // already-shown confirmation carried through, same reasoning as
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
                         downloadJob = router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
-                            Toast.makeText(context, context.getString(R.string.download_started), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, startedMessage(context, it), Toast.LENGTH_SHORT).show()
                         }
                         visible = false
                     },

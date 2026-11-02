@@ -861,6 +861,7 @@
     <string name="download_this_how">این را چگونه دانلود کنیم؟</string>
     <string name="instant">فوری</string>
     <string name="download_started">دانلود شروع شد</string>
+    <string name="couldnt_start_download">دانلود شروع نشد</string>
     <string name="shows_download_progress_and_completion">پیشرفت و پایان دانلود را نشان می‌دهد</string>
     <string name="download_results_channel">دانلودهای تمام‌شده</string>
     <string name="download_results_channel_description">وقتی دانلودی تمام شود یا ناموفق باشد خبر می‌دهد</string>
