@@ -625,6 +625,7 @@
     <string name="nothing_here_yet">لا شيء هنا بعد</string>
     <string name="try_a_different_search">جرّب بحثًا مختلفًا.</string>
     <string name="pictures_you_remove_from_your_device">ستظهر هنا الصور التي تزيلها من معرض جهازك.</string>
+    <string name="restored_files_stay_deleted">تبقى هنا الملفات التي تستعيدها من سلة محذوفات المعرض: استخدم «التنزيل مجددًا» لإعادتها إلى المكتبة.</string>
     <string name="star_a_download_to_pin_it">ضع نجمة على تنزيل لتثبيته هنا.</string>
     <string name="downloaded_pictures_will_show_up_in">ستظهر الصور المنزَّلة في هذا المعرض.</string>
     <string name="scroll_to_top">التمرير إلى الأعلى</string>

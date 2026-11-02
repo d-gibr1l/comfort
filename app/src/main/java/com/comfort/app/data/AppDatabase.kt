@@ -239,12 +239,18 @@ private val MIGRATION_28_29 = object : Migration(28, 29) {
     }
 }
 
+private val MIGRATION_29_30 = object : Migration(29, 30) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE saved_files ADD COLUMN path TEXT")
+    }
+}
+
 @Database(
     entities = [
         DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class, SavedFile::class,
         Subscription::class, SubscriptionSeenEntry::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -264,7 +270,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
                         MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
-                        MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
+                        MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

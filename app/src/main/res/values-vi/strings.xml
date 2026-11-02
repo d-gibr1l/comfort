@@ -625,6 +625,7 @@
     <string name="nothing_here_yet">Chưa có gì ở đây</string>
     <string name="try_a_different_search">Hãy thử tìm kiếm khác.</string>
     <string name="pictures_you_remove_from_your_device">Ảnh bạn xóa khỏi thư viện ảnh của thiết bị sẽ hiện ở đây.</string>
+    <string name="restored_files_stay_deleted">Tệp bạn khôi phục từ thùng rác của thư viện ảnh vẫn ở đây: dùng Tải xuống lại để đưa chúng về Thư viện.</string>
     <string name="star_a_download_to_pin_it">Gắn sao cho một lượt tải để ghim nó ở đây.</string>
     <string name="downloaded_pictures_will_show_up_in">Ảnh đã tải sẽ hiện trong thư viện ảnh này.</string>
     <string name="scroll_to_top">Cuộn lên đầu</string>

@@ -692,6 +692,7 @@
     <string name="nothing_here_yet">Nada aqui ainda</string>
     <string name="try_a_different_search">Tente outra busca.</string>
     <string name="pictures_you_remove_from_your_device">As imagens que você apagar da galeria do aparelho aparecem aqui.</string>
+    <string name="restored_files_stay_deleted">Arquivos restaurados da lixeira da galeria ficam aqui: use Baixar de novo para tê-los de volta na biblioteca.</string>
     <string name="star_a_download_to_pin_it">Marque um download com estrela para fixá-lo aqui.</string>
     <string name="downloaded_pictures_will_show_up_in">As imagens baixadas aparecem nesta galeria.</string>
     <string name="scroll_to_top">Voltar ao topo</string>

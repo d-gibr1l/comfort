@@ -625,6 +625,7 @@
     <string name="nothing_here_yet">Ancora niente qui</string>
     <string name="try_a_different_search">Prova una ricerca diversa.</string>
     <string name="pictures_you_remove_from_your_device">Le immagini che rimuovi dalla galleria del dispositivo compariranno qui.</string>
+    <string name="restored_files_stay_deleted">I file ripristinati dal cestino della galleria restano qui: usa Scarica di nuovo per riaverli nella libreria.</string>
     <string name="star_a_download_to_pin_it">Aggiungi una stella a un download per fissarlo qui.</string>
     <string name="downloaded_pictures_will_show_up_in">Le immagini scaricate compariranno in questa galleria.</string>
     <string name="scroll_to_top">Torna in cima</string>
