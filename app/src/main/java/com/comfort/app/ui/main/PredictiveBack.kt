@@ -73,6 +73,11 @@ class BackRevealState internal constructor(
     // page behind (reported live, 2026-09-24).
     private var running: Job? = null
 
+    /** The page behind is showing (a back gesture or its animation): the page in front has to
+     * paint its own background over it. Read in a draw phase, it redraws as this changes. */
+    val revealing: Boolean
+        get() = behindAlpha.value > 0f
+
     /** A transition (open, back, a back gesture) is on: the pages aren't at rest. Read from the
      * animated values themselves, so it's right however the transition started or ended. */
     val busy: Boolean

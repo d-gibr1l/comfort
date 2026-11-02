@@ -133,9 +133,10 @@ internal fun LibraryHeader(
     onToggleAudioOnly: () -> Unit,
 ) {
     Box(
+        // No background of its own: it's the list's first item, so nothing scrolls under it, and
+        // under it is the page's background in the same colour.
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding(),
     ) {
         // Favorites/Grid-List/Queue, pinned at a fixed top=12dp position independent of the
