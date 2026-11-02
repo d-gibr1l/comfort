@@ -243,6 +243,10 @@ class MainActivity : ComponentActivity() {
       CompositionLocalProvider(LocalThemeState provides themeState) {
         GalleryDLTheme(themeMode = themeMode, lightTheme = lightTheme, darkTheme = darkTheme, pureBlack = pureBlack) {
           Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            // The window's own background (the theme's default colour) was painted first on every
+            // frame, all of it under this Surface, which covers the whole window. Dropped once the
+            // content is up: one full-screen fill less per frame on every screen.
+            androidx.compose.runtime.LaunchedEffect(Unit) { window.setBackgroundDrawable(null) }
             MainNavigation(openQueueSignal = openQueueSignal.intValue, shortcut = shortcut.value)
           }
         }

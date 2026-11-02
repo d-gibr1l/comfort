@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
@@ -428,6 +429,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         val keptTabs = (
             shownTabs + listOfNotNull(2.takeIf { keepSettings }, 1.takeIf { keepLibrary }, preparingTab, pageSwipe.neighbor?.takeIf { it != 0 })
         ).distinct()
+        val pageColor = MaterialTheme.colorScheme.background
         for (tab in keptTabs) key(tab) {
             Box(
                 // Opaque so a centered, width-capped page (Home/Settings on a wide window) doesn't
@@ -435,7 +437,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                 modifier = if (pageSwipe.involves(tab)) {
                     // Moved by a swipe: its background moves with it (inside the layer), or it
                     // would stay put and cover the page coming in beside it.
-                    Modifier.fillMaxSize().pageSwipeLayer(pageSwipe, tab, selectedTab).background(MaterialTheme.colorScheme.background)
+                    // Side by side with the other page, never over it: only the activity's Surface
+                    // is under it, the same colour, unless a tab switch is still underneath.
+                    Modifier.fillMaxSize().pageSwipeLayer(pageSwipe, tab, selectedTab).pageBackground(pageColor) { outgoingTab != null }
                 } else if (tab == outgoingTab) {
                     Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).predictiveBackBehind(tabBack, active = true)
                 } else {
@@ -455,7 +459,11 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                                 while (true) awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
                             }
                         }
-                        .background(MaterialTheme.colorScheme.background)
+                        // Only while something's under it — the tab being left during a switch, or
+                        // Home during a back gesture. At rest, under it is the activity's Surface in
+                        // the same colour (Home's alpha is 0), and painting it again cost every
+                        // frame a full-screen fill (TODO: Library opening, the rest).
+                        .pageBackground(pageColor) { outgoingTab != null || tabBack.revealing }
                         .predictiveBackReveal(tabBack)
                         .then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier)
                 }
@@ -885,10 +893,11 @@ fun HomeScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
+        // No background of its own: it scrolls with Home, nothing goes under it, and under it is
+        // the activity's Surface in the same colour.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .padding(top = 12.dp, bottom = 24.dp, start = 24.dp, end = 24.dp)
         ) {
@@ -1616,3 +1625,8 @@ private fun looksLikeLink(text: String): Boolean {
     if (t.contains(' ')) return false
     return android.util.Patterns.WEB_URL.matcher(t).matches() && t.contains('.')
 }
+
+/** A page's background, painted only while [needed] says something else is under it. Read in the
+ * draw phase, so the modifier chain stays the same (nothing recomposes) as it turns on and off. */
+private fun Modifier.pageBackground(color: Color, needed: () -> Boolean): Modifier =
+    drawBehind { if (needed()) drawRect(color) }
