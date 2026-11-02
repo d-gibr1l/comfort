@@ -29,6 +29,7 @@ class ThemeContrastTest {
         "onSurfaceVariant/surface" to (s.onSurfaceVariant to s.surface),
         "onSurfaceVariant/surfaceContainer" to (s.onSurfaceVariant to s.surfaceContainer),
         "onSurfaceVariant/surfaceContainerHigh" to (s.onSurfaceVariant to s.surfaceContainerHigh),
+        "onSurfaceVariant/surfaceContainerHighest" to (s.onSurfaceVariant to s.surfaceContainerHighest),
         "primary/background" to (s.primary to s.background),
         "primary/surfaceContainer" to (s.primary to s.surfaceContainer),
         "onPrimary/primary" to (s.onPrimary to s.primary),

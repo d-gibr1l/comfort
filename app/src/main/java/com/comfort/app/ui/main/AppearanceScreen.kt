@@ -234,7 +234,7 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     ThemeToggleRow(
@@ -301,7 +301,7 @@ private fun LanguageRow() {
         onClick = { picking = true },
         modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Language, contentDescription = null)
@@ -426,7 +426,7 @@ private fun ThemeToggleRow(
             // as a dead gray blob rather than a working control resting in its off position.
             colors = SwitchDefaults.colors(
                 uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 uncheckedBorderColor = MaterialTheme.colorScheme.outline,
             ),
         )

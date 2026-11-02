@@ -87,7 +87,7 @@ private fun buildLight(primary: Color, onPrimary: Color, primaryContainer: Color
     surfaceContainerLow = background,
     surfaceContainer = Neutral95,
     surfaceContainerHigh = Neutral90,
-    surfaceContainerHighest = Neutral80,
+    surfaceContainerHighest = Neutral85,
     // Were Neutral80/Neutral90 — Material's outlineVariant/next tone, not outline: ~1.5:1 and ~1.2:1
     // on these pages, so chip and button outlines barely showed (reported live on Yang). Now
     // ~4.5-4.8:1 and ~2.3-2.5:1, in line with Expressive Purple's hand-made scheme.

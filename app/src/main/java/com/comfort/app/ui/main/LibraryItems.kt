@@ -496,12 +496,12 @@ internal fun HistoryRow(
             .clip(LIBRARY_CARD_SHAPE)
             // "background" is the top-level scaffold/page role, not a role for a row sitting on
             // top of it as its own distinct surface — this row now reads as a real MD3 surface
-            // (surfaceContainer, same tone the Queue screen's own cards use) instead of blending
+            // (surfaceContainerHigh, the same as Settings' rows) instead of blending
             // into the page. The selected state used an alpha-blended primaryContainer, which
             // breaks the tonal-pairing contract other content on this row (onSurface title text,
             // not onPrimaryContainer) assumes a fully-opaque container guarantees — full-opacity
             // primaryContainer instead.
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer)
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
             .swipeRemoveAction()
             .then(
                 if (selectionMode) {
@@ -533,7 +533,8 @@ internal fun HistoryRow(
                     .fillMaxSize()
                     // The shared thumbnail shape (Components.kt thumbnailShape).
                     .clip(thumbnailShape())
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    // A step above the card's own surfaceContainerHigh, so an empty tile still shows.
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             ) {
                 if (hasThumbnail) {
                     LibraryThumbnail(item, Modifier.fillMaxSize())
