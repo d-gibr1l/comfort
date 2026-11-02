@@ -1071,6 +1071,7 @@
     <string name="unknown_title">Desconhecido</string>
     <string name="engine_update_download_running">Não dá para atualizar com um download em andamento — espere ele terminar</string>
     <string name="engine_update_checksum_mismatch">O arquivo baixado não bate com o checksum publicado — cancelado, nada foi instalado</string>
+    <string name="engine_update_no_checksum">Não foi possível verificar o download (a soma de verificação não estava disponível), então ele não foi instalado. Tente mais tarde.</string>
     <string name="engine_update_missing_package">O download não continha %1$s — nada foi alterado</string>
     <string name="engine_update_version_unreadable">Atualização instalada, mas não foi possível ler a versão dela</string>
     <string name="backup_couldnt_open_file">Não foi possível abrir o arquivo</string>

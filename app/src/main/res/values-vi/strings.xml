@@ -917,6 +917,7 @@
     <string name="unknown_title">Không rõ</string>
     <string name="engine_update_download_running">Không thể cập nhật khi đang tải — hãy chờ tải xong trước</string>
     <string name="engine_update_checksum_mismatch">Tệp đã tải không khớp mã kiểm tra được công bố — đã hủy, không cài gì</string>
+    <string name="engine_update_no_checksum">Không thể xác minh bản tải xuống (không có mã kiểm tra), nên chưa cài đặt. Hãy thử lại sau.</string>
     <string name="engine_update_missing_package">Bản tải không chứa %1$s — không thay đổi gì</string>
     <string name="engine_update_version_unreadable">Đã cài bản cập nhật nhưng không đọc được phiên bản</string>
     <string name="backup_couldnt_open_file">Không thể mở tệp</string>

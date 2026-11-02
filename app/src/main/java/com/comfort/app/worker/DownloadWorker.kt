@@ -1288,7 +1288,12 @@ class DownloadWorker(
                     return@withContext Result.success()
                 }
 
-                stagingDir.deleteRecursively()
+                // Nothing saved is a failure: its partial files (a big video's .part) follow Settings'
+                // "delete leftover on failure", like the other failure path below, so with it off a
+                // Retry resumes instead of starting over. Always deleted after a success.
+                if (savedCount.get() > 0 || GalleryDlPreferences.isDeleteLeftoverOnFailure(applicationContext)) {
+                    stagingDir.deleteRecursively()
+                }
 
                 if (savedCount.get() == 0) {
                     // Neither engine found anything to save. Previously this silently reported
@@ -1397,8 +1402,7 @@ class DownloadWorker(
                     dao.setErrorDetails(downloadId, null)
                     DownloadNotifications.notifyFailed(applicationContext, downloadId, liveTitle.get(), sanitized)
                     // Imported from YTDLnis's own "Cleanup leftover downloads" setting — a genuine
-                    // failure here (unlike the savedCount==0 branch above, which already ran the
-                    // unconditional deleteRecursively() before this catch could ever see it) leaves
+                    // failure here (like the savedCount==0 branch above, which follows the same setting) leaves
                     // whatever partial fragments/staging files exist untouched by default, so this
                     // is the one real place leftover files actually accumulate. Deleting them is
                     // still the default (matches every prior release's behavior); off lets a user

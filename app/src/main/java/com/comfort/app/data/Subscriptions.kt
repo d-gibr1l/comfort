@@ -158,6 +158,9 @@ object Subscriptions {
             )
             var queued = 0
             for (entry in plan.toDownload) {
+                // Removed while this check was fetching (remove() doesn't wait for it): nothing more
+                // is queued, remembered or announced for a source that's gone.
+                if (dao.getById(id) == null) return@withLock queued
                 val result = DownloadDispatcher.enqueueDownload(
                     context,
                     url = entry.url,
@@ -174,6 +177,7 @@ object Subscriptions {
                 // the next check doesn't queue these again.
                 dao.insertSeen(listOf(SubscriptionSeenEntry(id, entry.id)))
             }
+            if (dao.getById(id) == null) return@withLock queued
             dao.insertSeen(plan.toMarkSeen.map { SubscriptionSeenEntry(id, it) })
             dao.setCheckSucceeded(id, System.currentTimeMillis(), feed.title.ifBlank { subscription.title }, feed.thumbnail)
             if (queued > 0) DownloadNotifications.notifySubscriptionDownloads(context, id, feed.title.ifBlank { subscription.title }, queued)

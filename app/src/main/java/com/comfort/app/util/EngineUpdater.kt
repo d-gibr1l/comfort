@@ -104,8 +104,10 @@ object EngineUpdater {
     fun installedVersion(context: Context, engine: EngineInfo): String? {
         val dir = PythonRuntime.sitePackagesDir(context)
         val prefix = "${engine.packageDirName}-"
+        // The newest if there are several (an install interrupted part-way can leave two); listFiles'
+        // order is unspecified, so the first one found could be the old version.
         return dir.listFiles { f -> f.isDirectory && f.name.startsWith(prefix) && f.name.endsWith(".dist-info") }
-            ?.firstOrNull()
+            ?.maxByOrNull { it.lastModified() }
             ?.name
             ?.removePrefix(prefix)
             ?.removeSuffix(".dist-info")
@@ -192,7 +194,9 @@ object EngineUpdater {
             ?: return@runCatching null
         val fullSha = JSONObject(json).getJSONObject("commit").getString("id")
         val version = "master-${fullSha.take(10)}"
-        FetchResult(version, "https://codeberg.org/mikf/gallery-dl/archive/master.zip", ArtifactKind.GIT_ZIP_SOURCE, null)
+        // That commit's zip, not the moving "master.zip": a commit landing between this check and
+        // the download (up to a minute) installed newer code than the version shown.
+        FetchResult(version, "https://codeberg.org/mikf/gallery-dl/archive/$fullSha.zip", ArtifactKind.GIT_ZIP_SOURCE, null)
     }.getOrNull()
 
     /** Instaloader's own "bleeding edge": its GitHub master branch (development happens there; its
@@ -331,6 +335,13 @@ object EngineUpdater {
                     }
                 }
 
+                // The nightly's tarball has a published checksum (SHA2-256SUMS); when it couldn't
+                // be read, it's refused rather than installed unchecked. (gallery-dl's and
+                // Instaloader's Master zips have none to check against — HTTPS only, by design.)
+                if (artifactKind == ArtifactKind.TAR_GZ_SOURCE && status.sha256.isNullOrBlank()) {
+                    tempFile.delete()
+                    error(context.getString(com.comfort.app.R.string.engine_update_no_checksum))
+                }
                 if (!status.sha256.isNullOrBlank()) {
                     val actual = sha256Of(tempFile)
                     if (!actual.equals(status.sha256, ignoreCase = true)) {
@@ -420,7 +431,7 @@ object EngineUpdater {
                 if (topDir != null && name.startsWith(packagePrefix)) {
                     val relative = name.removePrefix(packagePrefix)
                     if (relative.isNotEmpty()) {
-                        val outFile = File(sitePackages, "$packageDirName/$relative")
+                        val outFile = containedFile(sitePackages, "$packageDirName/$relative")
                         if (entry.isDirectory) {
                             outFile.mkdirs()
                         } else {
@@ -470,7 +481,7 @@ object EngineUpdater {
 
                 if ((typeflag == '0' || typeflag == ' ') && topDir != null && fullName.startsWith(packagePrefix)) {
                     val relative = fullName.removePrefix(packagePrefix)
-                    val outFile = File(sitePackages, "$packageDirName/$relative")
+                    val outFile = containedFile(sitePackages, "$packageDirName/$relative")
                     outFile.parentFile?.mkdirs()
                     outFile.outputStream().use { output -> copyExactly(input, output, size) }
                     skipFully(input, paddedSize - size)
@@ -479,6 +490,20 @@ object EngineUpdater {
                 }
             }
         }
+    }
+
+    /** [relative] under [root], refusing a path that leaves it ("../", an absolute path) — the
+     * same guard PythonRuntime.unzipStreamTo has for wheels. These archives are a source zip with
+     * no published checksum (gallery-dl/Instaloader Master) or a nightly tarball, and one crafted
+     * entry name would otherwise write anywhere in the app's private storage. */
+    private fun containedFile(root: File, relative: String): File {
+        val canonicalRoot = root.canonicalFile
+        val out = File(root, relative)
+        val canonicalOut = out.canonicalFile
+        if (!canonicalOut.path.startsWith(canonicalRoot.path + File.separator)) {
+            throw SecurityException("Archive entry is outside the install folder: $relative")
+        }
+        return out
     }
 
     private const val ZERO_BYTE: Byte = 0

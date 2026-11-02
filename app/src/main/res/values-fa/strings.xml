@@ -917,6 +917,7 @@
     <string name="unknown_title">ناشناخته</string>
     <string name="engine_update_download_running">هنگام اجرای دانلود نمی‌توان به‌روزرسانی کرد — ابتدا صبر کنید تمام شود</string>
     <string name="engine_update_checksum_mismatch">فایل دانلودشده با چک‌سام منتشرشده مطابقت نداشت — لغو شد، چیزی نصب نشد</string>
+    <string name="engine_update_no_checksum">دانلود تأیید نشد (چک‌سام آن در دسترس نبود)، بنابراین نصب نشد. بعداً دوباره امتحان کنید.</string>
     <string name="engine_update_missing_package">دانلود شامل %1$s نبود — چیزی تغییر نکرد</string>
     <string name="engine_update_version_unreadable">به‌روزرسانی نصب شد اما نسخه آن خوانده نشد</string>
     <string name="backup_couldnt_open_file">باز کردن فایل ممکن نشد</string>

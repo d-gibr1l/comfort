@@ -917,6 +917,7 @@
     <string name="unknown_title">غير معروف</string>
     <string name="engine_update_download_running">لا يمكن التحديث أثناء تشغيل تنزيل — انتظر حتى ينتهي أولًا</string>
     <string name="engine_update_checksum_mismatch">الملف المنزَّل لا يطابق المجموع الاختباري المنشور له — تم الإلغاء، ولم يُثبَّت شيء</string>
+    <string name="engine_update_no_checksum">تعذّر التحقق من التنزيل (لم يكن مجموعه الاختباري متاحًا)، لذا لم يُثبَّت. حاول مرة أخرى لاحقًا.</string>
     <string name="engine_update_missing_package">لم يحتوِ التنزيل على %1$s — لم يتغير شيء</string>
     <string name="engine_update_version_unreadable">تم تثبيت التحديث لكن تعذّرت قراءة إصداره</string>
     <string name="backup_couldnt_open_file">تعذّر فتح الملف</string>

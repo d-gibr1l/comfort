@@ -917,6 +917,7 @@
     <string name="unknown_title">不明</string>
     <string name="engine_update_download_running">ダウンロード中は更新できません。完了するまでお待ちください</string>
     <string name="engine_update_checksum_mismatch">ダウンロードしたファイルが公開されているチェックサムと一致しませんでした。中止し、何もインストールしていません</string>
+    <string name="engine_update_no_checksum">ダウンロードを検証できなかったため（チェックサムを取得できませんでした）、インストールしませんでした。後でもう一度お試しください。</string>
     <string name="engine_update_missing_package">ダウンロードに %1$s が含まれていませんでした。何も変更していません</string>
     <string name="engine_update_version_unreadable">アップデートはインストールしましたが、バージョンを読み取れませんでした</string>
     <string name="backup_couldnt_open_file">ファイルを開けませんでした</string>

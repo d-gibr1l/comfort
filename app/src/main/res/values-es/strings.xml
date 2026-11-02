@@ -1058,6 +1058,7 @@
     <string name="unknown_title">Desconocido</string>
     <string name="engine_update_download_running">No se puede actualizar mientras hay una descarga en curso; espera a que termine</string>
     <string name="engine_update_checksum_mismatch">El archivo descargado no coincidió con la suma de verificación publicada; se canceló y no se instaló nada</string>
+    <string name="engine_update_no_checksum">No se pudo verificar la descarga (su suma de comprobación no estaba disponible), así que no se instaló. Inténtalo más tarde.</string>
     <string name="engine_update_missing_package">La descarga no contenía %1$s; no se cambió nada</string>
     <string name="engine_update_version_unreadable">La actualización se instaló, pero no se pudo leer su versión</string>
     <string name="backup_couldnt_open_file">No se pudo abrir el archivo</string>

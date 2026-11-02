@@ -388,8 +388,11 @@ def _filter_error(expr):
 
 
 def _has_parent_segment(value):
+    """True if [value] (a path, format, or a dict/list of them) could leave the download folder: a
+    ".." segment, or an absolute path (os.path.join drops everything before one)."""
     if isinstance(value, str):
-        return any(seg.strip() == ".." for seg in value.replace("\\", "/").split("/"))
+        path = value.replace("\\", "/")
+        return path.lstrip().startswith("/") or any(seg.strip() == ".." for seg in path.split("/"))
     if isinstance(value, dict):
         return any(_has_parent_segment(v) for v in value.values())
     if isinstance(value, (list, tuple)):
@@ -422,6 +425,10 @@ def _refusal(action, spelling, values):
     if action.dest in _FILTER_DESTS and isinstance(value, str):
         error = _filter_error(value)
         return ("extra_invalid", error) if error else None
+    # The filename format is joined onto the download folder: "../" or "/..." would put files
+    # outside it (where they're never saved), the same hole the directory checks close.
+    if action.dest == "filename" and _has_parent_segment(value):
+        return "extra_not_allowed", value
     if action.dest == "postprocessors" and spelling in ("-P", "--postprocessor") and value in ("zip", "exec"):
         return "extra_not_allowed", value
     if action.dest == "path-restrict" and action.nargs != 0:
@@ -444,6 +451,7 @@ def _refusal(action, spelling, values):
         # extractor's own (config.interpolate), so only top-level ones can move files.
         if (last in _REFUSED_KEYS or (top and last == "base-directory")
                 or (top and last == "directory" and _has_parent_segment(parsed))
+                or (last == "filename" and _has_parent_segment(parsed))
                 or (last == "download" and parsed is False)
                 or (last == "cookies" and not isinstance(parsed, str))
                 or (last == "postprocessors" and ("zip" in str(parsed) or "exec" in str(parsed)))):

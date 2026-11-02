@@ -917,6 +917,7 @@
     <string name="unknown_title">Sconosciuto</string>
     <string name="engine_update_download_running">Impossibile aggiornare mentre un download è in corso — aspetta prima che finisca</string>
     <string name="engine_update_checksum_mismatch">Il file scaricato non corrisponde al checksum pubblicato — interrotto, non è stato installato nulla</string>
+    <string name="engine_update_no_checksum">Impossibile verificare il download (il suo checksum non era disponibile), quindi non è stato installato. Riprova più tardi.</string>
     <string name="engine_update_missing_package">Il download non conteneva %1$s — non è cambiato nulla</string>
     <string name="engine_update_version_unreadable">Aggiornamento installato, ma non è stato possibile leggerne la versione</string>
     <string name="backup_couldnt_open_file">Impossibile aprire il file</string>

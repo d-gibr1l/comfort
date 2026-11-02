@@ -1108,6 +1108,7 @@
     <string name="unknown_title">Неизвестно</string>
     <string name="engine_update_download_running">Нельзя обновить, пока идёт загрузка — дождитесь её окончания</string>
     <string name="engine_update_checksum_mismatch">Скачанный файл не совпал с опубликованной контрольной суммой — отменено, ничего не установлено</string>
+    <string name="engine_update_no_checksum">Не удалось проверить загрузку (контрольная сумма недоступна), поэтому она не установлена. Попробуйте позже.</string>
     <string name="engine_update_missing_package">В загрузке нет %1$s — ничего не изменено</string>
     <string name="engine_update_version_unreadable">Обновление установлено, но его версию не удалось прочитать</string>
     <string name="backup_couldnt_open_file">Не удалось открыть файл</string>
