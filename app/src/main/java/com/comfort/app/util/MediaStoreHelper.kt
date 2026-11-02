@@ -35,6 +35,34 @@ object MediaStoreHelper {
             androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
             android.content.pm.PackageManager.PERMISSION_GRANTED
 
+    /** Whether [uriString] is a file this app saved, as far as the gallery can tell: true for
+     * anything that isn't a gallery (MediaStore) Uri — a custom folder's document, the app's own
+     * cached cover — and for a gallery file under Download/Comfort (or the older Pictures/,
+     * Movies/, Music/Comfort folders). False for a gallery Uri that's missing or elsewhere.
+     *
+     * For a restored backup's history (BackupRestore): gallery ids are per phone, so on a new phone
+     * an old entry's content://media/.../1234 is whatever unrelated file has that id there — the
+     * Library showed it, opened it and offered to delete it. By folder, not owner: Android clears
+     * a file's owner when the app is uninstalled, so after a reinstall on the same phone the app's
+     * own files would fail an owner check. */
+    fun isComfortMediaFile(context: Context, uriString: String): Boolean {
+        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return false
+        if (uri.authority != MediaStore.AUTHORITY) return true
+        val path = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            } else {
+                @Suppress("DEPRECATION")
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                    ?.substringAfter("/0/", "")
+            }
+        }.getOrNull() ?: return false
+        val folder = path.trimStart('/')
+        return folder.startsWith("$RELATIVE_DIR/") || OLD_RELATIVE_DIRS.any { folder.startsWith(it) }
+    }
+
     /** Where downloads went before they moved to [RELATIVE_DIR] — [organizeSavedFiles] moves them. */
     private val OLD_RELATIVE_DIRS = listOf("Pictures/Comfort/", "Movies/Comfort/", "Music/Comfort/", "Download/Comfort/")
 

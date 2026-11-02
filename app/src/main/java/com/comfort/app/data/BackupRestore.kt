@@ -34,6 +34,19 @@ object BackupRestore {
         GalleryDlPreferences.KEY_VIDEO_LOCATION_URI,
     )
 
+    /** The app's own state, not the user's choices: never restored. A backup made while Pause all
+     * was on paused every new download on the phone it was restored to, stale update checks hid
+     * updates, and the one-time migration markers would skip migrations this phone still needs. */
+    private val STATE_KEYS = setOf(
+        "global_pause", "engine_update_last_check_ms", "engine_update_available",
+        "app_update_last_check_ms", "app_update_available", "saved_files_organized",
+        "old_names_tidied_2", "cookies",
+    )
+
+    /** A backup bigger than this isn't one (a video picked by mistake): refused before it's read
+     * into memory, rather than the app running out of it. Thousands of downloads fit in a few MB. */
+    private const val MAX_BACKUP_BYTES = 64L * 1024 * 1024
+
     // What counts as history: downloads that finished (not the queue, errors or the bin).
     private const val HISTORY_WHERE = "status IN ('FINISHED', 'SAVED')"
 
@@ -99,8 +112,19 @@ object BackupRestore {
 
     /** Reads [uri]; throws [IllegalArgumentException] if it isn't a Comfort backup. */
     suspend fun read(context: Context, uri: Uri): Backup = withContext(Dispatchers.IO) {
-        val text = context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
-            ?: error(context.getString(com.comfort.app.R.string.backup_couldnt_open_file))
+        val text = context.contentResolver.openInputStream(uri)?.use { input ->
+            val buffer = java.io.ByteArrayOutputStream()
+            val chunk = ByteArray(64 * 1024)
+            var total = 0L
+            while (true) {
+                val n = input.read(chunk)
+                if (n < 0) break
+                total += n
+                require(total <= MAX_BACKUP_BYTES) { "Not a Comfort backup" }
+                buffer.write(chunk, 0, n)
+            }
+            buffer.toString(Charsets.UTF_8.name())
+        } ?: error(context.getString(com.comfort.app.R.string.backup_couldnt_open_file))
         val root = runCatching { JSONObject(text) }.getOrNull()
         require(root != null && root.optString("format") == FORMAT) { "Not a Comfort backup" }
         Backup(root)
@@ -113,10 +137,12 @@ object BackupRestore {
             val settings = root.optJSONObject("settings")
             for (file in SETTINGS_FILES) {
                 val values = settings?.optJSONObject(file) ?: continue
-                val editor = context.getSharedPreferences(file, Context.MODE_PRIVATE).edit()
+                val prefs = context.getSharedPreferences(file, Context.MODE_PRIVATE)
+                val current = prefs.all
+                val editor = prefs.edit()
                 values.keys().forEach { key ->
-                    if (key in SKIPPED_SETTINGS) return@forEach
-                    if (decodeSetting(editor, key, values.optJSONObject(key))) settingsCount++
+                    if (key in SKIPPED_SETTINGS || key in STATE_KEYS) return@forEach
+                    if (decodeSetting(editor, key, values.optJSONObject(key), current[key])) settingsCount++
                 }
                 // On disk before "Restored" is reported (this runs on Dispatchers.IO): the app may
                 // be closed right after, and apply()'s background write lost with it.
@@ -126,17 +152,21 @@ object BackupRestore {
         }
         val cookies = root.optString("cookies")
         val restoreCookies = parts.cookies && cookies.isNotBlank()
-        if (restoreCookies) CookieStore.write(context, cookies)
+        // Merged, not replaced: a login made on this phone since (a site the backup doesn't have)
+        // stays; the backup's sites replace their own lines (CookieStore.mergePasted).
+        if (restoreCookies) CookieStore.mergePasted(CookieStore.read(context), cookies)?.let { CookieStore.write(context, it) }
         var historyCount = 0
         val history = root.optJSONObject("history")
         if (parts.history && history != null) {
             val room = AppDatabase.getDatabase(context)
             // In a Room transaction, so the Library's lists see the new rows when it ends.
+            val restoredIds = mutableListOf<String>()
             room.runInTransaction {
                 val db = room.openHelper.writableDatabase
-                historyCount = insertRows(db, "downloads", history.optJSONArray("downloads"))
+                historyCount = insertRows(db, "downloads", history.optJSONArray("downloads"), restoredIds)
                 insertRows(db, "saved_files", history.optJSONArray("saved_files"))
             }
+            dropOtherPhonesFiles(context, room, restoredIds)
         }
         var subscriptionCount = 0
         val subscriptions = root.optJSONObject("subscriptions")
@@ -163,9 +193,24 @@ object BackupRestore {
         else -> null
     }
 
-    private fun decodeSetting(editor: android.content.SharedPreferences.Editor, key: String, o: JSONObject?): Boolean {
+    /** [current]: what this phone has for the key now. A value of another type is skipped: the
+     * getter reading it (getInt on a String, ...) would throw on every launch — a crash only
+     * clearing the app's data fixed — from a backup made by another version or edited by hand. */
+    private fun decodeSetting(editor: android.content.SharedPreferences.Editor, key: String, o: JSONObject?, current: Any? = null): Boolean {
         if (o == null || !o.has("v")) return false
-        when (o.optString("t")) {
+        val type = o.optString("t")
+        val expected = when (current) {
+            null -> null
+            is Boolean -> "b"
+            is Int -> "i"
+            is Long -> "l"
+            is Float -> "f"
+            is String -> "s"
+            is Set<*> -> "ss"
+            else -> return false
+        }
+        if (expected != null && expected != type) return false
+        when (type) {
             "b" -> editor.putBoolean(key, o.optBoolean("v"))
             "i" -> editor.putInt(key, o.optInt("v"))
             "l" -> editor.putLong(key, o.optLong("v"))
@@ -197,8 +242,37 @@ object BackupRestore {
         array
     }
 
-    /** Inserts [rows] into [table], only the columns it has; a row already there is kept. */
-    private fun insertRows(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String, rows: JSONArray?): Int {
+    /** For restored history ([ids]): gallery files that aren't this app's on this phone (see
+     * MediaStoreHelper.isComfortMediaFile — another phone's ids name unrelated files here) are
+     * unlinked, and an entry left with none is marked as deleted from the phone: its history stays,
+     * pointing at nothing rather than at someone's photo. */
+    private fun dropOtherPhonesFiles(context: Context, room: AppDatabase, ids: List<String>) {
+        if (ids.isEmpty()) return
+        val db = room.openHelper.writableDatabase
+        for (id in ids) {
+            val (thumb, media) = db.query("SELECT thumbnailPath, mediaUri FROM downloads WHERE id = ?", arrayOf(id)).use { c ->
+                if (c.moveToFirst()) c.getString(0) to c.getString(1) else null to null
+            }
+            val files = db.query("SELECT uri FROM saved_files WHERE downloadId = ?", arrayOf(id)).use { c ->
+                buildList { while (c.moveToNext()) add(c.getString(0)) }
+            }
+            val foreign = (listOfNotNull(thumb, media) + files).toSet()
+                .filterTo(mutableSetOf()) { !com.comfort.app.util.MediaStoreHelper.isComfortMediaFile(context, it) }
+            if (foreign.isEmpty()) continue
+            room.runInTransaction {
+                for (uri in foreign) db.delete("saved_files", "downloadId = ? AND uri = ?", arrayOf(id, uri))
+                if (thumb in foreign) db.execSQL("UPDATE downloads SET thumbnailPath = NULL WHERE id = ?", arrayOf(id))
+                if (media in foreign) db.execSQL("UPDATE downloads SET mediaUri = NULL WHERE id = ?", arrayOf(id))
+                val keptFiles = files.any { it !in foreign }
+                val keptThumb = thumb != null && thumb !in foreign
+                if (!keptFiles && !keptThumb) db.execSQL("UPDATE downloads SET status = 'DELETED' WHERE id = ?", arrayOf(id))
+            }
+        }
+    }
+
+    /** Inserts [rows] into [table], only the columns it has; a row already there is kept. The ids
+     * of the rows inserted are added to [insertedIds] when given. */
+    private fun insertRows(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String, rows: JSONArray?, insertedIds: MutableList<String>? = null): Int {
         if (rows == null) return 0
         val columns = db.query("PRAGMA table_info($table)").use { c ->
             val name = c.getColumnIndexOrThrow("name")
@@ -218,7 +292,10 @@ object BackupRestore {
                     is Boolean -> values.put(key, if (v) 1L else 0L)
                 }
             }
-            if (db.insert(table, SQLiteDatabase.CONFLICT_IGNORE, values) != -1L) inserted++
+            if (db.insert(table, SQLiteDatabase.CONFLICT_IGNORE, values) != -1L) {
+                inserted++
+                row.optString("id").takeIf { it.isNotEmpty() }?.let { insertedIds?.add(it) }
+            }
         }
         return inserted
     }
