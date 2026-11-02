@@ -46,7 +46,9 @@ val SuccessGreen40 = Color(0xFF22C55E)
 val FavoriteGold = Color(0xFFFACC15)
 
 // Error
-val Red40 = Color(0xFFDC2626)
+// Deep enough for error text on the light themes' cards: #DC2626 read 4.27:1 on surfaceContainer,
+// under the 4.5:1 text needs (ThemeContrastTest).
+val Red40 = Color(0xFFB91C1C)
 val Red80 = Color(0xFFF87171)
 val Red10 = Color(0xFF450A0A)
 val Red90 = Color(0xFFFEE2E2)
