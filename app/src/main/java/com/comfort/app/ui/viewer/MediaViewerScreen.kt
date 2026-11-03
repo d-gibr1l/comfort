@@ -278,11 +278,19 @@ fun MediaViewerScreen(
     // Whether the video on screen is playing (reported by its VideoPlayerItem).
     var currentVideoPlaying by remember { mutableStateOf(true) }
 
+    // Comfort: the controls hide by themselves only until they're tapped back — then they stay
+    // until tapped away (showControlsByTap).
+    var autoHide by remember { mutableStateOf(true) }
+    fun showControlsByTap() {
+        showUi = true
+        autoHide = false
+    }
+
     // Auto hide UI after 6 seconds of inactivity (e.g., no swiping/page change). Comfort: 6 s, not
     // Photon's 4, and never while the video on screen is paused, so its controls stay at hand.
     val pausedVideo = currentItem?.isVideo == true && !currentVideoPlaying
-    LaunchedEffect(showUi, pagerState.isScrollInProgress, pagerState.currentPage, pausedVideo) {
-        if (showUi && !pausedVideo) {
+    LaunchedEffect(showUi, autoHide, pagerState.isScrollInProgress, pagerState.currentPage, pausedVideo) {
+        if (showUi && autoHide && !pausedVideo) {
             kotlinx.coroutines.delay(6000)
             showUi = false
         }
@@ -588,7 +596,7 @@ fun MediaViewerScreen(
                                     showInfoCard = false
                                     showUi = false
                                 } else {
-                                    showUi = true
+                                    showControlsByTap()
                                 }
                             }
                         )
@@ -623,7 +631,7 @@ fun MediaViewerScreen(
                                                 showInfoCard = false
                                                 showUi = false
                                             } else {
-                                                showUi = true
+                                                showControlsByTap()
                                             }
                                         },
                                         onDoubleTap = { centroid ->
