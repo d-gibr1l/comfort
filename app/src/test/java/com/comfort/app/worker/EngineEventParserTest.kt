@@ -48,6 +48,16 @@ class EngineEventParserTest {
     }
 
     @Test
+    fun structuredBareStackWithoutHeaderIsNoise() {
+        // Verbose yt-dlp with no exception in flight: traceback.format_list, no header line.
+        val json = """{"type":"error","message":"  File \"/data/user/0/com.comfort.app/no_backup/python_runtime/usr/lib/python3.14/site-packages/yt_dlp/extractor/common.py\", line 764, in extract\n    ie_result = self._real_extract(url)"}"""
+        assertEquals(EngineEvent.Ignored, parse(structured(json)))
+        // The real announcement before it still counts.
+        val error = """{"type":"error","message":"ERROR: [Instagram] DeA7Cnftmam: Video info extraction failed: HTTP Error 400: Bad Request"}"""
+        assertEquals(EngineEvent.Error("ERROR: [Instagram] DeA7Cnftmam: Video info extraction failed: HTTP Error 400: Bad Request"), parse(structured(error)))
+    }
+
+    @Test
     fun structuredErrorWithoutErrorPrefixIsStillAnError() {
         // Spotify's own errors don't start with "ERROR:" — as plain text they were dropped as noise.
         assertEquals(EngineEvent.Error("No tracks found at this Spotify link"), parse(structured("""{"type":"error","message":"No tracks found at this Spotify link"}""")))

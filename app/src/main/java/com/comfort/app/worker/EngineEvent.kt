@@ -92,12 +92,27 @@ object EngineEventParser {
             // yt-dlp's logger can carry its whole traceback, so only its headline is kept.
             // yt-dlp's logger also relays the traceback that follows an error as an error of its
             // own: no announcement in it, so it's noise like the text form's continuation lines.
-            "error" -> str("message")?.takeUnless { it.startsWith("Traceback (most recent call last)") }?.let { EngineEvent.Error(headline(it)) }
+            "error" -> str("message")?.takeUnless { isBareTraceback(it) }?.let { EngineEvent.Error(headline(it)) }
             "file" -> str("path")?.let { EngineEvent.File(it) }
             "status" -> str("message")?.let { EngineEvent.Status(it) }
             "note" -> str("code")?.let { EngineEvent.Note(it, str("flag"), str("engine"), str("detail")) }
             else -> null // "warning", "debug", "exit", or a type from a newer script
         } ?: EngineEvent.Ignored
+    }
+
+    // A stack frame as Python prints it: '  File "…/common.py", line 764, in extract'.
+    private val STACK_FRAME = Regex("""^File ".*", line \d+""")
+
+    /** A traceback with no announcement of its own. yt-dlp in verbose mode sends one after its
+     * "ERROR: …" line; when there's no exception in flight it's a bare stack (traceback.format_list,
+     * no "Traceback (most recent call last)" header), and its first frame ended up as the card's
+     * error — 'File "…/yt_dlp/extractor/common.py", line 764, in extract' instead of Instagram's
+     * "HTTP Error 400". */
+    internal fun isBareTraceback(message: String): Boolean {
+        val lines = message.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (lines.any { it.startsWith("ERROR:") }) return false
+        val first = lines.firstOrNull() ?: return true
+        return first.startsWith("Traceback (most recent call last)") || STACK_FRAME.containsMatchIn(first)
     }
 
     /** The line that says what went wrong: yt-dlp's "ERROR: ..." line when the message is a
