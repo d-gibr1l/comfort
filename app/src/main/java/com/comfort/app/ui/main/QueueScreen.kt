@@ -247,7 +247,8 @@ fun QueueScreen(
         // MainScreen, not one of its tabs — see MainScreen's own showQueueScreen handling), so
         // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
         snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
-        floatingActionButtonPosition = if (selectionMode) FabPosition.Center else FabPosition.End,
+        // At the end while selecting too, where the Pause/Resume button sits.
+        floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             if (selectionMode) {
                 val selection = selectedIds
@@ -717,8 +718,10 @@ fun QueueScreen(
     }
 }
 
-/** While selecting: the actions that fit the tab, on a bar floating at the bottom — in the
- * navigation pill's colours, the app's other floating bar. */
+/** While selecting: the actions that fit the tab, as a split button floating at the bottom (like
+ * the preview sheet's Download | Start at…): the tab's actions in the navigation pill's colours,
+ * then Delete as the trailing half, in light red. The segments are laid out here, rounded at the
+ * outer ends and nearly square where they meet, 2 dp apart. */
 @Composable
 private fun SelectionActionBar(
     filter: String,
@@ -729,51 +732,62 @@ private fun SelectionActionBar(
     onStartNow: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        shadowElevation = 6.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            @Composable
-            fun action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-                TextButton(onClick = onClick, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(label)
-                }
-            }
-            when (filter) {
-                "Running", "In Queue" -> {
-                    action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause)
-                    action(Icons.Outlined.Close, stringResource(R.string.action_cancel), onCancel)
-                }
-                // Past the schedule window, like each card's own Start now. No Cancel: four
-                // actions filled the bar in English and overflowed it in longer languages.
-                "Scheduled" -> {
-                    action(Icons.Outlined.PlayArrow, stringResource(R.string.up_next), onStartNow)
-                    action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause)
-                }
-                "Paused", "Cancelled" -> action(Icons.Outlined.PlayArrow, stringResource(R.string.resume), onResume)
-                "Errored" -> action(Icons.Outlined.Refresh, stringResource(R.string.retry), onRetry)
-            }
-            // Its own red pill: red text alone doesn't read on the bar's colour.
+    class Action(val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String, val onClick: () -> Unit)
+    val actions = when (filter) {
+        "Running", "In Queue" -> listOf(
+            Action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause),
+            Action(Icons.Outlined.Close, stringResource(R.string.action_cancel), onCancel),
+        )
+        // Past the schedule window, like each card's own Start now. No Cancel: with it the bar
+        // filled the width in English and overflowed in longer languages.
+        "Scheduled" -> listOf(
+            Action(Icons.Outlined.PlayArrow, stringResource(R.string.up_next), onStartNow),
+            Action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause),
+        )
+        "Paused", "Cancelled" -> listOf(Action(Icons.Outlined.PlayArrow, stringResource(R.string.resume), onResume))
+        "Errored" -> listOf(Action(Icons.Outlined.Refresh, stringResource(R.string.retry), onRetry))
+        else -> emptyList()
+    }
+    val outer = 28.dp
+    val inner = 4.dp
+    val elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 6.dp)
+    Row(modifier = Modifier.height(56.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        actions.forEachIndexed { index, action ->
             Button(
-                onClick = onDelete,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                onClick = action.onClick,
+                modifier = Modifier.fillMaxHeight(),
+                shape = RoundedCornerShape(
+                    topStart = if (index == 0) outer else inner, bottomStart = if (index == 0) outer else inner,
+                    topEnd = inner, bottomEnd = inner,
                 ),
-                modifier = Modifier.padding(start = 4.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                elevation = elevation,
+                contentPadding = PaddingValues(horizontal = 20.dp),
             ) {
-                Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.delete))
+                Icon(action.icon, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(action.label, maxLines = 1)
             }
+        }
+        // The trailing half: Delete, its icon only, in light red (red on the blue didn't read).
+        Button(
+            onClick = onDelete,
+            modifier = Modifier.fillMaxHeight(),
+            shape = RoundedCornerShape(
+                topStart = if (actions.isEmpty()) outer else inner, bottomStart = if (actions.isEmpty()) outer else inner,
+                topEnd = outer, bottomEnd = outer,
+            ),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+            elevation = elevation,
+            contentPadding = PaddingValues(start = 16.dp, end = 20.dp),
+        ) {
+            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(22.dp))
         }
     }
 }
