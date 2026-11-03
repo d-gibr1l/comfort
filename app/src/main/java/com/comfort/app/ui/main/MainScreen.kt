@@ -162,13 +162,14 @@ data class ShortcutRequest(val action: String, val seq: Int)
 fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0, shortcut: ShortcutRequest? = null) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
-    // Owned here, not inside DownloadsHistoryScreen's own Scaffold — see that screen's own
-    // snackbarHostState parameter doc comment for why (it drew behind FloatingNavBar otherwise).
-    val librarySnackbarHostState = remember { SnackbarHostState() }
-    // The media viewer's deletes, here so their Undo outlives the viewer (see MediaViewerHost).
-    val viewerDelete = rememberUndoableDelete(viewModel, librarySnackbarHostState)
-    val viewerDeleteFromPhone = rememberUndoableDelete(viewModel, librarySnackbarHostState, fromPhone = true)
+    // The app's one snackbar host and its rules (AppSnackbars), with this screen's scope so a
+    // delete's Undo outlives the screen it came from. Drawn in exactly one place at a time (below).
     val snackbarScope = rememberCoroutineScope()
+    val appSnackbars = remember { AppSnackbars(SnackbarHostState(), snackbarScope) }
+    val librarySnackbarHostState = appSnackbars.host
+    // The media viewer's deletes (see MediaViewerHost).
+    val viewerDelete = rememberUndoableDelete(viewModel, snackbars = appSnackbars)
+    val viewerDeleteFromPhone = rememberUndoableDelete(viewModel, fromPhone = true, snackbars = appSnackbars)
     // Which sheet a link opened from Home is showing (listing it / preview / item picker), and the
     // download it starts — LinkRouterViewModel, shared with the share sheet's own flow.
     val router: LinkRouterViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
@@ -359,6 +360,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     val showMiniPlayer = music.song != null && !showNowPlaying && mediaViewer == null
     CompositionLocalProvider(
         LocalUseNavRail provides useNavRail,
+        LocalAppSnackbars provides appSnackbars,
         // A song plays in the music player (its neighbours in the list as the queue); anything
         // else opens the media viewer, which pages through the pictures and videos only.
         com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { request ->
@@ -483,7 +485,6 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         viewModel = viewModel,
                         onOpenQueue = openQueue,
                         isQueueOpen = showQueueScreen,
-                        snackbarHostState = librarySnackbarHostState,
                         openSearchSignal = librarySearchSignal,
                         isVisible = tab == selectedTab || tab == outgoingTab,
                     )
@@ -546,22 +547,26 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         // themed surfaceContainerHigh card + accent Undo button QueueScreen's own equivalent
         // delete-undo Snackbar already uses, instead of Material's flat default bar this one
         // still had, unthemed against the rest of the app.
-        DownloadEventSnackbarHost(
-            librarySnackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance()),
-        )
-        // An engine update finishing (tapped in Settings, or automatic at launch), on any tab —
-        // held while the Queue is open: this host is under it, and the message showed and timed
-        // out unseen there. Through showReplacing like the others (it queued behind them, and
-        // blocked this collect while it did), waiting behind a delete's Undo.
-        var engineMessage by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(updates) { updates.engineUpdated.collect { engineMessage = it } }
-        LaunchedEffect(engineMessage, showQueueScreen) {
-            val message = engineMessage ?: return@LaunchedEffect
-            if (showQueueScreen) return@LaunchedEffect
-            engineMessage = null
-            snackbarScope.showReplacing(librarySnackbarHostState) {
-                librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = message))
+        // Only here when nothing covers it: the Queue draws this same host in its own Scaffold, and
+        // the media viewer over itself — two live copies showed every snackbar twice (TalkBack
+        // read each one twice).
+        if (!showQueueScreen && mediaViewer == null) {
+            DownloadEventSnackbarHost(
+                librarySnackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance()),
+            )
+        }
+        // An engine update finishing (tapped in Settings, or automatic at launch), on any tab. Each
+        // one is kept until a snackbar actually shows it: several close together (an auto-update
+        // of two engines) read as one message, none overwritten by the next.
+        var engineMessages by remember { mutableStateOf<List<String>>(emptyList()) }
+        LaunchedEffect(updates) { updates.engineUpdated.collect { engineMessages = engineMessages + it } }
+        LaunchedEffect(engineMessages) {
+            val batch = engineMessages
+            if (batch.isEmpty()) return@LaunchedEffect
+            appSnackbars.showEvent("engines") {
+                engineMessages = engineMessages - batch.toSet()
+                librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = batch.joinToString("\n")))
             }
         }
 
@@ -647,7 +652,9 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     }
     // The media viewer over everything, the nav rail included (on a tablet it opened beside it).
     mediaViewer?.let { request ->
+        val viewerBottomBar = remember { mutableStateOf(0.dp) }
         Box(Modifier.fillMaxSize()) {
+            CompositionLocalProvider(com.comfort.app.ui.viewer.LocalViewerBottomBarHeight provides viewerBottomBar) {
             com.comfort.app.ui.viewer.MediaViewerHost(
                 request, viewModel,
                 requestDelete = viewerDelete,
@@ -658,11 +665,15 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                     com.comfort.app.music.MusicPlayer.resumeAfterInterruption()
                 },
             )
-            // The Library's snackbars over the viewer, above its toolbar (the same host also draws
-            // under the pages, hidden behind the viewer while it's open).
+            }
+            // The app's snackbars over the viewer, just above its bottom controls (the viewer
+            // measures them: the toolbar, plus the filmstrip when it shows). The host under the pages
+            // isn't drawn meanwhile.
             DownloadEventSnackbarHost(
                 librarySnackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp),
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = viewerBottomBar.value.coerceAtLeast(0.dp))
+                    .then(if (viewerBottomBar.value == 0.dp) Modifier.navigationBarsPadding() else Modifier),
             )
         }
     }

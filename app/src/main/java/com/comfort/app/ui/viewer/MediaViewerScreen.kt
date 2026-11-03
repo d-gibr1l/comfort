@@ -102,6 +102,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.imageLoader
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -1039,6 +1040,8 @@ fun MediaViewerScreen(
             exifData = currentExif
         )
 
+        val bottomBarHeight = LocalViewerBottomBarHeight.current
+        val barDensity = androidx.compose.ui.platform.LocalDensity.current
         AnimatedVisibility(
             visible = showUi,
             enter = fadeIn(MotionTokens.gentleSpring()) +
@@ -1047,6 +1050,7 @@ fun MediaViewerScreen(
                     slideOutVertically(MotionTokens.gentleSpring()) { it },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .onSizeChanged { size -> bottomBarHeight?.value = with(barDensity) { size.height.toDp() } }
                 .navigationBarsPadding()
                 .padding(bottom = 4.dp)
         ) {

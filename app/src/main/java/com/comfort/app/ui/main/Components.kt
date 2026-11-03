@@ -234,61 +234,75 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
     }
 }
 
-/** What a host is showing or waiting to show: [job], and [undo], the delete-Undo snackbar's job
- * pending on that host (the same job when the Undo is what's showing). Main thread only. */
-private class ShownSnackbar(val job: kotlinx.coroutines.Job, val undo: kotlinx.coroutines.Job?)
+/** The app's one snackbar host and the rules for what it shows, owned by MainScreen so a delete's
+ * Undo outlives whichever screen asked for it (a Library left for another tab, a closed Queue, the
+ * viewer closing on its last item — each used to cancel the Undo and commit the delete at once).
+ *
+ * - A delete's Undo shows at once: it takes over from a message being shown, and ends a previous
+ *   Undo (committing that delete, as letting it time out would).
+ * - A message ([showEvent]) never cuts an Undo short: it waits, and shows once the Undo is done.
+ * - A newer message of the same [kind] replaces an older one (shown or waiting) — a burst of
+ *   download events doesn't replay old ones one by one; different kinds wait their turn.
+ * SnackbarHostState alone queues every call, so after a burst each dismissed snackbar made an older
+ * one appear. Main thread only. */
+class AppSnackbars(val host: SnackbarHostState, private val scope: kotlinx.coroutines.CoroutineScope) {
+    private var undoJob: kotlinx.coroutines.Job? = null
+    private var eventJob: kotlinx.coroutines.Job? = null
+    private var eventKind: String? = null
+    private val waiting = LinkedHashMap<String, suspend () -> Unit>()
 
-private val currentSnackbarJobs = java.util.WeakHashMap<SnackbarHostState, ShownSnackbar>()
+    /** A delete's Undo snackbar; [show]'s finally commits or reverts the delete. */
+    fun showUndo(show: suspend () -> Unit) {
+        eventJob?.cancel()
+        undoJob?.cancel()
+        lateinit var job: kotlinx.coroutines.Job
+        job = scope.launch { show() }
+        undoJob = job
+        job.invokeOnCompletion { if (undoJob === job) { undoJob = null; showNextWaiting() } }
+    }
 
-/** Launches [show] (a showSnackbar call on [host]) in place of whatever [host] is showing or still
- * has waiting. SnackbarHostState shows one at a time and queues the rest, so after a burst (Retry
- * All, several deletes) each dismissed snackbar made an older one appear — reported as "old
- * snackbars keep appearing". A replaced delete-undo snackbar ends its Undo window (its finally
- * runs), the same as letting it time out. */
-fun kotlinx.coroutines.CoroutineScope.showReplacing(
-    host: SnackbarHostState,
-    isUndo: Boolean = false,
-    show: suspend () -> Unit,
-): kotlinx.coroutines.Job {
-    val current = currentSnackbarJobs[host]
-    val pendingUndo = current?.undo?.takeIf { it.isActive }
-    // A pending delete-Undo is only replaced by another delete (which commits the first, as
-    // before). Anything else — a download finished/failed, an engine update — waits behind it:
-    // replacing it ended its Undo window early and committed the delete (with "Delete from
-    // phone", the file), two seconds in, because some other download happened to fail.
-    if (isUndo) {
-        current?.job?.cancel()
-        pendingUndo?.cancel()
-    } else if (current != null && current.job !== pendingUndo) {
-        current.job.cancel()
+    /** A message ("Download finished", "yt-dlp updated"): replaces one of the same [kind]. */
+    fun showEvent(kind: String, show: suspend () -> Unit) {
+        if (eventKind == kind) eventJob?.cancel()
+        waiting.remove(kind)
+        waiting[kind] = show
+        if (undoJob == null && eventJob?.isActive != true) showNextWaiting()
     }
-    lateinit var job: kotlinx.coroutines.Job
-    job = launch {
-        if (!isUndo) pendingUndo?.join()
-        show()
+
+    private fun showNextWaiting() {
+        val next = waiting.entries.firstOrNull() ?: return
+        waiting.remove(next.key)
+        lateinit var job: kotlinx.coroutines.Job
+        job = scope.launch { next.value() }
+        eventJob = job
+        eventKind = next.key
+        job.invokeOnCompletion {
+            if (eventJob === job) {
+                eventJob = null
+                eventKind = null
+                if (undoJob == null) showNextWaiting()
+            }
+        }
     }
-    currentSnackbarJobs[host] = ShownSnackbar(job, if (isUndo) job else pendingUndo)
-    job.invokeOnCompletion { if (currentSnackbarJobs[host]?.job === job) currentSnackbarJobs.remove(host) }
-    return job
+}
+
+/** Provided by MainScreen (see [AppSnackbars]). */
+val LocalAppSnackbars = androidx.compose.runtime.staticCompositionLocalOf<AppSnackbars> {
+    error("AppSnackbars not provided")
 }
 
 /** Fires a [DownloadEventVisuals] snackbar for any download that finishes or fails while the
- * caller is actively composed — never for ones that were already finished/errored *before* this
- * call's first composition (each backing "seen" set starts at null specifically so the very first
- * emission from each flow only seeds a baseline to diff against, it never itself fires a toast).
- * Call once per screen that wants this (Library, the Download Queue), each with its own
- * [snackbarHostState] — the two calls don't share any state, so a download finishing while the
- * user is on Library doesn't also toast if they later open the Queue, or vice versa: whichever
- * screen is actually on screen at the moment a transition happens is the one that shows it, and
- * never again after that, on either screen. */
+ * caller is composed — never for ones that were already finished/errored *before* this call's first
+ * composition (each backing "seen" set starts at null so the first emission from each flow only
+ * seeds a baseline to diff against). Called by the Download Queue only, so these show while the
+ * Queue is open. */
 @Composable
 fun DownloadEventSnackbars(
     historyItems: List<DownloadEntity>,
     queueItems: List<DownloadEntity>,
-    snackbarHostState: SnackbarHostState,
 ) {
     val eventsContext = androidx.compose.ui.platform.LocalContext.current
-    val scope = rememberCoroutineScope()
+    val snackbars = LocalAppSnackbars.current
 
     // Every download seen in the queue while this screen is open: only those can "finish" here. An
     // entry reaching the history any other way (the deleted-files scan finding a file again, a
@@ -310,8 +324,8 @@ fun DownloadEventSnackbars(
                 1 -> eventsContext.getString(R.string.download_finished_named, finished[0].title.ifBlank { eventsContext.getString(R.string.download_untitled) })
                 else -> eventsContext.resources.getQuantityString(R.plurals.downloads_finished, finished.size, finished.size)
             }
-            if (message != null) scope.showReplacing(snackbarHostState) {
-                snackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = message))
+            if (message != null) snackbars.showEvent("downloads") {
+                snackbars.host.showSnackbar(DownloadEventVisuals(isSuccess = true, message = message))
             }
         }
         seenFinishedIds = currentIds
@@ -336,8 +350,8 @@ fun DownloadEventSnackbars(
                 }
                 else -> eventsContext.resources.getQuantityString(R.plurals.downloads_failed, failed.size, failed.size)
             }
-            if (message != null) scope.showReplacing(snackbarHostState) {
-                snackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = false, message = message))
+            if (message != null) snackbars.showEvent("downloads") {
+                snackbars.host.showSnackbar(DownloadEventVisuals(isSuccess = false, message = message))
             }
         }
         seenErroredIds = erroredNow
@@ -500,19 +514,20 @@ fun thumbnailShape(): Shape = androidx.compose.material3.MaterialShapes.Cookie4S
 @Composable
 fun rememberUndoableDelete(
     viewModel: com.comfort.app.viewmodel.DownloadsViewModel,
-    snackbarHostState: SnackbarHostState,
     // "Delete from phone": the files go too, once the Undo window has passed.
     fromPhone: Boolean = false,
+    // The app-wide host and scope (MainScreen's), not this screen's: the Undo has to outlive the
+    // screen it was asked from, or leaving that screen commits the delete on the spot.
+    snackbars: AppSnackbars = LocalAppSnackbars.current,
 ): (Set<String>) -> Unit {
-    val scope = rememberCoroutineScope()
     val removeContext = androidx.compose.ui.platform.LocalContext.current
     return { ids ->
         if (ids.isNotEmpty()) {
             viewModel.hideForDeletion(ids)
-            scope.showReplacing(snackbarHostState, isUndo = true) {
+            snackbars.showUndo {
                 var undone = false
                 try {
-                    val result = snackbarHostState.showSnackbar(
+                    val result = snackbars.host.showSnackbar(
                         message = removeContext.resources.getQuantityString(
                             if (fromPhone) R.plurals.downloads_deleted_from_phone else R.plurals.downloads_removed, ids.size, ids.size,
                         ),

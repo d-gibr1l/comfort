@@ -112,14 +112,6 @@ fun DownloadsHistoryScreen(
     isQueueOpen: Boolean = false,
     // Bumped by the "Search Library" shortcut: opens the search, keyboard up.
     openSearchSignal: Int = 0,
-    // Hoisted up to MainScreen's own outer Box instead of a plain remember { SnackbarHostState() }
-    // here — this screen's own Scaffold draws *before* FloatingNavBar in that Box (it's one of the
-    // three tab contents, composed ahead of the persistent floating pill), so a SnackbarHost
-    // rendered through this screen's own Scaffold silently drew underneath the pill instead of
-    // over it. Reported live: the "Download removed" Undo snackbar peeked out from behind the nav
-    // bar's rounded ends instead of sitting above it. MainScreen now owns this SnackbarHost and
-    // renders it after FloatingNavBar, so this screen only needs the state to trigger it with.
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     // False while MainScreen keeps this screen built but hidden (so opening it has nothing to
     // build). Hidden, it's put back the way a fresh visit starts — no filter, selection or search,
     // newest first, at the top — and its Back handlers stay off, so Back on Home is Home's.
@@ -172,8 +164,10 @@ fun DownloadsHistoryScreen(
 
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
     // see rememberUndoableDelete.
-    val requestDelete = rememberUndoableDelete(viewModel, snackbarHostState)
-    val requestDeleteFromPhone = rememberUndoableDelete(viewModel, snackbarHostState, fromPhone = true)
+    // Snackbars go through MainScreen's host (LocalAppSnackbars), drawn over the nav bar; their
+    // Undo outlives this screen, which is rebuilt per visit while something downloads.
+    val requestDelete = rememberUndoableDelete(viewModel)
+    val requestDeleteFromPhone = rememberUndoableDelete(viewModel, fromPhone = true)
 
     // MainScreen keeps this screen composed underneath the Download Queue overlay now (needed for
     // the predictive-back reveal animation), where it used to fully unmount and remount — which

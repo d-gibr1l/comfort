@@ -87,11 +87,13 @@ fun QueueScreen(
     // everything NOT finished/saved/deleted (see DownloadDao.getQueueFlow), so a finished item is
     // only ever visible via historyFlow, never queueItems itself.
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems, snackbarHostState = snackbarHostState)
+    // The app's one snackbar host (MainScreen's): drawn here while the Queue is open, and under the
+    // pages again once it closes, so a delete's Undo carries on there instead of being committed.
+    val snackbars = LocalAppSnackbars.current
+    DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems)
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
     // see rememberUndoableDelete.
-    val requestDelete = rememberUndoableDelete(viewModel, snackbarHostState)
+    val requestDelete = rememberUndoableDelete(viewModel)
 
     // Lets a QUEUED item's card explain *why* it's stuck (no usable network right now) instead of
     // just "Waiting to start…" forever with no visible reason — reproduced live: a WorkManager job
@@ -246,7 +248,7 @@ fun QueueScreen(
         // No floating bottom nav bar overlaying this screen (it's a full-screen overlay on top of
         // MainScreen, not one of its tabs — see MainScreen's own showQueueScreen handling), so
         // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
-        snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
+        snackbarHost = { DownloadEventSnackbarHost(snackbars.host) },
         // Selecting: across the width (the split button at the end, where the Pause/Resume button
         // sits, and the Scheduled tab's Start now at the start).
         floatingActionButtonPosition = if (selectionMode) FabPosition.Center else FabPosition.End,

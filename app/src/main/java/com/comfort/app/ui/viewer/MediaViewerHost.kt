@@ -47,6 +47,11 @@ data class MediaViewerRequest(val downloads: List<DownloadEntity>, val startId: 
 /** Opens the media viewer (MainScreen hosts it over everything, nav bar included). */
 val LocalOpenMediaViewer = staticCompositionLocalOf<(MediaViewerRequest) -> Unit> { {} }
 
+/** Where the viewer's bottom controls (toolbar, and the filmstrip when shown) reach up to, nav bar
+ * included — MediaViewerScreen writes it, MainScreen keeps a snackbar drawn over the viewer above
+ * it. 0 while the controls are hidden. */
+val LocalViewerBottomBarHeight = staticCompositionLocalOf<androidx.compose.runtime.MutableState<androidx.compose.ui.unit.Dp>?> { null }
+
 /**
  * Photon Gallery's viewer (MediaViewerScreen) over Comfort's Library: each download's saved file as
  * one of Photon's GalleryItems, read from MediaStore; favourite, rename and delete through the
