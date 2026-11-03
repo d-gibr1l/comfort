@@ -467,8 +467,12 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
                         // Home during a back gesture. At rest, under it is the activity's Surface in
                         // the same colour (Home's alpha is 0), and painting it again cost every
                         // frame a full-screen fill (TODO: Library opening, the rest).
-                        .pageBackground(pageColor) { outgoingTab != null || tabBack.revealing }
+                        // Inside predictiveBackReveal's layer, so it fades and slides with the
+                        // page: outside it, the fill was opaque from the first frame of an opening
+                        // while the page faded in, hiding Home under a blank screen for ~9 frames
+                        // (a flicker on every tap of Library or Settings, recorded on the phone).
                         .predictiveBackReveal(tabBack)
+                        .pageBackground(pageColor) { outgoingTab != null || tabBack.revealing }
                         .then(if (hidden) Modifier.clearAndSetSemantics {} else Modifier)
                 }
             ) {
