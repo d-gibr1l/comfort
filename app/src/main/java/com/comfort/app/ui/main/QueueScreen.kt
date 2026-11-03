@@ -247,13 +247,15 @@ fun QueueScreen(
         // MainScreen, not one of its tabs — see MainScreen's own showQueueScreen handling), so
         // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
         snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
-        // At the end while selecting too, where the Pause/Resume button sits.
-        floatingActionButtonPosition = FabPosition.End,
+        // Selecting: across the width (the split button at the end, where the Pause/Resume button
+        // sits, and the Scheduled tab's Start now at the start).
+        floatingActionButtonPosition = if (selectionMode) FabPosition.Center else FabPosition.End,
         floatingActionButton = {
             if (selectionMode) {
                 val selection = selectedIds
                 SelectionActionBar(
                     filter = selectedFilter,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     // One bulk action each, not one per selected download: those ran all at once, in
                     // no particular order, and the cards moved a few at a time.
                     onPause = { viewModel.pauseDownloads(selection); selectedIds = emptySet() },
@@ -725,6 +727,7 @@ fun QueueScreen(
 @Composable
 private fun SelectionActionBar(
     filter: String,
+    modifier: Modifier = Modifier,
     onPause: () -> Unit,
     onCancel: () -> Unit,
     onResume: () -> Unit,
@@ -738,12 +741,9 @@ private fun SelectionActionBar(
             Action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause),
             Action(Icons.Outlined.Close, stringResource(R.string.action_cancel), onCancel),
         )
-        // Past the schedule window, like each card's own Start now. No Cancel: with it the bar
-        // filled the width in English and overflowed in longer languages.
-        "Scheduled" -> listOf(
-            Action(Icons.Outlined.PlayArrow, stringResource(R.string.up_next), onStartNow),
-            Action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause),
-        )
+        // Start now is a button of its own at the start (below). No Cancel: with it the bar filled
+        // the width in English and overflowed in longer languages.
+        "Scheduled" -> listOf(Action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause))
         "Paused", "Cancelled" -> listOf(Action(Icons.Outlined.PlayArrow, stringResource(R.string.resume), onResume))
         "Errored" -> listOf(Action(Icons.Outlined.Refresh, stringResource(R.string.retry), onRetry))
         else -> emptyList()
@@ -751,7 +751,27 @@ private fun SelectionActionBar(
     val outer = 28.dp
     val inner = 4.dp
     val elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 6.dp)
-    Row(modifier = Modifier.height(56.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(modifier = modifier.height(56.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        // The Scheduled tab's Start now (past the schedule window, like each card's own), apart
+        // from the split button, at the start.
+        if (filter == "Scheduled") {
+            Button(
+                onClick = onStartNow,
+                modifier = Modifier.fillMaxHeight(),
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                elevation = elevation,
+                contentPadding = PaddingValues(horizontal = 20.dp),
+            ) {
+                Icon(Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.up_next), maxLines = 1)
+            }
+        }
+        Spacer(Modifier.weight(1f))
         actions.forEachIndexed { index, action ->
             Button(
                 onClick = action.onClick,
