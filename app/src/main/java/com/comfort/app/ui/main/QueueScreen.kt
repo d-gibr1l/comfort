@@ -75,6 +75,9 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// The Scaffold has no top or bottom bar: the collapsing header measures the status bar itself and
+// the list pads for the nav bar, so its content padding goes unused.
+@android.annotation.SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QueueScreen(
@@ -298,7 +301,7 @@ fun QueueScreen(
                 }
             }
         },
-    ) { paddingValues ->
+    ) { _ ->
         // Same header concept as the Settings sub-pages (see SettingsSubScaffold): one pinned
         // overlay — back button above a large icon + title — that collapses into a compact bar
         // over the first stretch of scroll, hides while scrolling down, reappears on the way back
