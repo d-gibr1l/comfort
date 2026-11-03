@@ -354,9 +354,22 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Jumps a QUEUED/SCHEDULED download to the front of the line and past any schedule-window
      * wait — the "Start now" button on a waiting download. */
-    fun startNow(id: String) {
+    fun startNow(id: String) = startNow(listOf(id))
+
+    /** Start now for each of [ids] (the Scheduled tab's selection bar), in the order given. */
+    fun startNow(ids: Collection<String>) {
+        // Shown in their new place at once: the database gets the "up next" order first and the
+        // status after it, so a card at the bottom of a long Scheduled list slid up to the top of
+        // it before leaving for In Queue (reported live).
+        val order = -(System.currentTimeMillis() / 1000L).toInt()
+        val waiting = setOf(DownloadStatus.SCHEDULED, DownloadStatus.PAUSED, DownloadStatus.QUEUED)
+        showPendingMoves(queueFlow.value.filter { it.id in ids && it.status in waiting }.associate { entity ->
+            entity.id to PendingMove(entity.status) {
+                it.copy(status = DownloadStatus.QUEUED, queueOrder = order, forceStart = true)
+            }
+        })
         viewModelScope.launch {
-            DownloadDispatcher.startNow(getApplication(), id)
+            ids.forEach { DownloadDispatcher.startNow(getApplication(), it) }
         }
     }
 

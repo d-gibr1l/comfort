@@ -6,10 +6,6 @@ import android.content.ClipData
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
@@ -44,6 +40,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -147,60 +146,96 @@ private fun QueueThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) 
 }
 
 /** A card's thumbnail, which turns into a round checkbox while selecting (and back), like a mail
- * app's avatar. Purely visual: the long-press/tap that selects lives on the whole card (StoppedRow's
- * and QueueItemCard's own combinedClickable), not just here. It used to stay the thumbnail, dimmed,
- * with a small check badge over its corner that muddied the status icon underneath. */
+ * app's avatar. Purely visual: the long-press/tap that selects lives on the card's wrapper in
+ * QueueScreen, not here. It used to stay the thumbnail, dimmed, with a small check badge over its
+ * corner that muddied the status icon underneath. */
 @Composable
 private fun SelectableThumbnail(
-    selectionMode: Boolean,
-    selected: Boolean,
+    selectionProgress: () -> Float,
+    selected: () -> Boolean,
     size: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    androidx.compose.animation.AnimatedContent(
-        targetState = selectionMode,
-        transitionSpec = {
-            (fadeIn(tween(160)) + androidx.compose.animation.scaleIn(tween(160), initialScale = 0.6f))
-                .togetherWith(fadeOut(tween(120)) + androidx.compose.animation.scaleOut(tween(120), targetScale = 0.6f))
-        },
-        modifier = Modifier.size(size),
-        contentAlignment = Alignment.Center,
-        label = "selection checkbox",
-    ) { selecting ->
-        if (!selecting) {
-            Box(modifier = modifier, content = content)
-        } else {
-            Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
-                SelectionCheck(selected)
-            }
+    // Both stay composed, crossfaded in the draw phase. Swapping one for the other (AnimatedContent)
+    // rebuilt every visible card's thumbnail or checkbox in a single frame when selecting started
+    // or ended: 25-48 ms frames with 30 cards in the Queue.
+    Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+        Box(
+            // The layer first: [modifier] carries the thumbnail's own background, which has to fade too.
+            modifier = Modifier.graphicsLayer {
+                val selecting = selectionProgress()
+                alpha = 1f - selecting
+                val scale = 1f - 0.4f * selecting
+                scaleX = scale; scaleY = scale
+            }.then(modifier),
+            content = content,
+        )
+        Box(
+            modifier = Modifier.size(size).graphicsLayer {
+                val selecting = selectionProgress()
+                alpha = selecting
+                val scale = 0.6f + 0.4f * selecting
+                scaleX = scale; scaleY = scale
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            SelectionCheck(selected)
         }
     }
 }
 
 /** The round checkbox: an outline, filled with a check once selected. */
 @Composable
-private fun SelectionCheck(selected: Boolean) {
-    val fill by androidx.compose.animation.animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, label = "check fill",
-    )
+private fun SelectionCheck(selected: () -> Boolean) {
+    // [selected] read only while drawing: ticking a card redraws its check, nothing recomposes.
+    val primary = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outline
     Box(
         modifier = Modifier
             .size(26.dp)
-            .clip(CircleShape)
-            .background(fill)
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape),
+            .drawBehind {
+                val stroke = 2.dp.toPx()
+                if (selected()) {
+                    drawCircle(primary)
+                } else {
+                    drawCircle(outline, radius = size.minDimension / 2 - stroke / 2, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                }
+            },
         contentAlignment = Alignment.Center,
     ) {
-        if (selected) {
-            Icon(
-                Icons.Outlined.Check,
-                contentDescription = stringResource(R.string.selected),
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(18.dp),
-            )
+        // The card's wrapper says "selected" to TalkBack; this is only the picture of it.
+        Icon(
+            Icons.Outlined.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(18.dp).graphicsLayer { alpha = if (selected()) 1f else 0f },
+        )
+    }
+}
+
+/** A card's selected look (tinted and outlined, so the selection reads from the whole card), drawn
+ * behind it from [selected], read only while drawing. For a card already clipped to [shape]: half
+ * of the doubled stroke falls outside and is clipped away. */
+private fun Modifier.selectionHighlight(selected: () -> Boolean, shape: androidx.compose.ui.graphics.Shape, normal: Color, tint: Color, border: Color): Modifier =
+    drawWithCache {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(4.dp.toPx())
+        onDrawWithContent {
+            val isSelected = selected()
+            drawOutline(outline, if (isSelected) tint else normal)
+            drawContent()
+            if (isSelected) drawOutline(outline, border, style = stroke)
         }
     }
+
+/** Measured but, while [hidden], not placed: not drawn, not touchable, not in TalkBack. Read while
+ * laying out, so hiding a card's buttons for selecting doesn't recompose it. [collapse]: no height
+ * either, so the card closes up. */
+private fun Modifier.hiddenWhile(hidden: () -> Boolean, collapse: Boolean = false): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    if (hidden()) layout(placeable.width, if (collapse) 0 else placeable.height) {}
+    else layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -211,8 +246,11 @@ internal fun StoppedRow(
     onDelete: () -> Unit,
     onStartNow: () -> Unit = {},
     onStartAt: () -> Unit = {},
-    selectionMode: Boolean = false,
-    selected: Boolean = false,
+    // Read only while drawing or laying out (and on taps): a selection change doesn't recompose the
+    // card. The tap and long-press that select, and what TalkBack says, are on its wrapper (QueueScreen).
+    selecting: () -> Boolean = { false },
+    selected: () -> Boolean = { false },
+    selectionProgress: () -> Float = { 0f },
     onToggleSelect: () -> Unit = {},
 ) {
     val isPaused = item.status == DownloadStatus.PAUSED
@@ -227,32 +265,17 @@ internal fun StoppedRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.large)
-                // Selected: tinted and outlined, so the selection reads from the whole card.
-                .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
-                .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large) else Modifier)
-                // Always present, not just once selectionMode is already true — this is what
-                // actually *enters* selection mode via a long-press anywhere on the row (not just
-                // the thumbnail; reported live that only the thumbnail worked before this). Short
-                // taps stay a no-op outside selection mode, so the Resume/More buttons further
-                // right keep working normally: Compose routes a tap to the deepest element under
-                // it first, so a direct tap on one of those buttons is consumed there and never
-                // reaches this outer handler at all — only taps that land on otherwise-inert areas
-                // of the row (thumbnail, title, blank space) ever hit this onClick/onLongClick.
-                .combinedClickable(
-                    onClick = { if (selectionMode) onToggleSelect() },
-                    onLongClick = onToggleSelect,
+                .selectionHighlight(
+                    selected, MaterialTheme.shapes.large,
+                    normal = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tint = MaterialTheme.colorScheme.secondaryContainer,
+                    border = MaterialTheme.colorScheme.primary,
                 )
-                .semantics {
-                    if (selectionMode) {
-                        this.selected = selected
-                        this.role = Role.Checkbox
-                    }
-                }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SelectableThumbnail(
-                selectionMode = selectionMode,
+                selectionProgress = selectionProgress,
                 selected = selected,
                 size = 76.dp,
                 modifier = Modifier.size(76.dp).clip(thumbnailShape()).background(MaterialTheme.colorScheme.surfaceContainerHighest),
@@ -336,10 +359,16 @@ internal fun StoppedRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), onSelectionTap = if (selectionMode) onToggleSelect else null)
+            QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 2.dp), selecting = selecting, onSelectionTap = onToggleSelect)
         }
 
-            if (!selectionMode) {
+            // Hidden while selecting, not removed: removing and re-adding them (and their menus)
+            // on every card at once made selecting start and end in long frames. Kept in place, so
+            // the text beside them doesn't reflow; a tap there goes to the card (selects it).
+            Row(
+                modifier = Modifier.hiddenWhile(selecting),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 IconButton(onClick = onResume) {
                     Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.resume))
                 }
@@ -401,8 +430,10 @@ fun QueueItemCard(
     onStartAt: () -> Unit = {},
     onAddCookies: () -> Unit = {},
     onShowError: () -> Unit = {},
-    selectionMode: Boolean = false,
-    selected: Boolean = false,
+    // As StoppedRow's.
+    selecting: () -> Boolean = { false },
+    selected: () -> Boolean = { false },
+    selectionProgress: () -> Float = { 0f },
     onToggleSelect: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -419,29 +450,17 @@ fun QueueItemCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        // Selected: tinted and outlined, so the selection reads from the whole card.
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        border = if (selected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                // Same reasoning as StoppedRow's own combinedClickable — always present so a
-                // long-press anywhere on the card (not just the thumbnail) enters/extends
-                // selection, while a direct tap on one of the buttons further down is still
-                // consumed there first and never reaches this outer handler.
-                .combinedClickable(
-                    onClick = { if (selectionMode) onToggleSelect() },
-                    onLongClick = onToggleSelect,
+                .selectionHighlight(
+                    selected, MaterialTheme.shapes.medium,
+                    normal = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tint = MaterialTheme.colorScheme.secondaryContainer,
+                    border = MaterialTheme.colorScheme.primary,
                 )
-                .semantics {
-                    if (selectionMode) {
-                        this.selected = selected
-                        this.role = Role.Checkbox
-                    }
-                }
                 .padding(16.dp)
         ) {
             Row(
@@ -458,7 +477,7 @@ fun QueueItemCard(
                 // guarantees in dynamic color and high-contrast modes.
                 val isErrored = item.status == DownloadStatus.ERRORED
                 SelectableThumbnail(
-                    selectionMode = selectionMode,
+                    selectionProgress = selectionProgress,
                     selected = selected,
                     size = 40.dp,
                     modifier = Modifier.size(40.dp).clip(thumbnailShape()).background(
@@ -724,7 +743,7 @@ fun QueueItemCard(
                         }
                     }
                     // The link this download came from, in the space the pills leave free (QueueLink).
-                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), onSelectionTap = if (selectionMode) onToggleSelect else null)
+                    QueueLink(item.url, modifier = Modifier.weight(1f).padding(horizontal = 8.dp), selecting = selecting, onSelectionTap = onToggleSelect)
                     if (byteProgress != null && item.speedMbs > 0f) {
                         val remainingBytes = item.expectedBytes - (item.totalBytes + item.liveBytes)
                         val remainingSeconds = (remainingBytes / (item.speedMbs * 1024f * 1024f)).toInt()
@@ -818,12 +837,14 @@ fun QueueItemCard(
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), onSelectionTap = if (selectionMode) onToggleSelect else null)
+                QueueLink(item.url, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selecting = selecting, onSelectionTap = onToggleSelect)
             }
 
-            if (!selectionMode) {
+            // Hidden while selecting, laid out but not placed (see hiddenWhile): removed, its
+            // buttons were rebuilt on every card at once as selecting ended.
+            run {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().hiddenWhile(selecting, collapse = true),
                     // Explicit gap rather than relying on each TextButton/IconButton's own default
                     // touch-target padding for spacing — better-interface review: on the 4-action
                     // ERRORED row (Add cookies / Retry / Copy / Remove) that default padding was the
@@ -977,7 +998,8 @@ internal fun QueueLink(
     // While its card is in selection mode: a tap or long-press here selects/deselects the card.
     // The link used to be merely disabled then, which still swallowed the tap, so this strip was
     // the one part of a card that didn't respond.
-    onSelectionTap: (() -> Unit)? = null,
+    selecting: () -> Boolean = { false },
+    onSelectionTap: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
@@ -989,13 +1011,14 @@ internal fun QueueLink(
             .then(
                 // While selecting, only this: the link's own handler, even disabled, still took the
                 // tap before it could reach the card.
-                if (onSelectionTap != null) Modifier.combinedClickable(onClick = onSelectionTap, onLongClick = onSelectionTap)
-                else Modifier.combinedClickable(
+                // [selecting] read on the tap, not while composing (see StoppedRow's parameters).
+                Modifier.combinedClickable(
                 enabled = enabled,
                 onClickLabel = stringResource(R.string.open_link),
                 onLongClickLabel = stringResource(R.string.copy_link),
-                onClick = { runCatching { uriHandler.openUri(url) } },
-                onLongClick = {
+                onClick = { if (selecting()) onSelectionTap() else runCatching { uriHandler.openUri(url) } },
+                onLongClick = onLongClick@{
+                    if (selecting()) { onSelectionTap(); return@onLongClick }
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager)
                         ?.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.download_link), url))

@@ -128,6 +128,13 @@ fun QueueScreen(
     fun toggleSelected(id: String) {
         selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
     }
+    // What the cards read about the selection: lambdas they call while drawing or laying out, so a
+    // selection change redraws them without recomposing them. Passed as values, every visible card
+    // recomposed on each change: 25-80 ms frames entering or leaving selection, 25 ms a tap, with
+    // a long Queue (measured on the release build).
+    val selecting: () -> Boolean = remember { { selectedIds.isNotEmpty() } }
+    val selectionProgressState = animateFloatAsState(if (selectionMode) 1f else 0f, tween(160), label = "selection")
+    val selectionProgress: () -> Float = remember { { selectionProgressState.value } }
     // Takes priority over MainScreen's own predictive-back handling for this whole screen (a
     // system back press/gesture while selecting should clear the selection, not leave Queue
     // entirely) — same pattern already proven in DownloadsHistoryScreen's own multi-select.
@@ -252,6 +259,7 @@ fun QueueScreen(
                     onCancel = { viewModel.cancelDownloads(selection); selectedIds = emptySet() },
                     onResume = { viewModel.retryDownloads(selection); selectedIds = emptySet() },
                     onRetry = { viewModel.retryDownloads(selection); selectedIds = emptySet() },
+                    onStartNow = { viewModel.startNow(selection); selectedIds = emptySet() },
                     // Not cancelled first: the delete that runs once the Undo snackbar passes
                     // (DownloadDispatcher.deleteDownload) stops each one's job itself. Cancelling
                     // up front meant Undo brought running downloads back cancelled.
@@ -634,8 +642,9 @@ fun QueueScreen(
                                         onStartNow = { viewModel.startNow(item.id) },
                                         onStartAt = { startAtItemId = item.id },
                                         onDelete = { requestDelete(setOf(item.id)) },
-                                        selectionMode = selectionMode,
-                                        selected = isSelected,
+                                        selecting = selecting,
+                                        selected = { item.id in selectedIds },
+                                        selectionProgress = selectionProgress,
                                         onToggleSelect = { toggleSelected(item.id) },
                                     )
                                 } else {
@@ -654,8 +663,9 @@ fun QueueScreen(
                                             cookieLoginTarget = targetUrl to item.id
                                         },
                                         onShowError = { errorSheetItemId = item.id },
-                                        selectionMode = selectionMode,
-                                        selected = isSelected,
+                                        selecting = selecting,
+                                        selected = { item.id in selectedIds },
+                                        selectionProgress = selectionProgress,
                                         onToggleSelect = { toggleSelected(item.id) },
                                     )
                                 }
@@ -675,7 +685,28 @@ fun QueueScreen(
                             // swipe, and the card's page-turning edge strips sit in Android's
                             // back-gesture zone, so fast swipes almost never turned the page. Every
                             // card has its own delete/Cancel button.
-                            row()
+                            // The card's selecting: a long-press anywhere on it starts (or extends)
+                            // the selection, a tap while selecting ticks it, and TalkBack hears it as
+                            // a checkbox. Here, not in the card, so a selection change recomposes
+                            // only this. A tap on one of the card's own buttons is theirs (the
+                            // deepest element takes a tap first), so they keep working outside it.
+                            val stopped = item.status == DownloadStatus.CANCELLED || item.status == DownloadStatus.PAUSED
+                            Box(
+                                Modifier
+                                    .clip(if (stopped) MaterialTheme.shapes.large else MaterialTheme.shapes.medium)
+                                    .combinedClickable(
+                                        onClick = { if (selectionMode) toggleSelected(item.id) },
+                                        onLongClick = { toggleSelected(item.id) },
+                                    )
+                                    .semantics {
+                                        if (selectionMode) {
+                                            selected = isSelected
+                                            role = Role.Checkbox
+                                        }
+                                    }
+                            ) {
+                                row()
+                            }
                             }
                         }
                 }
@@ -686,7 +717,8 @@ fun QueueScreen(
     }
 }
 
-/** While selecting: the actions that fit the tab, on a bar floating at the bottom. */
+/** While selecting: the actions that fit the tab, on a bar floating at the bottom — in the
+ * navigation pill's colours, the app's other floating bar. */
 @Composable
 private fun SelectionActionBar(
     filter: String,
@@ -694,11 +726,13 @@ private fun SelectionActionBar(
     onCancel: () -> Unit,
     onResume: () -> Unit,
     onRetry: () -> Unit,
+    onStartNow: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
         shadowElevation = 6.dp,
     ) {
         Row(
@@ -706,23 +740,40 @@ private fun SelectionActionBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             @Composable
-            fun action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, onClick: () -> Unit) {
-                TextButton(onClick = onClick, colors = ButtonDefaults.textButtonColors(contentColor = color)) {
+            fun action(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+                TextButton(onClick = onClick, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimary)) {
                     Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(label)
                 }
             }
-            val normal = MaterialTheme.colorScheme.onSurface
             when (filter) {
-                "Running", "In Queue", "Scheduled" -> {
-                    action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), normal, onPause)
-                    action(Icons.Outlined.Close, stringResource(R.string.action_cancel), normal, onCancel)
+                "Running", "In Queue" -> {
+                    action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause)
+                    action(Icons.Outlined.Close, stringResource(R.string.action_cancel), onCancel)
                 }
-                "Paused", "Cancelled" -> action(Icons.Outlined.PlayArrow, stringResource(R.string.resume), normal, onResume)
-                "Errored" -> action(Icons.Outlined.Refresh, stringResource(R.string.retry), normal, onRetry)
+                // Past the schedule window, like each card's own Start now. No Cancel: four
+                // actions filled the bar in English and overflowed it in longer languages.
+                "Scheduled" -> {
+                    action(Icons.Outlined.PlayArrow, stringResource(R.string.up_next), onStartNow)
+                    action(Icons.Outlined.Pause, stringResource(R.string.widget_music_pause), onPause)
+                }
+                "Paused", "Cancelled" -> action(Icons.Outlined.PlayArrow, stringResource(R.string.resume), onResume)
+                "Errored" -> action(Icons.Outlined.Refresh, stringResource(R.string.retry), onRetry)
             }
-            action(Icons.Outlined.Delete, stringResource(R.string.delete), MaterialTheme.colorScheme.error, onDelete)
+            // Its own red pill: red text alone doesn't read on the bar's colour.
+            Button(
+                onClick = onDelete,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+                modifier = Modifier.padding(start = 4.dp),
+            ) {
+                Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.delete))
+            }
         }
     }
 }

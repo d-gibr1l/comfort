@@ -162,6 +162,8 @@ object DownloadDispatcher {
     private const val QUEUE_REPAIR_DEBOUNCE_MS = 600L
 
 
+    /** A download that's running or waiting to: during Pause All, only one the user resumed. */
+    private val ACTIVE_STATUSES = setOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
     private val PAUSABLE_STATUSES = listOf(DownloadStatus.RUNNING, DownloadStatus.QUEUED, DownloadStatus.SCHEDULED)
     private val CANCELLABLE_STATUSES = PAUSABLE_STATUSES + DownloadStatus.PAUSED
 
@@ -405,14 +407,11 @@ object DownloadDispatcher {
             // same check to every individual caller, is what makes "nothing downloads while paused"
             // actually hold for every entry point instead of just the one enqueueDownload guards.
             // Except [userInitiated]: tapping Continue on one specific paused card after "Pause All"
-            // silently wrote PAUSED straight back and did nothing (reported live). An explicit
-            // request to start *this* download ends the global hold instead — the user is resuming
-            // activity, so the Queue FAB flips back to "Pause" (it kept saying "Resume", reported
-            // live) and new links start normally again. Every other PAUSED row stays PAUSED: clearing
-            // the flag doesn't dispatch anything by itself, and "Resume All" still picks them up.
-            if (userInitiated && GalleryDlPreferences.isGloballyPaused(context)) {
-                GalleryDlPreferences.setGloballyPaused(context, false)
-            }
+            // silently wrote PAUSED straight back and did nothing (reported live). That download
+            // starts, and Pause All stays on: it used to end the hold, and every link added after
+            // started too (reported live). Pause All leaves no download active, so one that is
+            // active while it's on is one the user started this way, and its own re-dispatches (a
+            // network drop, the schedule window) keep it going; anything else waits for Resume All.
             val globallyPaused = GalleryDlPreferences.isGloballyPaused(context)
 
             // Cancel whatever job is already associated with each download first, under the same
@@ -451,7 +450,7 @@ object DownloadDispatcher {
                     val row = dao.getById(dispatch.id) ?: continue
                     if (dispatch.expectedStatus != null && row.status !in dispatch.expectedStatus) continue
                     dispatch.moveToQueueEndAt?.let { dao.moveToQueueEnd(dispatch.id, it) }
-                    if (globallyPaused) {
+                    if (globallyPaused && !userInitiated && row.status !in ACTIVE_STATUSES) {
                         dao.updateStatus(dispatch.id, DownloadStatus.PAUSED)
                         pausedIds += dispatch.id
                         continue
@@ -529,8 +528,9 @@ object DownloadDispatcher {
         // schedule-window check (which only polls once per 60s and lags behind cancellation, see
         // DownloadWorker's actualCallback) could get silently undone for whichever download
         // happened to be mid-transfer: it would come back SCHEDULED and start again on its own
-        // once the window reopened, ignoring the pause the user just asked for.
-        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        // once the window reopened, ignoring the pause the user just asked for. Pause All has made
+        // it PAUSED by then; one resumed on its own during Pause All isn't, and carries on.
+        if (AppDatabase.getDatabase(context).downloadDao().getById(id)?.status == DownloadStatus.PAUSED) return
         // NonCancellable: the caller is the download's own worker, and enqueueWork() starts by
         // cancelling that worker's job — which cancelled this very call before it had submitted the
         // new job. The download was left QUEUED with a dead job, waiting until the next app start
@@ -551,7 +551,8 @@ object DownloadDispatcher {
      * off (its staging folder stays). Start now's override is kept. NonCancellable for the same
      * reason as [suspendForSchedule]: replacing the job cancels the caller. */
     suspend fun waitForNetwork(context: Context, id: String) {
-        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        // Paused by Pause All in the meantime (see suspendForSchedule).
+        if (AppDatabase.getDatabase(context).downloadDao().getById(id)?.status == DownloadStatus.PAUSED) return
         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
             val dao = AppDatabase.getDatabase(context).downloadDao()
             val entity = dao.getById(id) ?: return@withContext
