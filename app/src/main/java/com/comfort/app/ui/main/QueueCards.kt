@@ -232,7 +232,7 @@ private fun Modifier.selectionHighlight(selected: () -> Boolean, shape: androidx
 /** Measured but, while [hidden], not placed: not drawn, not touchable, not in TalkBack. Read while
  * laying out, so hiding a card's buttons for selecting doesn't recompose it. [collapse]: no height
  * either, so the card closes up. */
-private fun Modifier.hiddenWhile(hidden: () -> Boolean, collapse: Boolean = false): Modifier = layout { measurable, constraints ->
+internal fun Modifier.hiddenWhile(hidden: () -> Boolean, collapse: Boolean = false): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
     if (hidden()) layout(placeable.width, if (collapse) 0 else placeable.height) {}
     else layout(placeable.width, placeable.height) { placeable.place(0, 0) }

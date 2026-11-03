@@ -87,11 +87,13 @@ fun QueueScreen(
     // everything NOT finished/saved/deleted (see DownloadDao.getQueueFlow), so a finished item is
     // only ever visible via historyFlow, never queueItems itself.
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems, snackbarHostState = snackbarHostState)
+    // The app's one snackbar host (MainScreen's): drawn here while the Queue is open, and under the
+    // pages again once it closes, so a delete's Undo carries on there instead of being committed.
+    val snackbars = LocalAppSnackbars.current
+    DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems)
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
     // see rememberUndoableDelete.
-    val requestDelete = rememberUndoableDelete(viewModel, snackbarHostState)
+    val requestDelete = rememberUndoableDelete(viewModel)
 
     // Lets a QUEUED item's card explain *why* it's stuck (no usable network right now) instead of
     // just "Waiting to start…" forever with no visible reason — reproduced live: a WorkManager job
@@ -246,7 +248,7 @@ fun QueueScreen(
         // No floating bottom nav bar overlaying this screen (it's a full-screen overlay on top of
         // MainScreen, not one of its tabs — see MainScreen's own showQueueScreen handling), so
         // unlike Library's own snackbarHost this needs no extra bottom padding to clear one.
-        snackbarHost = { DownloadEventSnackbarHost(snackbarHostState) },
+        snackbarHost = { DownloadEventSnackbarHost(snackbars.host) },
         // Selecting: across the width (the split button at the end, where the Pause/Resume button
         // sits, and the Scheduled tab's Start now at the start).
         floatingActionButtonPosition = if (selectionMode) FabPosition.Center else FabPosition.End,
@@ -296,70 +298,6 @@ fun QueueScreen(
                 }
             }
         },
-        topBar = {
-            if (selectionMode) {
-                TopAppBar(
-                    // The count rolls up or down as cards are picked, rather than the text just
-                    // swapping.
-                    title = {
-                        androidx.compose.animation.AnimatedContent(
-                            targetState = selectedIds.size,
-                            transitionSpec = {
-                                val up = targetState > initialState
-                                (androidx.compose.animation.slideInVertically(tween(180)) { if (up) it else -it } + fadeIn(tween(180)))
-                                    .togetherWith(androidx.compose.animation.slideOutVertically(tween(180)) { if (up) -it else it } + fadeOut(tween(120)))
-                            },
-                            label = "selected count",
-                        ) { count ->
-                            Text(stringResource(R.string.x_selected, count), fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    navigationIcon = {
-                        FilledTonalIconButton(
-                            onClick = { selectedIds = emptySet() },
-                            modifier = Modifier.padding(start = 8.dp),
-                        ) {
-                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cancel_selection))
-                        }
-                    },
-                    actions = {
-                        val allSelected = filteredItems.isNotEmpty() && filteredItems.all { it.id in selectedIds }
-                        // A labelled pill with a three-state box (none, some, all) rather than a bare
-                        // glyph: what a tap does (select all, or clear) is in its words.
-                        val boxState = when {
-                            allSelected -> androidx.compose.ui.state.ToggleableState.On
-                            selectedIds.isEmpty() -> androidx.compose.ui.state.ToggleableState.Off
-                            else -> androidx.compose.ui.state.ToggleableState.Indeterminate
-                        }
-                        Surface(
-                            onClick = { selectedIds = if (allSelected) emptySet() else filteredItems.map { it.id }.toSet() },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(end = 12.dp),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(start = 4.dp, end = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                TriStateCheckbox(state = boxState, onClick = null, modifier = Modifier.padding(8.dp).size(20.dp))
-                                Text(
-                                    if (allSelected) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
-                                    style = MaterialTheme.typography.labelLarge,
-                                )
-                            }
-                        }
-                        // The actions are on the floating bar at the bottom (SelectionActionBar).
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            }
-            // Outside selection mode the header is the Settings-style collapsing overlay drawn
-            // inside the content below, not a Scaffold topBar.
-        }
     ) { paddingValues ->
         // Same header concept as the Settings sub-pages (see SettingsSubScaffold): one pinned
         // overlay — back button above a large icon + title — that collapses into a compact bar
@@ -380,16 +318,17 @@ fun QueueScreen(
         )
         val density = LocalDensity.current
         val defaultHeaderHeightPx = remember(density) { with(density) { 180.dp.roundToPx() } }
-        val defaultSelectionHeaderHeightPx = remember(density) { with(density) { 104.dp.roundToPx() } }
         var maxHeaderHeightPx by remember { mutableStateOf(defaultHeaderHeightPx) }
-        var selectionHeaderHeightPx by remember { mutableStateOf(defaultSelectionHeaderHeightPx) }
-        // Only the top inset is taken from Scaffold (in selection mode, its TopAppBar, measured
-        // together with the chips under it); bottom clearance comes solely from the LazyColumn's
-        // own contentPadding, since reserving Scaffold's FAB-driven bottom inset as well
-        // double-counted it.
+        // While selecting, the overlay is just the "N selected" bar and the chips (the header's
+        // space closes up to the bar's height, see below), and the list starts under them.
+        var selectionHeaderHeightPx by remember { mutableStateOf(0) }
+        // Bottom clearance comes solely from the LazyColumn's own contentPadding, since reserving
+        // Scaffold's FAB-driven bottom inset as well double-counted it.
         val topReserve = with(density) {
-            (if (selectionMode) selectionHeaderHeightPx else maxHeaderHeightPx).toDp()
+            (if (selectionMode && selectionHeaderHeightPx > 0) selectionHeaderHeightPx else maxHeaderHeightPx).toDp()
         }
+        // Selecting with the header scrolled away brings it back, with the selection bar in it.
+        LaunchedEffect(selectionMode) { if (selectionMode) headerState.reveal.show() }
         // A new tab starts from the top, with the header fully expanded again, rather than
         // inheriting the previous tab's scroll position (possibly past the new tab's end).
         LaunchedEffect(selectedFilter) { listState.scrollToItem(0) }
@@ -438,31 +377,29 @@ fun QueueScreen(
             // unit that collapses and hides/reappears together. In selection mode the header part
             // gives way to Scaffold's selection TopAppBar, but the chips stay. zIndex keeps it (and
             // the scrim) drawn above the list declared after it.
-            if (!selectionMode) {
-                StatusBarScrim(
-                    alpha = { 1f - headerState.reveal.fraction },
-                    modifier = Modifier.align(Alignment.TopStart).zIndex(2f),
-                )
-            }
+            StatusBarScrim(
+                alpha = { 1f - headerState.reveal.fraction },
+                modifier = Modifier.align(Alignment.TopStart).zIndex(2f),
+            )
             Column(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .zIndex(1f)
                     .fillMaxWidth()
-                    .then(if (selectionMode) Modifier else Modifier.compactHeaderReveal(headerState.reveal))
+                    .compactHeaderReveal(headerState.reveal)
                     .background(MaterialTheme.colorScheme.background)
-                    .then(
-                        if (selectionMode) Modifier
-                            .onSizeChanged { selectionHeaderHeightPx = it.height }
-                            .padding(top = paddingValues.calculateTopPadding())
-                        // Measured outside the status bar inset (same as SettingsSubScaffold) so
-                        // the reserved space includes it.
-                        else Modifier
-                            .onSizeChanged { maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height) }
-                            .windowInsetsPadding(WindowInsets.statusBars)
-                    ),
+                    // Measured outside the status bar inset (same as SettingsSubScaffold) so the
+                    // reserved space includes it.
+                    .onSizeChanged {
+                        if (selecting()) selectionHeaderHeightPx = it.height
+                        else maxHeaderHeightPx = maxOf(maxHeaderHeightPx, it.height)
+                    }
+                    .windowInsetsPadding(WindowInsets.statusBars),
             ) {
-                if (!selectionMode) {
+                // Both always built, one shown, switched while laying out (hiddenWhile): building
+                // and dropping one or the other was most of the long frame starting or ending a
+                // selection. The selection bar sits at the top of the header's space, where it always was.
+                Box(contentAlignment = Alignment.BottomStart) {
                     SettingsSubPageHeader(
                         title = stringResource(R.string.queue),
                         topicIcon = Icons.Outlined.DownloadForOffline,
@@ -471,6 +408,72 @@ fun QueueScreen(
                         bottomPadding = headerState.bottomPadding,
                         collapseFraction = headerState.collapseFraction,
                         includeHorizontalPadding = true,
+                        // Collapsed while selecting: no space left between the bar and the chips.
+                        modifier = Modifier.hiddenWhile(selecting, collapse = true),
+                    )
+                    TopAppBar(
+                        // The count rolls up or down as cards are picked, rather than the text just
+                        // swapping.
+                        title = {
+                            androidx.compose.animation.AnimatedContent(
+                                targetState = selectedIds.size,
+                                transitionSpec = {
+                                    val up = targetState > initialState
+                                    (androidx.compose.animation.slideInVertically(tween(180)) { if (up) it else -it } + fadeIn(tween(180)))
+                                        .togetherWith(androidx.compose.animation.slideOutVertically(tween(180)) { if (up) -it else it } + fadeOut(tween(120)))
+                                },
+                                label = "selected count",
+                            ) { count ->
+                                Text(stringResource(R.string.x_selected, count), fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        navigationIcon = {
+                            FilledTonalIconButton(
+                                onClick = { selectedIds = emptySet() },
+                                modifier = Modifier.padding(start = 8.dp),
+                            ) {
+                                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cancel_selection))
+                            }
+                        },
+                        actions = {
+                            val allSelected = filteredItems.isNotEmpty() && filteredItems.all { it.id in selectedIds }
+                            // A labelled pill with a three-state box (none, some, all) rather than a bare
+                            // glyph: what a tap does (select all, or clear) is in its words.
+                            val boxState = when {
+                                allSelected -> androidx.compose.ui.state.ToggleableState.On
+                                selectedIds.isEmpty() -> androidx.compose.ui.state.ToggleableState.Off
+                                else -> androidx.compose.ui.state.ToggleableState.Indeterminate
+                            }
+                            Surface(
+                                onClick = { selectedIds = if (allSelected) emptySet() else filteredItems.map { it.id }.toSet() },
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(end = 12.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(start = 4.dp, end = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    TriStateCheckbox(state = boxState, onClick = null, modifier = Modifier.padding(8.dp).size(20.dp))
+                                    Text(
+                                        if (allSelected) stringResource(R.string.deselect_all) else stringResource(R.string.select_all),
+                                        style = MaterialTheme.typography.labelLarge,
+                                    )
+                                }
+                            }
+                            // The actions are on the floating bar at the bottom (SelectionActionBar).
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            titleContentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        // The overlay already clears the status bar.
+                        windowInsets = WindowInsets(0),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .hiddenWhile({ !selecting() })
+                            .graphicsLayer { alpha = selectionProgress() },
                     )
                 }
             val countsByStatus = remember(queueItems) { queueItems.groupingBy { it.status }.eachCount() }
@@ -484,7 +487,7 @@ fun QueueScreen(
                     // No top padding under the title: the count badges poking above the chips
                     // still show, since a horizontal row only clips left/right. Under the
                     // selection TopAppBar they need room, or the bar (drawn over this) cuts them.
-                    .padding(top = if (selectionMode) 8.dp else 0.dp, bottom = 8.dp),
+                    .padding(bottom = 8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
