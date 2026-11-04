@@ -218,6 +218,7 @@ internal fun HistoryGridItem(
     onRename: (String) -> Unit,
     onRedownload: () -> Unit,
     onDownloadMissing: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
@@ -234,7 +235,7 @@ internal fun HistoryGridItem(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             // Width comes from the tile's span in its row (justifiedCells), height from the row.
             // Square corners and edge to edge, like a gallery app's grid.
             .fillMaxWidth()
@@ -327,17 +328,19 @@ internal fun HistoryGridItem(
                         Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
-                DownloadActionsMenu(
-                    item = item,
-                    expanded = menuExpanded,
-                    onDismiss = { menuExpanded = false },
-                    onToggleFavorite = onToggleFavorite,
-                    onRename = { showRenameDialog = true },
-                    onRedownload = onRedownload,
-                    onDownloadMissing = onDownloadMissing,
-                    onDelete = onDelete,
-                    onDeleteFromPhone = onDeleteFromPhone,
-                )
+                if (menuExpanded) {
+                    DownloadActionsMenu(
+                        item = item,
+                        expanded = menuExpanded,
+                        onDismiss = { menuExpanded = false },
+                        onToggleFavorite = onToggleFavorite,
+                        onRename = { showRenameDialog = true },
+                        onRedownload = onRedownload,
+                        onDownloadMissing = onDownloadMissing,
+                        onDelete = onDelete,
+                        onDeleteFromPhone = onDeleteFromPhone,
+                    )
+                }
             }
         }
 
@@ -474,6 +477,7 @@ internal fun HistoryRow(
     onRename: (String) -> Unit,
     onRedownload: () -> Unit,
     onDownloadMissing: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     // DELETED means the underlying file is confirmed gone — don't bother attempting a load that
@@ -491,7 +495,7 @@ internal fun HistoryRow(
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(LIBRARY_CARD_SHAPE)
             // "background" is the top-level scaffold/page role, not a role for a row sitting on
@@ -645,17 +649,19 @@ internal fun HistoryRow(
             IconButton(onClick = { menuExpanded = true }) {
                 Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
             }
-            DownloadActionsMenu(
-                item = item,
-                expanded = menuExpanded,
-                onDismiss = { menuExpanded = false },
-                onToggleFavorite = onToggleFavorite,
-                onRename = { showRenameDialog = true },
-                onRedownload = onRedownload,
-                onDownloadMissing = onDownloadMissing,
-                onDelete = onDelete,
-                onDeleteFromPhone = onDeleteFromPhone,
-            )
+            if (menuExpanded) {
+                DownloadActionsMenu(
+                    item = item,
+                    expanded = menuExpanded,
+                    onDismiss = { menuExpanded = false },
+                    onToggleFavorite = onToggleFavorite,
+                    onRename = { showRenameDialog = true },
+                    onRedownload = onRedownload,
+                    onDownloadMissing = onDownloadMissing,
+                    onDelete = onDelete,
+                    onDeleteFromPhone = onDeleteFromPhone,
+                )
+            }
         }
     }
 }
@@ -846,6 +852,7 @@ internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifie
         val request = remember(item.id, item.thumbnailPath, item.mediaUri, item.isAudio) {
             coil.request.ImageRequest.Builder(context)
                 .data(item.thumbnailModel())
+                .crossfade(false)
                 // Under the file's key, so the media viewer can show it at once while it loads.
                 .memoryCacheKey(com.comfort.app.util.thumbnailCacheKey(item.id))
                 .build()

@@ -33,3 +33,6 @@ test_cookies.txt
 
 # Python bytecode from running the engine wrappers or tools/ tests on a PC.
 __pycache__/
+
+db.sqlite
+.idea/

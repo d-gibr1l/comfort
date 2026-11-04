@@ -70,8 +70,14 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Each Library item's shape and length (MediaShapes), by download id — what the grid sizes
      * its tiles and duration badges from. Read from MediaStore off the main thread; an audio
      * download's cover art gives the shape and its real file (mediaUri) the length. Cached to
-     * avoid re-parsing MediaStore for existing items across emissions. */
+     * avoid re-parsing MediaStore for existing items across emissions.
+     *
+     * Throttled: rawHistoryFlow and rawDeletedFlow are each throttled individually, but combine()
+     * still fires on every upstream emission — both can fire within the same throttle window and
+     * produce two back-to-back Map emissions. A single .throttleLatest() after combine() collapses
+     * those bursts before the expensive IO block runs and before the UI recomputes grid layout. */
     val mediaShapes: StateFlow<Map<String, MediaShape>> = combine(rawHistoryFlow, rawDeletedFlow) { history, deleted -> history + deleted }
+        .throttleLatest(LIST_UPDATE_MS)
         .map { items ->
             withContext(Dispatchers.IO) {
                 val currentIds = items.map { it.id }.toSet()

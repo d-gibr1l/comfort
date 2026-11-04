@@ -138,8 +138,7 @@ fun DownloadsHistoryScreen(
     // ids have already played their entrance once and never resets — Modifier.animateItem() below
     // already handles the smooth reflow/removal animation on its own, so this only ever needs to
     // gate the one-time entrance.
-    val alreadyAnimatedIds = remember { mutableSetOf<String>() }
-    MarkShownAfterFirstFrame(alreadyAnimatedIds, historyItems, deletedItems) { it.id }
+
     // better-interface review: the entrance slide below animated unconditionally, with nothing
     // checking the OS-level reduce-motion setting — same finding already fixed on QueueScreen.kt.
     val reducedMotion = rememberIsReducedMotionEnabled()
@@ -563,9 +562,10 @@ fun DownloadsHistoryScreen(
             val gridWidth = maxWidth.value
             val sizeRef = minOf(gridWidth, GRID_SIZE_REF_DP)
             val (targetFraction, minTileFraction, maxHeightFraction) = LIBRARY_GRID_SIZES[gridSize.coerceIn(0, LIBRARY_GRID_SIZES.lastIndex)]
-            val cells = remember(visibleItems, shapes, gridWidth, gridSize) {
+            val aspects = remember(visibleItems, shapes) { visibleItems.map { shapes[it.id]?.aspect ?: 1f } }
+            val cells = remember(aspects, gridWidth, gridSize) {
                 justifiedCells(
-                    aspects = visibleItems.map { shapes[it.id]?.aspect ?: 1f },
+                    aspects = aspects,
                     width = gridWidth,
                     maxPerRow = maxOf(4, (4 * gridWidth / GRID_SIZE_REF_DP).toInt()),
                     targetHeight = sizeRef * targetFraction,
@@ -612,45 +612,27 @@ fun DownloadsHistoryScreen(
                     key = { _, item -> item.id },
                     span = { index, _ -> GridItemSpan(cells.getOrNull(index)?.span ?: JUSTIFIED_COLUMNS / 3) },
                 ) { index, item ->
-                    // Same slide-up + fade-in entrance / crossfade-out + reflow-on-removal pattern
-                    // as the Download Queue's own cards (see QueueScreen.kt's own comment on this)
-                    // — visibleState never flips back to false from here, so the removal half is
-                    // entirely animateItem()'s own built-in fade-out + placement animation below,
-                    // not this AnimatedVisibility's exit (deliberately ExitTransition.None).
-                    val visibleState = remember(item.id) {
-                        MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
-                    }
-                    SideEffect { alreadyAnimatedIds.add(item.id) }
-                    AnimatedVisibility(
-                        visibleState = visibleState,
-                        // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
-                        // but keeps the fade — brief functional feedback that a new item just
-                        // appeared, same as QueueScreen.kt's own reduced-motion fix.
-                        enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
-                        exit = ExitTransition.None,
+                    HistoryGridItem(
+                        item = item,
+                        height = (cells.getOrNull(index)?.height ?: (gridWidth / 3)).dp,
+                        shape = shapes[item.id],
+                        selected = item.id in selectedIds,
+                        selectionMode = selectionMode,
+                        onTap = {
+                            if (selectionMode) {
+                                selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
+                            }
+                        },
+                        onLongPress = { selectedIds = selectedIds + item.id },
+                        onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
+                        onDelete = { requestDelete(setOf(item.id)) },
+                        onDeleteFromPhone = { requestDeleteFromPhone(setOf(item.id)) },
+                        onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
+                        onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
+                        onRedownload = { viewModel.redownloadDeleted(item.id) },
+                        onDownloadMissing = { viewModel.retryDownload(item.id) },
                         modifier = Modifier.animateItem(),
-                    ) {
-                        HistoryGridItem(
-                            item = item,
-                            height = (cells.getOrNull(index)?.height ?: (gridWidth / 3)).dp,
-                            shape = shapes[item.id],
-                            selected = item.id in selectedIds,
-                            selectionMode = selectionMode,
-                            onTap = {
-                                if (selectionMode) {
-                                    selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
-                                }
-                            },
-                            onLongPress = { selectedIds = selectedIds + item.id },
-                            onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
-                            onDelete = { requestDelete(setOf(item.id)) },
-                            onDeleteFromPhone = { requestDeleteFromPhone(setOf(item.id)) },
-                            onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
-                            onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
-                            onRedownload = { viewModel.redownloadDeleted(item.id) },
-                            onDownloadMissing = { viewModel.retryDownload(item.id) },
-                        )
-                    }
+                    )
                 }
             }
             }
@@ -662,7 +644,22 @@ fun DownloadsHistoryScreen(
             ) {
                 item { fullHeaderContent() }
                 items(visibleItems, key = { it.id }) { item ->
-                    val row = @Composable {
+                    // Inset rounded cards (same 16dp side margin and 20dp corners as the
+                    // Queue's cards) rather than edge-to-edge rows on one continuous band.
+                    // Always wrap in SwipeToDeleteCard — just disable it while selecting.
+                    // Keeping the wrapper alive and passing enabled = !selectionMode lets the slot
+                    // table stay intact; only drag-gesture handling flips on or off.
+                    SwipeToDeleteCard(
+                        onDelete = { requestDelete(setOf(item.id)) },
+                        shape = LIBRARY_CARD_SHAPE,
+                        enabled = !selectionMode,
+                        modifier = Modifier
+                            .animateItem()
+                            .fillMaxWidth()
+                            .wrapContentWidth(Alignment.CenterHorizontally)
+                            .widthIn(max = CONTENT_MAX_WIDTH)
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
                         HistoryRow(
                             item = item,
                             selected = item.id in selectedIds,
@@ -682,37 +679,6 @@ fun DownloadsHistoryScreen(
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
                             onDownloadMissing = { viewModel.retryDownload(item.id) },
                         )
-                    }
-                    // Same entrance/removal pattern as the grid above and the Download Queue's own
-                    // cards — see either's own comment on why exit is deliberately ExitTransition.None.
-                    val visibleState = remember(item.id) {
-                        MutableTransitionState(alreadyAnimatedIds.contains(item.id)).apply { targetState = true }
-                    }
-                    SideEffect { alreadyAnimatedIds.add(item.id) }
-                    AnimatedVisibility(
-                        visibleState = visibleState,
-                        // Reduced motion drops the slide (a vestibular-trigger-shaped movement)
-                        // but keeps the fade — brief functional feedback that a new item just
-                        // appeared, same as QueueScreen.kt's own reduced-motion fix.
-                        enter = if (reducedMotion) fadeIn(tween(350)) else fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 6 },
-                        exit = ExitTransition.None,
-                        // Inset rounded cards (same 16dp side margin and 20dp corners as the
-                        // Queue's cards) rather than edge-to-edge rows on one continuous band.
-                        // At most the other pages' reading width, centred (a tablet's rows ran edge
-                        // to edge, the ⋮ a screen away from the title).
-                        modifier = Modifier.animateItem()
-                            .fillMaxWidth()
-                            .wrapContentWidth(Alignment.CenterHorizontally)
-                            .widthIn(max = CONTENT_MAX_WIDTH)
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                    ) {
-                        if (selectionMode) {
-                            row()
-                        } else {
-                            SwipeToDeleteCard(onDelete = { requestDelete(setOf(item.id)) }, shape = LIBRARY_CARD_SHAPE) {
-                                row()
-                            }
-                        }
                     }
                 }
             }
@@ -874,17 +840,12 @@ fun DownloadsHistoryScreen(
     }
 }
 
-/** Marks every item of [lists] as already shown ([shown], the lists' "played its entrance" set)
- * once a frame has gone by since they changed. The entrance is for an item that just arrived, so
- * only the ones on screen in that frame play it. It used to play for any item the list hadn't drawn
- * yet this session: after the app started, a fast fling brought in a whole screen of never-drawn
- * cards, every one starting invisible, and the Library went blank mid-scroll (seen live). The
- * Queue's cards use it too. */
+/** Marks every item of [lists] as already shown ([shown], the lists' "played its entrance" set).
+ * The entrance animation is only for an item that just arrived, so items that are already in the
+ * library must not re-play entrance animations while scrolling down or up. */
 @Composable
 internal fun <T> MarkShownAfterFirstFrame(shown: MutableSet<String>, vararg lists: List<T>, id: (T) -> String) {
-    LaunchedEffect(*lists) {
-        // Two frames: the lazy list composes the items on screen in the frame after the change.
-        repeat(2) { androidx.compose.runtime.withFrameNanos { } }
+    SideEffect {
         lists.forEach { list -> list.forEach { shown.add(id(it)) } }
     }
 }
