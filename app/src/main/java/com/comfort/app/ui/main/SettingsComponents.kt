@@ -164,7 +164,11 @@ internal data class CollapsingHeaderState(
 internal class CompactHeaderReveal {
     var heightPx by androidx.compose.runtime.mutableFloatStateOf(0f)
     private var rawHiddenPx by androidx.compose.runtime.mutableFloatStateOf(0f)
-    val hiddenPx: Float get() = rawHiddenPx.coerceIn(0f, heightPx)
+    val hiddenPx: Float get() = when {
+        rawHiddenPx.isInfinite() -> if (heightPx > 0f) heightPx else 10000f
+        heightPx > 0f -> rawHiddenPx.coerceIn(0f, heightPx)
+        else -> 0f
+    }
     /** 1 = fully shown, 0 = fully hidden. */
     val fraction: Float get() = when {
         heightPx > 0f -> 1f - hiddenPx / heightPx

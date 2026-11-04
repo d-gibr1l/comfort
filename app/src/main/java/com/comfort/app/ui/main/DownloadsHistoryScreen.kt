@@ -21,7 +21,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.MutatePriority
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -262,6 +266,7 @@ fun DownloadsHistoryScreen(
     // threshold; a reversal back into downward movement near the top disarms it immediately, same
     // as scrolling down should never show the compact bar there at all, transformed or not.
     var nearTopTransformActive by remember { mutableStateOf(false) }
+    var isScrollingToTop by remember { mutableStateOf(false) }
     val libraryHeaderScrollConnection = remember(compactBarThresholdPx, selectionMode) {
         object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
             override fun onPostScroll(
@@ -269,7 +274,9 @@ fun DownloadsHistoryScreen(
                 available: androidx.compose.ui.geometry.Offset,
                 source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
             ): androidx.compose.ui.geometry.Offset {
-                if (selectionMode) return androidx.compose.ui.geometry.Offset.Zero
+                if (selectionMode || isScrollingToTop || source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) {
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
                 // consumed.y < 0 means the content moved up, i.e. scrolled toward its end.
                 val delta = -consumed.y
                 if (delta == 0f) return androidx.compose.ui.geometry.Offset.Zero
@@ -336,7 +343,7 @@ fun DownloadsHistoryScreen(
             } else {
                 listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
             }
-            scrollValuePx > compactBarThresholdPx || (index == 0 && nearTopTransformActive && offset > 0)
+            !isScrollingToTop && (scrollValuePx > compactBarThresholdPx || (index == 0 && nearTopTransformActive && offset > 0))
         }
     }
 
@@ -487,9 +494,10 @@ fun DownloadsHistoryScreen(
                         audioOnly = !audioOnly
                         if (audioOnly) { favoritesOnly = false; showDeletedOnly = false; showDuplicatesOnly = false }
                     },
+                    modifier = Modifier,
                 )
                 // The Audio filter's songs, played in the music player: all in order, or shuffled.
-                val songs = visibleItems.filter { it.isAudio && it.status != DownloadStatus.DELETED }
+                val songs = remember(visibleItems) { visibleItems.filter { it.isAudio && it.status != DownloadStatus.DELETED } }
                 if (audioOnly && songs.isNotEmpty()) {
                     val playSongs = com.comfort.app.ui.music.LocalPlaySongs.current
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -606,7 +614,7 @@ fun DownloadsHistoryScreen(
                 // list. Modifier.padding can't do this (it throws on a negative value); measuring
                 // wider than the slot and placing the result shifted left is the same trick as
                 // making an image bleed past a padded container's own edges.
-                item(span = { GridItemSpan(maxLineSpan) }) { fullHeaderContent() }
+                item(key = "library_header", contentType = "header", span = { GridItemSpan(maxLineSpan) }) { fullHeaderContent() }
                 gridItemsIndexed(
                     visibleItems,
                     key = { _, item -> item.id },
@@ -631,7 +639,7 @@ fun DownloadsHistoryScreen(
                         onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                         onRedownload = { viewModel.redownloadDeleted(item.id) },
                         onDownloadMissing = { viewModel.retryDownload(item.id) },
-                        modifier = Modifier.animateItem(),
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
                     )
                 }
             }
@@ -642,7 +650,7 @@ fun DownloadsHistoryScreen(
                 contentPadding = PaddingValues(top = topPaddingWhileSelecting, bottom = navBarClearance()),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                item { fullHeaderContent() }
+                item(key = "library_header", contentType = "header") { fullHeaderContent() }
                 items(visibleItems, key = { it.id }) { item ->
                     // Inset rounded cards (same 16dp side margin and 20dp corners as the
                     // Queue's cards) rather than edge-to-edge rows on one continuous band.
@@ -654,7 +662,7 @@ fun DownloadsHistoryScreen(
                         shape = LIBRARY_CARD_SHAPE,
                         enabled = !selectionMode,
                         modifier = Modifier
-                            .animateItem()
+                            .animateItem(fadeInSpec = null, fadeOutSpec = null)
                             .fillMaxWidth()
                             .wrapContentWidth(Alignment.CenterHorizontally)
                             .widthIn(max = CONTENT_MAX_WIDTH)
@@ -704,15 +712,20 @@ fun DownloadsHistoryScreen(
         ) {
             FloatingActionButton(
                 onClick = {
+                    compactBarReveal.hide()
+                    nearTopTransformActive = false
+                    isScrollingToTop = true
                     scrollTopScope.launch {
-                        // From far down, animateScrollToItem() alone teleported most of the way and
-                        // then snapped (recorded: two jumps, barely any motion). Jump silently to a
-                        // few rows from the top first, then glide only that last stretch.
-                        if (gridView) {
-                            if (gridState.firstVisibleItemIndex > SCROLL_TOP_GLIDE_ITEMS) gridState.scrollToItem(SCROLL_TOP_GLIDE_ITEMS)
-                            gridState.animateScrollToItem(0)
-                        } else {
-                            listState.glideToTop()
+                        try {
+                            if (gridView) {
+                                gridState.fastSmoothScrollToTop(density)
+                            } else {
+                                listState.fastSmoothScrollToTop(density)
+                            }
+                        } finally {
+                            isScrollingToTop = false
+                            compactBarReveal.hide()
+                            nearTopTransformActive = false
                         }
                     }
                 },
@@ -731,12 +744,12 @@ fun DownloadsHistoryScreen(
         // scroll jank reported live). Only the crossing of the threshold matters.
         val pastHeader by remember { derivedStateOf { scrollValuePx >= compactBarThresholdPx } }
         val statusBarScrimVisible = !selectionMode && !usingStaticFullHeaderBranch && pastHeader
-        val statusBarScrimAlpha by animateFloatAsState(
+        val statusBarScrimAlpha = animateFloatAsState(
             targetValue = if (statusBarScrimVisible) 1f else 0f,
             animationSpec = tween(200),
             label = "library-status-bar-scrim",
         )
-        StatusBarScrim(alpha = { statusBarScrimAlpha }, modifier = Modifier.align(Alignment.TopStart))
+        StatusBarScrim(alpha = { statusBarScrimAlpha.value }, modifier = Modifier.align(Alignment.TopStart))
 
         if (selectionMode) {
             TopAppBar(
@@ -853,28 +866,158 @@ internal fun <T> MarkShownAfterFirstFrame(shown: MutableSet<String>, vararg list
 /** Gap between grid tiles, horizontally and vertically (dp). */
 private const val GRID_GAP_DP = 2f
 
-/** How many rows from the top the Library's scroll-to-top button glides over (it jumps to here
- * first when further down). */
-private const val SCROLL_TOP_GLIDE_ITEMS = 6
 
-/** The list view's scroll-to-top: jump to [SCROLL_TOP_GLIDE_ITEMS] rows from the top, then one
- * even 450ms glide the rest of the way. animateScrollToItem(0) did the last stretch with the top
- * item off screen, and recorded frame by frame it sat still for ~7 frames and then covered it all
- * in ~4. The distance is estimated from the visible rows' real heights (near-uniform here) and
- * padded, since the list can't scroll past its top — the excess is absorbed in the slow end of the
- * ease — and a final scrollToItem(0) settles any shortfall. */
-private suspend fun androidx.compose.foundation.lazy.LazyListState.glideToTop() {
-    if (firstVisibleItemIndex > SCROLL_TOP_GLIDE_ITEMS) scrollToItem(SCROLL_TOP_GLIDE_ITEMS)
-    val rowHeights = layoutInfo.visibleItemsInfo.filter { it.index > 0 }.map { it.size }
-    if (rowHeights.isNotEmpty() && firstVisibleItemIndex > 0) {
-        val distance = (firstVisibleItemIndex * rowHeights.average() + firstVisibleItemScrollOffset) * 1.15
-        animateScrollBy(
-            -distance.toFloat(),
-            androidx.compose.animation.core.tween(450, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-        )
-    }
-    scrollToItem(0)
-}
 
 /** The width (dp) the grid's tile sizes are measured against at most — about a big phone's. */
 private const val GRID_SIZE_REF_DP = 480f
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.fastSmoothScrollToTop(
+    density: androidx.compose.ui.unit.Density,
+) {
+    if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) return
+
+    // If very far down (> 50 items), snap closer first so the user isn't waiting
+    // through dozens of off-screen items.
+    if (firstVisibleItemIndex > 50) {
+        scrollToItem(30)
+    }
+
+    val avgCardSize = layoutInfo.visibleItemsInfo.filter { it.index != 0 }
+        .map { it.size }
+        .average()
+        .toFloat()
+        .takeIf { !it.isNaN() && it > 0 } ?: with(density) { 85.dp.toPx() }
+
+    val estimatedHeaderSize = with(density) { 260.dp.toPx() }
+
+    val aAccel = with(density) { 24000.dp.toPx() }
+    val aDecel = with(density) { 16000.dp.toPx() }
+    val maxV = with(density) {
+        (4000f + (firstVisibleItemIndex * 90f).coerceAtMost(4500f)).dp.toPx()
+    }
+
+    var v = 0f
+    var prevTimeNanos = 0L
+    var reachedTop = false
+
+    scroll(MutatePriority.Default) {
+        while (!reachedTop && (firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0)) {
+            withFrameNanos { frameTimeNanos ->
+                val dt = if (prevTimeNanos == 0L) {
+                    1f / 120f
+                } else {
+                    ((frameTimeNanos - prevTimeNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
+                }
+                prevTimeNanos = frameTimeNanos
+
+                val item0 = layoutInfo.visibleItemsInfo.find { it.index == 0 }
+                val remaining = if (firstVisibleItemIndex == 0) {
+                    firstVisibleItemScrollOffset.toFloat()
+                } else if (item0 != null) {
+                    (-item0.offset).toFloat()
+                } else {
+                    firstVisibleItemScrollOffset.toFloat() +
+                        (firstVisibleItemIndex - 1).coerceAtLeast(0) * avgCardSize +
+                        estimatedHeaderSize
+                }
+
+                if (remaining <= 0.5f) {
+                    reachedTop = true
+                    return@withFrameNanos
+                }
+
+                val targetVDecel = kotlin.math.sqrt(kotlin.math.max(0f, 2f * aDecel * remaining))
+                val targetV = minOf(maxV, targetVDecel)
+                v = minOf(v + aAccel * dt, targetV)
+
+                val delta = minOf(v * dt, remaining)
+                val consumed = scrollBy(-delta)
+                if (consumed == 0f && delta > 0.5f) {
+                    reachedTop = true
+                }
+            }
+            if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) {
+                break
+            }
+        }
+    }
+
+    if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset in 1..2) {
+        scrollToItem(0, 0)
+    }
+}
+
+private suspend fun androidx.compose.foundation.lazy.grid.LazyGridState.fastSmoothScrollToTop(
+    density: androidx.compose.ui.unit.Density,
+) {
+    if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) return
+
+    if (firstVisibleItemIndex > 60) {
+        scrollToItem(36)
+    }
+
+    val avgTileHeight = layoutInfo.visibleItemsInfo.filter { it.index != 0 }
+        .map { it.size.height }
+        .average()
+        .toFloat()
+        .takeIf { !it.isNaN() && it > 0 } ?: with(density) { 120.dp.toPx() }
+
+    val estimatedHeaderSize = with(density) { 260.dp.toPx() }
+
+    val aAccel = with(density) { 24000.dp.toPx() }
+    val aDecel = with(density) { 16000.dp.toPx() }
+    val maxV = with(density) {
+        (4000f + ((firstVisibleItemIndex / 3f) * 120f).coerceAtMost(4500f)).dp.toPx()
+    }
+
+    var v = 0f
+    var prevTimeNanos = 0L
+    var reachedTop = false
+
+    scroll(MutatePriority.Default) {
+        while (!reachedTop && (firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0)) {
+            withFrameNanos { frameTimeNanos ->
+                val dt = if (prevTimeNanos == 0L) {
+                    1f / 120f
+                } else {
+                    ((frameTimeNanos - prevTimeNanos) / 1_000_000_000f).coerceIn(0.001f, 0.05f)
+                }
+                prevTimeNanos = frameTimeNanos
+
+                val item0 = layoutInfo.visibleItemsInfo.find { it.index == 0 }
+                val remaining = if (firstVisibleItemIndex == 0) {
+                    firstVisibleItemScrollOffset.toFloat()
+                } else if (item0 != null) {
+                    (-item0.offset.y).toFloat()
+                } else {
+                    val currentRows = (firstVisibleItemIndex - 1).coerceAtLeast(0) / 3f
+                    firstVisibleItemScrollOffset.toFloat() +
+                        currentRows * avgTileHeight +
+                        estimatedHeaderSize
+                }
+
+                if (remaining <= 0.5f) {
+                    reachedTop = true
+                    return@withFrameNanos
+                }
+
+                val targetVDecel = kotlin.math.sqrt(kotlin.math.max(0f, 2f * aDecel * remaining))
+                val targetV = minOf(maxV, targetVDecel)
+                v = minOf(v + aAccel * dt, targetV)
+
+                val delta = minOf(v * dt, remaining)
+                val consumed = scrollBy(-delta)
+                if (consumed == 0f && delta > 0.5f) {
+                    reachedTop = true
+                }
+            }
+            if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0) {
+                break
+            }
+        }
+    }
+
+    if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset in 1..2) {
+        scrollToItem(0, 0)
+    }
+}

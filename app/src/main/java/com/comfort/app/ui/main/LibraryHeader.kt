@@ -54,6 +54,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -131,11 +132,12 @@ internal fun LibraryHeader(
     onClearDeleted: () -> Unit,
     audioOnly: Boolean,
     onToggleAudioOnly: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Box(
         // No background of its own: it's the list's first item, so nothing scrolls under it, and
         // under it is the page's background in the same colour.
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding(),
     ) {
@@ -243,7 +245,9 @@ internal fun LibraryHeader(
             // (reported live, and true of the analogous Queue-screen fix too) stopped short of
             // actually revealing the last chip.
             val toolbarScrollState = rememberScrollState()
-            LaunchedEffect(Unit) {
+            var hasNudged by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(hasNudged) {
+                if (hasNudged) return@LaunchedEffect
                 // Give the static state a beat to register before moving anything — also lets the
                 // real maxValue (only known post-layout) settle so a screen where every chip
                 // already fits doesn't nudge toward nothing.
@@ -255,6 +259,7 @@ internal fun LibraryHeader(
                     delay(250)
                     toolbarScrollState.animateScrollTo(0, animationSpec = tween(450))
                 }
+                hasNudged = true
             }
             Row(
                 modifier = Modifier
@@ -271,15 +276,17 @@ internal fun LibraryHeader(
                         onClick = { onSortMenuExpandedChange(true) },
                         groupIndex = 0, groupSize = 4,
                     )
-                    DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { onSortMenuExpandedChange(false) }) {
-                        LibrarySort.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(option.label)) },
-                                leadingIcon = if (option == sortOption) {
-                                    { Icon(Icons.Outlined.Check, contentDescription = null) }
-                                } else null,
-                                onClick = { onSortOptionChange(option); onSortMenuExpandedChange(false) },
-                            )
+                    if (sortMenuExpanded) {
+                        DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { onSortMenuExpandedChange(false) }) {
+                            LibrarySort.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(option.label)) },
+                                    leadingIcon = if (option == sortOption) {
+                                        { Icon(Icons.Outlined.Check, contentDescription = null) }
+                                    } else null,
+                                    onClick = { onSortOptionChange(option); onSortMenuExpandedChange(false) },
+                                )
+                            }
                         }
                     }
                 }
@@ -591,7 +598,7 @@ private fun LibraryToolbarChip(
         FilterChip(
             selected = active,
             onClick = onClick,
-            modifier = Modifier.height(40.dp).onSizeChanged { chipWidthPx = it.width },
+            modifier = Modifier.height(40.dp).then(if (count != null) Modifier.onSizeChanged { chipWidthPx = it.width } else Modifier),
             interactionSource = interactionSource,
             shape = rememberMorphingChipShape(groupIndex, groupSize, selected = active, interactionSource = interactionSource, height = 40.dp),
             leadingIcon = {
