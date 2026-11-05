@@ -113,18 +113,78 @@ object EngineUpdater {
             ?.removeSuffix(".dist-info")
     }
 
-    private fun httpGetText(urlStr: String): String? = runCatching {
-        (URL(urlStr).openConnection() as HttpURLConnection).run {
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            setRequestProperty("User-Agent", "Comfort-App-Updater")
-            try {
-                inputStream.bufferedReader().use { it.readText() }
-            } finally {
-                disconnect()
+    private fun httpGetText(urlStr: String, retries: Int = 3): String? {
+        for (attempt in 1..retries) {
+            val result = runCatching {
+                val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10_000
+                    readTimeout = 15_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Comfort-App-Updater")
+                    setRequestProperty("Accept", "application/vnd.github.v3+json, application/json, text/plain, */*")
+                }
+                conn.run {
+                    try {
+                        val code = responseCode
+                        if (code in 200..299) {
+                            inputStream.bufferedReader().use { it.readText() }
+                        } else {
+                            null
+                        }
+                    } finally {
+                        disconnect()
+                    }
+                }
+            }.getOrNull()
+            if (result != null) return result
+            if (attempt < retries) {
+                try { Thread.sleep(attempt * 1000L) } catch (_: InterruptedException) {}
             }
         }
-    }.getOrNull()
+        return null
+    }
+
+    private fun downloadArtifactWithRetry(urlStr: String, destFile: File, retries: Int = 3): Boolean {
+        val partFile = File(destFile.parentFile, "${destFile.name}.part")
+        for (attempt in 1..retries) {
+            val success = runCatching {
+                val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 60_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Comfort-App-Updater")
+                }
+                conn.run {
+                    try {
+                        val code = responseCode
+                        if (code in 200..299) {
+                            inputStream.use { input ->
+                                partFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            if (partFile.length() > 0) {
+                                destFile.delete()
+                                partFile.renameTo(destFile)
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } finally {
+                        disconnect()
+                    }
+                }
+            }.getOrDefault(false)
+            if (success && destFile.isFile && destFile.length() > 0) return true
+            partFile.delete()
+            if (attempt < retries) {
+                try { Thread.sleep(attempt * 1500L) } catch (_: InterruptedException) {}
+            }
+        }
+        return false
+    }
 
     /** Hits PyPI's own JSON API for the latest published release plus its wheel's direct download
      * URL and sha256 — the same source `pip install --upgrade` itself resolves against. Null on
@@ -153,29 +213,53 @@ object EngineUpdater {
      * yt_dlp/...`) rather than a wheel. `SHA2-256SUMS` (a published checksums file, same shape as
      * `sha256sum`'s own output) is fetched alongside it purely to verify that tarball the same way
      * PyPI's own published digest verifies a stable wheel. */
-    private fun fetchLatestYtDlpNightly(): FetchResult? = runCatching {
+    private fun fetchLatestYtDlpNightly(): FetchResult? {
         val json = httpGetText("https://api.github.com/repos/yt-dlp/yt-dlp-nightly-builds/releases/latest")
-            ?: return@runCatching null
-        val root = JSONObject(json)
-        val version = root.getString("tag_name")
-        val assets = root.getJSONArray("assets")
-        var tarUrl: String? = null
-        var sumsUrl: String? = null
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            when (asset.optString("name")) {
-                "yt-dlp.tar.gz" -> tarUrl = asset.getString("browser_download_url")
-                "SHA2-256SUMS" -> sumsUrl = asset.getString("browser_download_url")
-            }
+        if (json != null) {
+            val parsed = runCatching {
+                val root = JSONObject(json)
+                val version = root.getString("tag_name")
+                val assets = root.getJSONArray("assets")
+                var tarUrl: String? = null
+                var sumsUrl: String? = null
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    when (asset.optString("name")) {
+                        "yt-dlp.tar.gz" -> tarUrl = asset.getString("browser_download_url")
+                        "SHA2-256SUMS" -> sumsUrl = asset.getString("browser_download_url")
+                    }
+                }
+                val artifactUrl = tarUrl ?: return@runCatching null
+                val sha256 = sumsUrl?.let { httpGetText(it) }
+                    ?.lineSequence()
+                    ?.firstOrNull { it.trim().endsWith("yt-dlp.tar.gz") }
+                    ?.trim()?.substringBefore(' ')
+                    ?.takeIf { it.isNotBlank() }
+                FetchResult(version, artifactUrl, ArtifactKind.TAR_GZ_SOURCE, sha256)
+            }.getOrNull()
+            if (parsed != null) return parsed
         }
-        val artifactUrl = tarUrl ?: return@runCatching null
-        val sha256 = sumsUrl?.let { httpGetText(it) }
-            ?.lineSequence()
-            ?.firstOrNull { it.trim().endsWith("yt-dlp.tar.gz") }
-            ?.trim()?.substringBefore(' ')
-            ?.takeIf { it.isNotBlank() }
-        FetchResult(version, artifactUrl, ArtifactKind.TAR_GZ_SOURCE, sha256)
-    }.getOrNull()
+
+        // Web redirect fallback when GitHub API is rate-limited (HTTP 403) or unauthenticated
+        return runCatching {
+            val conn = (URL("https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest").openConnection() as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                connectTimeout = 10_000
+                readTimeout = 15_000
+                setRequestProperty("User-Agent", "Comfort-App-Updater")
+            }
+            val location = try { conn.getHeaderField("Location") } finally { conn.disconnect() } ?: return@runCatching null
+            val tag = location.substringAfterLast("/tag/", "").takeIf { it.isNotBlank() } ?: return@runCatching null
+            val artifactUrl = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/$tag/yt-dlp.tar.gz"
+            val sumsUrl = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/$tag/SHA2-256SUMS"
+            val sha256 = httpGetText(sumsUrl)
+                ?.lineSequence()
+                ?.firstOrNull { it.trim().endsWith("yt-dlp.tar.gz") }
+                ?.trim()?.substringBefore(' ')
+                ?.takeIf { it.isNotBlank() }
+            FetchResult(tag, artifactUrl, ArtifactKind.TAR_GZ_SOURCE, sha256)
+        }.getOrNull()
+    }
 
     /** gallery-dl's closest equivalent to a "bleeding edge" channel — it has no nightly build at
      * all (see this object's own doc comment), so this reads the live HEAD commit of its Master
@@ -204,17 +288,34 @@ object EngineUpdater {
      * zip with no published checksum — but pinned to the exact commit just read rather than the
      * moving "master" ref, so what gets installed is guaranteed to be the version shown. GitHub
      * wraps it as `instaloader-<sha>/instaloader/...`, which [installFromGitZip] already handles. */
-    private fun fetchLatestInstaloaderMaster(): FetchResult? = runCatching {
+    private fun fetchLatestInstaloaderMaster(): FetchResult? {
         val json = httpGetText("https://api.github.com/repos/instaloader/instaloader/branches/master")
-            ?: return@runCatching null
-        val fullSha = JSONObject(json).getJSONObject("commit").getString("sha")
-        FetchResult(
-            "master-${fullSha.take(10)}",
-            "https://github.com/instaloader/instaloader/archive/$fullSha.zip",
-            ArtifactKind.GIT_ZIP_SOURCE,
-            null,
-        )
-    }.getOrNull()
+        if (json != null) {
+            val parsed = runCatching {
+                val fullSha = JSONObject(json).getJSONObject("commit").getString("sha")
+                FetchResult(
+                    "master-${fullSha.take(10)}",
+                    "https://github.com/instaloader/instaloader/archive/$fullSha.zip",
+                    ArtifactKind.GIT_ZIP_SOURCE,
+                    null,
+                )
+            }.getOrNull()
+            if (parsed != null) return parsed
+        }
+
+        // Atom feed fallback when GitHub API is rate-limited
+        return runCatching {
+            val atom = httpGetText("https://github.com/instaloader/instaloader/commits/master.atom") ?: return@runCatching null
+            val match = Regex("""Commit/([0-9a-fA-F]{40})""").find(atom)
+            val fullSha = match?.groupValues?.get(1) ?: return@runCatching null
+            FetchResult(
+                "master-${fullSha.take(10)}",
+                "https://github.com/instaloader/instaloader/archive/$fullSha.zip",
+                ArtifactKind.GIT_ZIP_SOURCE,
+                null,
+            )
+        }.getOrNull()
+    }
 
     private fun channelFor(context: Context, engine: EngineInfo): EngineUpdateChannel = when (engine) {
         YT_DLP -> GalleryDlPreferences.getYtDlpUpdateChannel(context)
@@ -262,21 +363,35 @@ object EngineUpdater {
     private suspend fun checkAndAutoUpdateLocked(context: Context, onUpdated: (VersionStatus, String) -> Unit): List<VersionStatus> = withContext(Dispatchers.IO) {
         PythonRuntime.ensureProvisioned(context)
         var statuses = checkAll(context)
+        var deferredDueToRunning = false
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
             statuses = statuses.map { status ->
-                // A turned-off engine never runs, so it isn't worth the data to keep updated.
                 if (status.updateAvailable && status.artifactUrl != null && isOn(context, status.engine)) {
-                    update(context, status).getOrNull()?.let { newVersion ->
-                        onUpdated(status, newVersion)
-                        status.copy(installedVersion = newVersion)
-                    } ?: status
+                    val isRunning = AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()
+                    if (isRunning) {
+                        deferredDueToRunning = true
+                        status
+                    } else {
+                        val res = update(context, status)
+                        res.getOrNull()?.let { newVersion ->
+                            onUpdated(status, newVersion)
+                            status.copy(installedVersion = newVersion)
+                        } ?: run {
+                            if (res.exceptionOrNull()?.message?.contains("download running", ignoreCase = true) == true) {
+                                deferredDueToRunning = true
+                            }
+                            status
+                        }
+                    }
                 } else {
                     status
                 }
             }
         }
         GalleryDlPreferences.setEngineUpdateAvailable(context, statuses.any { it.updateAvailable && isOn(context, it.engine) })
-        GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+        if (!deferredDueToRunning) {
+            GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
+        }
         statuses
     }
 
@@ -325,19 +440,11 @@ object EngineUpdater {
                 if (!PythonRuntime.ensureProvisioned(context)) error("Python runtime isn't provisioned yet")
 
                 val tempFile = File(context.cacheDir, "${engine.packageDirName}_update.download")
-                (URL(artifactUrl).openConnection() as HttpURLConnection).run {
-                    connectTimeout = 10_000
-                    readTimeout = 30_000
-                    try {
-                        inputStream.use { input -> tempFile.outputStream().use { output -> input.copyTo(output) } }
-                    } finally {
-                        disconnect()
-                    }
+                if (!downloadArtifactWithRetry(artifactUrl, tempFile)) {
+                    error("Failed to download update for ${engine.displayName}")
                 }
 
-                // The nightly's tarball has a published checksum (SHA2-256SUMS); when it couldn't
-                // be read, it's refused rather than installed unchecked. (gallery-dl's and
-                // Instaloader's Master zips have none to check against — HTTPS only, by design.)
+                // Verify checksum if available
                 if (artifactKind == ArtifactKind.TAR_GZ_SOURCE && status.sha256.isNullOrBlank()) {
                     tempFile.delete()
                     error(context.getString(com.comfort.app.R.string.engine_update_no_checksum))
@@ -350,14 +457,7 @@ object EngineUpdater {
                     }
                 }
 
-                // Unpacked next to site-packages first, then swapped in. Unpacking straight into
-                // site-packages after deleting the old version left the engine half-installed for as
-                // long as that took (~1 min for gallery-dl's master zip, seen on device), and broken
-                // for good if it failed part-way (corrupt download, full storage). Now the old
-                // version stays in place until the new one is complete and checked, and the swap
-                // itself is a few same-filesystem renames.
                 val sitePackages = PythonRuntime.sitePackagesDir(context)
-                // Left behind only if the app was killed mid-install; no other install runs now.
                 sitePackages.parentFile?.listFiles { f -> f.name.startsWith(".update-") }?.forEach { it.deleteRecursively() }
                 val staging = File(sitePackages.parentFile, ".update-${engine.packageDirName}-${System.nanoTime()}").apply {
                     deleteRecursively()
@@ -372,30 +472,67 @@ object EngineUpdater {
                     if (artifactKind != ArtifactKind.WHEEL) {
                         File(staging, "${engine.packageDirName}-$version.dist-info").mkdirs()
                     }
-                    if (!File(staging, "${engine.packageDirName}/__init__.py").isFile) {
+                    val pkgDir = File(staging, engine.packageDirName)
+                    if (!File(pkgDir, "__init__.py").isFile) {
                         error(context.getString(com.comfort.app.R.string.engine_update_missing_package, engine.displayName))
                     }
 
-                    // Shares PythonRuntime's provisioning Mutex, so the swap can't race a concurrent
-                    // ensureProvisioned() (a first-ever provision, or a job starting right now).
+                    // Precompile and syntax-check on staging first: if the downloaded package has
+                    // syntax errors or is corrupt, fail here before touching the working installation.
+                    val precompiled = PythonRuntime.precompile(context, pkgDir)
+                    if (!precompiled) {
+                        error("Precompilation failed for ${engine.displayName} update")
+                    }
+
+                    // Atomic swap with automatic rollback protection
                     PythonRuntime.withProvisionLock {
-                        // Checked again here, right before the swap: the check above came before the
-                        // artifact's download (up to a minute for gallery-dl's zip), and a queued
-                        // download that got its slot meanwhile would lose its engine mid-run.
                         if (AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()) {
                             error(context.getString(com.comfort.app.R.string.engine_update_download_running))
                         }
-                        // The old install goes entirely: a file the previous version shipped that the
-                        // new one doesn't (a removed submodule) would otherwise linger forever.
-                        sitePackages.listFiles { f ->
+
+                        val backupDir = File(sitePackages.parentFile, ".backup-${engine.packageDirName}-${System.nanoTime()}").apply {
+                            deleteRecursively()
+                            mkdirs()
+                        }
+
+                        val currentFiles = sitePackages.listFiles { f ->
                             f.name == engine.packageDirName || (f.name.startsWith("${engine.packageDirName}-") && f.name.endsWith(".dist-info"))
-                        }?.forEach { it.deleteRecursively() }
-                        staging.listFiles()?.forEach { entry ->
-                            val target = File(sitePackages, entry.name)
-                            // A wheel's "<pkg>-<version>.data" can collide with the old version's.
-                            if (target.exists()) target.deleteRecursively()
-                            if (!entry.renameTo(target)) {
-                                entry.copyRecursively(target, overwrite = true)
+                        }.orEmpty()
+
+                        // Move existing working version to backupDir instead of deleting upfront
+                        for (file in currentFiles) {
+                            val backupTarget = File(backupDir, file.name)
+                            if (!file.renameTo(backupTarget)) {
+                                if (file.copyRecursively(backupTarget, overwrite = true)) {
+                                    file.deleteRecursively()
+                                }
+                            }
+                        }
+
+                        var swapSuccess = false
+                        try {
+                            staging.listFiles()?.forEach { entry ->
+                                val target = File(sitePackages, entry.name)
+                                if (target.exists()) target.deleteRecursively()
+                                if (!entry.renameTo(target)) {
+                                    entry.copyRecursively(target, overwrite = true)
+                                }
+                            }
+                            if (File(sitePackages, "${engine.packageDirName}/__init__.py").isFile) {
+                                swapSuccess = true
+                            }
+                        } finally {
+                            if (!swapSuccess) {
+                                // Rollback: restore backup
+                                File(sitePackages, engine.packageDirName).deleteRecursively()
+                                backupDir.listFiles()?.forEach { entry ->
+                                    val target = File(sitePackages, entry.name)
+                                    if (!entry.renameTo(target)) {
+                                        entry.copyRecursively(target, overwrite = true)
+                                    }
+                                }
+                            } else {
+                                backupDir.deleteRecursively()
                             }
                         }
                     }

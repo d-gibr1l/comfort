@@ -46,6 +46,7 @@ class ComfortApp : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             removeStaleShortcuts()
             runCatching { com.comfort.app.util.GalleryDlListing.sweepStaleCache(this@ComfortApp) }
+            runCatching { com.comfort.app.worker.EngineUpdateWorker.schedule(this@ComfortApp) }
         }
         val organize = !GalleryDlPreferences.isSavedFilesOrganized(this)
         val rename = !GalleryDlPreferences.isOldNamesTidied(this)

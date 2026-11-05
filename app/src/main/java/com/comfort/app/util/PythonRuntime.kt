@@ -121,6 +121,7 @@ object PythonRuntime {
                 refreshRuntimeKeepingEngines(context, root, zipSo)
             }
             copyScriptsIfStale(context, root)
+            recoverStaleEngineBackups(context)
             return@withLock true
         }
 
@@ -160,6 +161,23 @@ object PythonRuntime {
         GalleryDlPreferences.setEngineUpdateLastCheckMs(context, 0L)
         android.util.Log.i("PythonRuntime", "provisioned $PROVISION_VERSION in ${System.currentTimeMillis() - provisionStarted}ms")
         true
+    }
+
+    internal fun recoverStaleEngineBackups(context: Context) {
+        val sitePackages = sitePackagesDir(context)
+        val parent = sitePackages.parentFile ?: return
+        parent.listFiles { f -> f.isDirectory && f.name.startsWith(".backup-") }?.forEach { backupDir ->
+            val engineName = backupDir.name.removePrefix(".backup-").substringBeforeLast('-')
+            val currentEngine = File(sitePackages, engineName)
+            if (!File(currentEngine, "__init__.py").isFile) {
+                backupDir.listFiles()?.forEach { file ->
+                    val target = File(sitePackages, file.name)
+                    if (!file.renameTo(target)) file.copyRecursively(target, overwrite = true)
+                }
+            }
+            backupDir.deleteRecursively()
+        }
+        parent.listFiles { f -> f.isDirectory && f.name.startsWith(".update-") }?.forEach { it.deleteRecursively() }
     }
 
     private fun keptEnginesDir(context: Context) = File(context.noBackupFilesDir, "python_engines_kept")

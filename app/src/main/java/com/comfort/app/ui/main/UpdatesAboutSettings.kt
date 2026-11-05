@@ -926,6 +926,7 @@ private fun EnginesSection() {
             onCheckedChange = {
                 autoUpdate = it
                 GalleryDlPreferences.setAutoUpdateEnginesEnabled(context, it)
+                if (it) com.comfort.app.worker.EngineUpdateWorker.schedule(context) else com.comfort.app.worker.EngineUpdateWorker.cancel(context)
             },
         )
         Spacer(Modifier.height(16.dp))
