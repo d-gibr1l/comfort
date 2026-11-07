@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Standalone custom download logo splash entrance: smooth 380ms scale-up and fade-in -->
+<!-- Standalone custom download logo: Option 1 (Arrow Drop & Cradle) over 380ms -->
 <animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/ic_splash_logo">
     <target
+        android:name="path_tray"
+        android:animation="@animator/splash_tray_alpha" />
+    <target
+        android:name="group_tray"
+        android:animation="@animator/splash_tray_scale" />
+    <target
         android:name="path_arrow"
-        android:animation="@animator/splash_arrow_anim" />
+        android:animation="@animator/splash_arrow_alpha" />
+    <target
+        android:name="group_arrow"
+        android:animation="@animator/splash_arrow_drop" />
 </animated-vector>

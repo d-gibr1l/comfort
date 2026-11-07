@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Downward drop with spring recoil overshoot over 380ms -->
+<set xmlns:android="http://schemas.android.com/apk/res/android">
+    <objectAnimator
+        android:propertyName="translateY"
+        android:valueFrom="-32"
+        android:valueTo="0"
+        android:valueType="floatType"
+        android:startOffset="0"
+        android:duration="380"
+        android:interpolator="@interpolator/splash_drop_overshoot" />
+    <objectAnimator
+        android:propertyName="scaleX"
+        android:valueFrom="0.9"
+        android:valueTo="1"
+        android:valueType="floatType"
+        android:startOffset="0"
+        android:duration="380"
+        android:interpolator="@interpolator/splash_ease" />
+    <objectAnimator
+        android:propertyName="scaleY"
+        android:valueFrom="0.9"
+        android:valueTo="1"
+        android:valueType="floatType"
+        android:startOffset="0"
+        android:duration="380"
+        android:interpolator="@interpolator/splash_ease" />
+</set>
