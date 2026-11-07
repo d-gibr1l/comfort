@@ -366,6 +366,8 @@ fun DownloadsHistoryScreen(
     // user deleted from their gallery outside the app.
     LaunchedEffect(isVisible) {
         if (isVisible) {
+            // Allow the page entrance animation (push / swipe) to completely finish before scanning MediaStore
+            delay(600)
             viewModel.scanForDeletedMedia()
         } else {
             // Back to the top only when the list itself is about to change (a filter, search or
@@ -639,7 +641,7 @@ fun DownloadsHistoryScreen(
                         onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                         onRedownload = { viewModel.redownloadDeleted(item.id) },
                         onDownloadMissing = { viewModel.retryDownload(item.id) },
-                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = null),
                     )
                 }
             }

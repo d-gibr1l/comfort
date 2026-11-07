@@ -5,23 +5,23 @@
         android:valueFrom="0"
         android:valueTo="1"
         android:valueType="floatType"
-        android:startOffset="320"
-        android:duration="360"
+        android:startOffset="0"
+        android:duration="380"
         android:interpolator="@interpolator/splash_ease" />
     <objectAnimator
         android:propertyName="scaleX"
-        android:valueFrom="0.82"
+        android:valueFrom="0.75"
         android:valueTo="1"
         android:valueType="floatType"
-        android:startOffset="320"
-        android:duration="360"
+        android:startOffset="0"
+        android:duration="380"
         android:interpolator="@interpolator/splash_ease" />
     <objectAnimator
         android:propertyName="scaleY"
-        android:valueFrom="0.82"
+        android:valueFrom="0.75"
         android:valueTo="1"
         android:valueType="floatType"
-        android:startOffset="320"
-        android:duration="360"
+        android:startOffset="0"
+        android:duration="380"
         android:interpolator="@interpolator/splash_ease" />
 </set>

@@ -1344,10 +1344,13 @@ class DownloadWorker(
                     applicationContext.resources.getQuantityString(R.plurals.items_couldnt_be_downloaded, missingItems, missingItems, outOf)
                 } else null
                 DownloadLog.line(applicationContext, downloadId, "finished: ${savedCount.get()} saved" + (incompleteMessage?.let { ", $it" } ?: ""))
-                val finalThumbnail = dao.getById(downloadId)?.thumbnailPath
+                val finishedEntity = dao.getById(downloadId)
+                val finalThumbnail = finishedEntity?.thumbnailPath
+                val finalMediaUri = finishedEntity?.mediaUri ?: finalThumbnail
                 DownloadNotifications.notifyFinished(
                     applicationContext, downloadId, liveTitle.get(), savedCount.get(), finalThumbnail, missingItems,
                     notes = synchronized(extraNotes) { extraNotes.toList() },
+                    mediaUri = finalMediaUri,
                 )
                 if (entity?.incognito == true) {
                     // Imported from YTDLnis's own Incognito setting (see

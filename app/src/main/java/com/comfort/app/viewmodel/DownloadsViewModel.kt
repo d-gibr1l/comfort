@@ -4,6 +4,8 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.transform
 
 import android.app.Application
+import android.net.Uri
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.comfort.app.data.AppDatabase
@@ -44,15 +46,15 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     // Progress lines only arrive about once a second anyway.
     private val rawHistoryFlow: StateFlow<List<DownloadEntity>> = dao.getHistoryFlow()
         .throttleLatest(LIST_UPDATE_MS)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val rawDeletedFlow: StateFlow<List<DownloadEntity>> = dao.getDeletedFlow()
         .throttleLatest(LIST_UPDATE_MS) // a deleted-files scan or bulk delete is a burst too
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val rawQueueFlow: StateFlow<List<DownloadEntity>> = dao.getQueueFlow()
         .throttleLatest(LIST_UPDATE_MS)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Optimistic-hide set shared by every screen's undoable delete (see hideForDeletion() below)
     // — an id sits here for the window between the user tapping delete and either the Undo
@@ -65,7 +67,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     val historyFlow: StateFlow<List<DownloadEntity>> = combine(rawHistoryFlow, _deletingIds) { history, deleting ->
         if (deleting.isEmpty()) history else history.filterNot { it.id in deleting }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Each Library item's shape and length (MediaShapes), by download id — what the grid sizes
      * its tiles and duration badges from. Read from MediaStore off the main thread; an audio
@@ -82,6 +84,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             withContext(Dispatchers.IO) {
                 val currentIds = items.map { it.id }.toSet()
                 shapeCache.keys.retainAll(currentIds)
+                val uncached = items.filter { !shapeCache.containsKey(it.id) }
+                if (uncached.isNotEmpty()) {
+                    val urisToWarm = uncached.flatMap { listOfNotNull(it.thumbnailPath, it.mediaUri) }
+                    MediaShapes.warm(getApplication(), urisToWarm)
+                }
                 items.mapNotNull { item ->
                     val cached = shapeCache[item.id]
                     if (cached != null) return@mapNotNull item.id to cached
@@ -93,11 +100,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 }.toMap()
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val deletedFlow: StateFlow<List<DownloadEntity>> = combine(rawDeletedFlow, _deletingIds) { deleted, deleting ->
         if (deleting.isEmpty()) deleted else deleted.filterNot { it.id in deleting }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // What a bulk action looks like from the moment it's tapped. Even in one pass, Retry All on 100
     // downloads takes WorkManager a moment, and the Queue used to show it as it happened: cards
@@ -114,7 +121,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds, _pendingMoves, liveProgress) { queue, deleting, pending, live ->
         queueRows(queue, deleting, pending, live)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
         // Ends each pending move once its row has left the status it was made from. Only watches
@@ -188,18 +195,18 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Drives the "ongoing download" badge on the Library tab and the Queue icon. */
     val hasActiveDownloads: StateFlow<Boolean> = queueFlow
         .map { list -> list.any { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val activeDownloadsCount: StateFlow<Int> = queueFlow
         .map { list -> list.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     /** Library's own "Duplicates" filter — see DuplicateAttempt's doc comment for what these
      * actually are (a link that "Prevent duplicate downloads" recognized as already queued/
      * running/finished, so nothing was actually re-downloaded). */
     val duplicateAttemptsFlow: StateFlow<List<com.comfort.app.data.DuplicateAttempt>> = dao.getDuplicateAttemptsFlow()
         .throttleLatest(LIST_UPDATE_MS) // a deleted-files scan or bulk delete is a burst too
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** The "Redownload" action on a Duplicates entry — same forceDuplicate escape hatch the share
      * sheet's own Snackbar action uses, then clears this specific log entry since it's been acted
@@ -523,15 +530,52 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 val candidates = dao.getHistoryWithThumbnailOnce()
                 val deleted = dao.getDeletedOnce()
                 withContext(Dispatchers.IO) {
+                    val allUris = (candidates + deleted).mapNotNull { it.mediaUri ?: it.thumbnailPath }
+                    val mediaStoreIds = allUris.mapNotNull { uriStr ->
+                        val uri = runCatching { Uri.parse(uriStr) }.getOrNull()
+                        if (uri?.authority == MediaStore.AUTHORITY) uri.lastPathSegment?.toLongOrNull() else null
+                    }.distinct()
+
+                    val existingIds = mutableSetOf<Long>()
+                    mediaStoreIds.chunked(500).forEach { ids ->
+                        runCatching {
+                            context.contentResolver.query(
+                                MediaStore.Files.getContentUri("external"),
+                                arrayOf(MediaStore.MediaColumns._ID),
+                                "${MediaStore.MediaColumns._ID} IN (${ids.joinToString(",")})",
+                                null,
+                                null,
+                            )?.use { c ->
+                                while (c.moveToNext()) {
+                                    existingIds.add(c.getLong(0))
+                                }
+                            }
+                        }
+                    }
+
                     candidates.forEach { entity ->
-                        val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
-                        if (!MediaStoreHelper.exists(context, uri)) {
+                        val uriStr = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
+                        val uri = runCatching { Uri.parse(uriStr) }.getOrNull()
+                        val exists = if (uri?.authority == MediaStore.AUTHORITY) {
+                            val id = uri.lastPathSegment?.toLongOrNull()
+                            id != null && id in existingIds
+                        } else {
+                            MediaStoreHelper.exists(context, uriStr)
+                        }
+                        if (!exists) {
                             dao.updateStatus(entity.id, DownloadStatus.DELETED)
                         }
                     }
                     deleted.forEach { entity ->
-                        val uri = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
-                        if (uri.startsWith("content://media/") && MediaStoreHelper.exists(context, uri, failOpen = false)) {
+                        val uriStr = entity.mediaUri ?: entity.thumbnailPath ?: return@forEach
+                        val uri = runCatching { Uri.parse(uriStr) }.getOrNull()
+                        val exists = if (uri?.authority == MediaStore.AUTHORITY) {
+                            val id = uri.lastPathSegment?.toLongOrNull()
+                            id != null && id in existingIds
+                        } else {
+                            MediaStoreHelper.exists(context, uriStr, failOpen = false)
+                        }
+                        if (exists) {
                             dao.updateStatus(entity.id, DownloadStatus.FINISHED)
                         }
                     }

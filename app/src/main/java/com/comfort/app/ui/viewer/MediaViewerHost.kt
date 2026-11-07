@@ -78,7 +78,10 @@ fun MediaViewerHost(
     val scope = rememberCoroutineScope()
     // Live, so a favourite or a delete (and its Undo) shows here at once.
     val history by viewModel.historyFlow.collectAsStateWithLifecycle()
-    val live = remember(history) { history.associateBy { it.id } }
+    val live = remember(history, request.downloads) {
+        if (history.isEmpty()) request.downloads.associateBy { it.id }
+        else history.associateBy { it.id }
+    }
     // Everything at once when that's quick (~70 ms for a 100-item Library): the tapped item's
     // thumbnail shows meanwhile (below). Opening on the tapped download alone and adding the rest
     // after shifted the page for a frame as they arrived (a flicker), so that's only the fallback

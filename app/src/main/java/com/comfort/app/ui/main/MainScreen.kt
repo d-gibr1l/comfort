@@ -157,9 +157,17 @@ fun ConstrainedWidth(modifier: Modifier = Modifier, content: @Composable () -> U
 /** A launcher shortcut to act on ([action], MainActivity.SHORTCUT_*); [seq] makes a repeat a new value. */
 data class ShortcutRequest(val action: String, val seq: Int)
 
+/** A notification or intent request to open a downloaded item in Comfort; [seq] makes repeats re-trigger. */
+data class OpenDownloadRequest(val downloadId: String, val seq: Int)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int = 0, shortcut: ShortcutRequest? = null) {
+fun MainScreen(
+    viewModel: DownloadsViewModel = viewModel(),
+    openQueueSignal: Int = 0,
+    shortcut: ShortcutRequest? = null,
+    openDownload: OpenDownloadRequest? = null,
+) {
     var selectedTab by remember { mutableStateOf(0) }
     var showQueueScreen by remember { mutableStateOf(false) }
     // The app's one snackbar host and its rules (AppSnackbars), with this screen's scope so a
@@ -199,7 +207,10 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // Engine and app update checks, once per launch and rate-limited — see UpdatesViewModel.
     val updates = updatesViewModel()
     val anyUpdateAvailable by updates.anyUpdateAvailable.collectAsState()
-    LaunchedEffect(Unit) { updates.runLaunchChecks() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(3_000)
+        updates.runLaunchChecks()
+    }
     // "Delete from phone" on gallery files Android won't let the app delete on its own (made
     // before a reinstall, say): the system's own dialog asks the user (DownloadsViewModel.deleteConsent).
     val deleteConsentLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -259,24 +270,20 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // to build; otherwise enterTab builds it the frame before its slide (measured on the
     // benchmark build: a ~75ms frame inside the slide without either).
     var keepSettings by remember { mutableStateOf(false) }
+    val shouldKeepLibrary = activeDownloadsCount == 0
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(2_000)
+        kotlinx.coroutines.delay(4_000)
         keepSettings = true
     }
-    // A tab that isn't kept composed (Library) is built first, hidden, and only then slides in:
-    // built inside the push it cost the animation its first frames (the page's ~35-50ms
-    // composition landed in them — the lag opening Library). Now that cost is one frame before
-    // the slide starts, and the slide itself only has to draw a page that's already there.
-    var preparingTab by remember { mutableStateOf<Int?>(null) }
-    val keepLibrary = keepSettings && activeDownloadsCount == 0
     // The Library's scroll position, held here: the Library itself is rebuilt each visit while
     // something's downloading (above), and its place in the list went with it.
     val libraryListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val libraryGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    var preparingTab by remember { mutableStateOf<Int?>(null) }
     val tabScope = rememberCoroutineScope()
     fun enterTab(index: Int, enter: () -> Unit) {
         if (preparingTab != null) return
-        if ((index == 2 && keepSettings) || (index == 1 && keepLibrary)) { enter(); return }
+        if ((index == 2 && keepSettings) || (index == 1 && shouldKeepLibrary)) { enter(); return }
         preparingTab = index
         tabScope.launch {
             // The next frame composes and measures it (hidden); the one after starts the slide.
@@ -358,6 +365,46 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
     // The media viewer (Photon Gallery's, ui/viewer), opened from a Library item over everything.
     var mediaViewer by remember { mutableStateOf<com.comfort.app.ui.viewer.MediaViewerRequest?>(null) }
     val showMiniPlayer = music.song != null && !showNowPlaying && mediaViewer == null
+
+    // Completed download notification tap or "Open" action button: open in Comfort.
+    LaunchedEffect(openDownload) {
+        val request = openDownload ?: return@LaunchedEffect
+        val targetId = request.downloadId
+        showQueueScreen = false
+
+        val history = viewModel.historyFlow.value
+        val entity = history.firstOrNull { it.id == targetId }
+            ?: kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.comfort.app.data.AppDatabase.getDatabase(context).downloadDao().getById(targetId)
+            }
+
+        if (entity != null) {
+            selectedTab = 1
+            if (entity.isAudio) {
+                mediaViewer = null
+                val audioList = if (history.any { it.id == entity.id }) {
+                    history.filter { it.isAudio }
+                } else {
+                    listOf(entity)
+                }
+                com.comfort.app.music.MusicPlayer.play(context, audioList, entity.id)
+                showNowPlaying = true
+            } else {
+                showNowPlaying = false
+                val viewableList = if (history.any { it.id == entity.id }) {
+                    history.filter { !it.isAudio }
+                } else {
+                    listOf(entity)
+                }
+                mediaViewer = com.comfort.app.ui.viewer.MediaViewerRequest(
+                    downloads = viewableList,
+                    startId = entity.id,
+                )
+            }
+        } else {
+            selectedTab = 1
+        }
+    }
     CompositionLocalProvider(
         LocalUseNavRail provides useNavRail,
         LocalAppSnackbars provides appSnackbars,
@@ -433,7 +480,7 @@ fun MainScreen(viewModel: DownloadsViewModel = viewModel(), openQueueSignal: Int
         val shownTabs = listOfNotNull(outgoingTab, selectedTab.takeIf { it != 0 }).distinct()
         // The page a swipe is bringing in is built as the swipe starts, if it wasn't already.
         val keptTabs = (
-            shownTabs + listOfNotNull(2.takeIf { keepSettings }, 1.takeIf { keepLibrary }, preparingTab, pageSwipe.neighbor?.takeIf { it != 0 })
+            shownTabs + listOfNotNull(2.takeIf { keepSettings }, 1.takeIf { shouldKeepLibrary }, preparingTab, pageSwipe.neighbor?.takeIf { it != 0 })
         ).distinct()
         val pageColor = MaterialTheme.colorScheme.background
         for (tab in keptTabs) key(tab) {

@@ -109,14 +109,8 @@ class BackRevealState internal constructor(
                 behindAlpha.snapTo(if (behindVisible) 1f else 0f)
                 shadow.snapTo(0f)
                 change()
-                // The new page's first frame is a long one (it's composed from scratch — Settings
-                // took ~70ms on-device), and an animation started now would spend its first
-                // ~150ms of 200 inside it: recorded live, the page jumped in over ~3 frames. So
-                // wait out that frame, and start the clock on the first normal one after it. The
-                // page sits at the start values (invisible, to the right) meanwhile.
                 withFrameNanos { }
-                withFrameNanos { }
-                val spec = tween<Float>(ENTER_MS, easing = ACCELERATE_DECELERATE)
+                val spec = tween<Float>(ENTER_MS, easing = DECELERATE)
                 coroutineScope {
                     launch { frontX.animateTo(0f, spec) }
                     launch { frontAlpha.animateTo(1f, spec) }

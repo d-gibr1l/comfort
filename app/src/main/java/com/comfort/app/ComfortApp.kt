@@ -44,6 +44,7 @@ class ComfortApp : Application() {
         // downloads and shares alone. The shortcut clean-up too, but off the main thread: it's
         // binder calls to the system's ShortcutManager, before the first frame on a cold start.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            kotlinx.coroutines.delay(3_000)
             removeStaleShortcuts()
             runCatching { com.comfort.app.util.GalleryDlListing.sweepStaleCache(this@ComfortApp) }
             runCatching { com.comfort.app.worker.EngineUpdateWorker.schedule(this@ComfortApp) }

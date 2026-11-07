@@ -2,6 +2,7 @@ package com.comfort.app.util
 
 import android.content.Context
 import android.net.Uri
+import android.provider.MediaStore
 
 /** A saved file's shape and length, for the Library: [aspect] is width/height as displayed
  * (rotation applied), [shortSide] the smaller dimension in pixels (a video's "720p"/"1080p",
@@ -13,13 +14,81 @@ data class MediaShape(val aspect: Float, val durationMs: Long?, val shortSide: I
  * has to be decoded or stored in the app's own database. */
 object MediaShapes {
     private val cache = java.util.concurrent.ConcurrentHashMap<String, MediaShape>()
+    private val NOT_FOUND = MediaShape(-1f, null, null)
 
     /** Null when [uri] isn't a readable MediaStore row (a remote thumbnail, a deleted file). Cached
      * per URI: a saved file never changes shape. Blocking — call off the main thread. */
     fun of(context: Context, uri: String): MediaShape? {
-        cache[uri]?.let { return it }
+        val cached = cache[uri]
+        if (cached != null) return if (cached === NOT_FOUND) null else cached
         if (!uri.startsWith("content://")) return null
-        return query(context, Uri.parse(uri))?.also { cache[uri] = it }
+        val shape = query(context, Uri.parse(uri))
+        cache[uri] = shape ?: NOT_FOUND
+        return shape
+    }
+
+    /** Pre-fetches and caches [MediaShape]s for multiple URIs in a single batch MediaStore query,
+     * avoiding hundreds of individual ContentResolver queries. */
+    fun warm(context: Context, uris: Collection<String>) {
+        val uncached = uris.filter { it.startsWith("content://") && !cache.containsKey(it) }
+        if (uncached.isEmpty()) return
+
+        val byId = mutableMapOf<Long, MutableList<String>>()
+        for (uriStr in uncached) {
+            val uri = runCatching { Uri.parse(uriStr) }.getOrNull()
+            if (uri?.authority == MediaStore.AUTHORITY) {
+                uri.lastPathSegment?.toLongOrNull()?.let { id ->
+                    byId.getOrPut(id) { mutableListOf() }.add(uriStr)
+                }
+            }
+        }
+        if (byId.isEmpty()) return
+
+        val projections = listOf(
+            arrayOf(MediaStore.MediaColumns._ID, "width", "height", "orientation", "duration"),
+            arrayOf(MediaStore.MediaColumns._ID, "width", "height", "duration"),
+            arrayOf(MediaStore.MediaColumns._ID, "width", "height"),
+        )
+
+        byId.keys.chunked(500).forEach { ids ->
+            for (projection in projections) {
+                val success = runCatching {
+                    context.contentResolver.query(
+                        MediaStore.Files.getContentUri("external"),
+                        projection,
+                        "${MediaStore.MediaColumns._ID} IN (${ids.joinToString(",")})",
+                        null,
+                        null,
+                    )?.use { c ->
+                        val idIdx = c.getColumnIndex(MediaStore.MediaColumns._ID)
+                        val wIdx = c.getColumnIndex("width")
+                        val hIdx = c.getColumnIndex("height")
+                        val oIdx = c.getColumnIndex("orientation")
+                        val dIdx = c.getColumnIndex("duration")
+
+                        while (c.moveToNext()) {
+                            val id = if (idIdx >= 0) c.getLong(idIdx) else continue
+                            var w = if (wIdx >= 0 && !c.isNull(wIdx)) c.getLong(wIdx) else 0L
+                            var h = if (hIdx >= 0 && !c.isNull(hIdx)) c.getLong(hIdx) else 0L
+                            val orient = if (oIdx >= 0 && !c.isNull(oIdx)) c.getLong(oIdx) else 0L
+                            if (orient % 180L == 90L) w = h.also { h = w }
+                            val dur = if (dIdx >= 0 && !c.isNull(dIdx)) c.getLong(dIdx).takeIf { it > 0 } else null
+
+                            val shape = MediaShape(
+                                aspect = if (w > 0 && h > 0) w.toFloat() / h else 1f,
+                                durationMs = dur,
+                                shortSide = minOf(w, h).takeIf { it > 0 }?.toInt(),
+                            )
+                            byId[id]?.forEach { uriStr ->
+                                cache[uriStr] = shape
+                            }
+                        }
+                    }
+                    true
+                }.getOrDefault(false)
+                if (success) break
+            }
+        }
     }
 
     private fun query(context: Context, uri: Uri): MediaShape? {

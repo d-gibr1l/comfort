@@ -17,7 +17,7 @@
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/avd_splash_logo</item>
-        <item name="windowSplashScreenAnimationDuration">700</item>
+        <item name="windowSplashScreenAnimationDuration">380</item>
         <item name="postSplashScreenTheme">@style/Theme.GalleryDL</item>
         <!-- Without this, the system picks icon vs. icon-less (solid color) splash from who first
              launched the activity record — so reopening from Recents after the process was killed

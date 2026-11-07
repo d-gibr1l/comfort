@@ -51,10 +51,16 @@ class MainActivity : ComponentActivity() {
     const val SHORTCUT_SEARCH_LIBRARY = "com.comfort.app.action.SEARCH_LIBRARY"
     // The music notification's tap (music/MusicService): opens Now Playing.
     const val ACTION_OPEN_NOW_PLAYING = "com.comfort.app.action.OPEN_NOW_PLAYING"
+    // Tapping a completed download notification or its "Open" action: opens inside Comfort.
+    const val ACTION_OPEN_DOWNLOAD = "com.comfort.app.action.OPEN_DOWNLOAD"
+    const val EXTRA_OPEN_DOWNLOAD_ID = "open_download_id"
   }
 
   /** The last shortcut used, with a count so using the same one twice still acts. */
   private val shortcut = mutableStateOf<com.comfort.app.ui.main.ShortcutRequest?>(null)
+
+  /** Open download in Comfort request (from completed download notification). */
+  private val openDownloadRequest = mutableStateOf<com.comfort.app.ui.main.OpenDownloadRequest?>(null)
 
   // A plain Compose State field (not `remember`ed — this Activity, not a composable, owns it) so
   // onNewIntent below can bump it from outside composition and still have setContent's read of it
@@ -71,8 +77,18 @@ class MainActivity : ComponentActivity() {
     if (intent.getBooleanExtra(EXTRA_OPEN_QUEUE, false)) {
       openQueueSignal.intValue++
     }
+    val targetDownloadId = intent.getStringExtra(EXTRA_OPEN_DOWNLOAD_ID)
+    if (!targetDownloadId.isNullOrBlank()) {
+      openDownloadRequest.value = com.comfort.app.ui.main.OpenDownloadRequest(
+        targetDownloadId,
+        (openDownloadRequest.value?.seq ?: 0) + 1,
+      )
+      intent.removeExtra(EXTRA_OPEN_DOWNLOAD_ID)
+    }
     val action = intent.action
-    if (action in setOf(SHORTCUT_PASTE_DOWNLOAD, SHORTCUT_OPEN_LIBRARY, SHORTCUT_OPEN_QUEUE, SHORTCUT_SEARCH_LIBRARY, ACTION_OPEN_NOW_PLAYING)) {
+    if (action == ACTION_OPEN_DOWNLOAD) {
+      intent.action = Intent.ACTION_MAIN
+    } else if (action in setOf(SHORTCUT_PASTE_DOWNLOAD, SHORTCUT_OPEN_LIBRARY, SHORTCUT_OPEN_QUEUE, SHORTCUT_SEARCH_LIBRARY, ACTION_OPEN_NOW_PLAYING)) {
       shortcut.value = com.comfort.app.ui.main.ShortcutRequest(action!!, (shortcut.value?.seq ?: 0) + 1)
       // Handled: a later recreation mustn't act on it again.
       intent.action = Intent.ACTION_MAIN
@@ -110,27 +126,18 @@ class MainActivity : ComponentActivity() {
     // reaching onNewIntent, which only fires for an already-running singleTask instance.
     consumeOpenQueueExtra(intent)
 
-    // The splash is released as soon as the first frame is ready. The logo's staggered entrance
-    // (COM/FOR/arrow, 680ms — windowSplashScreenAnimationDuration says 700) used to be protected
-    // by a fixed 700ms hold counted from here, but Android starts that animation when the app is
-    // tapped, before this runs — so the splash then sat still after the animation for however long
-    // the process took to start. Now, on Android 12+, it waits only for whatever of the animation
-    // is actually left (measured from when the system really started it), then fades out.
-    // Android 7-11 can't animate the icon at all (core-splashscreen shows it static there), so
-    // there's nothing to wait for: the logo shows only while the app is really starting.
+    // The splash is released after its 380ms logo animation finishes, then smoothly zooms and dissolves into the app.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       splashScreen.setOnExitAnimationListener { provider ->
-        val animationEnd = provider.iconAnimationStartMillis + provider.iconAnimationDurationMillis
-        // On Android 12+ core-splashscreen reports the start as a wall-clock time (the platform
-        // SplashScreenView's Instant), not uptime: subtracting uptimeMillis gave a delay of decades
-        // and the splash never went away (found live). Pick the clock by magnitude, and never wait
-        // longer than the whole animation whatever the numbers say.
+        val animationEnd = provider.iconAnimationStartMillis + 380L
         val now = if (animationEnd > 1_000_000_000_000L) System.currentTimeMillis() else android.os.SystemClock.uptimeMillis()
-        val remaining = (animationEnd - now).coerceIn(0L, 700L)
+        val remaining = (animationEnd - now).coerceIn(0L, 380L)
         provider.view.animate()
           .alpha(0f)
+          .scaleX(1.15f)
+          .scaleY(1.15f)
           .setStartDelay(remaining)
-          .setDuration(200L)
+          .setDuration(160L)
           .withEndAction {
             provider.remove()
             applySystemBarStyle?.invoke()
@@ -190,12 +197,9 @@ class MainActivity : ComponentActivity() {
       // because the process that owned it died before its worker could write a terminal status.
       // See DownloadDispatcher.repairOrphanedRunning()'s own doc comment for the full story.
       LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(3_000)
         DownloadDispatcher.repairOrphanedRunning(context)
-        // Same idea, for QUEUED/SCHEDULED rows — see repairOrphanedQueue's own doc comment for
-        // why this needed a startup call too, not just its existing reactive ones.
         DownloadDispatcher.repairOrphanedQueue(context)
-        // After the repairs above, so a download a dead process left "RUNNING" no longer protects
-        // its cookie copy from the sweep.
         com.comfort.app.util.GalleryDlListing.sweepStaleCookieCopies(context)
       }
 
@@ -254,7 +258,7 @@ class MainActivity : ComponentActivity() {
             // frame, all of it under this Surface, which covers the whole window. Dropped once the
             // content is up: one full-screen fill less per frame on every screen.
             androidx.compose.runtime.LaunchedEffect(Unit) { window.setBackgroundDrawable(null) }
-            MainNavigation(openQueueSignal = openQueueSignal.intValue, shortcut = shortcut.value)
+            MainNavigation(openQueueSignal = openQueueSignal.intValue, shortcut = shortcut.value, openDownload = openDownloadRequest.value)
           }
         }
       }

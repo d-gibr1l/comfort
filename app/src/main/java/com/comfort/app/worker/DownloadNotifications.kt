@@ -275,6 +275,7 @@ object DownloadNotifications {
         context: Context, downloadId: String, title: String, downloadedItems: Int, thumbnailUri: String?, missingItems: Int = 0,
         // Extra commands the wrappers left out (ExtraCommandNotes): said under the result.
         notes: List<String> = emptyList(),
+        mediaUri: String? = null,
     ) {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         // "picture(s)" used to be hardcoded here regardless of what actually got saved — a
@@ -297,45 +298,47 @@ object DownloadNotifications {
             builder.setStyle(NotificationCompat.BigTextStyle().bigText((listOf(text) + notes).joinToString("\n")))
         }
 
-        if (thumbnailUri != null) {
-            val uri = Uri.parse(thumbnailUri)
-            // Used to hardcode "image/*" here regardless of what actually got saved — harmless for
-            // a gallery-dl picture, but a yt-dlp video (a single-item download, so this is always
-            // the real saved MediaStore URI by the time a download finishes — see
-            // DownloadWorker's own setThumbnail/setThumbnailIfAbsent split) forced Gallery apps to
-            // open it as a static image (no playback controls) and made share targets like
-            // WhatsApp reject it outright as a fake image. contentResolver.getType() reads the
-            // real MIME type back from MediaStore for the content:// URI this normally is; falls
-            // back to the old "image/*" only for a multi-item gallery download's remote preview
-            // URL (not a content:// URI ContentResolver can resolve at all), which is still
-            // usually a picture anyway.
+        // Tapping the finished notification or its "Open" action opens the download in Comfort
+        // directly (in Now Playing for audio or the built-in media viewer for video/pictures)
+        // instead of delegating to an external viewer app.
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_OPEN_DOWNLOAD
+            putExtra(MainActivity.EXTRA_OPEN_DOWNLOAD_ID, downloadId)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val requestBase = downloadId.hashCode()
+        val openPendingIntent = PendingIntent.getActivity(
+            context, requestBase, openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        builder
+            .setContentIntent(openPendingIntent)
+            .addAction(
+                0, context.getString(R.string.open),
+                PendingIntent.getActivity(
+                    context, requestBase + 1, openIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
+
+        // Share action uses the real media file URI (or thumbnail as fallback)
+        val shareTargetUri = mediaUri ?: thumbnailUri
+        if (shareTargetUri != null) {
+            val uri = Uri.parse(shareTargetUri)
             val mimeType = context.contentResolver.getType(uri) ?: "image/*"
-            val openIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mimeType)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            val requestBase = downloadId.hashCode()
-            builder
-                .setContentIntent(
-                    PendingIntent.getActivity(context, requestBase, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                )
-                .addAction(
-                    0, context.getString(R.string.open),
-                    PendingIntent.getActivity(context, requestBase + 1, openIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE),
-                )
-                .addAction(
-                    0, context.getString(R.string.share),
-                    PendingIntent.getActivity(
-                        context, requestBase + 2,
-                        Intent.createChooser(shareIntent, context.getString(R.string.share)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    ),
-                )
+            builder.addAction(
+                0, context.getString(R.string.share),
+                PendingIntent.getActivity(
+                    context, requestBase + 2,
+                    Intent.createChooser(shareIntent, context.getString(R.string.share)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
         }
         // Same id as the ongoing progress notification — since that id is never the
         // FOREGROUND_SERVICE one anymore (see FOREGROUND_SERVICE_NOTIFICATION_ID's doc comment),

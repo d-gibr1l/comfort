@@ -11,7 +11,11 @@ import androidx.navigation3.ui.NavDisplay
 import com.comfort.app.ui.main.MainScreen
 
 @Composable
-fun MainNavigation(openQueueSignal: Int = 0, shortcut: com.comfort.app.ui.main.ShortcutRequest? = null) {
+fun MainNavigation(
+  openQueueSignal: Int = 0,
+  shortcut: com.comfort.app.ui.main.ShortcutRequest? = null,
+  openDownload: com.comfort.app.ui.main.OpenDownloadRequest? = null,
+) {
   val backStack = rememberNavBackStack(Main)
 
   NavDisplay(
@@ -20,7 +24,7 @@ fun MainNavigation(openQueueSignal: Int = 0, shortcut: com.comfort.app.ui.main.S
     entryProvider =
       entryProvider {
         entry<Main> {
-          MainScreen(openQueueSignal = openQueueSignal, shortcut = shortcut)
+          MainScreen(openQueueSignal = openQueueSignal, shortcut = shortcut, openDownload = openDownload)
         }
       },
   )
