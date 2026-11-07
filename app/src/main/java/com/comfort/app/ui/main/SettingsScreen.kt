@@ -202,19 +202,23 @@ fun MoreScreen(
         val back = rememberBackRevealState(enabled = isVisible && route != SettingsRoute.ROOT) {
             onNavigate(SettingsRoute.ROOT, null)
         }
+        val currentRoute by rememberUpdatedState(route)
+        val currentOnNavigate by rememberUpdatedState(onNavigate)
         // Opening a sub-page from the root list plays the push (see animateEnter).
-        val navigate: (SettingsRoute, String?) -> Unit = { target, key ->
-            if (route == SettingsRoute.ROOT && target != SettingsRoute.ROOT) {
-                back.animateEnter { onNavigate(target, key) }
-            } else {
-                onNavigate(target, key)
+        val navigate = remember(back) {
+            { target: SettingsRoute, key: String? ->
+                if (currentRoute == SettingsRoute.ROOT && target != SettingsRoute.ROOT) {
+                    back.animateEnter { currentOnNavigate(target, key) }
+                } else {
+                    currentOnNavigate(target, key)
+                }
             }
         }
         Box(modifier = Modifier.fillMaxSize().predictiveBackBehind(back, active = route != SettingsRoute.ROOT)) {
             SettingsRootScreen(onNavigate = navigate)
         }
         // Each sub-page's own back button plays the same peel-away as the gesture, then returns.
-        val onBack = { back.animateBack() }
+        val onBack = remember(back) { { back.animateBack() } }
         if (route != SettingsRoute.ROOT) Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(back)) {
             when (route) {
                 SettingsRoute.ROOT -> Unit

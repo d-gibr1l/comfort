@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -86,7 +87,7 @@ class BackRevealState internal constructor(
 
     private fun startExclusive(block: suspend CoroutineScope.() -> Unit) {
         running?.cancel()
-        running = scope.launch(block = block)
+        running = scope.launch(start = CoroutineStart.UNDISPATCHED, block = block)
     }
 
     /** An on-screen back button: the same transition as releasing a back swipe, from the start. */
@@ -94,28 +95,29 @@ class BackRevealState internal constructor(
         startExclusive { commit() }
     }
 
-    /** Opens the page in front — J2K's push, the mirror of its back: the new page comes in from
-     * 20% to the right while fading in, and the page behind slides 20% left while fading out, over
-     * 200ms. [change] is what makes the new page appear; it runs after the starting values are
-     * set, in the same frame, so the page never shows for a frame at rest first.
+    /** Opens the page in front with a responsive push: the incoming page enters from 20% to the
+     * right fully visible with a soft elevation shadow along its left edge, sliding into place while
+     * the page behind slides 20% left and fades out, over 160ms. [change] runs synchronously before
+     * motion begins so composition and the slide start without dead-frame latency.
      * [behindVisible] is false when the page behind is already hidden (switching between two
      * pages that both sit on top of it, e.g. Library to Settings), so only the new page moves. */
     fun animateEnter(behindVisible: Boolean = true, onFinished: () -> Unit = {}, change: () -> Unit) {
         startExclusive {
             try {
                 frontX.snapTo(ENTER_FROM_X)
-                frontAlpha.snapTo(0f)
+                frontAlpha.snapTo(1f)
                 behindX.snapTo(0f)
                 behindAlpha.snapTo(if (behindVisible) 1f else 0f)
-                shadow.snapTo(0f)
+                shadow.snapTo(1f)
                 change()
-                withFrameNanos { }
                 val spec = tween<Float>(ENTER_MS, easing = DECELERATE)
                 coroutineScope {
                     launch { frontX.animateTo(0f, spec) }
-                    launch { frontAlpha.animateTo(1f, spec) }
-                    launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
-                    launch { behindAlpha.animateTo(0f, spec) }
+                    launch { shadow.animateTo(0f, spec) }
+                    if (behindVisible) {
+                        launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
+                        launch { behindAlpha.animateTo(0f, spec) }
+                    }
                 }
             } finally {
                 onFinished()
@@ -189,7 +191,7 @@ class BackRevealState internal constructor(
         // Push: CrossFadeChangeHandler's 200ms with the Animator default interpolator
         // (AccelerateDecelerate, approximated as a cubic).
         const val ENTER_FROM_X = 0.2f
-        const val ENTER_MS = 200
+        const val ENTER_MS = 160
         val ACCELERATE_DECELERATE = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
     }
 }
