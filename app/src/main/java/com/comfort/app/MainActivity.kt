@@ -126,18 +126,14 @@ class MainActivity : ComponentActivity() {
     // reaching onNewIntent, which only fires for an already-running singleTask instance.
     consumeOpenQueueExtra(intent)
 
-    // The splash is released after its 380ms logo animation finishes, then smoothly zooms and dissolves into the app.
+    // The splash smoothly zooms and dissolves into the app the moment the first frame is rendered.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       splashScreen.setOnExitAnimationListener { provider ->
-        val animationEnd = provider.iconAnimationStartMillis + 380L
-        val now = if (animationEnd > 1_000_000_000_000L) System.currentTimeMillis() else android.os.SystemClock.uptimeMillis()
-        val remaining = (animationEnd - now).coerceIn(0L, 380L)
         provider.view.animate()
           .alpha(0f)
-          .scaleX(1.15f)
-          .scaleY(1.15f)
-          .setStartDelay(remaining)
-          .setDuration(160L)
+          .scaleX(1.12f)
+          .scaleY(1.12f)
+          .setDuration(120L)
           .withEndAction {
             provider.remove()
             applySystemBarStyle?.invoke()

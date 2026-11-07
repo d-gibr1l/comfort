@@ -270,9 +270,13 @@ fun MainScreen(
     // to build; otherwise enterTab builds it the frame before its slide (measured on the
     // benchmark build: a ~75ms frame inside the slide without either).
     var keepSettings by remember { mutableStateOf(false) }
-    val shouldKeepLibrary = activeDownloadsCount == 0
+    var keepLibrary by remember { mutableStateOf(false) }
+    val shouldKeepLibrary = keepLibrary && activeDownloadsCount == 0
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(4_000)
+        // Cold start displays Home instantly. Library warms in background at 400ms while idle.
+        kotlinx.coroutines.delay(400)
+        keepLibrary = true
+        kotlinx.coroutines.delay(3_600)
         keepSettings = true
     }
     // The Library's scroll position, held here: the Library itself is rebuilt each visit while
