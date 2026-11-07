@@ -935,7 +935,17 @@ fun HomeScreen(
     // Most-recent RUNNING item — a summary screen only ever needs to surface one at a time; the
     // full Queue is one tap away (onOpenQueue) for anything more than that.
     val activeDownload = remember(queueItems) { queueItems.firstOrNull { it.status == DownloadStatus.RUNNING } }
-    val recentDownloads = remember(historyItems) { historyItems.filter { !it.thumbnailPath.isNullOrBlank() }.take(10) }
+    // Pre-seeded from RecentDownloadsCache on Frame 1 to prevent content layout shift and pop-in.
+    val cachedRecent = remember { com.comfort.app.data.RecentDownloadsCache.get(homeContext) }
+    val recentDownloads = remember(historyItems, cachedRecent) {
+        if (historyItems.isNotEmpty()) {
+            val filtered = historyItems.filter { !it.thumbnailPath.isNullOrBlank() }.take(10)
+            com.comfort.app.data.RecentDownloadsCache.save(homeContext, filtered)
+            filtered
+        } else {
+            cachedRecent
+        }
+    }
 
     fun normalizeInputUrl(input: String): String {
         val trimmed = input.trim()
@@ -1001,8 +1011,12 @@ fun HomeScreen(
             // of only being right on one specific device.
             val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
             val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
-            var wordmarkFontSize by remember(screenWidth, fontScale) { mutableStateOf(88.sp) }
-            var wordmarkMeasured by remember(screenWidth, fontScale) { mutableStateOf(false) }
+            // Pre-computed target size (availableWidth ~ screenWidth - 96dp across 7 glyphs) so COMFORT
+            // renders at full opacity on Frame 1 without being hidden or looping font-size decrements.
+            val initialFontSize = remember(screenWidth, fontScale) {
+                ((screenWidth - 96.coerceAtMost(screenWidth - 100)) / 5.5f).coerceIn(24f, 68f).sp
+            }
+            var wordmarkFontSize by remember(screenWidth, fontScale) { mutableStateOf(initialFontSize) }
             BasicText(
                 "COMFORT",
                 style = TextStyle(
@@ -1016,19 +1030,11 @@ fun HomeScreen(
                 overflow = TextOverflow.Clip,
                 modifier = Modifier
                     .fillMaxWidth()
-                    // Extra inset beyond the screen's own 24dp margin (see this Column's parent
-                    // padding above) so the auto-fit-to-width logic below settles on a slightly
-                    // smaller size instead of stretching edge-to-edge — a size request, not a
-                    // literal fontSize, so it still scales consistently across screen widths the
-                    // same way the un-inset version did.
-                    .padding(horizontal = 48.dp)
-                    .graphicsLayer(alpha = if (wordmarkMeasured) 1f else 0f),
+                    .padding(horizontal = 48.dp),
                 onTextLayout = { result ->
                     if (result.didOverflowWidth && wordmarkFontSize > 12.sp) {
                         val next = wordmarkFontSize * 0.94f
                         wordmarkFontSize = if (next > 12.sp) next else 12.sp
-                    } else {
-                        wordmarkMeasured = true
                     }
                 },
             )
