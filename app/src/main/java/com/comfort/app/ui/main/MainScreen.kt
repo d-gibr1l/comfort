@@ -273,10 +273,10 @@ fun MainScreen(
     var keepLibrary by remember { mutableStateOf(false) }
     val shouldKeepLibrary = keepLibrary && activeDownloadsCount == 0
     LaunchedEffect(Unit) {
-        // Cold start displays Home instantly. Library warms in background at 400ms while idle.
-        kotlinx.coroutines.delay(400)
+        // Cold start displays Home instantly. Library warms in background at 1200ms while idle.
+        kotlinx.coroutines.delay(1_200)
         keepLibrary = true
-        kotlinx.coroutines.delay(3_600)
+        kotlinx.coroutines.delay(2_800)
         keepSettings = true
     }
     // The Library's scroll position, held here: the Library itself is rebuilt each visit while

@@ -126,21 +126,9 @@ class MainActivity : ComponentActivity() {
     // reaching onNewIntent, which only fires for an already-running singleTask instance.
     consumeOpenQueueExtra(intent)
 
-    // The splash smoothly zooms and dissolves into the app the moment the first frame is rendered.
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      splashScreen.setOnExitAnimationListener { provider ->
-        provider.view.animate()
-          .alpha(0f)
-          .scaleX(1.12f)
-          .scaleY(1.12f)
-          .setDuration(120L)
-          .withEndAction {
-            provider.remove()
-            applySystemBarStyle?.invoke()
-          }
-          .start()
-      }
-    }
+    // On Android 12+, leaving setOnExitAnimationListener unset lets the OS window manager dismiss
+    // the splash natively the exact instant Frame 1 is ready, with zero view-hierarchy hold or delay.
+    window.decorView.post { applySystemBarStyle?.invoke() }
 
     AppImageLoader.install(applicationContext)
     // Unpack + precompile the Python engines ahead of the first preview/download (no-op once done
@@ -197,25 +185,8 @@ class MainActivity : ComponentActivity() {
         DownloadDispatcher.repairOrphanedRunning(context)
         DownloadDispatcher.repairOrphanedQueue(context)
         com.comfort.app.util.GalleryDlListing.sweepStaleCookieCopies(context)
-      }
-
-      // (Re)applies the "Clean-up leftover downloads" interval every cold start — a
-      // PeriodicWorkRequest's interval is fixed at enqueue time, so this is what makes a change
-      // from a previous session actually take effect again. See its own doc comment.
-      LaunchedEffect(Unit) {
         DownloadDispatcher.rescheduleStagingCleanup(context)
-      }
-
-      // Re-arms the subscriptions' hourly check (or cancels it when there are none) — see
-      // Subscriptions.reschedule.
-      LaunchedEffect(Unit) {
         com.comfort.app.data.Subscriptions.reschedule(context)
-      }
-
-      // Re-arms the Schedule window's exact-alarm backstop every cold start — an AlarmManager
-      // alarm doesn't survive a reboot on its own, so this is what re-establishes it. See
-      // DownloadDispatcher.scheduleWindowAlarm's own doc comment.
-      LaunchedEffect(Unit) {
         DownloadDispatcher.scheduleWindowAlarm(context)
       }
 

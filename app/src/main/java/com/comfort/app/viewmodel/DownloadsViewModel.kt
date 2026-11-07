@@ -46,15 +46,15 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     // Progress lines only arrive about once a second anyway.
     private val rawHistoryFlow: StateFlow<List<DownloadEntity>> = dao.getHistoryFlow()
         .throttleLatest(LIST_UPDATE_MS)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val rawDeletedFlow: StateFlow<List<DownloadEntity>> = dao.getDeletedFlow()
         .throttleLatest(LIST_UPDATE_MS) // a deleted-files scan or bulk delete is a burst too
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val rawQueueFlow: StateFlow<List<DownloadEntity>> = dao.getQueueFlow()
         .throttleLatest(LIST_UPDATE_MS)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // Optimistic-hide set shared by every screen's undoable delete (see hideForDeletion() below)
     // — an id sits here for the window between the user tapping delete and either the Undo
@@ -67,7 +67,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     val historyFlow: StateFlow<List<DownloadEntity>> = combine(rawHistoryFlow, _deletingIds) { history, deleting ->
         if (deleting.isEmpty()) history else history.filterNot { it.id in deleting }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Each Library item's shape and length (MediaShapes), by download id — what the grid sizes
      * its tiles and duration badges from. Read from MediaStore off the main thread; an audio
@@ -100,11 +100,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 }.toMap()
             }
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val deletedFlow: StateFlow<List<DownloadEntity>> = combine(rawDeletedFlow, _deletingIds) { deleted, deleting ->
         if (deleting.isEmpty()) deleted else deleted.filterNot { it.id in deleting }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // What a bulk action looks like from the moment it's tapped. Even in one pass, Retry All on 100
     // downloads takes WorkManager a moment, and the Queue used to show it as it happened: cards
@@ -121,7 +121,7 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
 
     val queueFlow: StateFlow<List<DownloadEntity>> = combine(rawQueueFlow, _deletingIds, _pendingMoves, liveProgress) { queue, deleting, pending, live ->
         queueRows(queue, deleting, pending, live)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         // Ends each pending move once its row has left the status it was made from. Only watches
@@ -195,18 +195,18 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Drives the "ongoing download" badge on the Library tab and the Queue icon. */
     val hasActiveDownloads: StateFlow<Boolean> = queueFlow
         .map { list -> list.any { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val activeDownloadsCount: StateFlow<Int> = queueFlow
         .map { list -> list.count { it.status == DownloadStatus.RUNNING || it.status == DownloadStatus.QUEUED } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** Library's own "Duplicates" filter — see DuplicateAttempt's doc comment for what these
      * actually are (a link that "Prevent duplicate downloads" recognized as already queued/
      * running/finished, so nothing was actually re-downloaded). */
     val duplicateAttemptsFlow: StateFlow<List<com.comfort.app.data.DuplicateAttempt>> = dao.getDuplicateAttemptsFlow()
         .throttleLatest(LIST_UPDATE_MS) // a deleted-files scan or bulk delete is a burst too
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** The "Redownload" action on a Duplicates entry — same forceDuplicate escape hatch the share
      * sheet's own Snackbar action uses, then clears this specific log entry since it's been acted

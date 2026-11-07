@@ -38,8 +38,10 @@ class ComfortApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        VideoSiteRouter.loadSiteRules(this)
-        com.comfort.app.theme.ThemePreferences.applyNightMode(this)
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            VideoSiteRouter.loadSiteRules(this@ComfortApp)
+            com.comfort.app.theme.ThemePreferences.applyNightMode(this@ComfortApp)
+        }
         // Every process start, not just the main screen's: the app can run for days on
         // downloads and shares alone. The shortcut clean-up too, but off the main thread: it's
         // binder calls to the system's ShortcutManager, before the first frame on a cold start.
