@@ -679,11 +679,10 @@ object DownloadDispatcher {
      * other call sites is a reaction to some *other* action (a pause/cancel/schedule change) that
      * simply never happened in between, so nothing ever re-checked them. */
     suspend fun repairOrphanedQueue(context: Context) {
-        // A null workRequestId is also how a global pauseAll() deliberately parks a download added
-        // while paused (see DownloadsViewModel.resumeAll()'s own matching filter) — not every null
-        // means "orphaned by the chain cascade." Leave those alone here; resumeAll() is what's
-        // supposed to pick them back up.
-        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        // Not skipped during Pause All: pauseAll() makes every waiting download PAUSED (and one added
+        // while paused starts PAUSED), which getQueuedOnce() doesn't return, so what's left waiting
+        // is one the user resumed on its own (see enqueueWorkMany). Skipping everything left that
+        // one stuck "In Queue" for good once its job died (GitHub issue #1).
         repairIfJobDead(context, AppDatabase.getDatabase(context).downloadDao().getQueuedOnce())
     }
 
@@ -706,7 +705,7 @@ object DownloadDispatcher {
      * going stale, a RUNNING row's job dying isn't a predictable side effect of some other action
      * in this file, so there's no "this just happened, check now" trigger to hang it off of. */
     suspend fun repairOrphanedRunning(context: Context) {
-        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        // During Pause All too, for the same reason as [repairOrphanedQueue].
         repairIfJobDead(context, AppDatabase.getDatabase(context).downloadDao().getRunningOnce())
     }
 
@@ -774,13 +773,9 @@ object DownloadDispatcher {
      * WorkManager never re-evaluates a fixed delay on its own (only true Constraints, like
      * network type, are continuously re-checked). */
     suspend fun rescheduleQueuedDownloads(context: Context) {
-        // enqueueWork() doesn't check this itself, so without this guard a schedule-window change
-        // made while globally paused silently broke the pause: every QUEUED/SCHEDULED row got
-        // resubmitted straight to WorkManager regardless, dispatching downloads the user explicitly
-        // froze. Normally pauseAll() already converts every QUEUED/SCHEDULED row to PAUSED (so
-        // getQueuedOnce() below wouldn't find any while paused), but this stays a real, defensive
-        // guard rather than relying on that invariant always holding everywhere.
-        if (GalleryDlPreferences.isGloballyPaused(context)) return
+        // During Pause All too: pauseAll() makes every waiting download PAUSED, which isn't
+        // re-submitted here, so a waiting one is one the user resumed on its own and should follow
+        // the new schedule like any other. enqueueWorkMany() parks anything else that's waiting.
         val dao = AppDatabase.getDatabase(context).downloadDao()
         // enqueueWorkMany() cancels whatever job is already associated with each id itself, atomically
         // with resubmitting it — no need to duplicate that cancellation here.
