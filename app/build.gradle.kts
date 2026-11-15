@@ -20,7 +20,7 @@ android {
         // own install/upgrade key, not used here) but real Android tooling still expects it to move
         // in step, so bump it anyway on principle.
         versionCode = 15
-        versionName = "1.3.2.1"
+        versionName = "1.3.1.1"
         // The on-phone UI tests (app/src/androidTest). Run them with the test APK installed and
         // `adb shell am instrument -w com.comfort.app.test/androidx.test.runner.AndroidJUnitRunner`,
         // not connectedAndroidTest: that uninstalls the app afterwards, and its data with it.
