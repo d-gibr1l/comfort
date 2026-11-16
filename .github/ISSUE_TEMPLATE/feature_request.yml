@@ -1,0 +1,22 @@
+name: Feature request
+description: An idea for something Comfort could do, or do better.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: What you're trying to do, and what gets in the way today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Comfort help?
+      description: How you picture it working. Sketches, screenshots or another app that does it well are welcome.
+
+  - type: textarea
+    id: other
+    attributes:
+      label: Anything else
