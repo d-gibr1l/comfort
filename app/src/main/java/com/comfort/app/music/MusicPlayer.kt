@@ -141,6 +141,11 @@ object MusicPlayer {
     private val _state = MutableStateFlow(MusicState())
     val state: StateFlow<MusicState> = _state.asStateFlow()
 
+    private val _playedThisRun = MutableStateFlow(false)
+    /** Something has played since the app (its process) started. False after a restart that only
+     * brought back the last song, paused: the mini player then shows on the Library page alone. */
+    val playedThisRun: StateFlow<Boolean> = _playedThisRun.asStateFlow()
+
     private var future: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private val waiting = ArrayList<(MediaController) -> Unit>()
@@ -357,6 +362,7 @@ object MusicPlayer {
                 }
             }
         }
+        if (player.isPlaying) _playedThisRun.value = true
         _state.value = MusicState(
             song = song,
             isPlaying = player.isPlaying,

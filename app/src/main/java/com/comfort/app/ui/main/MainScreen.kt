@@ -374,7 +374,11 @@ fun MainScreen(
     val useNavRail = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= NAV_RAIL_MIN_WIDTH_DP
     // The media viewer (Photon Gallery's, ui/viewer), opened from a Library item over everything.
     var mediaViewer by remember { mutableStateOf<com.comfort.app.ui.viewer.MediaViewerRequest?>(null) }
-    val showMiniPlayer = music.song != null && !showNowPlaying && mediaViewer == null
+    // Reopened after the app was stopped, the last song comes back paused: the mini player waits on
+    // the Library page (where the music is) rather than sitting on every page, until something plays.
+    val playedThisRun by com.comfort.app.music.MusicPlayer.playedThisRun.collectAsState()
+    val showMiniPlayer = music.song != null && !showNowPlaying && mediaViewer == null &&
+        (playedThisRun || (selectedTab == 1 && !showQueueScreen))
 
     // Completed download notification tap or "Open" action button: open in Comfort.
     LaunchedEffect(openDownload) {
