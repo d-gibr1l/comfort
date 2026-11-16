@@ -273,11 +273,14 @@ fun MainScreen(
     var keepLibrary by remember { mutableStateOf(false) }
     val shouldKeepLibrary = keepLibrary && activeDownloadsCount == 0
     LaunchedEffect(Unit) {
-        // Cold start displays Home instantly. Library warms in background at 1200ms while idle.
-        kotlinx.coroutines.delay(1_200)
-        keepLibrary = true
-        kotlinx.coroutines.delay(2_800)
+        // Cold start displays Home instantly; then, while idle, Settings at 1s and Library at
+        // 1.2s. Settings was built at 4s, so a tap on it right after launch built it on the spot
+        // (55-70 ms frames), and its sub-pages then found none of the rows and cards they share
+        // with it ready either.
+        kotlinx.coroutines.delay(1_000)
         keepSettings = true
+        kotlinx.coroutines.delay(200)
+        keepLibrary = true
     }
     // The Library's scroll position, held here: the Library itself is rebuilt each visit while
     // something's downloading (above), and its place in the list went with it.
