@@ -125,430 +125,89 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
     }
 
     SettingsSubScaffold(title = stringResource(R.string.downloads), topicIcon = Icons.Outlined.Download, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = stringResource(R.string.sharing), icon = Icons.Outlined.Share) {
-            ShareModeRow(
-                mode = shareMode,
-                onModeChange = {
-                    shareMode = it
-                    GalleryDlPreferences.setShareMode(context, it)
-                },
-            )
-        }
-
-        SettingsSection(title = stringResource(R.string.concurrent_downloads), icon = Icons.Outlined.Layers) {
-            IconToggleRow(
-                icon = if (concurrentDownloadsEnabled) Icons.Outlined.Layers else Icons.Outlined.LayersClear,
-                title = stringResource(R.string.multiple_concurrent_downloads),
-                subtitle = stringResource(R.string.run_more_than_one_download_at),
-                checked = concurrentDownloadsEnabled,
-                onCheckedChange = {
-                    concurrentDownloadsEnabled = it
-                    downloadsSettings.setConcurrentDownloadsEnabled(it)
-                },
-            )
-            ToggleReveal(concurrentDownloadsEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SettingsSlider(
-                    value = concurrentDownloads,
-                    // Starts at 2, not 1 — 1 is exactly what the toggle above already means when
-                    // off, so the slider (only shown while it's on) has nothing meaningful to say
-                    // at that value; every position on it should actually mean "more than one."
-                    valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_DOWNLOADS,
-                    label = { context.getString(R.string.x_at_once, it) },
-                    onValueChange = {
-                        concurrentDownloads = it
-                        downloadsSettings.setConcurrentDownloads(it)
+        item {
+            SettingsSection(title = stringResource(R.string.sharing), icon = Icons.Outlined.Share) {
+                ShareModeRow(
+                    mode = shareMode,
+                    onModeChange = {
+                        shareMode = it
+                        GalleryDlPreferences.setShareMode(context, it)
                     },
                 )
             }
         }
 
-        SettingsSection(title = stringResource(R.string.network), icon = Icons.Outlined.Wifi) {
-            IconToggleRow(
-                icon = if (wifiOnly) Icons.Outlined.Wifi else Icons.Outlined.WifiOff,
-                title = stringResource(R.string.wi_fi_only),
-                subtitle = stringResource(R.string.queued_downloads_wait_for_a_wi),
-                checked = wifiOnly,
-                onCheckedChange = {
-                    wifiOnly = it
-                    downloadsSettings.setWifiOnly(it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = if (speedLimitEnabled) {
-                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_speed_2)
-                } else {
-                    Icons.Outlined.Speed
-                },
-                title = stringResource(R.string.speed_limit),
-                subtitle = stringResource(R.string.caps_download_bandwidth_for_all_future),
-                checked = speedLimitEnabled,
-                onCheckedChange = {
-                    speedLimitEnabled = it
-                    downloadsSettings.setSpeedLimitEnabled(it)
-                },
-            )
-            ToggleReveal(speedLimitEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SizeSheetField(
-                    currentValue = speedLimit,
-                    label = stringResource(R.string.speed_limit),
-                    units = SPEED_UNITS,
-                    onValueChange = {
-                        speedLimit = it
-                        downloadsSettings.setSpeedLimit(it)
+        item {
+            SettingsSection(title = stringResource(R.string.concurrent_downloads), icon = Icons.Outlined.Layers) {
+                IconToggleRow(
+                    icon = if (concurrentDownloadsEnabled) Icons.Outlined.Layers else Icons.Outlined.LayersClear,
+                    title = stringResource(R.string.multiple_concurrent_downloads),
+                    subtitle = stringResource(R.string.run_more_than_one_download_at),
+                    checked = concurrentDownloadsEnabled,
+                    onCheckedChange = {
+                        concurrentDownloadsEnabled = it
+                        downloadsSettings.setConcurrentDownloadsEnabled(it)
                     },
                 )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.Refresh,
-                title = stringResource(R.string.retries),
-                subtitle = stringResource(R.string.how_many_times_a_failed_request),
-                checked = networkRetriesEnabled,
-                onCheckedChange = {
-                    networkRetriesEnabled = it
-                    GalleryDlPreferences.setNetworkRetriesEnabled(context, it)
-                },
-            )
-            ToggleReveal(networkRetriesEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SettingsSlider(
-                    value = networkRetries,
-                    valueRange = 1..GalleryDlPreferences.MAX_NETWORK_RETRIES,
-                    label = { context.getString(R.string.x_retries, it) },
-                    onValueChange = {
-                        networkRetries = it
-                        GalleryDlPreferences.setNetworkRetries(context, it)
-                    },
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.Refresh,
-                title = stringResource(R.string.fragment_retries),
-                subtitle = stringResource(R.string.how_many_times_a_failed_video),
-                checked = fragmentRetriesEnabled,
-                onCheckedChange = {
-                    fragmentRetriesEnabled = it
-                    GalleryDlPreferences.setFragmentRetriesEnabled(context, it)
-                },
-            )
-            ToggleReveal(fragmentRetriesEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SettingsSlider(
-                    value = fragmentRetries,
-                    valueRange = 1..GalleryDlPreferences.MAX_FRAGMENT_RETRIES,
-                    label = { context.getString(R.string.x_retries, it) },
-                    onValueChange = {
-                        fragmentRetries = it
-                        GalleryDlPreferences.setFragmentRetries(context, it)
-                    },
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.Lock,
-                title = stringResource(R.string.proxy),
-                subtitle = stringResource(R.string.routes_all_future_downloads_through_this),
-                checked = proxyEnabled,
-                onCheckedChange = {
-                    proxyEnabled = it
-                    downloadsSettings.setProxyEnabled(it)
-                },
-            )
-            ToggleReveal(proxyEnabled) {
-                Spacer(Modifier.height(16.dp))
-                val isProxyError = proxyUrl.isNotBlank() && !DownloadsSettingsViewModel.isValidProxyUrl(proxyUrl)
-                OutlinedTextField(
-                    value = proxyUrl,
-                    onValueChange = {
-                        proxyUrl = it
-                        downloadsSettings.setProxyUrl(it)
-                    },
-                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text(stringResource(R.string.proxy)) },
-                    placeholder = { Text(stringResource(R.string.none)) },
-                    singleLine = true,
-                    isError = isProxyError,
-                    supportingText = {
-                        if (isProxyError) {
-                            Text(stringResource(R.string.must_start_with_http_https_or), color = MaterialTheme.colorScheme.error)
-                        } else if (proxyUrl.isBlank()) {
-                            Text(stringResource(R.string.e_g_http_10_0_0))
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                    shape = MaterialTheme.shapes.medium,
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.Public,
-                title = stringResource(R.string.force_ipv4),
-                subtitle = stringResource(R.string.forces_connections_over_ipv4_try_this),
-                checked = forceIpv4,
-                onCheckedChange = {
-                    forceIpv4 = it
-                    GalleryDlPreferences.setForceIpv4(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.GppBad,
-                title = stringResource(R.string.skip_certificate_checks),
-                subtitle = stringResource(R.string.disables_security_certificate_checks_only_enable),
-                checked = noCheckCertificates,
-                onCheckedChange = {
-                    noCheckCertificates = it
-                    GalleryDlPreferences.setNoCheckCertificates(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.AutoMirrored.Outlined.CallSplit,
-                title = stringResource(R.string.concurrent_fragments),
-                subtitle = stringResource(R.string.how_many_fragments_of_a_single),
-                checked = concurrentFragmentsEnabled,
-                onCheckedChange = {
-                    concurrentFragmentsEnabled = it
-                    GalleryDlPreferences.setConcurrentFragmentsEnabled(context, it)
-                },
-            )
-            ToggleReveal(concurrentFragmentsEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SettingsSlider(
-                    value = concurrentFragments,
-                    // Same reasoning as Concurrent downloads' own slider above — 1 is already what
-                    // the toggle above means when off.
-                    valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_FRAGMENTS,
-                    label = { context.getString(R.string.x_at_once, it) },
-                    onValueChange = {
-                        concurrentFragments = it
-                        GalleryDlPreferences.setConcurrentFragments(context, it)
-                    },
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = if (sleepIntervalEnabled) Icons.Outlined.AvTimer else Icons.Outlined.TimerOff,
-                title = stringResource(R.string.sleep_interval),
-                subtitle = stringResource(R.string.adds_a_random_delay_before_requests),
-                checked = sleepIntervalEnabled,
-                onCheckedChange = {
-                    sleepIntervalEnabled = it
-                    GalleryDlPreferences.setSleepIntervalEnabled(context, it)
-                },
-            )
-            ToggleReveal(sleepIntervalEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SettingsSlider(
-                    value = sleepIntervalSeconds,
-                    // Starts at 2, not the toggle's own off-value (0) — same off-value-redundancy
-                    // reasoning as Concurrent downloads/fragments' sliders — and the floor
-                    // yt_dlp_wrapper.py itself hardcodes for the random range's lower end.
-                    valueRange = 2..GalleryDlPreferences.MAX_SLEEP_INTERVAL_SECONDS,
-                    label = { "2-${it}s" },
-                    onValueChange = {
-                        sleepIntervalSeconds = it
-                        GalleryDlPreferences.setSleepIntervalSeconds(context, it)
-                    },
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.Schedule,
-                title = stringResource(R.string.socket_timeout),
-                subtitle = stringResource(R.string.how_long_to_wait_on_a),
-                checked = socketTimeoutEnabled,
-                onCheckedChange = {
-                    socketTimeoutEnabled = it
-                    GalleryDlPreferences.setSocketTimeoutEnabled(context, it)
-                },
-            )
-            ToggleReveal(socketTimeoutEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SettingsSlider(
-                    value = socketTimeoutSeconds,
-                    valueRange = 5..120,
-                    label = { "${it}s" },
-                    onValueChange = {
-                        socketTimeoutSeconds = it
-                        GalleryDlPreferences.setSocketTimeoutSeconds(context, it)
-                    },
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.Storage,
-                title = stringResource(R.string.buffer_size),
-                subtitle = stringResource(R.string.the_size_of_each_read_chunk),
-                checked = bufferSizeEnabled,
-                onCheckedChange = {
-                    bufferSizeEnabled = it
-                    GalleryDlPreferences.setBufferSizeEnabled(context, it)
-                },
-            )
-            ToggleReveal(bufferSizeEnabled) {
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = if (bufferSizeKb > 0) bufferSizeKb.toString() else "",
-                    onValueChange = { input ->
-                        val digits = input.filter { it.isDigit() }.take(7)
-                        val kb = digits.toIntOrNull()?.coerceIn(0, 1048576) ?: 0
-                        bufferSizeKb = kb
-                        GalleryDlPreferences.setBufferSizeKb(context, kb)
-                    },
-                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text("KB") },
-                    placeholder = { Text("1024") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    shape = MaterialTheme.shapes.medium,
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = if (aria2Enabled) {
-                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_bolt_boost)
-                } else {
-                    Icons.Outlined.FlashOff
-                },
-                title = stringResource(R.string.multi_connection_downloads_aria2c),
-                subtitle = stringResource(R.string.downloads_files_faster_by_splitting_them),
-                checked = aria2Enabled,
-                onCheckedChange = {
-                    aria2Enabled = it
-                    GalleryDlPreferences.setAria2Enabled(context, it)
-                },
-            )
-        }
-
-        SettingsSection(title = stringResource(R.string.reliability), icon = Icons.Outlined.Bolt) {
-            if (batteryUnrestricted) {
-                StatusRow(Icons.Outlined.CheckCircle, stringResource(R.string.unrestricted_downloads_can_keep_running_in), MaterialTheme.colorScheme.primary)
-            } else {
-                Text(
-                    stringResource(R.string.unrestricted_background_activity),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.without_this_android_s_battery_saver),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(
-                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                            Uri.parse("package:${context.packageName}"),
-                        )
-                        // Some OEM skins ship no activity for this action at all despite declaring
-                        // the permission — falls back to the general battery-settings screen rather
-                        // than crashing on startActivity() with no handler.
-                        runCatching { batteryOptimizationLauncher.launch(intent) }
-                            .onFailure { runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.allow_unrestricted_background_activity))
-                }
-            }
-        }
-
-        SettingsSection(title = stringResource(R.string.schedule), icon = Icons.Outlined.Schedule) {
-            IconToggleRow(
-                icon = Icons.Outlined.Schedule,
-                title = stringResource(R.string.restrict_to_time_window),
-                subtitle = stringResource(R.string.new_downloads_wait_in_the_queue),
-                checked = scheduleEnabled,
-                onCheckedChange = {
-                    scheduleEnabled = it
-                    downloadsSettings.setScheduleEnabled(it)
-                },
-            )
-
-            ToggleReveal(scheduleEnabled) {
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    TimePickerButton(
-                        modifier = Modifier.weight(1f),
-                        label = stringResource(R.string.start),
-                        minutesSinceMidnight = scheduleStartMin,
-                        onPicked = { minutes ->
-                            scheduleStartMin = minutes
-                            downloadsSettings.setScheduleStart(minutes)
-                        },
-                    )
-                    TimePickerButton(
-                        modifier = Modifier.weight(1f),
-                        label = stringResource(R.string.end),
-                        minutesSinceMidnight = scheduleEndMin,
-                        onPicked = { minutes ->
-                            scheduleEndMin = minutes
-                            downloadsSettings.setScheduleEnd(minutes)
+                ToggleReveal(concurrentDownloadsEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SettingsSlider(
+                        value = concurrentDownloads,
+                        // Starts at 2, not 1 — 1 is exactly what the toggle above already means when
+                        // off, so the slider (only shown while it's on) has nothing meaningful to say
+                        // at that value; every position on it should actually mean "more than one."
+                        valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_DOWNLOADS,
+                        label = { context.getString(R.string.x_at_once, it) },
+                        onValueChange = {
+                            concurrentDownloads = it
+                            downloadsSettings.setConcurrentDownloads(it)
                         },
                     )
                 }
-                ToggleReveal(scheduleStartMin == scheduleEndMin) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.start_and_end_times_are_identical),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.network), icon = Icons.Outlined.Wifi) {
+                IconToggleRow(
+                    icon = if (wifiOnly) Icons.Outlined.Wifi else Icons.Outlined.WifiOff,
+                    title = stringResource(R.string.wi_fi_only),
+                    subtitle = stringResource(R.string.queued_downloads_wait_for_a_wi),
+                    checked = wifiOnly,
+                    onCheckedChange = {
+                        wifiOnly = it
+                        downloadsSettings.setWifiOnly(it)
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = if (speedLimitEnabled) {
+                        ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_speed_2)
+                    } else {
+                        Icons.Outlined.Speed
+                    },
+                    title = stringResource(R.string.speed_limit),
+                    subtitle = stringResource(R.string.caps_download_bandwidth_for_all_future),
+                    checked = speedLimitEnabled,
+                    onCheckedChange = {
+                        speedLimitEnabled = it
+                        downloadsSettings.setSpeedLimitEnabled(it)
+                    },
+                )
+                ToggleReveal(speedLimitEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SizeSheetField(
+                        currentValue = speedLimit,
+                        label = stringResource(R.string.speed_limit),
+                        units = SPEED_UNITS,
+                        onValueChange = {
+                            speedLimit = it
+                            downloadsSettings.setSpeedLimit(it)
+                        },
                     )
                 }
 
@@ -558,188 +217,543 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
 
                 IconToggleRow(
                     icon = Icons.Outlined.Refresh,
-                    title = stringResource(R.string.use_alarm_for_scheduling),
-                    subtitle = stringResource(R.string.ensures_scheduled_downloads_start_exactly_on),
-                    checked = alarmSchedulingEnabled,
+                    title = stringResource(R.string.retries),
+                    subtitle = stringResource(R.string.how_many_times_a_failed_request),
+                    checked = networkRetriesEnabled,
                     onCheckedChange = {
-                        alarmSchedulingEnabled = it
-                        downloadsSettings.setAlarmSchedulingEnabled(it)
+                        networkRetriesEnabled = it
+                        GalleryDlPreferences.setNetworkRetriesEnabled(context, it)
+                    },
+                )
+                ToggleReveal(networkRetriesEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SettingsSlider(
+                        value = networkRetries,
+                        valueRange = 1..GalleryDlPreferences.MAX_NETWORK_RETRIES,
+                        label = { context.getString(R.string.x_retries, it) },
+                        onValueChange = {
+                            networkRetries = it
+                            GalleryDlPreferences.setNetworkRetries(context, it)
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.Refresh,
+                    title = stringResource(R.string.fragment_retries),
+                    subtitle = stringResource(R.string.how_many_times_a_failed_video),
+                    checked = fragmentRetriesEnabled,
+                    onCheckedChange = {
+                        fragmentRetriesEnabled = it
+                        GalleryDlPreferences.setFragmentRetriesEnabled(context, it)
+                    },
+                )
+                ToggleReveal(fragmentRetriesEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SettingsSlider(
+                        value = fragmentRetries,
+                        valueRange = 1..GalleryDlPreferences.MAX_FRAGMENT_RETRIES,
+                        label = { context.getString(R.string.x_retries, it) },
+                        onValueChange = {
+                            fragmentRetries = it
+                            GalleryDlPreferences.setFragmentRetries(context, it)
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.Lock,
+                    title = stringResource(R.string.proxy),
+                    subtitle = stringResource(R.string.routes_all_future_downloads_through_this),
+                    checked = proxyEnabled,
+                    onCheckedChange = {
+                        proxyEnabled = it
+                        downloadsSettings.setProxyEnabled(it)
+                    },
+                )
+                ToggleReveal(proxyEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    val isProxyError = proxyUrl.isNotBlank() && !DownloadsSettingsViewModel.isValidProxyUrl(proxyUrl)
+                    OutlinedTextField(
+                        value = proxyUrl,
+                        onValueChange = {
+                            proxyUrl = it
+                            downloadsSettings.setProxyUrl(it)
+                        },
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                        label = { Text(stringResource(R.string.proxy)) },
+                        placeholder = { Text(stringResource(R.string.none)) },
+                        singleLine = true,
+                        isError = isProxyError,
+                        supportingText = {
+                            if (isProxyError) {
+                                Text(stringResource(R.string.must_start_with_http_https_or), color = MaterialTheme.colorScheme.error)
+                            } else if (proxyUrl.isBlank()) {
+                                Text(stringResource(R.string.e_g_http_10_0_0))
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.Public,
+                    title = stringResource(R.string.force_ipv4),
+                    subtitle = stringResource(R.string.forces_connections_over_ipv4_try_this),
+                    checked = forceIpv4,
+                    onCheckedChange = {
+                        forceIpv4 = it
+                        GalleryDlPreferences.setForceIpv4(context, it)
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.GppBad,
+                    title = stringResource(R.string.skip_certificate_checks),
+                    subtitle = stringResource(R.string.disables_security_certificate_checks_only_enable),
+                    checked = noCheckCertificates,
+                    onCheckedChange = {
+                        noCheckCertificates = it
+                        GalleryDlPreferences.setNoCheckCertificates(context, it)
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.AutoMirrored.Outlined.CallSplit,
+                    title = stringResource(R.string.concurrent_fragments),
+                    subtitle = stringResource(R.string.how_many_fragments_of_a_single),
+                    checked = concurrentFragmentsEnabled,
+                    onCheckedChange = {
+                        concurrentFragmentsEnabled = it
+                        GalleryDlPreferences.setConcurrentFragmentsEnabled(context, it)
+                    },
+                )
+                ToggleReveal(concurrentFragmentsEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SettingsSlider(
+                        value = concurrentFragments,
+                        // Same reasoning as Concurrent downloads' own slider above — 1 is already what
+                        // the toggle above means when off.
+                        valueRange = 2..GalleryDlPreferences.MAX_CONCURRENT_FRAGMENTS,
+                        label = { context.getString(R.string.x_at_once, it) },
+                        onValueChange = {
+                            concurrentFragments = it
+                            GalleryDlPreferences.setConcurrentFragments(context, it)
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = if (sleepIntervalEnabled) Icons.Outlined.AvTimer else Icons.Outlined.TimerOff,
+                    title = stringResource(R.string.sleep_interval),
+                    subtitle = stringResource(R.string.adds_a_random_delay_before_requests),
+                    checked = sleepIntervalEnabled,
+                    onCheckedChange = {
+                        sleepIntervalEnabled = it
+                        GalleryDlPreferences.setSleepIntervalEnabled(context, it)
+                    },
+                )
+                ToggleReveal(sleepIntervalEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SettingsSlider(
+                        value = sleepIntervalSeconds,
+                        // Starts at 2, not the toggle's own off-value (0) — same off-value-redundancy
+                        // reasoning as Concurrent downloads/fragments' sliders — and the floor
+                        // yt_dlp_wrapper.py itself hardcodes for the random range's lower end.
+                        valueRange = 2..GalleryDlPreferences.MAX_SLEEP_INTERVAL_SECONDS,
+                        label = { "2-${it}s" },
+                        onValueChange = {
+                            sleepIntervalSeconds = it
+                            GalleryDlPreferences.setSleepIntervalSeconds(context, it)
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.socket_timeout),
+                    subtitle = stringResource(R.string.how_long_to_wait_on_a),
+                    checked = socketTimeoutEnabled,
+                    onCheckedChange = {
+                        socketTimeoutEnabled = it
+                        GalleryDlPreferences.setSocketTimeoutEnabled(context, it)
+                    },
+                )
+                ToggleReveal(socketTimeoutEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SettingsSlider(
+                        value = socketTimeoutSeconds,
+                        valueRange = 5..120,
+                        label = { "${it}s" },
+                        onValueChange = {
+                            socketTimeoutSeconds = it
+                            GalleryDlPreferences.setSocketTimeoutSeconds(context, it)
+                        },
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.Storage,
+                    title = stringResource(R.string.buffer_size),
+                    subtitle = stringResource(R.string.the_size_of_each_read_chunk),
+                    checked = bufferSizeEnabled,
+                    onCheckedChange = {
+                        bufferSizeEnabled = it
+                        GalleryDlPreferences.setBufferSizeEnabled(context, it)
+                    },
+                )
+                ToggleReveal(bufferSizeEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = if (bufferSizeKb > 0) bufferSizeKb.toString() else "",
+                        onValueChange = { input ->
+                            val digits = input.filter { it.isDigit() }.take(7)
+                            val kb = digits.toIntOrNull()?.coerceIn(0, 1048576) ?: 0
+                            bufferSizeKb = kb
+                            GalleryDlPreferences.setBufferSizeKb(context, kb)
+                        },
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                        label = { Text("KB") },
+                        placeholder = { Text("1024") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = if (aria2Enabled) {
+                        ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_bolt_boost)
+                    } else {
+                        Icons.Outlined.FlashOff
+                    },
+                    title = stringResource(R.string.multi_connection_downloads_aria2c),
+                    subtitle = stringResource(R.string.downloads_files_faster_by_splitting_them),
+                    checked = aria2Enabled,
+                    onCheckedChange = {
+                        aria2Enabled = it
+                        GalleryDlPreferences.setAria2Enabled(context, it)
                     },
                 )
             }
         }
 
-        SettingsSection(title = stringResource(R.string.max_file_size), icon = Icons.Outlined.SdStorage) {
-            IconToggleRow(
-                icon = Icons.Outlined.SdStorage,
-                title = stringResource(R.string.limit_max_file_size),
-                subtitle = stringResource(R.string.files_larger_than_this_are_skipped),
-                checked = maxFilesizeEnabled,
-                onCheckedChange = {
-                    maxFilesizeEnabled = it
-                    downloadsSettings.setMaxFilesizeEnabled(it)
-                },
-            )
+        item {
+            SettingsSection(title = stringResource(R.string.reliability), icon = Icons.Outlined.Bolt) {
+                if (batteryUnrestricted) {
+                    StatusRow(Icons.Outlined.CheckCircle, stringResource(R.string.unrestricted_downloads_can_keep_running_in), MaterialTheme.colorScheme.primary)
+                } else {
+                    Text(
+                        stringResource(R.string.unrestricted_background_activity),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.without_this_android_s_battery_saver),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(
+                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:${context.packageName}"),
+                            )
+                            // Some OEM skins ship no activity for this action at all despite declaring
+                            // the permission — falls back to the general battery-settings screen rather
+                            // than crashing on startActivity() with no handler.
+                            runCatching { batteryOptimizationLauncher.launch(intent) }
+                                .onFailure { runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.allow_unrestricted_background_activity))
+                    }
+                }
+            }
+        }
 
-            ToggleReveal(maxFilesizeEnabled) {
-                Spacer(Modifier.height(16.dp))
-                SizeSheetField(
-                    currentValue = maxFilesize,
-                    label = stringResource(R.string.max_file_size),
-                    units = FILESIZE_UNITS,
-                    onValueChange = {
-                        maxFilesize = it
-                        downloadsSettings.setMaxFilesize(it)
+        item {
+            SettingsSection(title = stringResource(R.string.schedule), icon = Icons.Outlined.Schedule) {
+                IconToggleRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.restrict_to_time_window),
+                    subtitle = stringResource(R.string.new_downloads_wait_in_the_queue),
+                    checked = scheduleEnabled,
+                    onCheckedChange = {
+                        scheduleEnabled = it
+                        downloadsSettings.setScheduleEnabled(it)
                     },
                 )
+
+                ToggleReveal(scheduleEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        TimePickerButton(
+                            modifier = Modifier.weight(1f),
+                            label = stringResource(R.string.start),
+                            minutesSinceMidnight = scheduleStartMin,
+                            onPicked = { minutes ->
+                                scheduleStartMin = minutes
+                                downloadsSettings.setScheduleStart(minutes)
+                            },
+                        )
+                        TimePickerButton(
+                            modifier = Modifier.weight(1f),
+                            label = stringResource(R.string.end),
+                            minutesSinceMidnight = scheduleEndMin,
+                            onPicked = { minutes ->
+                                scheduleEndMin = minutes
+                                downloadsSettings.setScheduleEnd(minutes)
+                            },
+                        )
+                    }
+                    ToggleReveal(scheduleStartMin == scheduleEndMin) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.start_and_end_times_are_identical),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(16.dp))
+
+                    IconToggleRow(
+                        icon = Icons.Outlined.Refresh,
+                        title = stringResource(R.string.use_alarm_for_scheduling),
+                        subtitle = stringResource(R.string.ensures_scheduled_downloads_start_exactly_on),
+                        checked = alarmSchedulingEnabled,
+                        onCheckedChange = {
+                            alarmSchedulingEnabled = it
+                            downloadsSettings.setAlarmSchedulingEnabled(it)
+                        },
+                    )
+                }
+            }
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.max_file_size), icon = Icons.Outlined.SdStorage) {
+                IconToggleRow(
+                    icon = Icons.Outlined.SdStorage,
+                    title = stringResource(R.string.limit_max_file_size),
+                    subtitle = stringResource(R.string.files_larger_than_this_are_skipped),
+                    checked = maxFilesizeEnabled,
+                    onCheckedChange = {
+                        maxFilesizeEnabled = it
+                        downloadsSettings.setMaxFilesizeEnabled(it)
+                    },
+                )
+
+                ToggleReveal(maxFilesizeEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    SizeSheetField(
+                        currentValue = maxFilesize,
+                        label = stringResource(R.string.max_file_size),
+                        units = FILESIZE_UNITS,
+                        onValueChange = {
+                            maxFilesize = it
+                            downloadsSettings.setMaxFilesize(it)
+                        },
+                    )
+                }
             }
         }
 
         // Imported from YTDLnis's own "Download Delay" and "Incognito" settings.
-        SettingsSection(title = stringResource(R.string.pacing_privacy), icon = Icons.Outlined.VisibilityOff) {
-            IconToggleRow(
-                icon = Icons.Outlined.Schedule,
-                title = stringResource(R.string.download_delay),
-                subtitle = stringResource(R.string.adds_a_delay_between_a_finished),
-                checked = downloadDelayEnabled,
-                onCheckedChange = {
-                    downloadDelayEnabled = it
-                    GalleryDlPreferences.setDownloadDelayEnabled(context, it)
-                },
-            )
-
-            ToggleReveal(downloadDelayEnabled) {
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = if (downloadDelaySeconds > 0) downloadDelaySeconds.toString() else "",
-                    onValueChange = { input ->
-                        val digits = input.filter { it.isDigit() }.take(6)
-                        val seconds = digits.toIntOrNull()?.coerceIn(0, 86400) ?: 0
-                        downloadDelaySeconds = seconds
-                        GalleryDlPreferences.setDownloadDelaySeconds(context, seconds)
+        item {
+            SettingsSection(title = stringResource(R.string.pacing_privacy), icon = Icons.Outlined.VisibilityOff) {
+                IconToggleRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = stringResource(R.string.download_delay),
+                    subtitle = stringResource(R.string.adds_a_delay_between_a_finished),
+                    checked = downloadDelayEnabled,
+                    onCheckedChange = {
+                        downloadDelayEnabled = it
+                        GalleryDlPreferences.setDownloadDelayEnabled(context, it)
                     },
-                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                    label = { Text(stringResource(R.string.seconds)) },
-                    placeholder = { Text("0") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    shape = MaterialTheme.shapes.medium,
                 )
-            }
 
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
+                ToggleReveal(downloadDelayEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = if (downloadDelaySeconds > 0) downloadDelaySeconds.toString() else "",
+                        onValueChange = { input ->
+                            val digits = input.filter { it.isDigit() }.take(6)
+                            val seconds = digits.toIntOrNull()?.coerceIn(0, 86400) ?: 0
+                            downloadDelaySeconds = seconds
+                            GalleryDlPreferences.setDownloadDelaySeconds(context, seconds)
+                        },
+                        modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                        label = { Text(stringResource(R.string.seconds)) },
+                        placeholder = { Text("0") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        shape = MaterialTheme.shapes.medium,
+                    )
+                }
 
-            IconToggleRow(
-                icon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_domino_mask),
-                title = stringResource(R.string.incognito_by_default),
-                subtitle = stringResource(R.string.downloads_are_still_saved_to_your),
-                checked = incognitoDefault,
-                onCheckedChange = {
-                    incognitoDefault = it
-                    GalleryDlPreferences.setIncognitoDefault(context, it)
-                },
-            )
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
 
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.ContentCopy,
-                title = stringResource(R.string.prevent_duplicate_downloads),
-                subtitle = stringResource(R.string.skips_downloading_a_link_if_it),
-                checked = preventDuplicateDownloads,
-                onCheckedChange = {
-                    preventDuplicateDownloads = it
-                    GalleryDlPreferences.setPreventDuplicateDownloads(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = if (rememberDownloadType) {
-                    Icons.Outlined.HighQuality
-                } else {
-                    ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_high_quality_off)
-                },
-                title = stringResource(R.string.remember_last_quality),
-                subtitle = stringResource(R.string.makes_the_quality_chosen_on_the),
-                checked = rememberDownloadType,
-                onCheckedChange = {
-                    rememberDownloadType = it
-                    GalleryDlPreferences.setRememberDownloadType(context, it)
-                },
-            )
-
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(16.dp))
-
-            IconToggleRow(
-                icon = Icons.Outlined.DeleteForever,
-                title = stringResource(R.string.clean_up_leftover_downloads),
-                subtitle = stringResource(R.string.automatically_deletes_partial_files_when_a),
-                checked = deleteLeftoverOnFailure,
-                onCheckedChange = {
-                    deleteLeftoverOnFailure = it
-                    downloadsSettings.setDeleteLeftoverOnFailure(it)
-                },
-            )
-            ToggleReveal(deleteLeftoverOnFailure) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    stringResource(R.string.on_failure_only_runs_from_inside),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                IconToggleRow(
+                    icon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_domino_mask),
+                    title = stringResource(R.string.incognito_by_default),
+                    subtitle = stringResource(R.string.downloads_are_still_saved_to_your),
+                    checked = incognitoDefault,
+                    onCheckedChange = {
+                        incognitoDefault = it
+                        GalleryDlPreferences.setIncognitoDefault(context, it)
+                    },
                 )
-                Spacer(Modifier.height(12.dp))
-                // Real FilterChips, not a hand-rolled Surface+onClick row — same conversion, and
-                // same reasoning, as the Sharing mode row above: the chip API's own accessibility
-                // semantics, minimum touch target, and selected-state contract, for free.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectableGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    // "Never" isn't one of the options here — the toggle above already covers
-                    // that state, so (same off-value-redundancy fix as Concurrent downloads/
-                    // fragments' sliders) it's deliberately excluded from what's reachable once
-                    // the toggle reveals this row, rather than being selectable two different ways.
-                    val cleanupOptions = listOf("" to stringResource(R.string.on_failure), "daily" to stringResource(R.string.daily), "weekly" to stringResource(R.string.weekly), "monthly" to stringResource(R.string.monthly))
-                    cleanupOptions.forEachIndexed { index, (value, label) ->
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val selected = cleanupLeftoverInterval == value
-                        FilterChip(
-                            selected = selected,
-                            onClick = {
-                                cleanupLeftoverInterval = value
-                                downloadsSettings.setCleanupLeftoverInterval(value)
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .semantics { role = Role.RadioButton },
-                            interactionSource = interactionSource,
-                            shape = rememberMorphingChipShape(index, cleanupOptions.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
-                            label = {
-                                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                    Text(label, style = MaterialTheme.typography.labelMedium)
-                                }
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                            border = null,
-                        )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.ContentCopy,
+                    title = stringResource(R.string.prevent_duplicate_downloads),
+                    subtitle = stringResource(R.string.skips_downloading_a_link_if_it),
+                    checked = preventDuplicateDownloads,
+                    onCheckedChange = {
+                        preventDuplicateDownloads = it
+                        GalleryDlPreferences.setPreventDuplicateDownloads(context, it)
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = if (rememberDownloadType) {
+                        Icons.Outlined.HighQuality
+                    } else {
+                        ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_high_quality_off)
+                    },
+                    title = stringResource(R.string.remember_last_quality),
+                    subtitle = stringResource(R.string.makes_the_quality_chosen_on_the),
+                    checked = rememberDownloadType,
+                    onCheckedChange = {
+                        rememberDownloadType = it
+                        GalleryDlPreferences.setRememberDownloadType(context, it)
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                IconToggleRow(
+                    icon = Icons.Outlined.DeleteForever,
+                    title = stringResource(R.string.clean_up_leftover_downloads),
+                    subtitle = stringResource(R.string.automatically_deletes_partial_files_when_a),
+                    checked = deleteLeftoverOnFailure,
+                    onCheckedChange = {
+                        deleteLeftoverOnFailure = it
+                        downloadsSettings.setDeleteLeftoverOnFailure(it)
+                    },
+                )
+                ToggleReveal(deleteLeftoverOnFailure) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.on_failure_only_runs_from_inside),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    // Real FilterChips, not a hand-rolled Surface+onClick row — same conversion, and
+                    // same reasoning, as the Sharing mode row above: the chip API's own accessibility
+                    // semantics, minimum touch target, and selected-state contract, for free.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        // "Never" isn't one of the options here — the toggle above already covers
+                        // that state, so (same off-value-redundancy fix as Concurrent downloads/
+                        // fragments' sliders) it's deliberately excluded from what's reachable once
+                        // the toggle reveals this row, rather than being selectable two different ways.
+                        val cleanupOptions = listOf("" to stringResource(R.string.on_failure), "daily" to stringResource(R.string.daily), "weekly" to stringResource(R.string.weekly), "monthly" to stringResource(R.string.monthly))
+                        cleanupOptions.forEachIndexed { index, (value, label) ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val selected = cleanupLeftoverInterval == value
+                            FilterChip(
+                                selected = selected,
+                                onClick = {
+                                    cleanupLeftoverInterval = value
+                                    downloadsSettings.setCleanupLeftoverInterval(value)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .semantics { role = Role.RadioButton },
+                                interactionSource = interactionSource,
+                                shape = rememberMorphingChipShape(index, cleanupOptions.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
+                                label = {
+                                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                        Text(label, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                                border = null,
+                            )
+                        }
                     }
                 }
             }

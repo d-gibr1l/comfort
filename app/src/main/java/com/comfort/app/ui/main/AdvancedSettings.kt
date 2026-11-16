@@ -45,244 +45,260 @@ internal fun AdvancedSettingsScreen(onBack: () -> Unit, highlightKey: String? = 
     val customHeadersError = validateCustomHeaders(customHeaders)?.let { stringResource(it.message, it.line) }
 
     SettingsSubScaffold(title = stringResource(R.string.advanced), topicIcon = Icons.Outlined.Terminal, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = stringResource(R.string.extra_arguments), icon = Icons.Outlined.Terminal) {
-            Text(
-                stringResource(R.string.extra_command_line_arguments_added_to),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            ExtraArgsSheetField()
-        }
-
-        SettingsSection(title = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.command_templates_section), icon = Icons.Outlined.Bookmarks) {
-            Column(modifier = highlightRowModifier(stringResource(R.string.command_templates_section))) {
-                CommandTemplatesSection()
+        item {
+            SettingsSection(title = stringResource(R.string.extra_arguments), icon = Icons.Outlined.Terminal) {
+                Text(
+                    stringResource(R.string.extra_command_line_arguments_added_to),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                ExtraArgsSheetField()
             }
         }
 
-        SettingsSection(title = stringResource(R.string.youtube), icon = Icons.Outlined.Memory) {
-            IconToggleRow(
-                icon = Icons.Outlined.Refresh,
-                title = stringResource(R.string.rotate_player_clients),
-                subtitle = stringResource(R.string.automatically_switches_between_android_ios_and),
-                checked = youtubeClientRotation,
-                onCheckedChange = {
-                    youtubeClientRotation = it
-                    GalleryDlPreferences.setYoutubeClientRotationEnabled(context, it)
-                },
-            )
-        }
-
-        SettingsSection(title = stringResource(R.string.bot_detection), icon = Icons.Outlined.Lock) {
-            IconToggleRow(
-                icon = Icons.Outlined.GppBad,
-                title = stringResource(R.string.impersonate_a_browser),
-                subtitle = stringResource(R.string.makes_the_app_look_like_a),
-                checked = impersonateEnabled,
-                onCheckedChange = {
-                    impersonateEnabled = it
-                    GalleryDlPreferences.setImpersonateEnabled(context, it)
-                },
-            )
-        }
-
-        SettingsSection(title = stringResource(R.string.yt_dlp_extractor_arguments), icon = Icons.Outlined.Tune) {
-            Text(
-                stringResource(R.string.site_specific_yt_dlp_tuning_throttling),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = extractorArgs,
-                onValueChange = { extractorArgs = it; extractorArgsSaved = false },
-                modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
-                label = { Text(stringResource(R.string.e_g_youtube_player_client_android)) },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                shape = MaterialTheme.shapes.medium,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            if (isExtractorArgsDirty) {
-                Button(
-                    onClick = {
-                        val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
-                        GalleryDlPreferences.setExtractorArgs(context, cleaned)
-                        // The field shows what was saved (one line): left as typed over several, it
-                        // never matched the saved text and the button stayed in its unsaved state.
-                        extractorArgs = cleaned
-                        extractorArgsSaved = true
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.save_extractor_arguments))
-                }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
-                        GalleryDlPreferences.setExtractorArgs(context, cleaned)
-                        // The field shows what was saved (one line): left as typed over several, it
-                        // never matched the saved text and the button stayed in its unsaved state.
-                        extractorArgs = cleaned
-                        extractorArgsSaved = true
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.save_extractor_arguments))
+        item {
+            SettingsSection(title = androidx.compose.ui.res.stringResource(com.comfort.app.R.string.command_templates_section), icon = Icons.Outlined.Bookmarks) {
+                Column(modifier = highlightRowModifier(stringResource(R.string.command_templates_section))) {
+                    CommandTemplatesSection()
                 }
             }
+        }
 
-            ToggleReveal(extractorArgsSaved) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.extractor_arguments_saved), tint = MaterialTheme.colorScheme.primary)
+        item {
+            SettingsSection(title = stringResource(R.string.youtube), icon = Icons.Outlined.Memory) {
+                IconToggleRow(
+                    icon = Icons.Outlined.Refresh,
+                    title = stringResource(R.string.rotate_player_clients),
+                    subtitle = stringResource(R.string.automatically_switches_between_android_ios_and),
+                    checked = youtubeClientRotation,
+                    onCheckedChange = {
+                        youtubeClientRotation = it
+                        GalleryDlPreferences.setYoutubeClientRotationEnabled(context, it)
+                    },
+                )
+            }
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.bot_detection), icon = Icons.Outlined.Lock) {
+                IconToggleRow(
+                    icon = Icons.Outlined.GppBad,
+                    title = stringResource(R.string.impersonate_a_browser),
+                    subtitle = stringResource(R.string.makes_the_app_look_like_a),
+                    checked = impersonateEnabled,
+                    onCheckedChange = {
+                        impersonateEnabled = it
+                        GalleryDlPreferences.setImpersonateEnabled(context, it)
+                    },
+                )
+            }
+        }
+
+        item {
+            SettingsSection(title = stringResource(R.string.yt_dlp_extractor_arguments), icon = Icons.Outlined.Tune) {
+                Text(
+                    stringResource(R.string.site_specific_yt_dlp_tuning_throttling),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = extractorArgs,
+                    onValueChange = { extractorArgs = it; extractorArgsSaved = false },
+                    modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
+                    label = { Text(stringResource(R.string.e_g_youtube_player_client_android)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                    shape = MaterialTheme.shapes.medium,
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (isExtractorArgsDirty) {
+                    Button(
+                        onClick = {
+                            val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
+                            GalleryDlPreferences.setExtractorArgs(context, cleaned)
+                            // The field shows what was saved (one line): left as typed over several, it
+                            // never matched the saved text and the button stayed in its unsaved state.
+                            extractorArgs = cleaned
+                            extractorArgsSaved = true
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_extractor_arguments))
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            val cleaned = extractorArgs.lines().filter { it.isNotBlank() }.joinToString(" ") { it.trim() }
+                            GalleryDlPreferences.setExtractorArgs(context, cleaned)
+                            // The field shows what was saved (one line): left as typed over several, it
+                            // never matched the saved text and the button stayed in its unsaved state.
+                            extractorArgs = cleaned
+                            extractorArgsSaved = true
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_extractor_arguments))
+                    }
+                }
+
+                ToggleReveal(extractorArgsSaved) {
+                    Spacer(Modifier.height(8.dp))
+                    StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.extractor_arguments_saved), tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
 
         // Imported from YTDLnis's own advanced_preferences.xml (Format Sorting, User Agent
         // Header) — yt-dlp only, same reasoning as this screen's other two fields above.
-        SettingsSection(title = stringResource(R.string.format_sort), icon = Icons.Outlined.FilterAlt) {
-            Text(
-                stringResource(R.string.raw_yt_dlp_format_sort_syntax),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
+        item {
+            SettingsSection(title = stringResource(R.string.format_sort), icon = Icons.Outlined.FilterAlt) {
+                Text(
+                    stringResource(R.string.raw_yt_dlp_format_sort_syntax),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = formatSort,
-                onValueChange = { formatSort = it; formatSortSaved = false },
-                modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
-                label = { Text(stringResource(R.string.e_g_codec_vp9_fps)) },
-                singleLine = true,
-                isError = isFormatSortError,
-                supportingText = {
-                    if (isFormatSortError) {
-                        Text(stringResource(R.string.cannot_contain_quotes_newlines_or_shell), color = MaterialTheme.colorScheme.error)
+                OutlinedTextField(
+                    value = formatSort,
+                    onValueChange = { formatSort = it; formatSortSaved = false },
+                    modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
+                    label = { Text(stringResource(R.string.e_g_codec_vp9_fps)) },
+                    singleLine = true,
+                    isError = isFormatSortError,
+                    supportingText = {
+                        if (isFormatSortError) {
+                            Text(stringResource(R.string.cannot_contain_quotes_newlines_or_shell), color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    shape = MaterialTheme.shapes.medium,
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (isFormatSortDirty) {
+                    Button(
+                        onClick = {
+                            GalleryDlPreferences.setFormatSort(context, formatSort.trim())
+                            formatSortSaved = true
+                        },
+                        enabled = !isFormatSortError,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_format_sort))
                     }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                shape = MaterialTheme.shapes.medium,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            if (isFormatSortDirty) {
-                Button(
-                    onClick = {
-                        GalleryDlPreferences.setFormatSort(context, formatSort.trim())
-                        formatSortSaved = true
-                    },
-                    enabled = !isFormatSortError,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.save_format_sort))
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            GalleryDlPreferences.setFormatSort(context, formatSort.trim())
+                            formatSortSaved = true
+                        },
+                        enabled = !isFormatSortError,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_format_sort))
+                    }
                 }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        GalleryDlPreferences.setFormatSort(context, formatSort.trim())
-                        formatSortSaved = true
-                    },
-                    enabled = !isFormatSortError,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.save_format_sort))
-                }
-            }
 
-            ToggleReveal(formatSortSaved) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.format_sort_saved), tint = MaterialTheme.colorScheme.primary)
+                ToggleReveal(formatSortSaved) {
+                    Spacer(Modifier.height(8.dp))
+                    StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.format_sort_saved), tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
 
-        SettingsSection(title = stringResource(R.string.custom_headers), icon = Icons.Outlined.Terminal) {
-            Text(
-                stringResource(R.string.one_header_name_value_per_line),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
+        item {
+            SettingsSection(title = stringResource(R.string.custom_headers), icon = Icons.Outlined.Terminal) {
+                Text(
+                    stringResource(R.string.one_header_name_value_per_line),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = customHeaders,
-                onValueChange = { customHeaders = it; customHeadersSaved = false },
-                modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
-                label = { Text(stringResource(R.string.e_g_referer_https_example_com)) },
-                isError = customHeadersError != null,
-                supportingText = {
-                    if (customHeadersError != null) {
-                        Text(customHeadersError, color = MaterialTheme.colorScheme.error)
+                OutlinedTextField(
+                    value = customHeaders,
+                    onValueChange = { customHeaders = it; customHeadersSaved = false },
+                    modifier = Modifier.fillMaxWidth().height(120.dp).clearFocusOnKeyboardDismiss(),
+                    label = { Text(stringResource(R.string.e_g_referer_https_example_com)) },
+                    isError = customHeadersError != null,
+                    supportingText = {
+                        if (customHeadersError != null) {
+                            Text(customHeadersError, color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                    shape = MaterialTheme.shapes.medium,
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (isCustomHeadersDirty) {
+                    Button(
+                        onClick = {
+                            GalleryDlPreferences.setCustomHeaders(context, customHeaders.trim())
+                            customHeadersSaved = true
+                        },
+                        enabled = customHeadersError == null,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_headers))
                     }
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                shape = MaterialTheme.shapes.medium,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            if (isCustomHeadersDirty) {
-                Button(
-                    onClick = {
-                        GalleryDlPreferences.setCustomHeaders(context, customHeaders.trim())
-                        customHeadersSaved = true
-                    },
-                    enabled = customHeadersError == null,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.save_headers))
+                } else {
+                    OutlinedButton(
+                        onClick = {
+                            GalleryDlPreferences.setCustomHeaders(context, customHeaders.trim())
+                            customHeadersSaved = true
+                        },
+                        enabled = customHeadersError == null,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_headers))
+                    }
                 }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        GalleryDlPreferences.setCustomHeaders(context, customHeaders.trim())
-                        customHeadersSaved = true
-                    },
-                    enabled = customHeadersError == null,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = MaterialTheme.shapes.medium,
-                ) {
-                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.save_headers))
-                }
-            }
 
-            ToggleReveal(customHeadersSaved) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.headers_saved), tint = MaterialTheme.colorScheme.primary)
+                ToggleReveal(customHeadersSaved) {
+                    Spacer(Modifier.height(8.dp))
+                    StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.headers_saved), tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
 
-        SettingsSection(title = stringResource(R.string.debugging), icon = Icons.Outlined.Code) {
-            IconToggleRow(
-                icon = Icons.Outlined.Terminal,
-                title = stringResource(R.string.verbose_logging),
-                subtitle = stringResource(R.string.logs_all_internal_yt_dlp_debug),
-                checked = verboseLogging,
-                onCheckedChange = {
-                    verboseLogging = it
-                    GalleryDlPreferences.setVerboseLogging(context, it)
-                },
-            )
-            Spacer(Modifier.height(16.dp))
-            ExportLogsRow()
+        item {
+            SettingsSection(title = stringResource(R.string.debugging), icon = Icons.Outlined.Code) {
+                IconToggleRow(
+                    icon = Icons.Outlined.Terminal,
+                    title = stringResource(R.string.verbose_logging),
+                    subtitle = stringResource(R.string.logs_all_internal_yt_dlp_debug),
+                    checked = verboseLogging,
+                    onCheckedChange = {
+                        verboseLogging = it
+                        GalleryDlPreferences.setVerboseLogging(context, it)
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+                ExportLogsRow()
+            }
         }
     }
 }

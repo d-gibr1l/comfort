@@ -127,124 +127,126 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     }
 
     SettingsSubScaffold(title = stringResource(R.string.cookies_login), topicIcon = Icons.Outlined.Lock, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(title = stringResource(R.string.cookies), icon = Icons.Outlined.Lock) {
-            Text(
-                stringResource(R.string.sign_in_through_the_built_in),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-
-            // A site's own rate-limiting/anti-bot systems associate a session with the account
-            // behind it, not just the device — a heavy download session with real personal cookies
-            // risks a site-level restriction on that actual account, not just this app or a fresh
-            // IP the way an unauthenticated 429 does (see the rate-limit tip on the Queue's own
-            // ERRORED cards). A throwaway account sidesteps that entirely.
-            Row(verticalAlignment = Alignment.Top) {
-                Icon(
-                    Icons.Outlined.Warning,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp).padding(top = 2.dp),
-                )
-                Spacer(Modifier.width(6.dp))
+        item {
+            SettingsSection(title = stringResource(R.string.cookies), icon = Icons.Outlined.Lock) {
                 Text(
-                    stringResource(R.string.consider_using_a_secondary_throwaway_account),
-                    style = MaterialTheme.typography.bodySmall,
+                    stringResource(R.string.sign_in_through_the_built_in),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
 
-            Button(
-                onClick = { showSitePicker = true },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Public, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.log_in_via_built_in_browser))
-            }
-
-            ToggleReveal(extractedCookies.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cookies_extracted_successfully), tint = MaterialTheme.colorScheme.primary)
-            }
-
-            Spacer(Modifier.height(20.dp))
-            Text(stringResource(R.string.or_paste_raw_cookies_manually), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = pastedCookies,
-                onValueChange = {
-                    pastedCookies = it
-                    pasteError = null
-                    savedConfirmation = false
-                },
-                modifier = Modifier.fillMaxWidth().height(160.dp).clearFocusOnKeyboardDismiss(),
-                label = { Text(stringResource(R.string.cookies_txt_contents)) },
-                maxLines = 10,
-                shape = MaterialTheme.shapes.medium,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-            )
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedButton(
-                onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    val trimmed = pastedCookies.trim()
-                    when {
-                        trimmed.isBlank() -> {
-                            pasteError = context.getString(R.string.please_paste_cookie_text_first)
-                            savedConfirmation = false
-                        }
-                        // The parser decides first: it also takes cookies.txt lines whose tabs became
-                        // spaces (some apps convert them when copying), and their values often hold
-                        // "=" — a format guess made beforehand turned those away as "name=value"
-                        // headers. The guesses only pick the message once nothing parsed.
-                        !cookiesViewModel.savePasted(pastedCookies) -> {
-                            pasteError = when {
-                                trimmed.startsWith("{") || trimmed.startsWith("[") ->
-                                    context.getString(R.string.detected_json_format_comfort_requires_netscape)
-                                trimmed.contains("Cookie:") || (trimmed.contains("=") && !trimmed.contains("\t")) ->
-                                    context.getString(R.string.detected_http_header_format_name_value)
-                                else ->
-                                    context.getString(R.string.couldn_t_find_any_valid_cookies)
-                            }
-                            savedConfirmation = false
-                        }
-                        else -> {
-                            pastedCookies = ""
-                            pasteError = null
-                            savedConfirmation = true
-                            Toast.makeText(context, context.getString(R.string.cookies_saved_and_applied), Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.save_cookies))
-            }
-
-            ToggleReveal(savedConfirmation) {
-                Spacer(Modifier.height(8.dp))
-                StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cookies_saved_and_applied), tint = MaterialTheme.colorScheme.primary)
-            }
-            pasteError?.let { message ->
-                Spacer(Modifier.height(8.dp))
+                // A site's own rate-limiting/anti-bot systems associate a session with the account
+                // behind it, not just the device — a heavy download session with real personal cookies
+                // risks a site-level restriction on that actual account, not just this app or a fresh
+                // IP the way an unauthenticated 429 does (see the rate-limit tip on the Queue's own
+                // ERRORED cards). A throwaway account sidesteps that entirely.
                 Row(verticalAlignment = Alignment.Top) {
                     Icon(
                         Icons.Outlined.Warning,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp).padding(top = 2.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(R.string.consider_using_a_secondary_throwaway_account),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = { showSitePicker = true },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Public, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.log_in_via_built_in_browser))
+                }
+
+                ToggleReveal(extractedCookies.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cookies_extracted_successfully), tint = MaterialTheme.colorScheme.primary)
+                }
+
+                Spacer(Modifier.height(20.dp))
+                Text(stringResource(R.string.or_paste_raw_cookies_manually), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = pastedCookies,
+                    onValueChange = {
+                        pastedCookies = it
+                        pasteError = null
+                        savedConfirmation = false
+                    },
+                    modifier = Modifier.fillMaxWidth().height(160.dp).clearFocusOnKeyboardDismiss(),
+                    label = { Text(stringResource(R.string.cookies_txt_contents)) },
+                    maxLines = 10,
+                    shape = MaterialTheme.shapes.medium,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                )
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        val trimmed = pastedCookies.trim()
+                        when {
+                            trimmed.isBlank() -> {
+                                pasteError = context.getString(R.string.please_paste_cookie_text_first)
+                                savedConfirmation = false
+                            }
+                            // The parser decides first: it also takes cookies.txt lines whose tabs became
+                            // spaces (some apps convert them when copying), and their values often hold
+                            // "=" — a format guess made beforehand turned those away as "name=value"
+                            // headers. The guesses only pick the message once nothing parsed.
+                            !cookiesViewModel.savePasted(pastedCookies) -> {
+                                pasteError = when {
+                                    trimmed.startsWith("{") || trimmed.startsWith("[") ->
+                                        context.getString(R.string.detected_json_format_comfort_requires_netscape)
+                                    trimmed.contains("Cookie:") || (trimmed.contains("=") && !trimmed.contains("\t")) ->
+                                        context.getString(R.string.detected_http_header_format_name_value)
+                                    else ->
+                                        context.getString(R.string.couldn_t_find_any_valid_cookies)
+                                }
+                                savedConfirmation = false
+                            }
+                            else -> {
+                                pastedCookies = ""
+                                pasteError = null
+                                savedConfirmation = true
+                                Toast.makeText(context, context.getString(R.string.cookies_saved_and_applied), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.save_cookies))
+                }
+
+                ToggleReveal(savedConfirmation) {
+                    Spacer(Modifier.height(8.dp))
+                    StatusRow(icon = Icons.Outlined.CheckCircle, text = stringResource(R.string.cookies_saved_and_applied), tint = MaterialTheme.colorScheme.primary)
+                }
+                pasteError?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(
+                            Icons.Outlined.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp).padding(top = 2.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -259,137 +261,139 @@ internal fun CookiesSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         // Still sourced from the real cookies.txt (see savedCookiesContent's own comment), so it
         // always reflects exactly what a download would actually send. (cookieSites itself is
         // declared up with parsedCookies, not here — see that declaration's own comment for why.)
-        SettingsSection(title = stringResource(R.string.saved_cookies_x, cookieSites.size), icon = Icons.AutoMirrored.Outlined.List) {
-            if (cookieSites.isEmpty()) {
-                Text(
-                    stringResource(R.string.no_cookies_saved_yet),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                cookieSites.forEachIndexed { index, site ->
-                    val enabled = site.rootDomain !in disabledDomains
-                    val siteDescription = stringResource(
-                        R.string.view_cookies_for_site_count, site.label,
-                        pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
+        item {
+            SettingsSection(title = stringResource(R.string.saved_cookies_x, cookieSites.size), icon = Icons.AutoMirrored.Outlined.List) {
+                if (cookieSites.isEmpty()) {
+                    Text(
+                        stringResource(R.string.no_cookies_saved_yet),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(MaterialTheme.shapes.small)
-                            .clickable(
-                                onClickLabel = stringResource(R.string.view_cookies_for_x, site.label),
-                                onClick = { viewingSite = site },
-                            )
-                            .semantics(mergeDescendants = false) {
-                                role = Role.Button
-                                contentDescription = siteDescription
-                            }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // Delete stays at the lead position; Copy moved to sit right beside the
-                        // toggle at the trailing end instead, next to the one other cookie-related
-                        // action a user might reach for around the same time as flipping the switch.
-                        IconButton(onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            pendingDelete = PendingCookieDelete.Site(site)
-                        }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.remove_x_s_cookies, site.label), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                site.label,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                stringResource(
-                                    R.string.cookie_count_and_expiry,
-                                    pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
-                                    formatCookieExpiry(context, site.soonestExpiryEpochSeconds),
-                                ),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        IconButton(onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val text = site.cookies.joinToString("\n") { it.rawLine }
-                            scope.launch {
-                                runCatching {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip(context.getString(R.string.x_cookies, site.label), text)))
-                                    Toast.makeText(context, context.getString(R.string.copied_x_cookies_to_clipboard, site.label), Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_x_s_cookies, site.label), modifier = Modifier.size(18.dp))
-                        }
-                        // Kept, not deleted — a saved login the user just doesn't want *sent* right
-                        // now (a stale account, testing anonymous behavior, ...) without losing it
-                        // outright. Filters this site's cookies out of every download/preview from
-                        // here on (see GalleryDlPreferences.filterCookiesByDisabledDomains and its
-                        // call sites in DownloadWorker.kt/GalleryDlListing.kt) until switched back.
-                        Switch(
-                            checked = enabled,
-                            onCheckedChange = { checked ->
-                                haptics.performHapticFeedback(if (checked) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
-                                cookiesViewModel.setSiteEnabled(site.rootDomain, checked)
-                            },
-                            modifier = Modifier.semantics {
-                                contentDescription = context.getString(R.string.enable_cookies_for_x, site.label)
-                            },
-                            // Same fix as IconToggleRow's own Switch: the default unchecked thumb
-                            // color is nearly invisible against the unchecked track in this theme
-                            // — an off site (e.g. Instagram/Reddit above) read as a dead, unlabeled
-                            // gray blob instead of a working control resting in its off position.
-                            colors = SwitchDefaults.colors(
-                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
-                            ),
+                } else {
+                    cookieSites.forEachIndexed { index, site ->
+                        val enabled = site.rootDomain !in disabledDomains
+                        val siteDescription = stringResource(
+                            R.string.view_cookies_for_site_count, site.label,
+                            pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
                         )
-                    }
-                    if (index != cookieSites.lastIndex) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch {
-                                runCatching {
-                                    clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip("cookies.txt", savedCookiesContent)))
-                                    Toast.makeText(context, context.getString(R.string.copied_all_cookies_to_clipboard), Toast.LENGTH_SHORT).show()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable(
+                                    onClickLabel = stringResource(R.string.view_cookies_for_x, site.label),
+                                    onClick = { viewingSite = site },
+                                )
+                                .semantics(mergeDescendants = false) {
+                                    role = Role.Button
+                                    contentDescription = siteDescription
                                 }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // Delete stays at the lead position; Copy moved to sit right beside the
+                            // toggle at the trailing end instead, next to the one other cookie-related
+                            // action a user might reach for around the same time as flipping the switch.
+                            IconButton(onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pendingDelete = PendingCookieDelete.Site(site)
+                            }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.remove_x_s_cookies, site.label), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                             }
-                        },
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.copy_all))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    site.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    stringResource(
+                                        R.string.cookie_count_and_expiry,
+                                        pluralStringResource(R.plurals.cookie_count, site.cookies.size, site.cookies.size),
+                                        formatCookieExpiry(context, site.soonestExpiryEpochSeconds),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            IconButton(onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val text = site.cookies.joinToString("\n") { it.rawLine }
+                                scope.launch {
+                                    runCatching {
+                                        clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip(context.getString(R.string.x_cookies, site.label), text)))
+                                        Toast.makeText(context, context.getString(R.string.copied_x_cookies_to_clipboard, site.label), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }) {
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.copy_x_s_cookies, site.label), modifier = Modifier.size(18.dp))
+                            }
+                            // Kept, not deleted — a saved login the user just doesn't want *sent* right
+                            // now (a stale account, testing anonymous behavior, ...) without losing it
+                            // outright. Filters this site's cookies out of every download/preview from
+                            // here on (see GalleryDlPreferences.filterCookiesByDisabledDomains and its
+                            // call sites in DownloadWorker.kt/GalleryDlListing.kt) until switched back.
+                            Switch(
+                                checked = enabled,
+                                onCheckedChange = { checked ->
+                                    haptics.performHapticFeedback(if (checked) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff)
+                                    cookiesViewModel.setSiteEnabled(site.rootDomain, checked)
+                                },
+                                modifier = Modifier.semantics {
+                                    contentDescription = context.getString(R.string.enable_cookies_for_x, site.label)
+                                },
+                                // Same fix as IconToggleRow's own Switch: the default unchecked thumb
+                                // color is nearly invisible against the unchecked track in this theme
+                                // — an off site (e.g. Instagram/Reddit above) read as a dead, unlabeled
+                                // gray blob instead of a working control resting in its off position.
+                                colors = SwitchDefaults.colors(
+                                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+                                ),
+                            )
+                        }
+                        if (index != cookieSites.lastIndex) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
                     }
-                    OutlinedButton(
-                        onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            pendingDelete = PendingCookieDelete.All
-                        },
-                        modifier = Modifier.weight(1f).height(50.dp),
-                        shape = MaterialTheme.shapes.medium,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) {
-                        Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.clear_all))
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                scope.launch {
+                                    runCatching {
+                                        clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(sensitiveClip("cookies.txt", savedCookiesContent)))
+                                        Toast.makeText(context, context.getString(R.string.copied_all_cookies_to_clipboard), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.copy_all))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pendingDelete = PendingCookieDelete.All
+                            },
+                            modifier = Modifier.weight(1f).height(50.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        ) {
+                            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.clear_all))
+                        }
                     }
                 }
             }

@@ -46,6 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
@@ -58,16 +62,14 @@ import androidx.compose.material.icons.outlined.*
 // all just read this directly via highlightRowModifier() below. Not `private`: AppearanceScreen.kt
 // (a separate file, same package) needs it too, and Kotlin's own same-package visibility means no
 // import is needed either way.
-class HighlightController(val targetKey: String?, val scrollState: ScrollState) {
-    // Set once by the sub-screen's own root Column right after it's laid out — every row's own
-    // target-scroll math below is relative to *this*, not the row's raw on-screen position, so it
-    // stays correct regardless of how deep the row is nested (inside a SettingsSection's own Card,
-    // itself inside the scrolling Column).
-    var containerWindowY = 0f
-    // The scrolling content itself (set alongside containerWindowY): a row's place within it
-    // doesn't depend on when it's measured — the two window positions, taken at different moments
-    // (the row once, mid enter-transition; the container on every move), could disagree.
+class HighlightController(val targetKey: String?, val scrollable: androidx.compose.foundation.gestures.ScrollableState) {
+    // The scrolling list's viewport (not its content): a row is scrolled to by its distance from
+    // this, which works the same for a lazy list, where most rows aren't built at all, as for a
+    // plain scrolling column.
     var container: androidx.compose.ui.layout.LayoutCoordinates? = null
+    // The target row has been built. In a lazy list it may start out far below the screen, not yet
+    // built: the page scrolls down until it is (see SettingsSubScaffold), then the row takes over.
+    var found by androidx.compose.runtime.mutableStateOf(false)
 }
 
 val LocalHighlightState = compositionLocalOf<HighlightController?> { null }
@@ -85,6 +87,7 @@ fun highlightRowModifier(title: String): Modifier {
     val targetKey = highlight?.targetKey
     if (highlight == null || targetKey == null || !title.startsWith(targetKey, ignoreCase = true)) return Modifier
 
+    SideEffect { highlight.found = true }
     var rowWindowY by remember(highlight) { mutableStateOf<Float?>(null) }
     var rowCoords by remember(highlight) { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     val flash = remember(highlight) { Animatable(0f) }
@@ -95,19 +98,18 @@ fun highlightRowModifier(title: String): Modifier {
     val topRoomPx = with(androidx.compose.ui.platform.LocalDensity.current) { 140.dp.toPx() }
 
     LaunchedEffect(rowWindowY) {
-        val y = rowWindowY ?: return@LaunchedEffect
+        rowWindowY ?: return@LaunchedEffect
         // A beat for the sub-screen's own enter transition (slide-in from Settings root) to finish
         // before scrolling — animating scroll position mid-transition read as a jarring double
         // motion when tested without this.
         delay(300)
         val container = highlight.container
         val row = rowCoords
-        val target = if (container != null && row != null && container.isAttached && row.isAttached) {
-            (container.localPositionOf(row, androidx.compose.ui.geometry.Offset.Zero).y - topRoomPx).roundToInt().coerceAtLeast(0)
-        } else {
-            (highlight.scrollState.value + (y - highlight.containerWindowY)).roundToInt().coerceAtLeast(0)
+        if (container != null && row != null && container.isAttached && row.isAttached) {
+            // How far the row is below where it should sit, from the viewport's top.
+            val delta = container.localPositionOf(row, androidx.compose.ui.geometry.Offset.Zero).y - topRoomPx
+            highlight.scrollable.animateScrollBy(delta)
         }
-        highlight.scrollState.animateScrollTo(target)
         // Comfort: held long enough to find (it was a 0.45 s faint tint, easy to miss).
         flash.animateTo(1f, tween(200))
         delay(1200)
@@ -396,6 +398,25 @@ internal fun SettingsSubPageHeader(
     }
 }
 
+/** Opened from a search result whose row is further down than [listState] has built yet: scrolls
+ * down most of a screen at a time until the row is built ([HighlightController.found]); the row
+ * then scrolls itself into place (highlightRowModifier). */
+@Composable
+internal fun SearchScrollToRow(highlight: HighlightController, listState: androidx.compose.foundation.lazy.LazyListState) {
+    if (highlight.targetKey == null) return
+    LaunchedEffect(highlight) {
+        delay(300)
+        while (!highlight.found && listState.canScrollForward) {
+            val viewport = listState.layoutInfo.viewportSize.height.toFloat()
+            listState.animateScrollBy(viewport * 0.8f)
+        }
+    }
+}
+
+/** A settings sub-page: the collapsing header over a lazy list of [content]'s items (one per
+ * section, as Seal, YTDLnis and Tachiyomi do theirs). Only the sections on screen are built: as one
+ * scrolling column, every section of a long page was built and laid out before its first frame
+ * (Processing and Downloads took 115-130 ms to open, measured on the release build). */
 @Composable
 internal fun SettingsSubScaffold(
     title: String,
@@ -405,10 +426,10 @@ internal fun SettingsSubScaffold(
     // SettingsRootScreen's subpage results list) — see HighlightController's own doc comment for
     // how a row actually consumes this.
     highlightKey: String? = null,
-    content: @Composable ColumnScope.() -> Unit,
+    content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    val highlight = remember(highlightKey) { HighlightController(highlightKey, scrollState) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val highlight = remember(highlightKey) { HighlightController(highlightKey, listState) }
     val density = androidx.compose.ui.platform.LocalDensity.current
     var maxHeaderHeightPx by remember { mutableStateOf(0) }
     // There's only ever one header composable here, not an inline copy plus a separate pinned one
@@ -419,26 +440,31 @@ internal fun SettingsSubScaffold(
     // interpolated from scroll position while within the last collapseRangePx of the top — the
     // compact bar doesn't get replaced by the real header, it *grows into* it, exactly in step with
     // the finger, which is what "becomes the header" means here (same behavior on every sub-page).
-    val headerState = rememberCollapsingHeaderState(scrollState, expandedTopPadding = 76.dp)
+    val headerState = rememberLazyCollapsingHeaderState(listState, expandedTopPadding = 76.dp)
+
+    SearchScrollToRow(highlight, listState)
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalHighlightState provides highlight) {
-            Column(
+            androidx.compose.foundation.lazy.LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    // The scrolled content's own origin (scroll 0), header padding included.
-                    .onGloballyPositioned { highlight.container = it }
-                    // Reserves exactly the header's own resting (fully expanded) height so the
-                    // first section starts right where it visually ends at scroll = 0 — the header
-                    // itself is a pinned overlay below, entirely outside this Column, not one of
-                    // its children.
-                    .padding(top = with(density) { maxHeaderHeightPx.toDp() })
-                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp + navBarClearance())
-                    .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
+                    .nestedScroll(headerState.nestedScrollConnection!!)
+                    .onGloballyPositioned { highlight.container = it },
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp + navBarClearance()),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
-                content = content,
-            )
+            ) {
+                // The header's resting (fully expanded) height as a real first item, so the first
+                // section starts right where the header ends — the header itself is a pinned overlay
+                // below, outside the list. An item rather than top padding: the header's collapse
+                // follows this item's scroll offset (rememberLazyCollapsingHeaderState), which needs
+                // it taller than the collapse range. Less the 24 dp gap the list puts after it.
+                item(key = "settings-header-space") {
+                    Spacer(Modifier.height((with(density) { maxHeaderHeightPx.toDp() } - 24.dp).coerceAtLeast(0.dp)).fillMaxWidth())
+                }
+                content()
+            }
         }
         StatusBarScrim(alpha = { 1f - headerState.reveal.fraction }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(

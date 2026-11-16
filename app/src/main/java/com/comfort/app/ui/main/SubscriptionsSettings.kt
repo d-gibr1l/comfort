@@ -41,34 +41,36 @@ internal fun SubscriptionsSettingsScreen(onBack: () -> Unit, highlightKey: Strin
         onBack = onBack,
         highlightKey = highlightKey,
     ) {
-        val list = subscriptions
-        when {
-            // Still reading the database: nothing rather than a flash of the empty state.
-            list == null -> Unit
-            list.isEmpty() -> SettingsSection(title = stringResource(R.string.subscriptions_how_section), icon = Icons.Outlined.Info) {
-                Text(
-                    stringResource(R.string.subscriptions_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            else -> {
-                SettingsSection(title = stringResource(R.string.subscriptions_sources_section), icon = Icons.Outlined.Subscriptions) {
+        item {
+            val list = subscriptions
+            when {
+                // Still reading the database: nothing rather than a flash of the empty state.
+                list == null -> Unit
+                list.isEmpty() -> SettingsSection(title = stringResource(R.string.subscriptions_how_section), icon = Icons.Outlined.Info) {
                     Text(
-                        stringResource(R.string.subscriptions_description),
+                        stringResource(R.string.subscriptions_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                list.forEach { subscription ->
-                    SubscriptionCard(
-                        subscription = subscription,
-                        checking = subscription.id in checking,
-                        onCheckNow = { viewModel.checkNow(subscription.id) },
-                        onTogglePaused = { viewModel.setPaused(subscription.id, !subscription.paused) },
-                        onIntervalChange = { viewModel.setInterval(subscription.id, it) },
-                        onRemove = { pendingRemove = subscription },
-                    )
+                else -> {
+                    SettingsSection(title = stringResource(R.string.subscriptions_sources_section), icon = Icons.Outlined.Subscriptions) {
+                        Text(
+                            stringResource(R.string.subscriptions_description),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    list.forEach { subscription ->
+                        SubscriptionCard(
+                            subscription = subscription,
+                            checking = subscription.id in checking,
+                            onCheckNow = { viewModel.checkNow(subscription.id) },
+                            onTogglePaused = { viewModel.setPaused(subscription.id, !subscription.paused) },
+                            onIntervalChange = { viewModel.setInterval(subscription.id, it) },
+                            onRemove = { pendingRemove = subscription },
+                        )
+                    }
                 }
             }
         }

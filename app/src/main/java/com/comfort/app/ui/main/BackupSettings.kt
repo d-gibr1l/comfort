@@ -75,75 +75,81 @@ internal fun BackupSettingsScreen(onBack: () -> Unit, highlightKey: String? = nu
         onBack = onBack,
         highlightKey = highlightKey,
     ) {
-        SettingsSection(title = stringResource(R.string.backup_section), icon = Icons.Outlined.Backup) {
-            IconToggleRow(
-                icon = Icons.Outlined.Tune,
-                title = stringResource(R.string.backup_part_settings),
-                subtitle = stringResource(R.string.backup_part_settings_subtitle),
-                checked = includeSettings,
-                onCheckedChange = { includeSettings = it },
-            )
-            Spacer(Modifier.height(16.dp))
-            IconToggleRow(
-                icon = Icons.Outlined.PhotoLibrary,
-                title = stringResource(R.string.backup_part_history),
-                subtitle = stringResource(R.string.backup_part_history_subtitle),
-                checked = includeHistory,
-                onCheckedChange = { includeHistory = it },
-            )
-            Spacer(Modifier.height(16.dp))
-            IconToggleRow(
-                icon = Icons.Outlined.Subscriptions,
-                title = stringResource(R.string.backup_part_subscriptions),
-                subtitle = stringResource(R.string.backup_part_subscriptions_subtitle),
-                checked = includeSubscriptions,
-                onCheckedChange = { includeSubscriptions = it },
-            )
-            Spacer(Modifier.height(16.dp))
-            IconToggleRow(
-                icon = Icons.Outlined.Lock,
-                title = stringResource(R.string.backup_part_cookies),
-                subtitle = stringResource(R.string.backup_part_cookies_subtitle),
-                checked = includeCookies,
-                onCheckedChange = { includeCookies = it },
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-                    exportLauncher.launch("comfort-backup-$date.json")
-                },
-                enabled = !busy && (includeSettings || includeHistory || includeSubscriptions || includeCookies),
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.backup_action))
+        item {
+            SettingsSection(title = stringResource(R.string.backup_section), icon = Icons.Outlined.Backup) {
+                IconToggleRow(
+                    icon = Icons.Outlined.Tune,
+                    title = stringResource(R.string.backup_part_settings),
+                    subtitle = stringResource(R.string.backup_part_settings_subtitle),
+                    checked = includeSettings,
+                    onCheckedChange = { includeSettings = it },
+                )
+                Spacer(Modifier.height(16.dp))
+                IconToggleRow(
+                    icon = Icons.Outlined.PhotoLibrary,
+                    title = stringResource(R.string.backup_part_history),
+                    subtitle = stringResource(R.string.backup_part_history_subtitle),
+                    checked = includeHistory,
+                    onCheckedChange = { includeHistory = it },
+                )
+                Spacer(Modifier.height(16.dp))
+                IconToggleRow(
+                    icon = Icons.Outlined.Subscriptions,
+                    title = stringResource(R.string.backup_part_subscriptions),
+                    subtitle = stringResource(R.string.backup_part_subscriptions_subtitle),
+                    checked = includeSubscriptions,
+                    onCheckedChange = { includeSubscriptions = it },
+                )
+                Spacer(Modifier.height(16.dp))
+                IconToggleRow(
+                    icon = Icons.Outlined.Lock,
+                    title = stringResource(R.string.backup_part_cookies),
+                    subtitle = stringResource(R.string.backup_part_cookies_subtitle),
+                    checked = includeCookies,
+                    onCheckedChange = { includeCookies = it },
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                        exportLauncher.launch("comfort-backup-$date.json")
+                    },
+                    enabled = !busy && (includeSettings || includeHistory || includeSubscriptions || includeCookies),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.backup_action))
+                }
             }
         }
 
-        SettingsSection(title = stringResource(R.string.restore_section), icon = Icons.Outlined.Restore) {
-            Text(
-                stringResource(R.string.restore_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = { importLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Icon(Icons.Outlined.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.restore_action))
+        item {
+            SettingsSection(title = stringResource(R.string.restore_section), icon = Icons.Outlined.Restore) {
+                Text(
+                    stringResource(R.string.restore_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = { importLauncher.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
+                    Icon(Icons.Outlined.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.restore_action))
+                }
             }
         }
 
-        message?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 4.dp))
+        item {
+            message?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 4.dp))
+            }
         }
     }
 

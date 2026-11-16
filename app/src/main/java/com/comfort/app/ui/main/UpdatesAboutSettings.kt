@@ -58,10 +58,18 @@ import androidx.compose.material.icons.outlined.*
 @Composable
 internal fun UpdatesSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     SettingsSubScaffold(title = stringResource(R.string.updates_and_engines), topicIcon = Icons.Outlined.Update, onBack = onBack, highlightKey = highlightKey) {
-        EngineChoiceSection()
-        SitesSection()
-        AppUpdateSection()
-        EnginesSection()
+        item {
+            EngineChoiceSection()
+        }
+        item {
+            SitesSection()
+        }
+        item {
+            AppUpdateSection()
+        }
+        item {
+            EnginesSection()
+        }
     }
 }
 
@@ -685,26 +693,28 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
     }
 
     SettingsSubScaffold(title = stringResource(R.string.about), topicIcon = Icons.Outlined.Info, onBack = onBack, highlightKey = highlightKey) {
-        SettingsSection(
-            title = stringResource(R.string.app), 
-            icon = Icons.Outlined.Info,
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/d-gibr1l/comfort"))
-                runCatching { context.startActivity(intent) }
-            }
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.semantics {
-                    role = Role.Button
-                    contentDescription = context.getString(R.string.comfort_version_x_open_project_page, versionName)
+        item {
+            SettingsSection(
+                title = stringResource(R.string.app), 
+                icon = Icons.Outlined.Info,
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/d-gibr1l/comfort"))
+                    runCatching { context.startActivity(intent) }
                 }
             ) {
-                AppIconTile(size = 48.dp)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("Comfort", style = MaterialTheme.typography.titleSmall)
-                    Text(stringResource(R.string.version_x, versionName), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.semantics {
+                        role = Role.Button
+                        contentDescription = context.getString(R.string.comfort_version_x_open_project_page, versionName)
+                    }
+                ) {
+                    AppIconTile(size = 48.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Comfort", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.version_x, versionName), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -716,29 +726,31 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
         // (FfmpegRuntime) merging video/audio, QuickJS (QuickJsRuntime) solving yt-dlp's JS
         // challenges, and aria2 (Aria2Runtime) doing real multi-connection downloads — none of them
         // previously credited or linked anywhere in the app.
-        SettingsSection(title = stringResource(R.string.credits), icon = Icons.Outlined.Link) {
-            // gallery-dl, QuickJS, and aria2 have no usable real-logo asset (gallery-dl and QuickJS
-            // ship no logo at all; aria2's only asset is a 16x16 favicon too small to read as
-            // anything but a blob at chip size) — those three keep a generic Material icon.
-            // FFmpeg's favicon and the Python community logo (credited project is literally
-            // CPython, via YTDLnis's published interpreter build — see PythonRuntime's own doc
-            // comment) are real, recognizable marks, so those two use their actual artwork instead.
-            val credits = remember {
-                listOf(
-                    CreditEntry(icon = Icons.Outlined.Code, title = "gallery-dl", url = "https://github.com/mikf/gallery-dl"),
-                    CreditEntry(icon = Icons.Outlined.Terminal, title = "yt-dlp", url = "https://github.com/yt-dlp/yt-dlp"),
-                    CreditEntry(icon = FeatherIcons.Instagram, title = "Instaloader", url = "https://github.com/instaloader/instaloader"),
-                    CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_ffmpeg, title = "FFmpeg", url = "https://ffmpeg.org"),
-                    CreditEntry(icon = Icons.Outlined.Memory, title = "QuickJS", url = "https://bellard.org/quickjs/"),
-                    CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = context.getString(R.string.python_runtime), url = "https://github.com/deniscerri/ytdlnis-packages"),
-                    CreditEntry(icon = Icons.Outlined.Bolt, title = "aria2", url = "https://aria2.github.io/"),
-                )
-            }
-            credits.chunked(2).forEachIndexed { rowIndex, row ->
-                if (rowIndex > 0) Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    row.forEach { entry -> CreditChip(entry, modifier = Modifier.weight(1f)) }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
+        item {
+            SettingsSection(title = stringResource(R.string.credits), icon = Icons.Outlined.Link) {
+                // gallery-dl, QuickJS, and aria2 have no usable real-logo asset (gallery-dl and QuickJS
+                // ship no logo at all; aria2's only asset is a 16x16 favicon too small to read as
+                // anything but a blob at chip size) — those three keep a generic Material icon.
+                // FFmpeg's favicon and the Python community logo (credited project is literally
+                // CPython, via YTDLnis's published interpreter build — see PythonRuntime's own doc
+                // comment) are real, recognizable marks, so those two use their actual artwork instead.
+                val credits = remember {
+                    listOf(
+                        CreditEntry(icon = Icons.Outlined.Code, title = "gallery-dl", url = "https://github.com/mikf/gallery-dl"),
+                        CreditEntry(icon = Icons.Outlined.Terminal, title = "yt-dlp", url = "https://github.com/yt-dlp/yt-dlp"),
+                        CreditEntry(icon = FeatherIcons.Instagram, title = "Instaloader", url = "https://github.com/instaloader/instaloader"),
+                        CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_ffmpeg, title = "FFmpeg", url = "https://ffmpeg.org"),
+                        CreditEntry(icon = Icons.Outlined.Memory, title = "QuickJS", url = "https://bellard.org/quickjs/"),
+                        CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = context.getString(R.string.python_runtime), url = "https://github.com/deniscerri/ytdlnis-packages"),
+                        CreditEntry(icon = Icons.Outlined.Bolt, title = "aria2", url = "https://aria2.github.io/"),
+                    )
+                }
+                credits.chunked(2).forEachIndexed { rowIndex, row ->
+                    if (rowIndex > 0) Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        row.forEach { entry -> CreditChip(entry, modifier = Modifier.weight(1f)) }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }

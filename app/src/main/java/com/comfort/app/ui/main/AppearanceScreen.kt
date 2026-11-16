@@ -128,12 +128,12 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // The viewport, before the scroll: a search result's row is scrolled to by its
+                // distance from here (see highlightRowModifier).
+                .onGloballyPositioned { highlight.container = it }
                 .verticalScroll(scrollState)
-                    // The scrolled content's own origin (scroll 0), header padding included.
-                    .onGloballyPositioned { highlight.container = it }
                 .padding(top = with(density) { maxHeaderHeightPx.toDp() })
-                .padding(horizontal = 20.dp)
-                .onGloballyPositioned { highlight.containerWindowY = it.positionInWindow().y },
+                .padding(horizontal = 20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
