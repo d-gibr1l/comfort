@@ -65,6 +65,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -153,7 +158,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 // brightness, no blurred backdrop, no delete confirmation — Comfort's delete has Undo instead of
 // a recycle bin). Photon's OCR search highlight, album copy/move, private vault and photo editor
 // have no counterpart here and were left out; the ⋮ menu moved into the bottom toolbar.
-@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @androidx.compose.material3.ExperimentalMaterial3Api
 @Composable
 fun MediaViewerScreen(
@@ -967,7 +972,14 @@ fun MediaViewerScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .statusBarsPadding()
+                // Below the camera cutout, and where the status bar would be even while it's
+                // hidden: with the bars hidden (the viewer's full screen), statusBarsPadding was 0
+                // and the pill sat under the punch-hole camera.
+                .windowInsetsPadding(
+                    androidx.compose.foundation.layout.WindowInsets.displayCutout
+                        .union(androidx.compose.foundation.layout.WindowInsets.statusBarsIgnoringVisibility)
+                        .only(androidx.compose.foundation.layout.WindowInsetsSides.Top)
+                )
                 .padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
             Box(
