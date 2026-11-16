@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">例如：http://10.0.0.1:8080 或 socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">例如：Referer: https://example.com</string>
     <string name="retry_all">全部重试</string>
+    <string name="pause_all">全部暂停</string>
+    <string name="resume_all">全部继续</string>
     <string name="resume">继续</string>
     <string name="x_selected">已选择 %1$s 个</string>
     <string name="cancel_selection">取消选择</string>
@@ -947,9 +949,12 @@
     <string name="subscriptions_root_subtitle">下载频道和播放列表的新上传</string>
     <string name="subscriptions_search_subtitle">关注 YouTube 频道或播放列表，并自动下载其新上传</string>
     <string name="subscriptions_how_section">如何订阅</string>
-    <string name="subscriptions_empty">你还没有订阅任何内容。在 Comfort 中打开 YouTube 频道或播放列表的链接，然后在下载面板中点按“订阅”。之后其新上传会按你在该面板中的选择自动下载。已有的内容不会下载。</string>
+    <string name="subscriptions_empty">你还没有订阅任何内容。在上方添加 YouTube 频道或播放列表，或在其下载面板中点按“订阅”。之后新上传的视频会自动下载；已有的不会下载。</string>
     <string name="subscriptions_sources_section">来源</string>
-    <string name="subscriptions_description">新上传会添加到你的下载中，每次检查最多 10 个。要添加其他来源，请打开频道或播放列表链接并点按“订阅”。</string>
+    <string name="subscriptions_description">新上传的视频会加入你的下载，每次检查最多 10 个。</string>
+    <string name="subscriptions_add_section">添加频道或播放列表</string>
+    <string name="subscriptions_add_hint">youtube.com/@频道 或播放列表链接</string>
+    <string name="subscriptions_not_a_source">这不是 YouTube 频道或播放列表链接。试试 youtube.com/@名称。</string>
     <string name="subscriptions_check_every">检查间隔</string>
     <string name="subscriptions_hours">%1$d 小时</string>
     <string name="subscriptions_check_now">立即检查</string>

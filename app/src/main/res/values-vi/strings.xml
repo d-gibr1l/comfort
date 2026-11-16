@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">vd: http://10.0.0.1:8080 hoặc socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">vd: Referer: https://example.com</string>
     <string name="retry_all">Thử lại tất cả</string>
+    <string name="pause_all">Tạm dừng tất cả</string>
+    <string name="resume_all">Tiếp tục tất cả</string>
     <string name="resume">Tiếp tục</string>
     <string name="x_selected">Đã chọn %1$s</string>
     <string name="cancel_selection">Hủy chọn</string>
@@ -947,9 +949,12 @@
     <string name="subscriptions_root_subtitle">Tải video mới từ kênh và danh sách phát</string>
     <string name="subscriptions_search_subtitle">Theo dõi một kênh hoặc danh sách phát YouTube và tự tải video mới</string>
     <string name="subscriptions_how_section">Cách theo dõi</string>
-    <string name="subscriptions_empty">Bạn chưa theo dõi gì. Mở liên kết kênh hoặc danh sách phát YouTube trong Comfort, rồi nhấn Theo dõi trong bảng tải xuống của nó. Từ đó video mới sẽ tự tải về, với các lựa chọn bạn đã đặt trong bảng đó. Những gì đã có sẽ không được tải.</string>
+    <string name="subscriptions_empty">Bạn chưa đăng ký gì. Thêm kênh hoặc danh sách phát YouTube ở trên, hoặc nhấn Đăng ký trong bảng tải xuống của nó. Video mới sẽ tự tải xuống; những gì đã có thì không.</string>
     <string name="subscriptions_sources_section">Nguồn</string>
-    <string name="subscriptions_description">Video mới được thêm vào tải xuống, tối đa 10 mỗi lần kiểm tra. Để thêm nguồn khác, mở liên kết kênh hoặc danh sách phát và nhấn Theo dõi.</string>
+    <string name="subscriptions_description">Video mới được thêm vào mục tải xuống, tối đa 10 mỗi lần kiểm tra.</string>
+    <string name="subscriptions_add_section">Thêm kênh hoặc danh sách phát</string>
+    <string name="subscriptions_add_hint">youtube.com/@kenh hoặc liên kết danh sách phát</string>
+    <string name="subscriptions_not_a_source">Đây không phải liên kết kênh hoặc danh sách phát YouTube. Hãy thử youtube.com/@ten.</string>
     <string name="subscriptions_check_every">Kiểm tra mỗi</string>
     <string name="subscriptions_hours">%1$d giờ</string>
     <string name="subscriptions_check_now">Kiểm tra ngay</string>

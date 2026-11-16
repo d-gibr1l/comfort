@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,7 +27,8 @@ import com.comfort.app.viewmodel.rememberSheetViewModelStoreOwner
 // Settings > Subscriptions.
 
 /** The watched channels and playlists: each one's last check, Check now, Pause/Resume, how often
- * it's checked, and Remove. Sources are added from a channel or playlist link's download sheet. */
+ * it's checked, and Remove. Sources are added here from a link, or from a channel or playlist
+ * link's download sheet (its Subscribe). */
 @Composable
 internal fun SubscriptionsSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
     val owner = rememberSheetViewModelStoreOwner()
@@ -41,6 +43,10 @@ internal fun SubscriptionsSettingsScreen(onBack: () -> Unit, highlightKey: Strin
         onBack = onBack,
         highlightKey = highlightKey,
     ) {
+        item {
+            AddSourceCard(viewModel)
+            Spacer(Modifier.height(24.dp))
+        }
         item {
             val list = subscriptions
             when {
@@ -62,6 +68,8 @@ internal fun SubscriptionsSettingsScreen(onBack: () -> Unit, highlightKey: Strin
                         )
                     }
                     list.forEach { subscription ->
+                        // Apart from the note above and from each other (they touched).
+                        Spacer(Modifier.height(12.dp))
                         SubscriptionCard(
                             subscription = subscription,
                             checking = subscription.id in checking,
@@ -87,6 +95,71 @@ internal fun SubscriptionsSettingsScreen(onBack: () -> Unit, highlightKey: Strin
             },
             onDismiss = { pendingRemove = null },
         )
+    }
+}
+
+/** A YouTube channel (youtube.com/@name, or just @name) or playlist link, typed or pasted, and
+ * Subscribe: [SubscriptionsViewModel.add] looks it up and saves it. */
+@Composable
+private fun AddSourceCard(viewModel: SubscriptionsViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val adding by viewModel.adding.collectAsState()
+    val error by viewModel.addError.collectAsState()
+    var link by rememberSaveable { mutableStateOf("") }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val submit = {
+        keyboard?.hide()
+        viewModel.add(link) { message ->
+            link = ""
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    SettingsSection(title = stringResource(R.string.subscriptions_add_section), icon = Icons.Outlined.AddLink) {
+        OutlinedTextField(
+            value = link,
+            onValueChange = { link = it; viewModel.clearAddError() },
+            placeholder = { Text(stringResource(R.string.subscriptions_add_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            singleLine = true,
+            enabled = !adding,
+            isError = error != null,
+            supportingText = error?.let { { Text(it) } },
+            trailingIcon = {
+                // Paste while empty, clear once there's something.
+                if (link.isEmpty()) {
+                    IconButton(onClick = { clipboard.getText()?.text?.trim()?.let { link = it; viewModel.clearAddError() } }, enabled = !adding) {
+                        Icon(Icons.Outlined.ContentPaste, contentDescription = stringResource(R.string.paste))
+                    }
+                } else {
+                    IconButton(onClick = { link = ""; viewModel.clearAddError() }, enabled = !adding) {
+                        Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.search_clear))
+                    }
+                }
+            },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (link.isNotBlank()) submit() }),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = submit,
+            enabled = link.isNotBlank() && !adding,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) {
+            if (adding) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp), color = LocalContentColor.current)
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.subscriptions_checking))
+            } else {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.subscribe))
+            }
+        }
     }
 }
 

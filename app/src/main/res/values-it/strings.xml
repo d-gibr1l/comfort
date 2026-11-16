@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">es. http://10.0.0.1:8080 o socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">es. Referer: https://example.com</string>
     <string name="retry_all">Riprova tutti</string>
+    <string name="pause_all">Metti tutti in pausa</string>
+    <string name="resume_all">Riprendi tutti</string>
     <string name="resume">Riprendi</string>
     <string name="x_selected">%1$s selezionati</string>
     <string name="cancel_selection">Annulla selezione</string>
@@ -949,9 +951,12 @@
     <string name="subscriptions_root_subtitle">Scarica i nuovi caricamenti di canali e playlist</string>
     <string name="subscriptions_search_subtitle">Segui un canale o una playlist di YouTube e scarica automaticamente i nuovi caricamenti</string>
     <string name="subscriptions_how_section">Come iscriversi</string>
-    <string name="subscriptions_empty">Non sei ancora iscritto a niente. Apri in Comfort il link di un canale o di una playlist di YouTube e tocca Iscriviti nella sua scheda di download. Da allora i nuovi caricamenti si scaricheranno da soli, con le scelte fatte in quella scheda. Ciò che c\'è già non viene scaricato.</string>
+    <string name="subscriptions_empty">Non sei ancora iscritto a nulla. Aggiungi sopra un canale o una playlist di YouTube, oppure tocca Iscriviti nella sua scheda di download. I nuovi video si scaricheranno da soli; quelli già presenti no.</string>
     <string name="subscriptions_sources_section">Fonti</string>
-    <string name="subscriptions_description">I nuovi caricamenti vengono aggiunti ai tuoi download, fino a 10 per controllo. Per aggiungere un\'altra fonte, apri il link di un canale o di una playlist e tocca Iscriviti.</string>
+    <string name="subscriptions_description">I nuovi video vengono aggiunti ai tuoi download, fino a 10 per controllo.</string>
+    <string name="subscriptions_add_section">Aggiungi un canale o una playlist</string>
+    <string name="subscriptions_add_hint">youtube.com/@canale o link di una playlist</string>
+    <string name="subscriptions_not_a_source">Non è un link a un canale o a una playlist di YouTube. Prova youtube.com/@nome.</string>
     <string name="subscriptions_check_every">Controlla ogni</string>
     <string name="subscriptions_hours">%1$d h</string>
     <string name="subscriptions_check_now">Controlla ora</string>

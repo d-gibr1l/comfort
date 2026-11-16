@@ -299,7 +299,8 @@ fun QueueScreen(
                                 contentDescription = null,
                             )
                         },
-                        text = { Text(if (showResumeAction) stringResource(R.string.resume) else stringResource(R.string.widget_music_pause)) },
+                        // "All": it pauses or resumes the whole queue, not one download.
+                        text = { Text(if (showResumeAction) stringResource(R.string.resume_all) else stringResource(R.string.pause_all)) },
                     )
                 }
             }

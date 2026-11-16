@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">למשל: http://10.0.0.1:8080 או socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">למשל: Referer: https://example.com</string>
     <string name="retry_all">נסה שוב הכול</string>
+    <string name="pause_all">השהה הכול</string>
+    <string name="resume_all">המשך הכול</string>
     <string name="resume">המשך</string>
     <string name="x_selected">%1$s נבחרו</string>
     <string name="cancel_selection">ביטול הבחירה</string>
@@ -949,9 +951,12 @@
     <string name="subscriptions_root_subtitle">הורד העלאות חדשות מערוצים ופלייליסטים</string>
     <string name="subscriptions_search_subtitle">עקוב אחרי ערוץ או פלייליסט ביוטיוב והורד את ההעלאות החדשות שלו אוטומטית</string>
     <string name="subscriptions_how_section">איך נרשמים</string>
-    <string name="subscriptions_empty">עדיין לא נרשמת לשום דבר. פתח קישור לערוץ או פלייליסט ביוטיוב ב-Comfort, והקש על הרשמה בגיליון ההורדה שלו. מאז ההעלאות החדשות שלו יורדו לבד, עם הבחירות שעשית בגיליון. מה שכבר קיים לא מורד.</string>
+    <string name="subscriptions_empty">עדיין לא נרשמת לשום דבר. הוסיפו למעלה ערוץ או פלייליסט ב-YouTube, או הקישו על הרשמה בגיליון ההורדה שלו. הסרטונים החדשים יורדו לבד; מה שכבר קיים לא יורד.</string>
     <string name="subscriptions_sources_section">מקורות</string>
-    <string name="subscriptions_description">העלאות חדשות מתווספות להורדות שלך, עד 10 בכל בדיקה. כדי להוסיף מקור נוסף, פתח קישור לערוץ או פלייליסט והקש על הרשמה.</string>
+    <string name="subscriptions_description">סרטונים חדשים נוספים להורדות שלך, עד 10 בכל בדיקה.</string>
+    <string name="subscriptions_add_section">הוספת ערוץ או פלייליסט</string>
+    <string name="subscriptions_add_hint">youtube.com/@channel או קישור לפלייליסט</string>
+    <string name="subscriptions_not_a_source">זה לא קישור לערוץ או לפלייליסט ב-YouTube. נסו youtube.com/@name.</string>
     <string name="subscriptions_check_every">בדיקה כל</string>
     <string name="subscriptions_hours">%1$d שע׳</string>
     <string name="subscriptions_check_now">בדיקה עכשיו</string>

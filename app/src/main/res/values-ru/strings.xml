@@ -581,6 +581,8 @@
     <string name="e_g_http_10_0_0">например, http://10.0.0.1:8080 или socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">например, Referer: https://example.com</string>
     <string name="retry_all">Повторить все</string>
+    <string name="pause_all">Приостановить все</string>
+    <string name="resume_all">Возобновить все</string>
     <string name="resume">Продолжить</string>
     <string name="x_selected">Выбрано: %1$s</string>
     <string name="cancel_selection">Отменить выбор</string>
@@ -1147,9 +1149,12 @@
     <string name="subscriptions_root_subtitle">Скачивание новых видео с каналов и плейлистов</string>
     <string name="subscriptions_search_subtitle">Следите за каналом или плейлистом YouTube и автоматически скачивайте новые видео</string>
     <string name="subscriptions_how_section">Как подписаться</string>
-    <string name="subscriptions_empty">Подписок пока нет. Откройте в Comfort ссылку на канал или плейлист YouTube и нажмите «Подписаться» в окне загрузки. Новые видео будут скачиваться сами, с настройками, выбранными в этом окне. То, что уже опубликовано, не скачивается.</string>
+    <string name="subscriptions_empty">Вы ещё ни на что не подписаны. Добавьте выше канал или плейлист YouTube или нажмите «Подписаться» в его окне загрузки. Новые видео будут загружаться сами; уже существующие — нет.</string>
     <string name="subscriptions_sources_section">Источники</string>
-    <string name="subscriptions_description">Новые видео добавляются в загрузки, до 10 за одну проверку. Чтобы добавить источник, откройте ссылку на канал или плейлист и нажмите «Подписаться».</string>
+    <string name="subscriptions_description">Новые видео добавляются в загрузки, до 10 за проверку.</string>
+    <string name="subscriptions_add_section">Добавить канал или плейлист</string>
+    <string name="subscriptions_add_hint">youtube.com/@канал или ссылка на плейлист</string>
+    <string name="subscriptions_not_a_source">Это не ссылка на канал или плейлист YouTube. Попробуйте youtube.com/@имя.</string>
     <string name="subscriptions_check_every">Проверять каждые</string>
     <string name="subscriptions_hours">%1$d ч</string>
     <string name="subscriptions_check_now">Проверить</string>

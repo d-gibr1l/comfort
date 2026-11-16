@@ -569,6 +569,8 @@
     <string name="e_g_http_10_0_0">ex.: http://10.0.0.1:8080 ou socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">ex.: Referer: https://example.com</string>
     <string name="retry_all">Tentar tudo de novo</string>
+    <string name="pause_all">Pausar tudo</string>
+    <string name="resume_all">Retomar tudo</string>
     <string name="resume">Retomar</string>
     <string name="x_selected">%1$s selecionados</string>
     <string name="cancel_selection">Cancelar seleção</string>
@@ -1108,9 +1110,12 @@
     <string name="subscriptions_root_subtitle">Baixe os novos envios de canais e playlists</string>
     <string name="subscriptions_search_subtitle">Acompanhe um canal ou playlist do YouTube e baixe os novos envios automaticamente</string>
     <string name="subscriptions_how_section">Como se inscrever</string>
-    <string name="subscriptions_empty">Você ainda não se inscreveu em nada. Abra um link de canal ou playlist do YouTube no Comfort e toque em Inscrever-se na tela de download. Os novos envios vão ser baixados sozinhos, com as escolhas que você fez nessa tela. O que já está lá não é baixado.</string>
+    <string name="subscriptions_empty">Você ainda não se inscreveu em nada. Adicione acima um canal ou playlist do YouTube, ou toque em Inscrever-se na folha de download dele. Os novos vídeos serão baixados sozinhos; o que já existe não é baixado.</string>
     <string name="subscriptions_sources_section">Fontes</string>
-    <string name="subscriptions_description">Os novos envios são adicionados aos seus downloads, até 10 por verificação. Para adicionar outra fonte, abra um link de canal ou playlist e toque em Inscrever-se.</string>
+    <string name="subscriptions_description">Os novos vídeos são adicionados aos seus downloads, até 10 por verificação.</string>
+    <string name="subscriptions_add_section">Adicionar canal ou playlist</string>
+    <string name="subscriptions_add_hint">youtube.com/@canal ou link de playlist</string>
+    <string name="subscriptions_not_a_source">Isso não é um link de canal ou playlist do YouTube. Tente youtube.com/@nome.</string>
     <string name="subscriptions_check_every">Verificar a cada</string>
     <string name="subscriptions_check_now">Verificar agora</string>
     <string name="subscriptions_pause">Pausar</string>

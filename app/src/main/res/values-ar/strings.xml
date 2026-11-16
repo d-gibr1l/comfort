@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">مثال: http://10.0.0.1:8080 أو socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">مثال: Referer: https://example.com</string>
     <string name="retry_all">إعادة محاولة الكل</string>
+    <string name="pause_all">إيقاف الكل مؤقتًا</string>
+    <string name="resume_all">استئناف الكل</string>
     <string name="resume">استئناف</string>
     <string name="x_selected">%1$s محدد</string>
     <string name="cancel_selection">إلغاء التحديد</string>
@@ -952,9 +954,12 @@
     <string name="subscriptions_root_subtitle">نزّل المحتوى الجديد من القنوات وقوائم التشغيل</string>
     <string name="subscriptions_search_subtitle">تابع قناة أو قائمة تشغيل على يوتيوب ونزّل محتواها الجديد تلقائيًا</string>
     <string name="subscriptions_how_section">كيفية الاشتراك</string>
-    <string name="subscriptions_empty">لم تشترك في أي شيء بعد. افتح رابط قناة أو قائمة تشغيل على يوتيوب في Comfort، وانقر «اشتراك» في ورقة التنزيل الخاصة به. بعدها سيُنزَّل محتواه الجديد تلقائيًا، بالخيارات التي اخترتها في تلك الورقة. لا يُنزَّل ما هو موجود مسبقًا.</string>
+    <string name="subscriptions_empty">لم تشترك في أي شيء بعد. أضف قناة أو قائمة تشغيل على YouTube أعلاه، أو اضغط اشتراك في ورقة التنزيل الخاصة بها. ستُنزَّل مقاطعها الجديدة تلقائيًا، ولا يُنزَّل ما هو موجود بالفعل.</string>
     <string name="subscriptions_sources_section">المصادر</string>
-    <string name="subscriptions_description">يُضاف المحتوى الجديد إلى تنزيلاتك، حتى 10 في كل فحص. لإضافة مصدر آخر، افتح رابط قناة أو قائمة تشغيل وانقر «اشتراك».</string>
+    <string name="subscriptions_description">تُضاف المقاطع الجديدة إلى تنزيلاتك، حتى 10 في كل فحص.</string>
+    <string name="subscriptions_add_section">أضف قناة أو قائمة تشغيل</string>
+    <string name="subscriptions_add_hint">youtube.com/@channel أو رابط قائمة تشغيل</string>
+    <string name="subscriptions_not_a_source">هذا ليس رابط قناة أو قائمة تشغيل على YouTube. جرّب youtube.com/@name.</string>
     <string name="subscriptions_check_every">الفحص كل</string>
     <string name="subscriptions_hours">%1$d س</string>
     <string name="subscriptions_check_now">الفحص الآن</string>

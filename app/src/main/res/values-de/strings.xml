@@ -555,6 +555,8 @@
     <string name="e_g_http_10_0_0">z. B. http://10.0.0.1:8080 oder socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">z. B. Referer: https://example.com</string>
     <string name="retry_all">Alle wiederholen</string>
+    <string name="pause_all">Alle pausieren</string>
+    <string name="resume_all">Alle fortsetzen</string>
     <string name="resume">Fortsetzen</string>
     <string name="x_selected">%1$s ausgewählt</string>
     <string name="cancel_selection">Auswahl aufheben</string>
@@ -1074,9 +1076,12 @@
     <string name="subscriptions_root_subtitle">Neue Uploads von Kanälen und Playlists laden</string>
     <string name="subscriptions_search_subtitle">Einem YouTube-Kanal oder einer Playlist folgen und neue Uploads automatisch laden</string>
     <string name="subscriptions_how_section">So abonnierst du</string>
-    <string name="subscriptions_empty">Du hast noch nichts abonniert. Öffne einen Link zu einem YouTube-Kanal oder einer Playlist in Comfort und tippe im Download-Fenster auf Abonnieren. Neue Uploads werden dann von selbst geladen, mit den Einstellungen aus diesem Fenster. Was schon da ist, wird nicht geladen.</string>
+    <string name="subscriptions_empty">Du hast noch nichts abonniert. Füge oben einen YouTube-Kanal oder eine Playlist hinzu oder tippe im Download-Fenster auf Abonnieren. Neue Uploads werden dann von selbst geladen; was schon da ist, nicht.</string>
     <string name="subscriptions_sources_section">Quellen</string>
-    <string name="subscriptions_description">Neue Uploads werden zu deinen Downloads hinzugefügt, bis zu 10 pro Prüfung. Um eine weitere Quelle hinzuzufügen, öffne einen Kanal- oder Playlist-Link und tippe auf Abonnieren.</string>
+    <string name="subscriptions_description">Neue Uploads kommen zu deinen Downloads, bis zu 10 pro Prüfung.</string>
+    <string name="subscriptions_add_section">Kanal oder Playlist hinzufügen</string>
+    <string name="subscriptions_add_hint">youtube.com/@kanal oder Playlist-Link</string>
+    <string name="subscriptions_not_a_source">Das ist kein YouTube-Kanal- oder Playlist-Link. Versuch youtube.com/@name.</string>
     <string name="subscriptions_check_every">Prüfen alle</string>
     <string name="subscriptions_hours">%1$d Std.</string>
     <string name="subscriptions_check_now">Jetzt prüfen</string>

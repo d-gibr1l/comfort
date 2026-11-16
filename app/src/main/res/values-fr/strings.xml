@@ -568,6 +568,8 @@
     <string name="e_g_http_10_0_0">ex. http://10.0.0.1:8080 ou socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">ex. Referer: https://example.com</string>
     <string name="retry_all">Tout réessayer</string>
+    <string name="pause_all">Tout mettre en pause</string>
+    <string name="resume_all">Tout reprendre</string>
     <string name="resume">Reprendre</string>
     <string name="x_selected">%1$s sélectionné(s)</string>
     <string name="cancel_selection">Annuler la sélection</string>
@@ -1112,9 +1114,12 @@
     <string name="subscriptions_root_subtitle">Télécharge les nouvelles vidéos des chaînes et playlists</string>
     <string name="subscriptions_search_subtitle">Suis une chaîne ou une playlist YouTube et télécharge automatiquement ses nouvelles vidéos</string>
     <string name="subscriptions_how_section">Comment s\'abonner</string>
-    <string name="subscriptions_empty">Tu n\'es encore abonné à rien. Ouvre un lien de chaîne ou de playlist YouTube dans Comfort, puis appuie sur S\'abonner dans son panneau de téléchargement. Ses nouvelles vidéos se téléchargeront alors toutes seules, avec les choix faits dans ce panneau. Ce qui existe déjà n\'est pas téléchargé.</string>
+    <string name="subscriptions_empty">Vous n\'êtes abonné à rien pour l\'instant. Ajoutez une chaîne ou une playlist YouTube ci-dessus, ou touchez S\'abonner dans sa feuille de téléchargement. Ses nouvelles vidéos se téléchargeront seules ; ce qui existe déjà n\'est pas téléchargé.</string>
     <string name="subscriptions_sources_section">Sources</string>
-    <string name="subscriptions_description">Les nouvelles vidéos sont ajoutées à tes téléchargements, jusqu\'à 10 par vérification. Pour ajouter une source, ouvre un lien de chaîne ou de playlist et appuie sur S\'abonner.</string>
+    <string name="subscriptions_description">Les nouvelles vidéos s\'ajoutent à vos téléchargements, jusqu\'à 10 par vérification.</string>
+    <string name="subscriptions_add_section">Ajouter une chaîne ou une playlist</string>
+    <string name="subscriptions_add_hint">youtube.com/@chaine ou lien de playlist</string>
+    <string name="subscriptions_not_a_source">Ce n\'est pas un lien de chaîne ou de playlist YouTube. Essayez youtube.com/@nom.</string>
     <string name="subscriptions_check_every">Vérifier toutes les</string>
     <string name="subscriptions_hours">%1$d h</string>
     <string name="subscriptions_check_now">Vérifier</string>

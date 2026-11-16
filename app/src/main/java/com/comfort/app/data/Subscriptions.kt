@@ -85,6 +85,24 @@ object Subscriptions {
         return SubscribeResult.Added(subscription)
     }
 
+    /** A YouTube channel or playlist address from what was typed or pasted on the Subscriptions
+     * page — "youtube.com/@name", a bare "@name", /channel/, /c/, /user/, or a playlist (list=) —
+     * as a full https link; null for anything else (a single video, another site). */
+    fun youTubeSourceUrl(input: String): String? {
+        val text = input.trim().takeIf { it.isNotEmpty() } ?: return null
+        if (Regex("""^@[\w.\-]+$""").matches(text)) return "https://www.youtube.com/$text"
+        val withScheme = if (text.startsWith("http://") || text.startsWith("https://")) text else "https://$text"
+        val uri = runCatching { java.net.URI(withScheme) }.getOrNull() ?: return null
+        val host = uri.host?.lowercase()?.removePrefix("www.")?.removePrefix("m.")?.removePrefix("music.") ?: return null
+        if (host != "youtube.com") return null
+        val path = uri.path.orEmpty()
+        val isChannel = Regex("""^/(@[^/]+|channel/[\w\-]+|c/[^/]+|user/[^/]+)(/.*)?$""").matches(path)
+        if (isChannel) return withScheme
+        // A playlist, or a video opened from one (watch?v=…&list=…): the playlist itself.
+        val list = uri.query.orEmpty().split('&').firstOrNull { it.startsWith("list=") }?.removePrefix("list=")
+        return list?.takeIf { it.isNotBlank() }?.let { "https://www.youtube.com/playlist?list=$it" }
+    }
+
     suspend fun setPaused(context: Context, id: String, paused: Boolean) = dao(context).setPaused(id, paused)
 
     suspend fun setInterval(context: Context, id: String, hours: Int) = dao(context).setInterval(id, hours)

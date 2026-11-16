@@ -563,6 +563,8 @@
     <string name="e_g_http_10_0_0">p. ej. http://10.0.0.1:8080 o socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">p. ej. Referer: https://example.com</string>
     <string name="retry_all">Reintentar todo</string>
+    <string name="pause_all">Pausar todo</string>
+    <string name="resume_all">Reanudar todo</string>
     <string name="resume">Reanudar</string>
     <string name="x_selected">%1$s seleccionados</string>
     <string name="cancel_selection">Cancelar selección</string>
@@ -1095,9 +1097,12 @@
     <string name="subscriptions_root_subtitle">Descarga lo nuevo de canales y listas de reproducción</string>
     <string name="subscriptions_search_subtitle">Sigue un canal o una lista de YouTube y descarga lo nuevo que suban automáticamente</string>
     <string name="subscriptions_how_section">Cómo suscribirte</string>
-    <string name="subscriptions_empty">Todavía no te suscribiste a nada. Abre en Comfort el enlace de un canal o una lista de YouTube y toca Suscribirse en su panel de descarga. Lo nuevo que suban se descargará solo, con las opciones que elegiste en ese panel. Lo que ya había no se descarga.</string>
+    <string name="subscriptions_empty">Aún no te has suscrito a nada. Añade arriba un canal o una lista de YouTube, o toca Suscribirse en su hoja de descarga. Sus vídeos nuevos se descargarán solos; lo que ya existe no se descarga.</string>
     <string name="subscriptions_sources_section">Fuentes</string>
-    <string name="subscriptions_description">Lo nuevo se añade a tus descargas, hasta 10 por comprobación. Para añadir otra fuente, abre el enlace de un canal o una lista y toca Suscribirse.</string>
+    <string name="subscriptions_description">Los vídeos nuevos se añaden a tus descargas, hasta 10 por comprobación.</string>
+    <string name="subscriptions_add_section">Añadir un canal o lista</string>
+    <string name="subscriptions_add_hint">youtube.com/@canal o enlace de una lista</string>
+    <string name="subscriptions_not_a_source">No es un enlace de canal o lista de YouTube. Prueba youtube.com/@nombre.</string>
     <string name="subscriptions_check_every">Comprobar cada</string>
     <string name="subscriptions_check_now">Comprobar ahora</string>
     <string name="subscriptions_pause">Pausar</string>

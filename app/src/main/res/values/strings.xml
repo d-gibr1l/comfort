@@ -585,6 +585,8 @@
     <string name="e_g_referer_https_example_com">e.g. Referer: https://example.com</string>
     <!-- QueueScreen.kt -->
     <string name="retry_all">Retry All</string>
+    <string name="pause_all">Pause All</string>
+    <string name="resume_all">Resume All</string>
     <string name="resume">Resume</string>
     <string name="x_selected">%1$s selected</string>
     <string name="cancel_selection">Cancel selection</string>
@@ -1135,9 +1137,12 @@
     <string name="subscriptions_root_subtitle">Download new uploads from channels and playlists</string>
     <string name="subscriptions_search_subtitle">Watch a YouTube channel or playlist and download its new uploads automatically</string>
     <string name="subscriptions_how_section">How to subscribe</string>
-    <string name="subscriptions_empty">You haven\'t subscribed to anything yet. Open a YouTube channel or playlist link in Comfort, and tap Subscribe in its download sheet. Its new uploads will then download on their own, with the choices you made in that sheet. What\'s already there isn\'t downloaded.</string>
+    <string name="subscriptions_empty">You haven\'t subscribed to anything yet. Add a YouTube channel or playlist above, or tap Subscribe in its download sheet. Its new uploads then download on their own; what\'s already there isn\'t downloaded.</string>
     <string name="subscriptions_sources_section">Sources</string>
-    <string name="subscriptions_description">New uploads are added to your downloads, up to 10 per check. To add another source, open a channel or playlist link and tap Subscribe.</string>
+    <string name="subscriptions_description">New uploads are added to your downloads, up to 10 per check.</string>
+    <string name="subscriptions_add_section">Add a channel or playlist</string>
+    <string name="subscriptions_add_hint">youtube.com/@channel or a playlist link</string>
+    <string name="subscriptions_not_a_source">That isn\'t a YouTube channel or playlist link. Try youtube.com/@name.</string>
     <string name="subscriptions_check_every">Check every</string>
     <string name="subscriptions_hours">%1$d h</string>
     <string name="subscriptions_check_now">Check now</string>

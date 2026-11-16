@@ -552,6 +552,8 @@
     <string name="e_g_http_10_0_0">mis. http://10.0.0.1:8080 atau socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">mis. Referer: https://example.com</string>
     <string name="retry_all">Coba Lagi Semua</string>
+    <string name="pause_all">Jeda Semua</string>
+    <string name="resume_all">Lanjutkan Semua</string>
     <string name="resume">Lanjutkan</string>
     <string name="x_selected">%1$s dipilih</string>
     <string name="cancel_selection">Batalkan pilihan</string>
@@ -1056,9 +1058,12 @@
     <string name="subscriptions_root_subtitle">Unduh unggahan baru dari channel dan playlist</string>
     <string name="subscriptions_search_subtitle">Pantau channel atau playlist YouTube dan unduh unggahan barunya secara otomatis</string>
     <string name="subscriptions_how_section">Cara berlangganan</string>
-    <string name="subscriptions_empty">Anda belum berlangganan apa pun. Buka tautan channel atau playlist YouTube di Comfort, lalu ketuk Langganan di lembar unduhannya. Unggahan barunya akan terunduh sendiri, dengan pilihan yang Anda buat di lembar itu. Yang sudah ada tidak ikut diunduh.</string>
+    <string name="subscriptions_empty">Anda belum berlangganan apa pun. Tambahkan saluran atau playlist YouTube di atas, atau ketuk Berlangganan di lembar unduhannya. Unggahan barunya akan terunduh sendiri; yang sudah ada tidak diunduh.</string>
     <string name="subscriptions_sources_section">Sumber</string>
-    <string name="subscriptions_description">Unggahan baru ditambahkan ke unduhan Anda, hingga 10 per pemeriksaan. Untuk menambah sumber lain, buka tautan channel atau playlist lalu ketuk Langganan.</string>
+    <string name="subscriptions_description">Unggahan baru ditambahkan ke unduhan Anda, hingga 10 per pemeriksaan.</string>
+    <string name="subscriptions_add_section">Tambahkan saluran atau playlist</string>
+    <string name="subscriptions_add_hint">youtube.com/@saluran atau link playlist</string>
+    <string name="subscriptions_not_a_source">Itu bukan link saluran atau playlist YouTube. Coba youtube.com/@nama.</string>
     <string name="subscriptions_check_every">Periksa setiap</string>
     <string name="subscriptions_hours">%1$d jam</string>
     <string name="subscriptions_check_now">Periksa sekarang</string>

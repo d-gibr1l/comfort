@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">जैसे: http://10.0.0.1:8080 या socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">जैसे: Referer: https://example.com</string>
     <string name="retry_all">सभी फिर से आज़माएँ</string>
+    <string name="pause_all">सभी रोकें</string>
+    <string name="resume_all">सभी फिर शुरू करें</string>
     <string name="resume">जारी रखें</string>
     <string name="x_selected">%1$s चुने गए</string>
     <string name="cancel_selection">चुनाव रद्द करें</string>
@@ -948,9 +950,12 @@
     <string name="subscriptions_root_subtitle">चैनलों और प्लेलिस्ट से नए अपलोड डाउनलोड करें</string>
     <string name="subscriptions_search_subtitle">किसी YouTube चैनल या प्लेलिस्ट को फ़ॉलो करें और उसके नए अपलोड अपने-आप डाउनलोड करें</string>
     <string name="subscriptions_how_section">सदस्यता कैसे लें</string>
-    <string name="subscriptions_empty">आपने अभी किसी की सदस्यता नहीं ली है। Comfort में किसी YouTube चैनल या प्लेलिस्ट का लिंक खोलें, और उसकी डाउनलोड शीट में सदस्यता लें पर टैप करें। फिर उसके नए अपलोड, उस शीट में किए आपके चुनावों के साथ, अपने-आप डाउनलोड होंगे। जो पहले से है वह डाउनलोड नहीं होता।</string>
+    <string name="subscriptions_empty">आपने अभी तक कुछ सब्सक्राइब नहीं किया है। ऊपर कोई YouTube चैनल या प्लेलिस्ट जोड़ें, या उसकी डाउनलोड शीट में सब्सक्राइब पर टैप करें। उसके नए अपलोड अपने-आप डाउनलोड होंगे; जो पहले से है वह नहीं।</string>
     <string name="subscriptions_sources_section">स्रोत</string>
-    <string name="subscriptions_description">नए अपलोड आपके डाउनलोड में जोड़े जाते हैं, हर जाँच में 10 तक। दूसरा स्रोत जोड़ने के लिए किसी चैनल या प्लेलिस्ट का लिंक खोलें और सदस्यता लें पर टैप करें।</string>
+    <string name="subscriptions_description">नए अपलोड आपके डाउनलोड में जुड़ते हैं, हर जाँच में 10 तक।</string>
+    <string name="subscriptions_add_section">चैनल या प्लेलिस्ट जोड़ें</string>
+    <string name="subscriptions_add_hint">youtube.com/@channel या प्लेलिस्ट लिंक</string>
+    <string name="subscriptions_not_a_source">यह YouTube चैनल या प्लेलिस्ट का लिंक नहीं है। youtube.com/@name आज़माएँ।</string>
     <string name="subscriptions_check_every">जाँच का अंतराल</string>
     <string name="subscriptions_hours">%1$d घंटे</string>
     <string name="subscriptions_check_now">अभी जाँचें</string>

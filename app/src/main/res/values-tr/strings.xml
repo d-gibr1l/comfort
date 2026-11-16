@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">ör. http://10.0.0.1:8080 veya socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">ör. Referer: https://example.com</string>
     <string name="retry_all">Tümünü yeniden dene</string>
+    <string name="pause_all">Tümünü duraklat</string>
+    <string name="resume_all">Tümünü sürdür</string>
     <string name="resume">Sürdür</string>
     <string name="x_selected">%1$s seçildi</string>
     <string name="cancel_selection">Seçimi iptal et</string>
@@ -948,9 +950,12 @@
     <string name="subscriptions_root_subtitle">Kanallardan ve oynatma listelerinden yeni yüklemeleri indir</string>
     <string name="subscriptions_search_subtitle">Bir YouTube kanalını veya oynatma listesini takip et ve yeni yüklemelerini otomatik indir</string>
     <string name="subscriptions_how_section">Nasıl abone olunur</string>
-    <string name="subscriptions_empty">Henüz hiçbir şeye abone olmadın. Comfort\'ta bir YouTube kanalı veya oynatma listesi bağlantısı aç ve indirme sayfasındaki Abone ol\'a dokun. Sonra yeni yüklemeleri, o sayfada yaptığın seçimlerle kendiliğinden iner. Zaten var olanlar indirilmez.</string>
+    <string name="subscriptions_empty">Henüz hiçbir şeye abone olmadınız. Yukarıdan bir YouTube kanalı veya oynatma listesi ekleyin ya da indirme sayfasında Abone ol\'a dokunun. Yeni yüklemeleri kendiliğinden indirilir; zaten olanlar indirilmez.</string>
     <string name="subscriptions_sources_section">Kaynaklar</string>
-    <string name="subscriptions_description">Yeni yüklemeler indirmelerine eklenir, her denetimde en fazla 10. Başka bir kaynak eklemek için bir kanal veya oynatma listesi bağlantısı aç ve Abone ol\'a dokun.</string>
+    <string name="subscriptions_description">Yeni yüklemeler indirmelerinize eklenir, her kontrolde en fazla 10.</string>
+    <string name="subscriptions_add_section">Kanal veya oynatma listesi ekle</string>
+    <string name="subscriptions_add_hint">youtube.com/@kanal veya oynatma listesi bağlantısı</string>
+    <string name="subscriptions_not_a_source">Bu bir YouTube kanalı veya oynatma listesi bağlantısı değil. youtube.com/@ad deneyin.</string>
     <string name="subscriptions_check_every">Denetleme sıklığı</string>
     <string name="subscriptions_hours">%1$d sa</string>
     <string name="subscriptions_check_now">Şimdi denetle</string>

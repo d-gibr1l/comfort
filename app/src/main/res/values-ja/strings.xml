@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">例: http://10.0.0.1:8080 または socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">例: Referer: https://example.com</string>
     <string name="retry_all">すべて再試行</string>
+    <string name="pause_all">すべて一時停止</string>
+    <string name="resume_all">すべて再開</string>
     <string name="resume">再開</string>
     <string name="x_selected">%1$s 件選択中</string>
     <string name="cancel_selection">選択を解除</string>
@@ -947,9 +949,12 @@
     <string name="subscriptions_root_subtitle">チャンネルや再生リストの新しい動画をダウンロード</string>
     <string name="subscriptions_search_subtitle">YouTube のチャンネルや再生リストを登録し、新しい動画を自動でダウンロード</string>
     <string name="subscriptions_how_section">登録の方法</string>
-    <string name="subscriptions_empty">まだ何も登録していません。YouTube のチャンネルか再生リストのリンクを Comfort で開き、ダウンロード画面の「登録」をタップしてください。以降、新しい動画がその画面で選んだ設定で自動的にダウンロードされます。すでにある動画はダウンロードされません。</string>
+    <string name="subscriptions_empty">まだ何も登録していません。上で YouTube のチャンネルや再生リストを追加するか、ダウンロード画面で「登録」をタップしてください。新しい動画は自動でダウンロードされます。既存の動画はダウンロードされません。</string>
     <string name="subscriptions_sources_section">登録元</string>
-    <string name="subscriptions_description">新しい動画はダウンロードに追加されます(1 回の確認で最大 10 件)。別の登録元を追加するには、チャンネルか再生リストのリンクを開いて「登録」をタップします。</string>
+    <string name="subscriptions_description">新しい動画はダウンロードに追加されます（1 回のチェックで最大 10 件）。</string>
+    <string name="subscriptions_add_section">チャンネルや再生リストを追加</string>
+    <string name="subscriptions_add_hint">youtube.com/@channel または再生リストのリンク</string>
+    <string name="subscriptions_not_a_source">YouTube のチャンネルや再生リストのリンクではありません。youtube.com/@name の形で入力してください。</string>
     <string name="subscriptions_check_every">確認の間隔</string>
     <string name="subscriptions_hours">%1$d 時間</string>
     <string name="subscriptions_check_now">今すぐ確認</string>

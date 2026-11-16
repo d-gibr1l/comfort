@@ -514,6 +514,8 @@
     <string name="e_g_http_10_0_0">مثلاً: http://10.0.0.1:8080 یا socks5://127.0.0.1:1080</string>
     <string name="e_g_referer_https_example_com">مثلاً: Referer: https://example.com</string>
     <string name="retry_all">تلاش دوباره همه</string>
+    <string name="pause_all">توقف همه</string>
+    <string name="resume_all">ادامهٔ همه</string>
     <string name="resume">ادامه</string>
     <string name="x_selected">%1$s انتخاب شد</string>
     <string name="cancel_selection">لغو انتخاب</string>
@@ -948,9 +950,12 @@
     <string name="subscriptions_root_subtitle">دانلود بارگذاری‌های جدید کانال‌ها و فهرست‌های پخش</string>
     <string name="subscriptions_search_subtitle">یک کانال یا فهرست پخش یوتیوب را دنبال کنید و بارگذاری‌های جدیدش را خودکار دانلود کنید</string>
     <string name="subscriptions_how_section">نحوه مشترک شدن</string>
-    <string name="subscriptions_empty">هنوز مشترک چیزی نشده‌اید. پیوند یک کانال یا فهرست پخش یوتیوب را در Comfort باز کنید و در برگه دانلودش روی اشتراک بزنید. از آن پس بارگذاری‌های جدیدش خودبه‌خود با انتخاب‌هایی که در آن برگه کردید دانلود می‌شوند. آنچه از قبل هست دانلود نمی‌شود.</string>
+    <string name="subscriptions_empty">هنوز مشترک چیزی نشده‌اید. یک کانال یا فهرست پخش YouTube را در بالا اضافه کنید یا در برگهٔ بارگیری آن روی اشتراک بزنید. ویدیوهای جدیدش خودکار بارگیری می‌شوند؛ آنچه از قبل هست بارگیری نمی‌شود.</string>
     <string name="subscriptions_sources_section">منابع</string>
-    <string name="subscriptions_description">بارگذاری‌های جدید به دانلودهای شما افزوده می‌شوند، تا ۱۰ مورد در هر بررسی. برای افزودن منبع دیگر، پیوند یک کانال یا فهرست پخش را باز کنید و روی اشتراک بزنید.</string>
+    <string name="subscriptions_description">ویدیوهای جدید به بارگیری‌های شما اضافه می‌شوند، تا ۱۰ مورد در هر بررسی.</string>
+    <string name="subscriptions_add_section">افزودن کانال یا فهرست پخش</string>
+    <string name="subscriptions_add_hint">youtube.com/@channel یا پیوند فهرست پخش</string>
+    <string name="subscriptions_not_a_source">این پیوند کانال یا فهرست پخش YouTube نیست. youtube.com/@name را امتحان کنید.</string>
     <string name="subscriptions_check_every">بررسی هر</string>
     <string name="subscriptions_hours">%1$d ساعت</string>
     <string name="subscriptions_check_now">بررسی اکنون</string>
