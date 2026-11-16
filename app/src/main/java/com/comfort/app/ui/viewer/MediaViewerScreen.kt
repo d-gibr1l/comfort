@@ -949,6 +949,11 @@ fun MediaViewerScreen(
                             val index = galleryItems.indexOf(target)
                             if (index >= 0) coroutineScope.launch { pagerState.animateScrollToPage(index) }
                         },
+                        // A drag along it: straight to each one, to keep up with the finger.
+                        onScrub = { target ->
+                            val index = galleryItems.indexOf(target)
+                            if (index >= 0) coroutineScope.launch { pagerState.scrollToPage(index) }
+                        },
                     )
                     Spacer(Modifier.height(FILMSTRIP_SPACE - 56.dp))
                 }
