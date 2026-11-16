@@ -415,8 +415,9 @@ fun DownloadsHistoryScreen(
             }
             .let { list ->
                 when (sortOption) {
-                    LibrarySort.DATE_NEWEST -> list.sortedByDescending { it.effectiveDate }
-                    LibrarySort.DATE_OLDEST -> list.sortedBy { it.effectiveDate }
+                    // By when each finished (DownloadEntity.libraryDate), not when it started.
+                    LibrarySort.DATE_NEWEST -> list.sortedByDescending { it.libraryDate }
+                    LibrarySort.DATE_OLDEST -> list.sortedBy { it.libraryDate }
                     LibrarySort.NAME -> list.sortedBy { it.title.ifBlank { it.url }.lowercase() }
                     LibrarySort.SIZE -> list.sortedByDescending { it.totalBytes }
                 }

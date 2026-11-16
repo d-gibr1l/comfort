@@ -646,7 +646,7 @@ internal fun HistoryRow(
             )
             Spacer(Modifier.height(6.dp))
 
-            MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, historyDateFormat().format(Date(item.effectiveDate))))
+            MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, historyDateFormat().format(Date(item.libraryDate))))
             Spacer(Modifier.height(2.dp))
             MetaRow(icon = Icons.Outlined.SdStorage, text = stringResource(R.string.size_x, formatFileSize(item.totalBytes)))
             if (item.missingItems > 0) {

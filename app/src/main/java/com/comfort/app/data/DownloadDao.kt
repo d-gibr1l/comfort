@@ -109,6 +109,11 @@ interface DownloadDao {
     @Query("UPDATE downloads SET status = :status, errorMessage = :errorMessage, erroredAt = :erroredAt WHERE id = :id")
     suspend fun updateError(id: String, status: DownloadStatus, errorMessage: String?, erroredAt: Long = System.currentTimeMillis())
 
+    /** A download done: FINISHED, with [errorMessage] for the items it couldn't get, and when
+     * ([at], DownloadEntity.finishedAt). erroredAt too, as the error write this replaced set it. */
+    @Query("UPDATE downloads SET status = 'FINISHED', errorMessage = :errorMessage, erroredAt = :at, finishedAt = :at WHERE id = :id")
+    suspend fun markFinished(id: String, errorMessage: String?, at: Long = System.currentTimeMillis())
+
     /** Each engine's own error for a failed download (see DownloadEntity.errorDetails). */
     @Query("UPDATE downloads SET errorDetails = :details WHERE id = :id")
     suspend fun setErrorDetails(id: String, details: String?)

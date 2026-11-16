@@ -134,6 +134,7 @@ class MseRecorder(private val workDir: File) {
                     thumbnailPath = if (video == null) null else saved.toString(),
                     mediaUri = if (video == null) saved.toString() else null,
                     status = DownloadStatus.FINISHED,
+                    finishedAt = System.currentTimeMillis(),
                     progress = 1f,
                     downloadedItems = 1,
                     totalItems = 1,

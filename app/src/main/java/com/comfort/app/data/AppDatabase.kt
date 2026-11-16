@@ -245,12 +245,22 @@ private val MIGRATION_29_30 = object : Migration(29, 30) {
     }
 }
 
+// finishedAt: when a download finished (the Library sorts by it). Filled in for the ones already
+// finished from erroredAt, which the finish has always written too (updateError(.., FINISHED, ..)).
+// Rows finished another way (a browser recording, a compressed copy) stay null: start time.
+private val MIGRATION_30_31 = object : Migration(30, 31) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE downloads ADD COLUMN finishedAt INTEGER")
+        db.execSQL("UPDATE downloads SET finishedAt = erroredAt WHERE finishedAt IS NULL AND status IN ('FINISHED', 'SAVED', 'DELETED') AND erroredAt IS NOT NULL")
+    }
+}
+
 @Database(
     entities = [
         DownloadEntity::class, DownloadedFileRecord::class, DuplicateAttempt::class, SavedFile::class,
         Subscription::class, SubscriptionSeenEntry::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -271,6 +281,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
                         MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26,
                         MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
+                        MIGRATION_30_31,
                     )
                     // Only a safety net for a schema bump nobody wrote an explicit migration
                     // for — every version change from here on should get a real Migration

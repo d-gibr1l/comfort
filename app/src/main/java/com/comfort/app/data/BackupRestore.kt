@@ -164,6 +164,8 @@ object BackupRestore {
             room.runInTransaction {
                 val db = room.openHelper.writableDatabase
                 historyCount = insertRows(db, "downloads", history.optJSONArray("downloads"), restoredIds)
+                // A backup from before finishedAt: filled in as MIGRATION_30_31 does.
+                db.execSQL("UPDATE downloads SET finishedAt = erroredAt WHERE finishedAt IS NULL AND status IN ('FINISHED', 'SAVED', 'DELETED') AND erroredAt IS NOT NULL")
                 insertRows(db, "saved_files", history.optJSONArray("saved_files"))
             }
             dropOtherPhonesFiles(context, room, restoredIds)

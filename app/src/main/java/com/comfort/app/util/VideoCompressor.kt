@@ -138,6 +138,7 @@ object VideoCompressor {
                     title = "${item.title.replace(Regex("""\s*\(\d{3,4}p\)$"""), "")} (${target}p)",
                     thumbnailPath = saved.toString(),
                     status = DownloadStatus.FINISHED,
+                    finishedAt = System.currentTimeMillis(),
                     progress = 1f,
                     downloadedItems = 1,
                     totalItems = 1,

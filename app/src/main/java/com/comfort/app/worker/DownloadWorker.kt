@@ -1368,7 +1368,7 @@ class DownloadWorker(
                     dao.clearSavedFiles(downloadId)
                     dao.delete(downloadId)
                 } else {
-                    dao.updateError(downloadId, DownloadStatus.FINISHED, incompleteMessage)
+                    dao.markFinished(downloadId, incompleteMessage)
                     dao.setErrorDetails(downloadId, if (incompleteMessage != null) errorDetailsJson() else null)
                 }
                 DownloadDispatcher.forgetLock(downloadId)

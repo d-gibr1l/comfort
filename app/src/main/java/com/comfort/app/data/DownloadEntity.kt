@@ -119,6 +119,9 @@ data class DownloadEntity(
     // queueOrder/dateAdded order regardless of which one actually just happened. Null for anything
     // that has never errored.
     val erroredAt: Long? = null,
+    // When it finished (the Library's date order and the date on its row). Null for one that
+    // hasn't, and for one finished before this existed whose time wasn't known (see MIGRATION_30_31).
+    val finishedAt: Long? = null,
     // The real saved media file's own content Uri — distinct from thumbnailPath, which for an
     // audio download now holds a standalone extracted-cover-art image instead (see
     // MediaStoreHelper.extractAudioArtworkUri's own doc comment: Coil can't decode a video frame
@@ -199,4 +202,9 @@ data class DownloadEntity(
      * displays sensibly. */
     val effectiveDate: Long
         get() = downloadStartTime.takeIf { it > 0 } ?: dateAdded
+
+    /** The Library's date: when it finished, so the newest download is the one that just
+     * completed, not one started earlier that took longer ([effectiveDate] where that's unknown). */
+    val libraryDate: Long
+        get() = finishedAt ?: effectiveDate
 }
