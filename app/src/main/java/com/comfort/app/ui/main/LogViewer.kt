@@ -202,7 +202,16 @@ internal fun LogViewer(onDismiss: () -> Unit) {
                 else -> LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
-                    modifier = Modifier.fillMaxSize().onTouchDown {
+                    modifier = Modifier.fillMaxSize().onTouchDown(
+                        onUp = {
+                            // Lifted with the sheet where it sits open: that gesture is over, and
+                            // Back or a tap above may close the sheet again. It used to stay marked
+                            // as a list gesture after any scroll, and Back did nothing. (Lifted
+                            // with the sheet pulled down, it's cleared once it springs back open.)
+                            val offset = runCatching { sheetState.requireOffset() }.getOrNull()
+                            if (offset == null || openOffsetPx.isNaN() || offset <= openOffsetPx + 1f) gestureOnList[0] = false
+                        },
+                    ) {
                         gestureOnList[0] = true
                         pullStartPx[0] = runCatching { sheetState.requireOffset() }.getOrDefault(Float.NaN)
                     }.nestedScroll(pullNotFling).pinchToZoomText(zoom),
@@ -285,9 +294,16 @@ private fun LogRow(line: LogLine, newDownload: Boolean, zoom: Float, expanded: B
 }
 
 /** Calls [onDown] as each touch starts here, before anything inside handles it, without taking it. */
-private fun Modifier.onTouchDown(onDown: () -> Unit): Modifier = pointerInput(Unit) {
+private fun Modifier.onTouchDown(onUp: (() -> Unit)? = null, onDown: () -> Unit): Modifier = pointerInput(Unit) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         onDown()
+        if (onUp != null) {
+            // Until every finger is up (the list scrolling consumes the moves; only watched here).
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+            } while (event.changes.any { it.pressed })
+            onUp()
+        }
     }
 }
