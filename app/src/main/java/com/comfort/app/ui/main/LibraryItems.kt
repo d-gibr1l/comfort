@@ -564,10 +564,10 @@ internal fun HistoryRow(
                     }
                 }
 
-                // No item-count or status overlay here (unlike the grid): the row's own text beside
-                // the thumbnail already shows both. A video's or song's length ("▶ 0:13") sits in the
-                // bottom-left corner, inside the thumbnail.
-                if (durationMs != null) {
+                // A video's length ("▶ 0:13") or a song's ("♪ 4:14",
+                // a note, so a song is told from a video at a glance) sits in the bottom-left corner,
+                // inside the thumbnail; a song whose length isn't known yet still gets its note.
+                if (durationMs != null || item.isAudio) {
                     Row(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
@@ -577,10 +577,39 @@ internal fun HistoryRow(
                             .padding(start = 3.dp, end = 5.dp, top = 1.dp, bottom = 1.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Icon(
+                            if (item.isAudio) Icons.Outlined.MusicNote else Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        if (durationMs != null) {
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                formatGridDuration(durationMs),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+                // How many items, on the thumbnail itself, as in the grid: bottom-right, opposite the
+                // length. The row's text beside it has only the date then.
+                if (item.downloadedItems > 1) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .padding(start = 3.dp, end = 5.dp, top = 1.dp, bottom = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(2.dp))
                         Text(
-                            formatGridDuration(durationMs),
+                            "${item.downloadedItems}",
                             color = Color.White,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
@@ -646,7 +675,7 @@ internal fun HistoryRow(
             )
             Spacer(Modifier.height(6.dp))
 
-            MetaRow(icon = Icons.Outlined.Layers, text = stringResource(R.string.x_x, item.downloadedItems, historyDateFormat().format(Date(item.libraryDate))))
+            MetaRow(icon = Icons.Outlined.Event, text = historyDateFormat().format(Date(item.libraryDate)))
             Spacer(Modifier.height(2.dp))
             MetaRow(icon = Icons.Outlined.SdStorage, text = stringResource(R.string.size_x, formatFileSize(item.totalBytes)))
             if (item.missingItems > 0) {
