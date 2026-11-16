@@ -453,6 +453,17 @@
     <string name="updates_available">अपडेट उपलब्ध हैं</string>
     <string name="engines">इंजन</string>
     <string name="auto_update">अपने-आप अपडेट</string>
+    <string name="later">बाद में</string>
+    <string name="new_update">नया अपडेट</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">नया क्या है</string>
+    <string name="update_now">अभी अपडेट करें</string>
+    <string name="update_now_x">अभी अपडेट करें · %1$s</string>
+    <string name="downloading_x_of_y">डाउनलोड हो रहा है… %2$s में से %1$s</string>
+    <string name="engine_updates">इंजन अपडेट</string>
+    <string name="downloading_the_update">अपडेट डाउनलोड हो रहा है…</string>
+    <string name="auto_update_is_off_these_wait">ऑटो-अपडेट बंद है, इसलिए ये आपका इंतज़ार कर रहे हैं।</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">मिलने पर नए yt-dlp, gallery-dl और Instaloader अपडेट अपने-आप इंस्टॉल करता है।</string>
     <string name="version_unknown">संस्करण अज्ञात</string>
     <string name="update_to_x">%1$s पर अपडेट करें</string>

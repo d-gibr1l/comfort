@@ -493,6 +493,17 @@
     <string name="updates_available">Atualizações disponíveis</string>
     <string name="engines">Motores</string>
     <string name="auto_update">Atualização automática</string>
+    <string name="later">Depois</string>
+    <string name="new_update">Nova atualização</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">Novidades</string>
+    <string name="update_now">Atualizar agora</string>
+    <string name="update_now_x">Atualizar agora · %1$s</string>
+    <string name="downloading_x_of_y">Baixando… %1$s de %2$s</string>
+    <string name="engine_updates">Atualizações dos motores</string>
+    <string name="downloading_the_update">Baixando a atualização…</string>
+    <string name="auto_update_is_off_these_wait">A atualização automática está desligada, então estas esperam por você.</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">Instala automaticamente novas versões do yt-dlp, gallery-dl e Instaloader quando encontradas.</string>
     <string name="version_unknown">Versão desconhecida</string>
     <string name="update_to_x">Atualizar para %1$s</string>

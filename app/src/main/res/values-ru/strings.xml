@@ -501,6 +501,17 @@
     <string name="updates_available">Есть обновления</string>
     <string name="engines">Движки</string>
     <string name="auto_update">Автообновление</string>
+    <string name="later">Позже</string>
+    <string name="new_update">Новое обновление</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">Что нового</string>
+    <string name="update_now">Обновить сейчас</string>
+    <string name="update_now_x">Обновить сейчас · %1$s</string>
+    <string name="downloading_x_of_y">Загрузка… %1$s из %2$s</string>
+    <string name="engine_updates">Обновления движков</string>
+    <string name="downloading_the_update">Загрузка обновления…</string>
+    <string name="auto_update_is_off_these_wait">Автообновление выключено, поэтому они ждут вас.</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">Автоматически устанавливает новые версии yt-dlp, gallery-dl и Instaloader, когда они выходят.</string>
     <string name="version_unknown">Версия неизвестна</string>
     <string name="update_to_x">Обновить до %1$s</string>

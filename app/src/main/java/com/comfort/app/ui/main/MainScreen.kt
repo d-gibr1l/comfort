@@ -211,6 +211,8 @@ fun MainScreen(
         kotlinx.coroutines.delay(3_000)
         updates.runLaunchChecks()
     }
+    // What those checks found: a new Comfort, or engine updates waiting with auto-update off.
+    UpdatePromptDialog(updates)
     // "Delete from phone" on gallery files Android won't let the app delete on its own (made
     // before a reinstall, say): the system's own dialog asks the user (DownloadsViewModel.deleteConsent).
     val deleteConsentLauncher = androidx.activity.compose.rememberLauncherForActivityResult(

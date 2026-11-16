@@ -453,6 +453,17 @@
     <string name="updates_available">アップデートがあります</string>
     <string name="engines">エンジン</string>
     <string name="auto_update">自動更新</string>
+    <string name="later">後で</string>
+    <string name="new_update">新しいアップデート</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">新機能</string>
+    <string name="update_now">今すぐ更新</string>
+    <string name="update_now_x">今すぐ更新・%1$s</string>
+    <string name="downloading_x_of_y">ダウンロード中… %1$s / %2$s</string>
+    <string name="engine_updates">エンジンの更新</string>
+    <string name="downloading_the_update">アップデートをダウンロード中…</string>
+    <string name="auto_update_is_off_these_wait">自動更新がオフのため、これらは保留中です。</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">新しい yt-dlp、gallery-dl、Instaloader が見つかると自動でインストールします。</string>
     <string name="version_unknown">バージョン不明</string>
     <string name="update_to_x">%1$s に更新</string>

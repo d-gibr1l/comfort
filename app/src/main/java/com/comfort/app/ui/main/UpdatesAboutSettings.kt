@@ -833,9 +833,9 @@ private fun SettingsErrorBanner(message: String, modifier: Modifier = Modifier) 
 }
 
 /** The app's icon as the launcher shows it, drawn from the launcher's own vector — used wherever
- * the app shows its own icon (About, App Update), so none can show an outdated export. */
+ * the app shows its own icon (About, App Update, the update sheet), so none can show an outdated export. */
 @Composable
-private fun AppIconTile(size: androidx.compose.ui.unit.Dp) {
+internal fun AppIconTile(size: androidx.compose.ui.unit.Dp) {
     // painterResource() can't load mipmap-anydpi-v26/ic_launcher.xml directly (an
     // AdaptiveIconDrawable, not a plain vector/raster) — composed by hand here from the same two
     // layers instead: ic_launcher_background.xml (a plain white rect, approximated directly rather
@@ -981,7 +981,9 @@ internal fun QuickAppUpdateSection() {
     val current = status
     if (current == null || !current.updateAvailable) return
 
-    SettingsSection(title = stringResource(R.string.app_update_available), icon = Icons.Outlined.Download) {
+    // A tap on the card shows the update's sheet (what's new, Update now); its button still
+    // updates straight away.
+    SettingsSection(title = stringResource(R.string.app_update_available), icon = Icons.Outlined.Download, onClick = { updates.showAppPrompt(current) }) {
         AppUpdateRow(
             status = current,
             downloadProgress = downloadProgress,

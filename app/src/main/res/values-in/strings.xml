@@ -479,6 +479,17 @@
     <string name="updates_available">Pembaruan tersedia</string>
     <string name="engines">Mesin</string>
     <string name="auto_update">Perbarui otomatis</string>
+    <string name="later">Nanti</string>
+    <string name="new_update">Pembaruan baru</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">Yang baru</string>
+    <string name="update_now">Perbarui sekarang</string>
+    <string name="update_now_x">Perbarui sekarang · %1$s</string>
+    <string name="downloading_x_of_y">Mengunduh… %1$s dari %2$s</string>
+    <string name="engine_updates">Pembaruan mesin</string>
+    <string name="downloading_the_update">Mengunduh pembaruan…</string>
+    <string name="auto_update_is_off_these_wait">Pembaruan otomatis nonaktif, jadi ini menunggu Anda.</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">Otomatis memasang versi terbaru yt-dlp, gallery-dl, dan Instaloader jika ditemukan.</string>
     <string name="version_unknown">Versi tidak diketahui</string>
     <string name="update_to_x">Perbarui ke %1$s</string>

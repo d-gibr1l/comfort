@@ -505,6 +505,17 @@
     <string name="updates_available">Updates available</string>
     <string name="engines">Engines</string>
     <string name="auto_update">Auto-update</string>
+    <string name="later">Later</string>
+    <string name="new_update">New update</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">What\'s new</string>
+    <string name="update_now">Update now</string>
+    <string name="update_now_x">Update now · %1$s</string>
+    <string name="downloading_x_of_y">Downloading… %1$s of %2$s</string>
+    <string name="engine_updates">Engine updates</string>
+    <string name="downloading_the_update">Downloading the update…</string>
+    <string name="auto_update_is_off_these_wait">Auto-update is off, so these are waiting for you.</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">Automatically installs newer yt-dlp, gallery-dl and Instaloader updates when found.</string>
     <string name="version_unknown">Version unknown</string>
     <string name="update_to_x">Update to %1$s</string>

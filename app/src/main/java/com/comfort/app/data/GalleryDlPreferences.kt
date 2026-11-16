@@ -1067,6 +1067,16 @@ object GalleryDlPreferences {
 
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update
      * it finds automatically instead of only flagging it for the user to apply by hand. */
+    // The update popups' "already shown" marks (UpdatesViewModel.UpdatePrompt): the app version
+    // last offered, and the engine updates last offered ("yt_dlp=2026.11.16,…").
+    private const val KEY_PROMPTED_APP_VERSION = "update_prompted_app_version"
+    private const val KEY_PROMPTED_ENGINE_VERSIONS = "update_prompted_engine_versions"
+
+    fun getPromptedAppVersion(context: Context): String? = prefs(context).getString(KEY_PROMPTED_APP_VERSION, null)
+    fun setPromptedAppVersion(context: Context, version: String) = prefs(context).edit().putString(KEY_PROMPTED_APP_VERSION, version).apply()
+    fun getPromptedEngineVersions(context: Context): String? = prefs(context).getString(KEY_PROMPTED_ENGINE_VERSIONS, null)
+    fun setPromptedEngineVersions(context: Context, versions: String) = prefs(context).edit().putString(KEY_PROMPTED_ENGINE_VERSIONS, versions).apply()
+
     fun isAutoUpdateEnginesEnabled(context: Context): Boolean {
         return prefs(context).getBoolean(KEY_AUTO_UPDATE_ENGINES, true)
     }

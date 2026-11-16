@@ -13,6 +13,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** Checks GitHub Releases on the app's own open-source repo for a newer build than what's
@@ -39,6 +40,8 @@ object AppUpdater {
         val latestVersion: String?,
         val downloadUrl: String?,
         val releaseNotes: String?,
+        /** The APK's size, from the release's asset list; null if it didn't say. */
+        val downloadBytes: Long? = null,
     ) {
         // null latestVersion (no releases yet, or the check failed) is deliberately NOT "update
         // available" — same reasoning as EngineUpdater.VersionStatus.
@@ -68,7 +71,9 @@ object AppUpdater {
      * releases published yet, or a release with no .apk asset attached, all treated the same as
      * "nothing new to report right now" rather than a hard error (identical idiom to
      * EngineUpdater.fetchLatest). */
-    private fun fetchLatest(): Triple<String, String, String?>? = runCatching {
+    private class Latest(val version: String, val url: String, val notes: String?, val bytes: Long?)
+
+    private fun fetchLatest(): Latest? = runCatching {
         val json = (URL("https://api.github.com/repos/$REPO/releases/latest").openConnection() as HttpURLConnection).run {
             connectTimeout = 10_000
             readTimeout = 15_000
@@ -86,7 +91,7 @@ object AppUpdater {
         val assets: JSONArray = root.getJSONArray("assets")
         val apks = (0 until assets.length()).map { assets.getJSONObject(it) }
             .filter { it.getString("name").endsWith(".apk") }
-            .associate { it.getString("name") to it.getString("browser_download_url") }
+            .associateBy { it.getString("name") }
         // A release carries the split APKs (Comfort-<version>-arm64-v8a.apk, ...-universal.apk, ...),
         // so take the one built for this phone's CPU, then the universal one, then any APK — the
         // first .apk alone could be another CPU's build, which the installer rejects.
@@ -95,13 +100,15 @@ object AppUpdater {
             // An APK with no ABI in its name (an older release's single build) is universal too.
             // Not just any APK: one built for another CPU downloads and then won't install.
             ?: apks.entries.firstOrNull { e -> KNOWN_ABIS.none { e.key.endsWith("-$it.apk") } }
-        preferred?.let { Triple(version, it.value, notes) }
+        preferred?.let { (_, asset) ->
+            Latest(version, asset.getString("browser_download_url"), notes, asset.optLong("size").takeIf { it > 0 })
+        }
     }.getOrNull()
 
     suspend fun check(context: Context): UpdateStatus = withContext(Dispatchers.IO) {
         val installed = installedVersion(context)
         val latest = fetchLatest()
-        UpdateStatus(installed, latest?.first, latest?.second, latest?.third)
+        UpdateStatus(installed, latest?.version, latest?.url, latest?.notes, latest?.bytes)
     }
 
     /** Downloads [downloadUrl] into the app's own cache dir — content-provider'd back out to the
@@ -112,6 +119,13 @@ object AppUpdater {
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
     val downloadProgress = kotlinx.coroutines.flow.MutableStateFlow<Float?>(null)
     val downloadError = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    // The download running, for [cancelDownload].
+    @Volatile private var downloadJob: kotlinx.coroutines.Job? = null
+
+    /** Stops the update's download: its part-file goes, and the update can be started again. */
+    fun cancelDownload() {
+        downloadJob?.cancel()
+    }
 
     fun startDownload(context: Context, status: UpdateStatus) {
         if (downloadProgress.value != null) return // Already downloading
@@ -132,9 +146,9 @@ object AppUpdater {
         
         val appContext = context.applicationContext
         
-        scope.launch {
+        val tempFile = File(appContext.cacheDir, "Comfort-${fileVersion(status.latestVersion)}.apk.tmp")
+        downloadJob = scope.launch {
             runCatching {
-                val tempFile = File(appContext.cacheDir, "Comfort-${fileVersion(status.latestVersion)}.apk.tmp")
                 (URL(downloadUrl).openConnection() as HttpURLConnection).run {
                     connectTimeout = 10_000
                     readTimeout = 30_000
@@ -146,6 +160,8 @@ object AppUpdater {
                                 val buffer = ByteArray(8192)
                                 var bytes = input.read(buffer)
                                 while (bytes >= 0) {
+                                    // Cancelled (cancelDownload): out of here, the connection closed below.
+                                    ensureActive()
                                     output.write(buffer, 0, bytes)
                                     downloadedBytes += bytes
                                     if (totalBytes > 0) {
@@ -175,7 +191,12 @@ object AppUpdater {
                     promptInstall(appContext, apkFile)
                 }
             }.onFailure { e ->
-                downloadError.value = appContext.getString(com.comfort.app.R.string.couldnt_download_update, e.message.orEmpty())
+                if (e is kotlinx.coroutines.CancellationException) {
+                    // Cancelled: no error to show, and no half-file left behind.
+                    tempFile.delete()
+                } else {
+                    downloadError.value = appContext.getString(com.comfort.app.R.string.couldnt_download_update, e.message.orEmpty())
+                }
                 downloadProgress.value = null
             }
         }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -68,6 +69,54 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
         _engineUpdated.tryEmit(context.getString(com.comfort.app.R.string.engine_updated_to, status.engine.displayName, newVersion))
     }
 
+    /** What the launch check found, to show as a popup (MainScreen): a new Comfort, or engine
+     * updates waiting because auto-update is off. Each shown once per version, so "Later" isn't
+     * asked again until a newer one comes out; Settings > Updates keeps offering it. */
+    sealed interface UpdatePrompt {
+        data class App(val status: AppUpdater.UpdateStatus) : UpdatePrompt
+        data class Engines(val statuses: List<EngineUpdater.VersionStatus>) : UpdatePrompt
+    }
+
+    private val _prompts = MutableStateFlow<List<UpdatePrompt>>(emptyList())
+    /** The popup to show now (the first; the app's before the engines'). */
+    val prompt: StateFlow<UpdatePrompt?> = _prompts
+        .map { it.firstOrNull() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun dismissPrompt() {
+        _prompts.update { it.drop(1) }
+    }
+
+    private fun offerApp(status: AppUpdater.UpdateStatus) {
+        val version = status.latestVersion ?: return
+        if (!status.updateAvailable || status.downloadUrl == null) return
+        if (GalleryDlPreferences.getPromptedAppVersion(context) == version) return
+        GalleryDlPreferences.setPromptedAppVersion(context, version)
+        // Ahead of an engines popup: the app's update may bring newer engines itself.
+        _prompts.update { listOf(UpdatePrompt.App(status)) + it.filter { p -> p !is UpdatePrompt.App } }
+    }
+
+    private fun offerEngines(statuses: List<EngineUpdater.VersionStatus>) {
+        // With auto-update on, the check installed them (or will, after a running download).
+        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) return
+        val waiting = statuses.filter { it.updateAvailable && it.artifactUrl != null && EngineUpdater.isOn(context, it.engine) }
+        if (waiting.isEmpty()) return
+        val key = waiting.joinToString(",") { "${it.engine.packageDirName}=${it.latestVersion}" }
+        if (GalleryDlPreferences.getPromptedEngineVersions(context) == key) return
+        GalleryDlPreferences.setPromptedEngineVersions(context, key)
+        _prompts.update { it.filter { p -> p !is UpdatePrompt.Engines } + UpdatePrompt.Engines(waiting) }
+    }
+
+    /** The app update's sheet on request (Settings' "App update available" card), shown again
+     * whether or not it was offered before. */
+    fun showAppPrompt(status: AppUpdater.UpdateStatus) {
+        if (!status.updateAvailable) return
+        _prompts.update { listOf(UpdatePrompt.App(status)) + it.filter { p -> p !is UpdatePrompt.App } }
+    }
+
+    /** The popup's Update for engines: each one in turn, as a tapped Update on the Updates page. */
+    fun updateEngines(statuses: List<EngineUpdater.VersionStatus>) = statuses.forEach(::updateEngine)
+
     private var launchChecked = false
 
     /** Home's once-per-launch checks, each rate-limited by its own interval so relaunching doesn't
@@ -81,18 +130,23 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             withContext(Dispatchers.IO) { PythonRuntime.ensureProvisioned(context) }
             val lastEngineCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
             if (System.currentTimeMillis() - lastEngineCheck >= GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) {
-                publishEngines(EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate))
+                val statuses = EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate)
+                publishEngines(statuses)
+                offerEngines(statuses)
             }
         }
         viewModelScope.launch {
             val lastAppCheck = GalleryDlPreferences.getAppUpdateLastCheckMs(context)
-            if (System.currentTimeMillis() - lastAppCheck >= GalleryDlPreferences.APP_UPDATE_CHECK_INTERVAL_MS) checkApp()
+            if (System.currentTimeMillis() - lastAppCheck >= GalleryDlPreferences.APP_UPDATE_CHECK_INTERVAL_MS) {
+                runAppCheck()?.let(::offerApp)
+            }
         }
     }
 
     /** A fresh engine check — installs what it finds when auto-update is on (EngineUpdater
-     * serializes overlapping checks, so a second caller just finds everything current). */
-    fun checkEngines() {
+     * serializes overlapping checks, so a second caller just finds everything current). [offer]:
+     * a check nobody asked for (not the Updates page's) offers what it finds as a popup. */
+    fun checkEngines(offer: Boolean = false) {
         // Asked again while one runs (a channel switched right after the Updates page opened, which
         // starts a check): one more check once it's done, or the page kept the old channel's result.
         if (_checkingEngines.value) { recheckEngines = true; return }
@@ -101,7 +155,9 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             try {
                 do {
                     recheckEngines = false
-                    publishEngines(EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate))
+                    val statuses = EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate)
+                    publishEngines(statuses)
+                    if (offer) offerEngines(statuses)
                 } while (recheckEngines)
             } finally {
                 _checkingEngines.value = false
@@ -112,8 +168,10 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
     @Volatile private var recheckEngines = false
 
     /** Checks once per ViewModel unless [checkEngines] is called again (the Updates page's button). */
+    // The Settings page's check, at every launch (it's built in the background a second in): it
+    // offers the popup too, or it took the launch check's place without one (UpdatePrompt).
     fun ensureEnginesChecked() {
-        if (_engineStatuses.value == null) checkEngines()
+        if (_engineStatuses.value == null) checkEngines(offer = true)
     }
 
     /** A tapped Update for one engine. */
@@ -147,26 +205,33 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun checkApp() {
-        if (_checkingApp.value) return
+        viewModelScope.launch { runAppCheck() }
+    }
+
+    /** The app check itself; null if one was already running. */
+    private suspend fun runAppCheck(): AppUpdater.UpdateStatus? {
+        if (_checkingApp.value) return null
         _checkingApp.value = true
-        viewModelScope.launch {
-            try {
-                val result = AppUpdater.check(context)
-                _appStatus.value = result
-                appUpdateAvailable.value = result.updateAvailable
-                GalleryDlPreferences.setAppUpdateAvailable(context, result.updateAvailable)
-                GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
-            } finally {
-                _checkingApp.value = false
-            }
+        try {
+            val result = AppUpdater.check(context)
+            _appStatus.value = result
+            appUpdateAvailable.value = result.updateAvailable
+            GalleryDlPreferences.setAppUpdateAvailable(context, result.updateAvailable)
+            GalleryDlPreferences.setAppUpdateLastCheckMs(context, System.currentTimeMillis())
+            return result
+        } finally {
+            _checkingApp.value = false
         }
     }
 
+    /** The Settings page's check, at every launch: offers the popup too (see ensureEnginesChecked). */
     fun ensureAppChecked() {
-        if (_appStatus.value == null) checkApp()
+        if (_appStatus.value == null) viewModelScope.launch { runAppCheck()?.let(::offerApp) }
     }
 
     fun startAppDownload(status: AppUpdater.UpdateStatus) = AppUpdater.startDownload(context, status)
+
+    fun cancelAppDownload() = AppUpdater.cancelDownload()
 
     private fun publishEngines(statuses: List<EngineUpdater.VersionStatus>) {
         _engineStatuses.value = statuses

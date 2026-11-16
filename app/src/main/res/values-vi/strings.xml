@@ -453,6 +453,17 @@
     <string name="updates_available">Có bản cập nhật</string>
     <string name="engines">Công cụ</string>
     <string name="auto_update">Tự động cập nhật</string>
+    <string name="later">Để sau</string>
+    <string name="new_update">Bản cập nhật mới</string>
+    <string name="comfort_x">Comfort %1$s</string>
+    <string name="whats_new">Có gì mới</string>
+    <string name="update_now">Cập nhật ngay</string>
+    <string name="update_now_x">Cập nhật ngay · %1$s</string>
+    <string name="downloading_x_of_y">Đang tải… %1$s / %2$s</string>
+    <string name="engine_updates">Cập nhật công cụ</string>
+    <string name="downloading_the_update">Đang tải bản cập nhật…</string>
+    <string name="auto_update_is_off_these_wait">Tự động cập nhật đang tắt nên các bản này đang chờ bạn.</string>
+    <string name="engine_x_from_to">%1$s: %2$s → %3$s</string>
     <string name="automatically_installs_newer_yt_dlp_gallery">Tự cài bản cập nhật mới của yt-dlp, gallery-dl và Instaloader khi tìm thấy.</string>
     <string name="version_unknown">Không rõ phiên bản</string>
     <string name="update_to_x">Cập nhật lên %1$s</string>

@@ -39,7 +39,7 @@ object BackupRestore {
      * updates, and the one-time migration markers would skip migrations this phone still needs. */
     private val STATE_KEYS = setOf(
         "global_pause", "engine_update_last_check_ms", "engine_update_available",
-        "app_update_last_check_ms", "app_update_available", "saved_files_organized",
+        "app_update_last_check_ms", "app_update_available", "update_prompted_app_version", "update_prompted_engine_versions", "saved_files_organized",
         "old_names_tidied_2", "cookies",
     )
 
