@@ -477,6 +477,9 @@ fun MediaViewerScreen(
 
         HorizontalPager(
             state = pagerState,
+            // A gap between items while swiping, like Samsung's Gallery, so one ends visibly
+            // before the next begins.
+            pageSpacing = 16.dp,
             userScrollEnabled = currentScale <= 1.05f && dismissOffsetY.value == 0f,
             modifier = Modifier
                 .fillMaxSize()
