@@ -364,6 +364,9 @@
     <string name="the_size_of_each_read_chunk">Größe jedes gelesenen Blocks (nur yt-dlp). Selten eine Änderung wert.</string>
     <string name="multi_connection_downloads_aria2c">Downloads mit mehreren Verbindungen (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">Lädt Dateien schneller, indem sie in mehrere Teile aufgeteilt werden (nur yt-dlp). Am besten bei langsamen Verbindungen.</string>
+    <string name="aria2_downloading">aria2 wird geladen…</string>
+    <string name="aria2_downloading_x">aria2 wird geladen… %1$d %%</string>
+    <string name="aria2_download_failed">aria2 konnte nicht geladen werden: %1$s</string>
     <string name="reliability">Zuverlässigkeit</string>
     <string name="unrestricted_downloads_can_keep_running_in">Uneingeschränkt – Downloads können im Hintergrund weiterlaufen.</string>
     <string name="unrestricted_background_activity">Uneingeschränkte Hintergrundaktivität</string>

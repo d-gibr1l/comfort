@@ -351,6 +351,9 @@
     <string name="the_size_of_each_read_chunk">Her okuma parçasının boyutu (yalnızca yt-dlp). Varsayılandan değiştirmeye nadiren değer.</string>
     <string name="multi_connection_downloads_aria2c">Çok bağlantılı indirmeler (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">Dosyaları birden çok parçaya bölerek daha hızlı indirir (yalnızca yt-dlp). Yavaş bağlantılar için en iyisi.</string>
+    <string name="aria2_downloading">aria2 indiriliyor…</string>
+    <string name="aria2_downloading_x">aria2 indiriliyor… %%%1$d</string>
+    <string name="aria2_download_failed">aria2 indirilemedi: %1$s</string>
     <string name="reliability">Güvenilirlik</string>
     <string name="unrestricted_downloads_can_keep_running_in">Kısıtlamasız — indirmeler arka planda çalışmaya devam edebilir.</string>
     <string name="unrestricted_background_activity">Kısıtlamasız arka plan etkinliği</string>

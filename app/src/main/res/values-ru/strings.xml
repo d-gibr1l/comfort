@@ -375,6 +375,9 @@
     <string name="the_size_of_each_read_chunk">Размер каждого блока чтения (только yt-dlp). Менять обычно не стоит.</string>
     <string name="multi_connection_downloads_aria2c">Многопоточная загрузка (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">Ускоряет загрузку, разбивая файлы на несколько частей (только yt-dlp). Лучше всего для медленного соединения.</string>
+    <string name="aria2_downloading">Загрузка aria2…</string>
+    <string name="aria2_downloading_x">Загрузка aria2… %1$d%%</string>
+    <string name="aria2_download_failed">Не удалось загрузить aria2: %1$s</string>
     <string name="reliability">Надёжность</string>
     <string name="unrestricted_downloads_can_keep_running_in">Без ограничений — загрузки могут работать в фоне.</string>
     <string name="unrestricted_background_activity">Фоновая работа без ограничений</string>

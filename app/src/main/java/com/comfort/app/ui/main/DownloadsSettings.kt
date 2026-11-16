@@ -82,6 +82,8 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
     var bufferSizeKb by remember { mutableStateOf(GalleryDlPreferences.getBufferSizeKb(context)) }
     var bufferSizeEnabled by remember { mutableStateOf(GalleryDlPreferences.isBufferSizeEnabled(context)) }
     var aria2Enabled by remember { mutableStateOf(GalleryDlPreferences.isAria2Enabled(context)) }
+    // aria2's libraries download when it's turned on (Aria2Runtime): their progress or error.
+    val aria2Install by com.comfort.app.util.Aria2Runtime.install.collectAsState()
     var downloadDelayEnabled by remember { mutableStateOf(GalleryDlPreferences.isDownloadDelayEnabled(context)) }
     var downloadDelaySeconds by remember { mutableStateOf(GalleryDlPreferences.getDownloadDelaySeconds(context)) }
     var incognitoDefault by remember { mutableStateOf(GalleryDlPreferences.isIncognitoDefault(context)) }
@@ -465,11 +467,27 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         Icons.Outlined.FlashOff
                     },
                     title = stringResource(R.string.multi_connection_downloads_aria2c),
-                    subtitle = stringResource(R.string.downloads_files_faster_by_splitting_them),
-                    checked = aria2Enabled,
-                    onCheckedChange = {
-                        aria2Enabled = it
-                        GalleryDlPreferences.setAria2Enabled(context, it)
+                    subtitle = aria2Install?.let { state ->
+                        state.error?.let { stringResource(R.string.aria2_download_failed, it) }
+                            ?: state.progress?.let { stringResource(R.string.aria2_downloading_x, (it * 100).toInt()) }
+                            ?: stringResource(R.string.aria2_downloading)
+                    } ?: stringResource(R.string.downloads_files_faster_by_splitting_them),
+                    // On while its libraries download; back off if that fails.
+                    checked = aria2Enabled || (aria2Install != null && aria2Install?.error == null),
+                    onCheckedChange = { on ->
+                        // Left alone while its libraries download.
+                        if (aria2Install != null && aria2Install?.error == null) return@IconToggleRow
+                        com.comfort.app.util.Aria2Runtime.dismissError()
+                        if (!on) {
+                            aria2Enabled = false
+                            GalleryDlPreferences.setAria2Enabled(context, false)
+                        } else {
+                            com.comfort.app.util.Aria2Runtime.startInstall(context) { ok ->
+                                // Saved here too, so it holds even if the page was left meanwhile.
+                                GalleryDlPreferences.setAria2Enabled(context, ok)
+                                aria2Enabled = ok
+                            }
+                        }
                     },
                 )
             }

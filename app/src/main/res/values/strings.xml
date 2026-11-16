@@ -385,6 +385,9 @@
     <string name="the_size_of_each_read_chunk">The size of each read chunk (yt-dlp only). Rarely worth changing from the default.</string>
     <string name="multi_connection_downloads_aria2c">Multi-connection downloads (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">Downloads files faster by splitting them into multiple parts (yt-dlp only). Best for slow connections.</string>
+    <string name="aria2_downloading">Downloading aria2…</string>
+    <string name="aria2_downloading_x">Downloading aria2… %1$d%%</string>
+    <string name="aria2_download_failed">Couldn\'t download aria2: %1$s</string>
     <string name="reliability">Reliability</string>
     <string name="unrestricted_downloads_can_keep_running_in">Unrestricted — downloads can keep running in the background.</string>
     <string name="unrestricted_background_activity">Unrestricted background activity</string>

@@ -351,6 +351,9 @@
     <string name="the_size_of_each_read_chunk">每次读取块的大小（仅 yt-dlp）。很少需要修改默认值。</string>
     <string name="multi_connection_downloads_aria2c">多连接下载（aria2c）</string>
     <string name="downloads_files_faster_by_splitting_them">将文件分成多个部分以更快下载（仅 yt-dlp）。最适合慢速网络。</string>
+    <string name="aria2_downloading">正在下载 aria2…</string>
+    <string name="aria2_downloading_x">正在下载 aria2… %1$d%%</string>
+    <string name="aria2_download_failed">无法下载 aria2：%1$s</string>
     <string name="reliability">可靠性</string>
     <string name="unrestricted_downloads_can_keep_running_in">不受限制 — 下载可以在后台继续运行。</string>
     <string name="unrestricted_background_activity">不受限制的后台活动</string>

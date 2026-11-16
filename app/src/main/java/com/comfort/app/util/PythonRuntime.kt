@@ -64,7 +64,9 @@ object PythonRuntime {
     // 2: trimmed by tools/trim_runtime_zips.py (unstripped curl_cffi, test modules, Tcl/Tk… ~17 MB
     // less unpacked on arm64).
     // 3: curl_cffi.libs/libc++_shared back as it was: stripped, it didn't load (no impersonation).
-    private const val RUNTIME_ZIP_VERSION = "3"
+    // 4: trimmed again: an unused libc++/libpng, the debugger/docs/test modules, pycryptodome's
+    // elliptic curves and other unused ciphers (~4.3 MB less unpacked on arm64).
+    private const val RUNTIME_ZIP_VERSION = "4"
     private const val RUNTIME_ZIP_MARKER = "runtime_zip.txt"
     // Top-level site-packages entries that are engines (package, .dist-info, .data), the ones
     // EngineUpdater can replace in-app.

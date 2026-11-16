@@ -150,7 +150,10 @@ internal class EngineCommands(
     private val formatIdOverride = GalleryDlPreferences.getFormatIdOverride(context)
     private val youtubeClientRotation = GalleryDlPreferences.isYoutubeClientRotationEnabled(context)
     private val impersonate = GalleryDlPreferences.isImpersonateEnabled(context)
-    private val aria2Enabled = GalleryDlPreferences.isAria2Enabled(context)
+    // Only once its downloaded libraries are there (Aria2Runtime): on without them (cleared, or
+    // the download never finished), yt-dlp's own downloader is used rather than an aria2c that
+    // can't start.
+    private val aria2Enabled = GalleryDlPreferences.isAria2Enabled(context) && Aria2Runtime.isReady(context)
     private val aria2Path = if (aria2Enabled) Aria2Runtime.getExecutablePath(context).orEmpty() else ""
     private val aria2LibDir by lazy { if (aria2Enabled && !previewOnly) Aria2Runtime.ensureProvisioned(context)?.absolutePath.orEmpty() else "" }
 

@@ -351,6 +351,9 @@
     <string name="the_size_of_each_read_chunk">Kích thước mỗi khối đọc (chỉ yt-dlp). Hiếm khi cần đổi so với mặc định.</string>
     <string name="multi_connection_downloads_aria2c">Tải đa kết nối (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">Tải tệp nhanh hơn bằng cách chia thành nhiều phần (chỉ yt-dlp). Tốt nhất cho kết nối chậm.</string>
+    <string name="aria2_downloading">Đang tải aria2…</string>
+    <string name="aria2_downloading_x">Đang tải aria2… %1$d%%</string>
+    <string name="aria2_download_failed">Không thể tải aria2: %1$s</string>
     <string name="reliability">Độ tin cậy</string>
     <string name="unrestricted_downloads_can_keep_running_in">Không hạn chế — lượt tải có thể tiếp tục chạy nền.</string>
     <string name="unrestricted_background_activity">Hoạt động nền không hạn chế</string>

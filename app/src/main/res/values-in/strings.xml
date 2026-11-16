@@ -361,6 +361,9 @@
     <string name="the_size_of_each_read_chunk">Ukuran setiap potongan baca (khusus yt-dlp). Jarang perlu diubah dari bawaan.</string>
     <string name="multi_connection_downloads_aria2c">Unduhan multi-koneksi (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">Mengunduh file lebih cepat dengan membaginya menjadi beberapa bagian (khusus yt-dlp). Paling cocok untuk koneksi lambat.</string>
+    <string name="aria2_downloading">Mengunduh aria2…</string>
+    <string name="aria2_downloading_x">Mengunduh aria2… %1$d%%</string>
+    <string name="aria2_download_failed">Tidak dapat mengunduh aria2: %1$s</string>
     <string name="reliability">Keandalan</string>
     <string name="unrestricted_downloads_can_keep_running_in">Tanpa batasan — unduhan bisa terus berjalan di latar belakang.</string>
     <string name="unrestricted_background_activity">Aktivitas latar belakang tanpa batasan</string>

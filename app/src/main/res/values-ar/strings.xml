@@ -351,6 +351,9 @@
     <string name="the_size_of_each_read_chunk">حجم كل كتلة قراءة (yt-dlp فقط). نادرًا ما يستحق تغييره عن الافتراضي.</string>
     <string name="multi_connection_downloads_aria2c">تنزيلات متعددة الاتصالات (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">ينزّل الملفات أسرع بتقسيمها إلى أجزاء متعددة (yt-dlp فقط). الأفضل للاتصالات البطيئة.</string>
+    <string name="aria2_downloading">جارٍ تنزيل aria2…</string>
+    <string name="aria2_downloading_x">جارٍ تنزيل aria2… %1$d%%</string>
+    <string name="aria2_download_failed">تعذّر تنزيل aria2: %1$s</string>
     <string name="reliability">الموثوقية</string>
     <string name="unrestricted_downloads_can_keep_running_in">بلا قيود — يمكن أن تستمر التنزيلات في الخلفية.</string>
     <string name="unrestricted_background_activity">نشاط غير مقيّد في الخلفية</string>

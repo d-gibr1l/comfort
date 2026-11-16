@@ -351,6 +351,9 @@
     <string name="the_size_of_each_read_chunk">हर पढ़े जाने वाले हिस्से का आकार (केवल yt-dlp)। डिफ़ॉल्ट से बदलना शायद ही कभी फ़ायदेमंद हो।</string>
     <string name="multi_connection_downloads_aria2c">कई-कनेक्शन डाउनलोड (aria2c)</string>
     <string name="downloads_files_faster_by_splitting_them">फ़ाइलों को कई हिस्सों में बाँटकर तेज़ी से डाउनलोड करता है (केवल yt-dlp)। धीमे कनेक्शन के लिए सबसे अच्छा।</string>
+    <string name="aria2_downloading">aria2 डाउनलोड हो रहा है…</string>
+    <string name="aria2_downloading_x">aria2 डाउनलोड हो रहा है… %1$d%%</string>
+    <string name="aria2_download_failed">aria2 डाउनलोड नहीं हो सका: %1$s</string>
     <string name="reliability">विश्वसनीयता</string>
     <string name="unrestricted_downloads_can_keep_running_in">बिना पाबंदी — डाउनलोड बैकग्राउंड में चलते रह सकते हैं।</string>
     <string name="unrestricted_background_activity">बिना पाबंदी बैकग्राउंड गतिविधि</string>
