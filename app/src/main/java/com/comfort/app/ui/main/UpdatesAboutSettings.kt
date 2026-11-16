@@ -1108,9 +1108,12 @@ private fun EngineChannelPicker(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        listOf(
+        listOfNotNull(
             EngineUpdateChannel.STABLE to stringResource(R.string.stable),
             EngineUpdateChannel.BLEEDING_EDGE to bleedingEdgeLabel,
+            // yt-dlp's build of every commit to master, newer than Nightly by up to a day. The
+            // other engines' second option already is their master branch.
+            (EngineUpdateChannel.MASTER to stringResource(R.string.master)).takeIf { engine == EngineUpdater.YT_DLP },
         ).forEach { (value, label) ->
             val selected = channel == value
             Surface(

@@ -69,6 +69,9 @@ enum class EngineUpdateChannel {
     // roughly daily. gallery-dl: its live, unreleased Master branch source directly (gallery-dl
     // has no separate nightly build — this is the closest equivalent).
     BLEEDING_EDGE,
+    // yt-dlp only: yt-dlp/yt-dlp-master-builds, built from every commit to master, so newer than
+    // Nightly by up to a day. The other engines' BLEEDING_EDGE is already their master branch.
+    MASTER,
 }
 
 object GalleryDlPreferences {

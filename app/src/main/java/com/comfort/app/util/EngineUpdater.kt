@@ -212,9 +212,10 @@ object EngineUpdater {
      * stable releases, so this is installed from `yt-dlp.tar.gz` (a plain source tree, `yt-dlp/
      * yt_dlp/...`) rather than a wheel. `SHA2-256SUMS` (a published checksums file, same shape as
      * `sha256sum`'s own output) is fetched alongside it purely to verify that tarball the same way
-     * PyPI's own published digest verifies a stable wheel. */
-    private fun fetchLatestYtDlpNightly(): FetchResult? {
-        val json = httpGetText("https://api.github.com/repos/yt-dlp/yt-dlp-nightly-builds/releases/latest")
+     * PyPI's own published digest verifies a stable wheel. [repo] yt-dlp/yt-dlp-master-builds is
+     * the Master channel: the same files, built from every commit to master. */
+    private fun fetchLatestYtDlpNightly(repo: String = "yt-dlp/yt-dlp-nightly-builds"): FetchResult? {
+        val json = httpGetText("https://api.github.com/repos/$repo/releases/latest")
         if (json != null) {
             val parsed = runCatching {
                 val root = JSONObject(json)
@@ -242,7 +243,7 @@ object EngineUpdater {
 
         // Web redirect fallback when GitHub API is rate-limited (HTTP 403) or unauthenticated
         return runCatching {
-            val conn = (URL("https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest").openConnection() as HttpURLConnection).apply {
+            val conn = (URL("https://github.com/$repo/releases/latest").openConnection() as HttpURLConnection).apply {
                 instanceFollowRedirects = false
                 connectTimeout = 10_000
                 readTimeout = 15_000
@@ -250,8 +251,8 @@ object EngineUpdater {
             }
             val location = try { conn.getHeaderField("Location") } finally { conn.disconnect() } ?: return@runCatching null
             val tag = location.substringAfterLast("/tag/", "").takeIf { it.isNotBlank() } ?: return@runCatching null
-            val artifactUrl = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/$tag/yt-dlp.tar.gz"
-            val sumsUrl = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/$tag/SHA2-256SUMS"
+            val artifactUrl = "https://github.com/$repo/releases/download/$tag/yt-dlp.tar.gz"
+            val sumsUrl = "https://github.com/$repo/releases/download/$tag/SHA2-256SUMS"
             val sha256 = httpGetText(sumsUrl)
                 ?.lineSequence()
                 ?.firstOrNull { it.trim().endsWith("yt-dlp.tar.gz") }
@@ -331,6 +332,13 @@ object EngineUpdater {
                 EngineUpdateChannel.STABLE -> fetchLatestStable(engine)
                 EngineUpdateChannel.BLEEDING_EDGE -> when (engine) {
                     YT_DLP -> fetchLatestYtDlpNightly()
+                    INSTALOADER -> fetchLatestInstaloaderMaster()
+                    else -> fetchLatestGalleryDlMaster()
+                }
+                // Offered for yt-dlp only (EngineChannelPicker); for the others it's what
+                // BLEEDING_EDGE already is.
+                EngineUpdateChannel.MASTER -> when (engine) {
+                    YT_DLP -> fetchLatestYtDlpNightly("yt-dlp/yt-dlp-master-builds")
                     INSTALOADER -> fetchLatestInstaloaderMaster()
                     else -> fetchLatestGalleryDlMaster()
                 }
