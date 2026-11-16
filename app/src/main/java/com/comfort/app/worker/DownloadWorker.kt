@@ -1197,7 +1197,11 @@ class DownloadWorker(
                         val ext = f.extension.lowercase()
                         f.isFile && ext in SWEEP_MEDIA_EXTENSIONS &&
                             // yt-dlp's own images are thumbnails (embedded, or the sidecar sweep's).
-                            !(engine == DownloadEngine.YT_DLP && ext in SWEEP_IMAGE_EXTENSIONS) &&
+                            // Spotify's too: it downloads through yt-dlp, which leaves the matched
+                            // YouTube upload's thumbnail behind after embedding — saved here as a
+                            // second file, another release's cover the Library then showed for
+                            // the song in place of Spotify's.
+                            !((engine == DownloadEngine.YT_DLP || engine == DownloadEngine.SPOTIFY) && ext in SWEEP_IMAGE_EXTENSIONS) &&
                             // A stream still to be merged, or a file being written.
                             !YTDLP_PART_STREAM.containsMatchIn(f.name) && ".temp." !in f.name && ".part" !in f.name
                     }.toList()

@@ -413,7 +413,7 @@ def _embed_cover_art(filepath, cover_data):
         pass
 
 
-def _retag_with_spotify_metadata(filepath, title, artist, album, thumbnail_url):
+def _retag_with_spotify_metadata(filepath, title, artist, album, cover_data):
     """Overrides whatever the matched YouTube video's own metadata/thumbnail ended up embedded
     with — Spotify's real tags are more authoritative than a YouTube upload's own, often much
     messier, title/uploader fields."""
@@ -433,13 +433,30 @@ def _retag_with_spotify_metadata(filepath, title, artist, album, thumbnail_url):
     except Exception:
         pass
 
-    if not thumbnail_url:
+    if cover_data:
+        _embed_cover_art(filepath, cover_data)
+
+
+def _replace_saved_thumbnail(song_path, cover_data):
+    """"Save thumbnail" wrote the YouTube match's own thumbnail beside the song — often another
+    release's cover (a "Topic" upload shows the song's first album). The Library shows that file
+    for the song, so its cover changed once saved from the one seen while it downloaded (and the
+    one embedded in it). Spotify's cover instead, as a .jpg of the same name. The song itself is
+    already saved (moved out); the image stays until DownloadWorker's end-of-run sweep saves it."""
+    if not cover_data:
+        return
+    stem = os.path.splitext(song_path)[0]
+    found = [stem + ext for ext in (".jpg", ".jpeg", ".webp", ".png") if os.path.exists(stem + ext)]
+    if not found:
         return
     try:
-        cover_data = _fetch(thumbnail_url)
+        with open(stem + ".jpg", "wb") as f:
+            f.write(cover_data)
+        for other in found:
+            if other != stem + ".jpg":
+                os.remove(other)
     except Exception:
-        return
-    _embed_cover_art(filepath, cover_data)
+        pass
 
 
 def _parse_playlist_items(playlist_items):
@@ -547,6 +564,20 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 continue
 
             captured_path = [None]
+            # Spotify's cover, fetched once per track: embedded in the song and written over the
+            # saved thumbnail both.
+            cover_cache = []
+
+            def _cover(_url=thumbnail_url, _cache=cover_cache):
+                if not _cache:
+                    data = None
+                    if _url:
+                        try:
+                            data = _fetch(_url)
+                        except Exception:
+                            data = None
+                    _cache.append(data)
+                return _cache[0]
 
             # Retagging has to happen HERE — before forwarding the line on to _cb — not after
             # yt_dlp_wrapper.download() returns like a first version of this did. _cb is
@@ -564,7 +595,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 path = file_path(line)
                 if path and os.path.isabs(path) and os.path.exists(path):
                     _out[0] = path
-                    _retag_with_spotify_metadata(path, tag_title, tag_artist, album_name, thumbnail_url)
+                    _retag_with_spotify_metadata(path, tag_title, tag_artist, album_name, _cover())
                 if _cb:
                     _cb(line)
 
@@ -587,6 +618,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 socket_timeout_seconds=socket_timeout_seconds, retries=retries,
                 audio_format=audio_format, normalize_audio=normalize_audio,
             )
+            if save_thumbnail and captured_path[0]:
+                _replace_saved_thumbnail(captured_path[0], _cover())
             if status != "Done":
                 continue
             any_success = True
