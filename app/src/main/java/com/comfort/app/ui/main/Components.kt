@@ -501,11 +501,11 @@ fun EmptyState(
  * edge and to run over the nav bar's "Library" label. */
 fun badgeCountText(count: Int): String = if (count > 99) "99+" else count.toString()
 
-/** The download thumbnail shape — Material 3 Expressive's 4-sided cookie, for the Library list
- * and Queue thumbnails. One place, so every thumbnail stays the same shape. */
+/** The download thumbnail shape — Material 3 Expressive's Arch, for the Library list and Queue
+ * thumbnails. One place, so every thumbnail stays the same shape. */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun thumbnailShape(): Shape = androidx.compose.material3.MaterialShapes.Cookie4Sided.toShape()
+fun thumbnailShape(): Shape = androidx.compose.material3.MaterialShapes.Arch.toShape()
 
 /** Delete with an Undo window, shared by the Queue and the Library. hideForDeletion() only hides
  * the ids (reversible); the real, irreversible confirmDelete() runs once the Snackbar's Undo window
