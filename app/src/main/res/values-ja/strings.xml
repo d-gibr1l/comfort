@@ -427,6 +427,7 @@
     <string name="search_sites">サイトを検索</string>
     <string name="clear_search">検索をクリア</string>
     <string name="changed_by_you">自分で変更</string>
+    <string name="posts_and_reels_go_to_instaloader">投稿とリールはまず Instaloader へ</string>
     <string name="move_x">%1$s を移動</string>
     <string name="move_to_x">%1$s に移動</string>
     <string name="reset_to_default">既定に戻す</string>

@@ -427,6 +427,7 @@
     <string name="search_sites">搜索网站</string>
     <string name="clear_search">清除搜索</string>
     <string name="changed_by_you">由你更改</string>
+    <string name="posts_and_reels_go_to_instaloader">帖子和 Reels 先交给 Instaloader</string>
     <string name="move_x">移动 %1$s</string>
     <string name="move_to_x">移到 %1$s</string>
     <string name="reset_to_default">重置为默认</string>

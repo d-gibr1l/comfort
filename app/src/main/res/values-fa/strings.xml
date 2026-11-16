@@ -427,6 +427,7 @@
     <string name="search_sites">جستجوی سایت‌ها</string>
     <string name="clear_search">پاک کردن جستجو</string>
     <string name="changed_by_you">تغییر داده‌شده توسط شما</string>
+    <string name="posts_and_reels_go_to_instaloader">پست‌ها و ریلزها اول به Instaloader می‌روند</string>
     <string name="move_x">انتقال %1$s</string>
     <string name="move_to_x">انتقال به %1$s</string>
     <string name="reset_to_default">بازنشانی به پیش‌فرض</string>

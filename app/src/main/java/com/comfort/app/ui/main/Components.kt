@@ -576,3 +576,63 @@ fun Modifier.clearFocusOnKeyboardDismiss(): Modifier = composed {
         }
     }
 }
+
+/** A ⋮ button's colours: filled in [highlight] while its menu is [open], so it's clear which
+ * button the menu came from (plain otherwise). Pass a [highlight] that stands out from the
+ * button's background — on a secondaryContainer bar, the primary colour. */
+@Composable
+fun menuButtonColors(
+    open: Boolean,
+    highlight: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.secondaryContainer,
+): androidx.compose.material3.IconButtonColors {
+    val content = androidx.compose.material3.LocalContentColor.current
+    val container by androidx.compose.animation.animateColorAsState(
+        if (open) highlight else highlight.copy(alpha = 0f), label = "menuButtonContainer",
+    )
+    // The colour that goes on [highlight] (the current content colour for one not in the scheme).
+    val onHighlight = androidx.compose.material3.contentColorFor(highlight)
+    val tint by androidx.compose.animation.animateColorAsState(if (open) onHighlight else content, label = "menuButtonContent")
+    return androidx.compose.material3.IconButtonDefaults.iconButtonColors(containerColor = container, contentColor = tint)
+}
+
+/** A ModalBottomSheet state that's hard to close by accident, like the Configure sheet's
+ * (DownloadPreviewSheet, which explains the why): a drag must pull the sheet [minDismissDrag]
+ * below where it sits open to close it — a shorter one, or a quick flick (Material's fling closes
+ * at ~125 dp/s however short the drag), springs back. Back and the scrim still close it. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun rememberSturdySheetState(minDismissDrag: androidx.compose.ui.unit.Dp = 160.dp): androidx.compose.material3.SheetState {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val minDismissDragPx = with(density) { minDismissDrag.toPx() }
+    val stateRef = remember { arrayOfNulls<androidx.compose.material3.SheetState>(1) }
+    val expandedOffset = remember { androidx.compose.runtime.mutableFloatStateOf(Float.NaN) }
+    val state = remember {
+        androidx.compose.material3.SheetState(
+            skipPartiallyExpanded = true,
+            positionalThreshold = { with(density) { 200.dp.toPx() } },
+            velocityThreshold = { with(density) { 800.dp.toPx() } },
+            initialValue = androidx.compose.material3.SheetValue.Hidden,
+            confirmValueChange = { target ->
+                if (target != androidx.compose.material3.SheetValue.Hidden) true
+                else {
+                    // Back and the scrim ask with the sheet where it sits (not dragged): those close.
+                    val offset = stateRef[0]?.let { runCatching { it.requireOffset() }.getOrNull() }
+                    val open = expandedOffset.floatValue
+                    val dragged = if (offset == null || open.isNaN()) null else offset - open
+                    dragged == null || dragged < 1f || dragged >= minDismissDragPx
+                }
+            },
+            skipHiddenState = false,
+        )
+    }
+    stateRef[0] = state
+    // Where the sheet sits open, read whenever it comes to rest there.
+    androidx.compose.runtime.LaunchedEffect(state) {
+        androidx.compose.runtime.snapshotFlow { state.currentValue to state.isAnimationRunning }.collect { (value, animating) ->
+            if (value == androidx.compose.material3.SheetValue.Expanded && !animating) {
+                runCatching { state.requireOffset() }.getOrNull()?.let { expandedOffset.floatValue = it }
+            }
+        }
+    }
+    return state
+}

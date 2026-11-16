@@ -479,6 +479,7 @@
     <string name="search_sites">Search sites</string>
     <string name="clear_search">Clear search</string>
     <string name="changed_by_you">Changed by you</string>
+    <string name="posts_and_reels_go_to_instaloader">Posts and reels go to Instaloader first</string>
     <string name="move_x">Move %1$s</string>
     <string name="move_to_x">Move to %1$s</string>
     <string name="reset_to_default">Reset to default</string>

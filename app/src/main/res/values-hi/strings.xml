@@ -427,6 +427,7 @@
     <string name="search_sites">साइटें खोजें</string>
     <string name="clear_search">खोज साफ़ करें</string>
     <string name="changed_by_you">आपके द्वारा बदला गया</string>
+    <string name="posts_and_reels_go_to_instaloader">पोस्ट और रील पहले Instaloader को जाती हैं</string>
     <string name="move_x">%1$s ले जाएँ</string>
     <string name="move_to_x">%1$s में ले जाएँ</string>
     <string name="reset_to_default">डिफ़ॉल्ट पर रीसेट करें</string>

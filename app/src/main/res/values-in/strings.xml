@@ -453,6 +453,7 @@
     <string name="search_sites">Cari situs</string>
     <string name="clear_search">Hapus pencarian</string>
     <string name="changed_by_you">Diubah oleh Anda</string>
+    <string name="posts_and_reels_go_to_instaloader">Postingan dan reel dikirim ke Instaloader terlebih dahulu</string>
     <string name="move_x">Pindahkan %1$s</string>
     <string name="move_to_x">Pindahkan ke %1$s</string>
     <string name="reset_to_default">Setel ulang ke bawaan</string>

@@ -58,6 +58,8 @@ object VideoSiteRouter {
     @Volatile private var addedGalleryDl: Set<String> = emptySet()
     @Volatile private var addedBoth: Set<String> = emptySet()
     @Volatile private var removedYtDlp: Set<String> = emptySet()
+    // Sites the user deleted from the lists: shown on none, and routed like a site on no list.
+    @Volatile private var deleted: Set<String> = emptySet()
 
     /** Where a site's links go, as the Sites lists name it: one engine only, or both (gallery-dl
      * first, yt-dlp for its videos — the route a site takes unless something says otherwise). */
@@ -65,11 +67,12 @@ object VideoSiteRouter {
 
     /** Sets the user's changes; [loadSiteRules] reads them from Settings. [removedDefaults] are
      * built-in yt-dlp-only sites moved elsewhere. */
-    internal fun applySiteRules(ytDlp: Set<String>, galleryDl: Set<String>, removedDefaults: Set<String>, both: Set<String> = emptySet()) {
+    internal fun applySiteRules(ytDlp: Set<String>, galleryDl: Set<String>, removedDefaults: Set<String>, both: Set<String> = emptySet(), deletedSites: Set<String> = emptySet()) {
         addedYtDlp = ytDlp
         addedGalleryDl = galleryDl
         addedBoth = both
         removedYtDlp = removedDefaults
+        deleted = deletedSites
     }
 
     fun loadSiteRules(context: Context) = applySiteRules(
@@ -77,6 +80,7 @@ object VideoSiteRouter {
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_GALLERY_DL),
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED),
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_BOTH),
+        GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_DELETED),
     )
 
     /** Sites whose links go to yt-dlp alone: the built-in video sites still on it, plus any added. */
@@ -110,38 +114,62 @@ object VideoSiteRouter {
         bothSupported.forEach { route[it] = SiteRoute.BOTH }
         videoOnlyHosts.forEach { route[it] = SiteRoute.YT_DLP_ONLY }
         (addedGalleryDl + addedYtDlp + addedBoth + removedYtDlp).forEach { host -> siteOverride(host)?.let { route[host] = it } }
+        deleted.forEach { route.remove(it) }
         return SiteRoute.entries.associateWith { r -> route.filterValues { it == r }.keys.sorted() }
     }
 
     /** Sends [host]'s links on [routeTo] from now on. */
-    fun setSiteRoute(context: Context, host: String, routeTo: SiteRoute) {
-        val yt = addedYtDlp - host
-        val gdl = addedGalleryDl - host
-        val both = addedBoth - host
-        val removed = removedYtDlp - host
-        val builtIn = host in videoOnlyHosts
+    fun setSiteRoute(context: Context, host: String, routeTo: SiteRoute) = setSitesRoute(context, setOf(host), routeTo)
+
+    /** Sends every one of [hosts]' links on [routeTo] from now on, saved once (a batch can be
+     * thousands of sites). */
+    fun setSitesRoute(context: Context, hosts: Set<String>, routeTo: SiteRoute) {
+        val builtIn = hosts intersect videoOnlyHosts
+        val yt = addedYtDlp - hosts
+        val gdl = addedGalleryDl - hosts
+        val both = addedBoth - hosts
+        val removed = removedYtDlp - hosts
+        val del = deleted - hosts
         when (routeTo) {
-            SiteRoute.GALLERY_DL_ONLY -> saveSiteRules(context, yt, gdl + host, if (builtIn) removed + host else removed, both)
-            SiteRoute.YT_DLP_ONLY -> saveSiteRules(context, if (builtIn) yt else yt + host, gdl, removed, both)
-            SiteRoute.BOTH -> saveSiteRules(context, yt, gdl, if (builtIn) removed + host else removed, both + host)
+            SiteRoute.GALLERY_DL_ONLY -> saveSiteRules(context, yt, gdl + hosts, removed + builtIn, both, del)
+            SiteRoute.YT_DLP_ONLY -> saveSiteRules(context, yt + (hosts - builtIn), gdl, removed, both, del)
+            SiteRoute.BOTH -> saveSiteRules(context, yt, gdl, removed + builtIn, both + hosts, del)
         }
     }
 
+    /** Takes [host] off every list: its links then go as a site on no list does (gallery-dl
+     * first, yt-dlp for its videos). Adding it again, or Restore defaults, brings it back. */
+    fun deleteSite(context: Context, host: String) = deleteSites(context, setOf(host))
+
+    /** [deleteSite] for many at once, saved once. */
+    fun deleteSites(context: Context, hosts: Set<String>) {
+        val builtIn = hosts intersect videoOnlyHosts
+        saveSiteRules(
+            context, addedYtDlp - hosts, addedGalleryDl - hosts,
+            removedYtDlp - hosts + builtIn,
+            addedBoth - hosts, deleted + hosts,
+        )
+    }
+
     /** Undoes the user's change to [host]: back to its default route. */
-    fun resetSite(context: Context, host: String) =
-        saveSiteRules(context, addedYtDlp - host, addedGalleryDl - host, removedYtDlp - host, addedBoth - host)
+    fun resetSite(context: Context, host: String) = resetSites(context, setOf(host))
+
+    /** [resetSite] for many at once, saved once. */
+    fun resetSites(context: Context, hosts: Set<String>) =
+        saveSiteRules(context, addedYtDlp - hosts, addedGalleryDl - hosts, removedYtDlp - hosts, addedBoth - hosts, deleted - hosts)
 
     /** How many sites the user changed. */
-    fun siteChangeCount() = (addedYtDlp + addedGalleryDl + addedBoth + removedYtDlp).size
+    fun siteChangeCount() = (addedYtDlp + addedGalleryDl + addedBoth + removedYtDlp + deleted).size
 
-    fun resetSites(context: Context) = saveSiteRules(context, emptySet(), emptySet(), emptySet(), emptySet())
+    fun resetSites(context: Context) = saveSiteRules(context, emptySet(), emptySet(), emptySet(), emptySet(), emptySet())
 
-    private fun saveSiteRules(context: Context, yt: Set<String>, gdl: Set<String>, removed: Set<String>, both: Set<String>) {
+    private fun saveSiteRules(context: Context, yt: Set<String>, gdl: Set<String>, removed: Set<String>, both: Set<String>, del: Set<String> = deleted) {
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP, yt)
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_GALLERY_DL, gdl)
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED, removed)
         GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_BOTH, both)
-        applySiteRules(yt, gdl, removed, both)
+        GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_DELETED, del)
+        applySiteRules(yt, gdl, removed, both, del)
     }
 
     /** A site typed or pasted into the Sites list — a bare domain or a whole link — as the host the

@@ -25,6 +25,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +36,7 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.Instagram
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -255,7 +260,15 @@ private fun SitesSection() {
         SiteListSheet(
             route = which,
             sites = lists?.get(which).orEmpty(),
-            onMove = { host, to -> route(host, to) },
+            onMove = { hosts, to ->
+                if (to == null) com.comfort.app.data.VideoSiteRouter.resetSites(context, hosts)
+                else com.comfort.app.data.VideoSiteRouter.setSitesRoute(context, hosts, to)
+                revision++
+            },
+            onDelete = { hosts ->
+                com.comfort.app.data.VideoSiteRouter.deleteSites(context, hosts)
+                revision++
+            },
             onDismiss = { browsing = null },
         )
     }
@@ -263,7 +276,7 @@ private fun SitesSection() {
     if (!open) return
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = { open = false },
-        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberSturdySheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         // Edge to edge: the content runs under the navigation bar instead of stopping above it.
         contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0) },
@@ -467,20 +480,33 @@ private fun siteRouteIcon(route: com.comfort.app.data.VideoSiteRouter.SiteRoute)
 }
 
 /** One Sites list, searchable — hundreds to thousands of sites, so a lazy list. Each site's ⋮ menu
- * moves it to another list, or resets a site the user changed back to its default. */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+ * moves it to another list, resets a site the user changed back to its default, or deletes it.
+ * A long press starts selecting: taps then pick more, and the bar above the list does the same
+ * to all of them at once (Select all takes what the search shows). */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun SiteListSheet(
     route: com.comfort.app.data.VideoSiteRouter.SiteRoute,
     sites: List<String>,
-    onMove: (String, com.comfort.app.data.VideoSiteRouter.SiteRoute?) -> Unit,
+    onMove: (Set<String>, com.comfort.app.data.VideoSiteRouter.SiteRoute?) -> Unit,
+    onDelete: (Set<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    val selecting = selected.isNotEmpty()
+    // Sites moved or deleted leave the list: they leave the selection too.
+    LaunchedEffect(sites) { selected = selected intersect sites.toSet() }
+    // With "Use Instaloader for Instagram" on, Instagram's posts and reels go to Instaloader
+    // before the list's engines (VideoSiteRouter.resolveEngine), whichever list it's on.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val instaloaderOn = remember {
+        com.comfort.app.data.GalleryDlPreferences.isInstaloaderForInstagram(context)
+    }
     val shown = remember(query, sites) { if (query.isBlank()) sites else sites.filter { it.contains(query.trim(), ignoreCase = true) } }
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberSturdySheetState(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         // Edge to edge: the content runs under the navigation bar instead of stopping above it.
         contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0) },
@@ -520,18 +546,185 @@ private fun SiteListSheet(
                 modifier = Modifier.fillMaxWidth().clearFocusOnKeyboardDismiss(),
             )
             Spacer(Modifier.height(8.dp))
-            androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            androidx.activity.compose.BackHandler(enabled = selecting) { selected = emptySet() }
+            androidx.compose.animation.AnimatedVisibility(visible = selecting) {
+                val allShown = shown.isNotEmpty() && selected.containsAll(shown)
+                var batchMenu by remember { mutableStateOf(false) }
+                val anyChanged = selected.any { com.comfort.app.data.VideoSiteRouter.siteOverride(it) != null }
+                androidx.compose.material3.Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selected = emptySet() }) {
+                            Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.deselect_all))
+                        }
+                        Text(
+                            stringResource(R.string.x_selected, "%,d".format(selected.size)),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { selected = if (allShown) selected - shown.toSet() else selected + shown }) {
+                            Icon(
+                                if (allShown) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                                contentDescription = stringResource(if (allShown) R.string.deselect_all else R.string.select_all),
+                            )
+                        }
+                        IconButton(onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            onDelete(selected)
+                        }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+                        }
+                        androidx.compose.foundation.layout.Box {
+                            IconButton(onClick = { batchMenu = true }, colors = menuButtonColors(batchMenu, MaterialTheme.colorScheme.primary)) { Icon(Icons.Outlined.MoreVert, contentDescription = null) }
+                            androidx.compose.material3.DropdownMenu(expanded = batchMenu, onDismissRequest = { batchMenu = false }) {
+                                com.comfort.app.data.VideoSiteRouter.SiteRoute.entries.filter { it != route }.forEach { to ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.move_to_x, siteRouteTitle(to))) },
+                                        leadingIcon = { Icon(siteRouteIcon(to), contentDescription = null) },
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            batchMenu = false
+                                            onMove(selected, to)
+                                        },
+                                    )
+                                }
+                                if (anyChanged) {
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.reset_to_default)) },
+                                        leadingIcon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
+                                        onClick = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                            batchMenu = false
+                                            onMove(selected, null)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Long-press a site and drag: every site from it to the finger is selected (or, from
+            // one already selected, unselected), the list scrolling on near its top or bottom —
+            // the photo-gallery gesture. A long press without a drag picks just that one.
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            var dragSelecting by remember { mutableStateOf(false) }
+            var dragPointerY by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+            val dragState = remember { IntArray(2) } // anchor, current
+            val dragBase = remember { arrayOf(emptySet<String>()) }
+            val dragAdds = remember { BooleanArray(1) }
+            val latestShown by androidx.compose.runtime.rememberUpdatedState(shown)
+            fun siteIndexAt(y: Float): Int? = listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { y >= it.offset && y < it.offset + it.size && it.index < latestShown.size }?.index
+            fun applyDrag() {
+                val (from, to) = dragState[0] to dragState[1]
+                val range = latestShown.subList(minOf(from, to), maxOf(from, to) + 1)
+                selected = if (dragAdds[0]) dragBase[0] + range else dragBase[0] - range.toSet()
+            }
+            val listDensity = androidx.compose.ui.platform.LocalDensity.current
+            val edgePx = with(listDensity) { 64.dp.toPx() }
+            // A frame, deep in a zone: about what going up ran at (a finger above the list).
+            val maxSpeedPx = with(listDensity) { 20.dp.toPx() }
+            // The list runs on under the navigation bar, where a finger can't go: the bottom zone
+            // sits above it, so it's as reachable as the top one.
+            val navBarPx = androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(listDensity).toFloat()
+            LaunchedEffect(dragSelecting) {
+                while (dragSelecting) {
+                    val bottom = listState.layoutInfo.viewportSize.height - navBarPx
+                    // How deep into an edge zone the finger is, 0 to 1 (a finger past the list's
+                    // top counts as 1: unbounded, going up ran faster than down — reported).
+                    val up = ((edgePx - dragPointerY) / edgePx).coerceIn(0f, 1f)
+                    val down = ((dragPointerY - (bottom - edgePx)) / edgePx).coerceIn(0f, 1f)
+                    val speed = (down - up) * maxSpeedPx
+                    val height = bottom
+                    if (speed != 0f) {
+                        listState.scrollBy(speed)
+                        // The same tick as a drag over a row: without it they stopped once the list
+                        // took over scrolling (reported).
+                        siteIndexAt(dragPointerY.coerceIn(0f, height - 1f))?.let {
+                            if (it != dragState[1]) {
+                                dragState[1] = it
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                applyDrag()
+                            }
+                        }
+                    }
+                    androidx.compose.runtime.withFrameNanos { }
+                }
+            }
+            androidx.compose.foundation.lazy.LazyColumn(
+                state = listState,
+                // Off while drag-selecting, so the drag selects instead of scrolling.
+                userScrollEnabled = !dragSelecting,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                val i = siteIndexAt(offset.y) ?: return@detectDragGesturesAfterLongPress
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                dragBase[0] = selected
+                                dragAdds[0] = latestShown[i] !in selected
+                                dragState[0] = i
+                                dragState[1] = i
+                                dragPointerY = offset.y
+                                dragSelecting = true
+                                applyDrag()
+                            },
+                            onDrag = { change, _ ->
+                                if (!dragSelecting) return@detectDragGesturesAfterLongPress
+                                change.consume()
+                                dragPointerY = change.position.y
+                                siteIndexAt(change.position.y)?.let { i ->
+                                    if (i != dragState[1]) {
+                                        dragState[1] = i
+                                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        applyDrag()
+                                    }
+                                }
+                            },
+                            onDragEnd = { dragSelecting = false },
+                            onDragCancel = { dragSelecting = false },
+                        )
+                    },
+            ) {
                 items(shown.size, key = { shown.getOrNull(it) ?: it }) { i ->
                     val site = shown.getOrNull(i) ?: return@items
                     val changed = com.comfort.app.data.VideoSiteRouter.siteOverride(site) != null
+                    val isSelected = site in selected
                     var menu by remember { mutableStateOf(false) }
-                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f) else Color.Transparent)
+                            // The long press is the list's (it can go on into a drag); this one's
+                            // for TalkBack, which long-presses through the semantics.
+                            .combinedClickable(
+                                onClick = { if (selecting) selected = if (isSelected) selected - site else selected + site },
+                            )
+                            .semantics {
+                                onLongClick {
+                                    selected = if (isSelected) selected - site else selected + site
+                                    true
+                                }
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         androidx.compose.foundation.layout.Box(
                             modifier = Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(if (changed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
+                                .background(if (changed || isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
+                            if (isSelected) {
+                                Icon(Icons.Outlined.Check, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+                            } else Text(
                                 site.firstOrNull()?.uppercase() ?: "",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold,
@@ -542,9 +735,13 @@ private fun SiteListSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(site, style = MaterialTheme.typography.bodyLarge)
                             if (changed) Text(stringResource(R.string.changed_by_you), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            if (instaloaderOn && site == "instagram.com") Text(stringResource(R.string.posts_and_reels_go_to_instaloader), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        androidx.compose.foundation.layout.Box {
-                            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.move_x, site)) }
+                        // While selecting, the bar above does it for all of them (its room kept,
+                        // so the rows don't shrink and the list jump).
+                        if (selecting) Spacer(Modifier.size(48.dp))
+                        else androidx.compose.foundation.layout.Box {
+                            IconButton(onClick = { menu = true }, colors = menuButtonColors(menu)) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.move_x, site)) }
                             androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 com.comfort.app.data.VideoSiteRouter.SiteRoute.entries.filter { it != route }.forEach { to ->
                                     androidx.compose.material3.DropdownMenuItem(
@@ -553,7 +750,7 @@ private fun SiteListSheet(
                                         onClick = {
                                             haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
                                             menu = false
-                                            onMove(site, to)
+                                            onMove(setOf(site), to)
                                         },
                                     )
                                 }
@@ -564,10 +761,20 @@ private fun SiteListSheet(
                                         onClick = {
                                             haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
                                             menu = false
-                                            onMove(site, null)
+                                            onMove(setOf(site), null)
                                         },
                                     )
                                 }
+                                // Off every list; its links then go as a site on no list does.
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        menu = false
+                                        onDelete(setOf(site))
+                                    },
+                                )
                             }
                         }
                     }

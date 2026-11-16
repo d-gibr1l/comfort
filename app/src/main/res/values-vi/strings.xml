@@ -427,6 +427,7 @@
     <string name="search_sites">Tìm trang</string>
     <string name="clear_search">Xóa tìm kiếm</string>
     <string name="changed_by_you">Do bạn thay đổi</string>
+    <string name="posts_and_reels_go_to_instaloader">Bài đăng và reel được gửi tới Instaloader trước</string>
     <string name="move_x">Chuyển %1$s</string>
     <string name="move_to_x">Chuyển sang %1$s</string>
     <string name="reset_to_default">Đặt lại mặc định</string>

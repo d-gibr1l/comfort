@@ -427,6 +427,7 @@
     <string name="search_sites">البحث في المواقع</string>
     <string name="clear_search">مسح البحث</string>
     <string name="changed_by_you">غيّرته أنت</string>
+    <string name="posts_and_reels_go_to_instaloader">المنشورات والريلز تذهب إلى Instaloader أولًا</string>
     <string name="move_x">نقل %1$s</string>
     <string name="move_to_x">نقل إلى %1$s</string>
     <string name="reset_to_default">إعادة إلى الافتراضي</string>

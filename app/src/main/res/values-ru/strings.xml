@@ -475,6 +475,7 @@
     <string name="search_sites">Поиск сайтов</string>
     <string name="clear_search">Очистить поиск</string>
     <string name="changed_by_you">Изменено вами</string>
+    <string name="posts_and_reels_go_to_instaloader">Посты и рилсы сначала идут в Instaloader</string>
     <string name="move_x">Переместить %1$s</string>
     <string name="move_to_x">Переместить в «%1$s»</string>
     <string name="reset_to_default">Сбросить</string>

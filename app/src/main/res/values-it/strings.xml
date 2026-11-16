@@ -427,6 +427,7 @@
     <string name="search_sites">Cerca siti</string>
     <string name="clear_search">Cancella ricerca</string>
     <string name="changed_by_you">Modificato da te</string>
+    <string name="posts_and_reels_go_to_instaloader">Post e reel passano prima da Instaloader</string>
     <string name="move_x">Sposta %1$s</string>
     <string name="move_to_x">Sposta in %1$s</string>
     <string name="reset_to_default">Ripristina predefinito</string>
