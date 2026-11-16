@@ -14,6 +14,8 @@ import android.os.Bundle
 import android.util.Patterns
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -210,23 +212,35 @@ class ShareActivity : ComponentActivity() {
                                 urls = urls,
                                 router = router,
                                 ask = shareMode != ShareMode.INSTANT,
-                                onFinished = { finish() },
+                                onFinished = { finishAfterEnqueues(router) },
                             )
                             shareMode == ShareMode.INSTANT -> InstantShareHandler(
                                 url = urls[0],
                                 router = router,
-                                onFinished = { finish() },
+                                onFinished = { finishAfterEnqueues(router) },
                             )
                             shareMode == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
                                 url = urls[0],
                                 router = router,
-                                onFinished = { finish() },
+                                onFinished = { finishAfterEnqueues(router) },
                             )
-                            else -> ShareRouter(url = urls[0], router = router, onFinished = { finish() })
+                            else -> ShareRouter(url = urls[0], router = router, onFinished = { finishAfterEnqueues(router) })
                         }
                     }
                 }
             }
+        }
+    }
+
+    /** Closes once [router]'s enqueues are in, so their "started" Toast is posted while this screen
+     * is still up (see LinkRouterViewModel.awaitEnqueues) — a few milliseconds, a DB insert; never
+     * more than 3 s, in case one hangs. */
+    private fun finishAfterEnqueues(router: LinkRouterViewModel) {
+        val share = sharedUrls
+        lifecycleScope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(3_000) { router.awaitEnqueues() }
+            // Not if another share came in meanwhile (onNewIntent): that one's screen is up now.
+            if (sharedUrls === share) finish()
         }
     }
 
@@ -306,7 +320,7 @@ private fun MultiLinkHandler(urls: List<String>, router: LinkRouterViewModel, on
                 startedCount == 0 -> app.getString(R.string.already_downloaded_see_duplicates)
                 else -> app.resources.getQuantityString(R.plurals.downloads_started_some_duplicates, startedCount, startedCount, duplicateCount)
             }
-            Toast.makeText(app, message, Toast.LENGTH_SHORT).show()
+            showShareToast(app, message)
         }
         // Not after it: enqueueing outlives this screen (LinkRouterViewModel), the Toast follows.
         onFinished()
@@ -326,7 +340,7 @@ private fun InstantShareHandler(url: String, router: LinkRouterViewModel, onFini
     LaunchedEffect(url) {
         val app = context.applicationContext
         router.download(url) { result ->
-            Toast.makeText(app, startedMessage(app, result), Toast.LENGTH_SHORT).show()
+            showShareToast(app, startedMessage(app, result))
         }
         onFinished()
     }
@@ -472,7 +486,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
                 router.close()
                 val app = context.applicationContext
                 router.download(url, forceDuplicate = true) {
-                    Toast.makeText(app, startedMessage(app, it), Toast.LENGTH_SHORT).show()
+                    showShareToast(app, startedMessage(app, it))
                 }
                 onFinished()
             },
@@ -486,7 +500,7 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
             onDownload = { options ->
                 val app = context.applicationContext
                 router.download(url, options) {
-                    Toast.makeText(app, startedMessage(app, it), Toast.LENGTH_SHORT).show()
+                    showShareToast(app, startedMessage(app, it))
                 }
                 onFinished()
             },
@@ -670,7 +684,7 @@ private fun SharePickerSheet(
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
                         val app = context.applicationContext
                         router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
-                            Toast.makeText(app, startedMessage(app, it), Toast.LENGTH_SHORT).show()
+                            showShareToast(app, startedMessage(app, it))
                         }
                         visible = false
                     },
@@ -681,4 +695,16 @@ private fun SharePickerSheet(
             }
         }
     }
+}
+
+// The last share's Toast, replaced by the next one rather than queued behind it.
+private var lastShareToast: Toast? = null
+
+/** A share's "started" Toast. It replaces the one still up instead of queueing behind it: a queued
+ * Toast is checked again when its turn comes, by when this share screen has closed, and Android
+ * drops a background app's Toasts past its quota (seen live: shares a second or two apart lost
+ * every third one, "blocked and discarded"). Shown now, it's shown while the screen is up. */
+private fun showShareToast(context: android.content.Context, message: String) {
+    lastShareToast?.cancel()
+    lastShareToast = Toast.makeText(context, message, Toast.LENGTH_SHORT).also { it.show() }
 }

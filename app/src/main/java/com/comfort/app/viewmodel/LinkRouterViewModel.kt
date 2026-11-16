@@ -140,16 +140,34 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
 
     /** Several shared links at once — each enqueued with the defaults; [onDone] gets how many were
      * already downloaded. */
-    fun downloadAll(urls: List<String>, onDone: (duplicates: Int) -> Unit): Job = enqueueScope.launch {
+    fun downloadAll(urls: List<String>, onDone: (duplicates: Int) -> Unit): Job = track(enqueueScope.launch {
         var duplicates = 0
         urls.forEach { url ->
             if (runEnqueue { DownloadDispatcher.enqueueDownload(context, url, titleFor(url)) } is EnqueueResult.Duplicate) duplicates++
         }
         onDone(duplicates)
-    }
+    })
 
     private fun enqueue(onDone: (EnqueueResult) -> Unit, block: suspend () -> EnqueueResult): Job =
-        enqueueScope.launch { onDone(runEnqueue(block)) }
+        track(enqueueScope.launch { onDone(runEnqueue(block)) })
+
+    // The enqueues still running, so the share screen can wait for their onDone (its Toast)
+    // before it closes: see [awaitEnqueues].
+    private val pending = java.util.Collections.synchronizedSet(mutableSetOf<Job>())
+
+    private fun track(job: Job): Job {
+        pending += job
+        job.invokeOnCompletion { pending -= job }
+        return job
+    }
+
+    /** Waits for every enqueue started here to finish, its onDone included. The share screen
+     * closes after this so the "started" Toast is posted while Comfort is still on screen:
+     * posted from the background, Android lets an app only ~3 Toasts in 20 s and drops the rest
+     * ("above allowed toast quota", seen live — a run of shares lost their Toasts). */
+    suspend fun awaitEnqueues() {
+        pending.toList().forEach { it.join() }
+    }
 
     /** [block], with a failure as [EnqueueResult.Failed] instead of an exception: thrown out of
      * the scope, it crashed the app, and its caller (the share sheet) never heard back. */
