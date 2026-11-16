@@ -101,6 +101,27 @@ object Aria2Runtime {
         }
     }
 
+    // How long aria2 can stay off before its downloaded libraries are deleted (~9 MB unpacked).
+    // Turning it on again downloads them again (~4 MB).
+    private const val UNUSED_DELETE_AFTER_MS = 30L * 24 * 60 * 60 * 1000
+
+    /** At app start: deletes the libraries once aria2 has been off for [UNUSED_DELETE_AFTER_MS].
+     * Libraries there with no recorded off time (unpacked by an older version, or before this
+     * existed) start the count now. Not while a download of them runs. */
+    fun sweepIfUnused(context: Context) {
+        if (com.comfort.app.data.GalleryDlPreferences.isAria2Enabled(context)) return
+        if (_install.value?.let { it.error == null } == true) return
+        val root = runtimeRoot(context)
+        if (!root.exists()) return
+        val offSince = com.comfort.app.data.GalleryDlPreferences.getAria2OffSinceMs(context)
+        val now = System.currentTimeMillis()
+        if (offSince <= 0L || offSince > now) {
+            com.comfort.app.data.GalleryDlPreferences.setAria2OffSinceMs(context, now)
+            return
+        }
+        if (now - offSince >= UNUSED_DELETE_AFTER_MS) root.deleteRecursively()
+    }
+
     /** Clears a shown error. */
     fun dismissError() {
         if (_install.value?.error != null) _install.value = null

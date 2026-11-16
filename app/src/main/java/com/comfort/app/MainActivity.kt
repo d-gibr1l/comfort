@@ -211,6 +211,8 @@ class MainActivity : ComponentActivity() {
         DownloadDispatcher.repairOrphanedRunning(context)
         DownloadDispatcher.repairOrphanedQueue(context)
         com.comfort.app.util.GalleryDlListing.sweepStaleCookieCopies(context)
+        // aria2's downloaded libraries, once it has been off for 30 days.
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.comfort.app.util.Aria2Runtime.sweepIfUnused(context) }
         DownloadDispatcher.rescheduleStagingCleanup(context)
         com.comfort.app.data.Subscriptions.reschedule(context)
         DownloadDispatcher.scheduleWindowAlarm(context)

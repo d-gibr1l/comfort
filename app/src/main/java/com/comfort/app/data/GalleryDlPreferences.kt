@@ -1062,7 +1062,19 @@ object GalleryDlPreferences {
     }
 
     fun setAria2Enabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_ARIA2_ENABLED, enabled).apply()
+        prefs(context).edit().putBoolean(KEY_ARIA2_ENABLED, enabled)
+            // When it was turned off, for Aria2Runtime.sweepIfUnused; cleared while on.
+            .apply { if (enabled) remove(KEY_ARIA2_OFF_SINCE) else putLong(KEY_ARIA2_OFF_SINCE, System.currentTimeMillis()) }
+            .apply()
+    }
+
+    const val KEY_ARIA2_OFF_SINCE = "aria2_off_since_ms"
+
+    /** When aria2 was turned off (0: never recorded, or it's on). */
+    fun getAria2OffSinceMs(context: Context): Long = prefs(context).getLong(KEY_ARIA2_OFF_SINCE, 0L)
+
+    fun setAria2OffSinceMs(context: Context, ms: Long) {
+        prefs(context).edit().putLong(KEY_ARIA2_OFF_SINCE, ms).apply()
     }
 
     /** When enabled (the default), MainScreen's own rate-limited engine check installs any update

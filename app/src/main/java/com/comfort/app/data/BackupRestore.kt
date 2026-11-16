@@ -40,7 +40,7 @@ object BackupRestore {
     private val STATE_KEYS = setOf(
         "global_pause", "engine_update_last_check_ms", "engine_update_available",
         "app_update_last_check_ms", "app_update_available", "update_prompted_app_version", "update_prompted_engine_versions", "saved_files_organized",
-        "old_names_tidied_2", "cookies",
+        "old_names_tidied_2", "cookies", "aria2_off_since_ms",
     )
 
     /** A backup bigger than this isn't one (a video picked by mistake): refused before it's read
