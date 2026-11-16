@@ -778,6 +778,13 @@
     <string name="shuffle_off">Casuale disattivo</string>
     <string name="on">Attivo</string>
     <string name="queue_shuffled">Coda · casuale</string>
+    <string name="queue_up_next">Prossimi</string>
+    <string name="queue_repeat">Ripeti</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d brano</item>
+        <item quantity="many">%d brani</item>
+        <item quantity="other">%d brani</item>
+    </plurals>
     <string name="drag_to_reorder">Trascina per riordinare</string>
     <string name="item_x_2">Elemento %1$s</string>
     <string name="view_original_source_2">Vedi la fonte originale</string>

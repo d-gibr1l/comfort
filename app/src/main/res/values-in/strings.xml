@@ -855,6 +855,11 @@
     <string name="shuffle_off">Acak mati</string>
     <string name="on">Aktif</string>
     <string name="queue_shuffled">Antrean · diacak</string>
+    <string name="queue_up_next">Berikutnya</string>
+    <string name="queue_repeat">Ulangi</string>
+    <plurals name="queue_songs_count">
+        <item quantity="other">%d lagu</item>
+    </plurals>
     <string name="drag_to_reorder">Seret untuk mengurutkan ulang</string>
     <string name="view_original_source_2">Lihat sumber asli</string>
     <string name="copy_post_link_2">Salin tautan postingan</string>

@@ -778,6 +778,16 @@
     <string name="shuffle_off">الترتيب العشوائي متوقف</string>
     <string name="on">مفعّل</string>
     <string name="queue_shuffled">القائمة · عشوائية</string>
+    <string name="queue_up_next">التالي</string>
+    <string name="queue_repeat">تكرار</string>
+    <plurals name="queue_songs_count">
+        <item quantity="zero">%d أغنية</item>
+        <item quantity="one">أغنية واحدة</item>
+        <item quantity="two">أغنيتان</item>
+        <item quantity="few">%d أغانٍ</item>
+        <item quantity="many">%d أغنية</item>
+        <item quantity="other">%d أغنية</item>
+    </plurals>
     <string name="drag_to_reorder">اسحب لإعادة الترتيب</string>
     <string name="item_x_2">العنصر %1$s</string>
     <string name="view_original_source_2">عرض المصدر الأصلي</string>

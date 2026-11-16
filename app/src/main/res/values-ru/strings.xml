@@ -912,6 +912,14 @@
     <string name="shuffle_off">Перемешивание выкл.</string>
     <string name="on">Вкл.</string>
     <string name="queue_shuffled">Очередь · перемешана</string>
+    <string name="queue_up_next">Далее</string>
+    <string name="queue_repeat">Повтор</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d песня</item>
+        <item quantity="few">%d песни</item>
+        <item quantity="many">%d песен</item>
+        <item quantity="other">%d песни</item>
+    </plurals>
     <string name="drag_to_reorder">Перетащите, чтобы изменить порядок</string>
     <string name="item_x_2">Элемент %1$s</string>
     <string name="view_original_source_2">Открыть источник</string>

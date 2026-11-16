@@ -864,6 +864,12 @@
     <string name="shuffle_off">Zufallswiedergabe aus</string>
     <string name="on">An</string>
     <string name="queue_shuffled">Warteschlange · zufällig</string>
+    <string name="queue_up_next">Als Nächstes</string>
+    <string name="queue_repeat">Wiederholen</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d Song</item>
+        <item quantity="other">%d Songs</item>
+    </plurals>
     <string name="drag_to_reorder">Zum Umsortieren ziehen</string>
     <string name="item_x_2">Element %1$s</string>
     <string name="view_original_source_2">Originalquelle ansehen</string>

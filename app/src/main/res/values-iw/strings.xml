@@ -778,6 +778,13 @@
     <string name="shuffle_off">ערבוב כבוי</string>
     <string name="on">פעיל</string>
     <string name="queue_shuffled">תור · מעורבב</string>
+    <string name="queue_up_next">הבא בתור</string>
+    <string name="queue_repeat">חזרה</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">שיר אחד</item>
+        <item quantity="two">שני שירים</item>
+        <item quantity="other">%d שירים</item>
+    </plurals>
     <string name="drag_to_reorder">גרור כדי לשנות סדר</string>
     <string name="item_x_2">פריט %1$s</string>
     <string name="view_original_source_2">הצגת המקור</string>

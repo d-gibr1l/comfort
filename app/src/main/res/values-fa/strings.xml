@@ -778,6 +778,12 @@
     <string name="shuffle_off">پخش تصادفی خاموش</string>
     <string name="on">روشن</string>
     <string name="queue_shuffled">صف · تصادفی</string>
+    <string name="queue_up_next">بعدی</string>
+    <string name="queue_repeat">تکرار</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d آهنگ</item>
+        <item quantity="other">%d آهنگ</item>
+    </plurals>
     <string name="drag_to_reorder">برای تغییر ترتیب بکشید</string>
     <string name="item_x_2">مورد %1$s</string>
     <string name="view_original_source_2">مشاهده منبع اصلی</string>

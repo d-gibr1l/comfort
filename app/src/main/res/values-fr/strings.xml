@@ -889,6 +889,13 @@
     <string name="shuffle_off">Lecture aléatoire désactivée</string>
     <string name="on">Activé</string>
     <string name="queue_shuffled">File · aléatoire</string>
+    <string name="queue_up_next">À suivre</string>
+    <string name="queue_repeat">Répéter</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d titre</item>
+        <item quantity="many">%d titres</item>
+        <item quantity="other">%d titres</item>
+    </plurals>
     <string name="drag_to_reorder">Faire glisser pour réorganiser</string>
     <string name="item_x_2">Élément %1$s</string>
     <string name="view_original_source_2">Voir la source d\'origine</string>

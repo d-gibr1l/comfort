@@ -111,6 +111,9 @@ internal fun SwipeToDeleteCard(
     shape: Shape = RectangleShape,
     /** Off: the card doesn't swipe (the music queue's song playing). */
     enabled: Boolean = true,
+    /** Red only in the strip the card has uncovered, not under all of it: for a see-through card
+     * (the music queue's rows over the player's backdrop), whose red would show through. */
+    revealOnly: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -181,6 +184,18 @@ internal fun SwipeToDeleteCard(
             if (dismissState.dismissDirection != SwipeToDismissBoxValue.Settled) Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(
+                        if (!revealOnly) Modifier else Modifier.layout { measurable, constraints ->
+                            // As wide as the card has slid, on the side it uncovered.
+                            val slid = kotlin.math.abs(runCatching { dismissState.requireOffset() }.getOrDefault(0f)).toInt()
+                                .coerceIn(0, constraints.maxWidth)
+                            val placeable = measurable.measure(constraints.copy(minWidth = slid, maxWidth = slid))
+                            layout(constraints.maxWidth, placeable.height) {
+                                val x = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) constraints.maxWidth - slid else 0
+                                placeable.place(x, 0)
+                            }
+                        }
+                    )
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.errorContainer)
                     .padding(horizontal = 24.dp),

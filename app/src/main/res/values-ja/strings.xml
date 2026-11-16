@@ -778,6 +778,11 @@
     <string name="shuffle_off">シャッフルオフ</string>
     <string name="on">オン</string>
     <string name="queue_shuffled">キュー · シャッフル中</string>
+    <string name="queue_up_next">次に再生</string>
+    <string name="queue_repeat">リピート</string>
+    <plurals name="queue_songs_count">
+        <item quantity="other">%d 曲</item>
+    </plurals>
     <string name="drag_to_reorder">ドラッグして並べ替え</string>
     <string name="item_x_2">項目 %1$s</string>
     <string name="view_original_source_2">元のページを表示</string>

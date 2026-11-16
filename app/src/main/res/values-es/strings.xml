@@ -877,6 +877,13 @@
     <string name="shuffle_off">Aleatorio desactivado</string>
     <string name="on">Activado</string>
     <string name="queue_shuffled">Cola · aleatoria</string>
+    <string name="queue_up_next">A continuación</string>
+    <string name="queue_repeat">Repetir</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d canción</item>
+        <item quantity="many">%d canciones</item>
+        <item quantity="other">%d canciones</item>
+    </plurals>
     <string name="drag_to_reorder">Arrastra para reordenar</string>
     <string name="item_x_2">Elemento %1$s</string>
     <string name="view_original_source_2">Ver fuente original</string>

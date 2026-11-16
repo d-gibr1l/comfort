@@ -63,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -450,6 +451,8 @@ internal fun formatTime(ms: Long): String {
 /** The seek bar as Auxio's: a wave while it plays (flat when paused), with the times under it. A
  * transparent slider on top takes the drags. */
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+private val SEEK_THUMB_WIDTH = 7.dp
+
 @Composable
 private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
     val total = duration.coerceAtLeast(1L)
@@ -465,7 +468,27 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
             waveSpeed = 10.dp,
             color = Color.White,
             trackColor = Color.White.copy(alpha = 0.25f),
-            modifier = Modifier.fillMaxWidth().height(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                // The Slider's own track: inset half the handle's width at each end, so the wave
+                // ends where the handle is (it ran on a little past it).
+                .padding(horizontal = SEEK_THUMB_WIDTH / 2)
+                .height(14.dp)
+                // A gap either side of the handle: the wave stopped at it and the line beyond went
+                // on from under it, seen through the handle as a "+". Cleared, not painted over —
+                // the backdrop behind is the blurred cover.
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val gap = SEEK_THUMB_WIDTH.toPx() / 2 + 4.dp.toPx()
+                    val x = fraction * size.width
+                    drawRect(
+                        Color.Black,
+                        topLeft = androidx.compose.ui.geometry.Offset(x - gap, 0f),
+                        size = androidx.compose.ui.geometry.Size(gap * 2, size.height),
+                        blendMode = androidx.compose.ui.graphics.BlendMode.Clear,
+                    )
+                },
         )
         val thumbInteraction = remember { MutableInteractionSource() }
         val colors = SliderDefaults.colors(
@@ -480,7 +503,7 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
             colors = colors,
             interactionSource = thumbInteraction,
             // A thicker handle than the default 4 dp.
-            thumb = { SliderDefaults.Thumb(interactionSource = thumbInteraction, colors = colors, thumbSize = androidx.compose.ui.unit.DpSize(7.dp, 40.dp)) },
+            thumb = { SliderDefaults.Thumb(interactionSource = thumbInteraction, colors = colors, thumbSize = androidx.compose.ui.unit.DpSize(SEEK_THUMB_WIDTH, 40.dp)) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -657,8 +680,18 @@ private fun QueueLayout(
                 Text(state.song?.title.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 state.song?.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
-            // Play then next in any language (see MediaLtr).
+            // Previous, play, next in any language (see MediaLtr).
             com.comfort.app.ui.MediaLtr { Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.OutlinedIconButton(
+                // As the player's own: restarts the song, or goes back one near its start.
+                onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() },
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+                colors = IconButtonDefaults.outlinedIconButtonColors(contentColor = Color.White),
+                modifier = Modifier.size(44.dp),
+            ) {
+                Icon(Icons.Rounded.SkipPrevious, contentDescription = stringResource(R.string.widget_music_previous))
+            }
+            Spacer(Modifier.size(6.dp))
             FilledIconButton(
                 onClick = MusicPlayer::togglePlay,
                 shape = RoundedCornerShape(12.dp),
@@ -690,9 +723,11 @@ private fun QueueLayout(
         )
         }
         Spacer(Modifier.height(8.dp))
+        // See-through: the queue stays on the player's own dark, blurred-cover backdrop.
         androidx.compose.material3.Surface(
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            color = Color.White.copy(alpha = 0.06f),
+            contentColor = Color.White,
             modifier = panelModifier.fillMaxSize(),
         ) {
             QueuePanel()

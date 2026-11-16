@@ -905,6 +905,12 @@
     <string name="on">On</string>
     <!-- QueueSheet.kt -->
     <string name="queue_shuffled">Queue · shuffled</string>
+    <string name="queue_up_next">Up next</string>
+    <string name="queue_repeat">Repeat</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
     <string name="drag_to_reorder">Drag to reorder</string>
     <!-- Filmstrip.kt -->
     <string name="item_x_2">Item %1$s</string>

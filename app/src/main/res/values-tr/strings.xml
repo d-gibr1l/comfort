@@ -778,6 +778,12 @@
     <string name="shuffle_off">Karıştırma kapalı</string>
     <string name="on">Açık</string>
     <string name="queue_shuffled">Kuyruk · karıştırıldı</string>
+    <string name="queue_up_next">Sıradaki</string>
+    <string name="queue_repeat">Tekrarla</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d şarkı</item>
+        <item quantity="other">%d şarkı</item>
+    </plurals>
     <string name="drag_to_reorder">Yeniden sıralamak için sürükle</string>
     <string name="item_x_2">Öğe %1$s</string>
     <string name="view_original_source_2">Orijinal kaynağı görüntüle</string>

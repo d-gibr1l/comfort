@@ -778,6 +778,11 @@
     <string name="shuffle_off">Tắt phát ngẫu nhiên</string>
     <string name="on">Bật</string>
     <string name="queue_shuffled">Hàng đợi · ngẫu nhiên</string>
+    <string name="queue_up_next">Tiếp theo</string>
+    <string name="queue_repeat">Lặp lại</string>
+    <plurals name="queue_songs_count">
+        <item quantity="other">%d bài</item>
+    </plurals>
     <string name="drag_to_reorder">Kéo để sắp xếp lại</string>
     <string name="item_x_2">Mục %1$s</string>
     <string name="view_original_source_2">Xem nguồn gốc</string>

@@ -741,7 +741,17 @@ fun MainScreen(
     // The music player's full screen, over everything.
     androidx.compose.animation.AnimatedVisibility(
         visible = showNowPlaying && music.song != null,
-        enter = androidx.compose.animation.slideInVertically { it },
+        // Held off two frames: the first builds the whole player (~15-30 ms on the phone), and a
+        // slide already running then jumped ahead by that much — the stutter on opening. Started
+        // after it, the slide runs from rest. Material's emphasized-decelerate curve, near the spring
+        // it replaces.
+        enter = androidx.compose.animation.slideInVertically(
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 400,
+                delayMillis = 32,
+                easing = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f),
+            ),
+        ) { it },
         exit = androidx.compose.animation.slideOutVertically { it },
     ) {
         com.comfort.app.ui.music.NowPlayingScreen(onClose = { showNowPlaying = false })

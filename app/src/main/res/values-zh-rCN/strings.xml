@@ -778,6 +778,11 @@
     <string name="shuffle_off">随机播放已关闭</string>
     <string name="on">开启</string>
     <string name="queue_shuffled">队列 · 随机</string>
+    <string name="queue_up_next">接下来播放</string>
+    <string name="queue_repeat">重复</string>
+    <plurals name="queue_songs_count">
+        <item quantity="other">%d 首歌曲</item>
+    </plurals>
     <string name="drag_to_reorder">拖动以重新排序</string>
     <string name="item_x_2">项目 %1$s</string>
     <string name="view_original_source_2">查看原始来源</string>

@@ -778,6 +778,12 @@
     <string name="shuffle_off">शफ़ल बंद</string>
     <string name="on">चालू</string>
     <string name="queue_shuffled">कतार · शफ़ल</string>
+    <string name="queue_up_next">आगे</string>
+    <string name="queue_repeat">दोहराएँ</string>
+    <plurals name="queue_songs_count">
+        <item quantity="one">%d गाना</item>
+        <item quantity="other">%d गाने</item>
+    </plurals>
     <string name="drag_to_reorder">क्रम बदलने के लिए खींचें</string>
     <string name="item_x_2">आइटम %1$s</string>
     <string name="view_original_source_2">मूल स्रोत देखें</string>
