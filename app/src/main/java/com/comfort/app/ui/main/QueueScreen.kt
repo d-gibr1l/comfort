@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -130,6 +131,8 @@ fun QueueScreen(
     // list stops making sense once a different list is showing.
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     val selectionMode = selectedIds.isNotEmpty()
+    // Long-press a card and drag: every one to the finger gets picked (DragSelect.kt).
+    val dragSelect = rememberDragSelectState()
     fun toggleSelected(id: String) {
         selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
     }
@@ -614,7 +617,16 @@ fun QueueScreen(
                     // Cards get their 16dp horizontal inset individually (see animateItem below).
                     contentPadding = PaddingValues(bottom = navBarClearance()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize(),
+                    // While a drag selects, the list doesn't scroll by the finger (DragSelect.kt).
+                    userScrollEnabled = !dragSelect.active,
+                    modifier = Modifier.fillMaxSize().dragToSelect(
+                        dragSelect, remember(pageItems) { pageItems.map { it.id } },
+                        itemAt = { pageListState.idAt(it) },
+                        scrollBy = { pageListState.scrollBy(it) },
+                        onSelectionChange = { selectedIds = it },
+                        topInset = topReserve,
+                        bottomInset = navBarClearance(),
+                    ),
                 ) {
                     // The header's reserved space as a real item 0, not top contentPadding: the
                     // header's collapse is driven by item 0's own scroll offset (see
@@ -705,7 +717,7 @@ fun QueueScreen(
                                     .clip(if (stopped) MaterialTheme.shapes.large else MaterialTheme.shapes.medium)
                                     .combinedClickable(
                                         onClick = { if (selectionMode) toggleSelected(item.id) },
-                                        onLongClick = { toggleSelected(item.id) },
+                                        onLongClick = { selectedIds = dragSelect.start(item.id, selectedIds) },
                                     )
                                     .semantics {
                                         if (selectionMode) {

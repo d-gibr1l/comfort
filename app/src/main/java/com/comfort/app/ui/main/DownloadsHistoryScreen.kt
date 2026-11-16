@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.material.icons.filled.PlayArrow
@@ -164,6 +165,8 @@ fun DownloadsHistoryScreen(
     // Tile size, changed by pinching the grid.
     var gridSize by remember { mutableStateOf(GalleryDlPreferences.getLibraryGridSize(context)) }
     val selectionMode = selectedIds.isNotEmpty()
+    // Long-press a download and drag: every one to the finger gets picked (DragSelect.kt).
+    val dragSelect = rememberDragSelectState()
 
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
     // see rememberUndoableDelete.
@@ -528,6 +531,7 @@ fun DownloadsHistoryScreen(
         val topPaddingWhileSelecting = with(LocalDensity.current) {
             if (selectionMode) selectionBarHeightPx.toDp() else 0.dp
         }
+        val visibleIds = remember(visibleItems) { visibleItems.map { it.id } }
         if (showDuplicatesOnly) {
             if (duplicateAttempts.isEmpty()) {
                 Column(modifier = Modifier.fillMaxSize().padding(top = topPaddingWhileSelecting)) {
@@ -598,7 +602,16 @@ fun DownloadsHistoryScreen(
                 horizontalArrangement = Arrangement.spacedBy(GRID_GAP_DP.dp),
                 verticalArrangement = Arrangement.spacedBy(GRID_GAP_DP.dp),
                 // Pinch out for bigger tiles, in for smaller — one step per pinch, remembered.
-                modifier = Modifier.fillMaxSize().pinchSteps(onStep = { step ->
+                // While a drag selects, the grid doesn't scroll by the finger (DragSelect.kt).
+                userScrollEnabled = !dragSelect.active,
+                modifier = Modifier.fillMaxSize().dragToSelect(
+                    dragSelect, visibleIds,
+                    itemAt = { gridState.idAt(it) },
+                    scrollBy = { gridState.scrollBy(it) },
+                    onSelectionChange = { selectedIds = it },
+                    topInset = topPaddingWhileSelecting,
+                    bottomInset = navBarClearance(),
+                ).pinchSteps(onStep = { step ->
                     val next = (gridSize + step).coerceIn(0, LIBRARY_GRID_SIZES.lastIndex)
                     if (next != gridSize) {
                         gridSize = next
@@ -633,7 +646,7 @@ fun DownloadsHistoryScreen(
                                 selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
                             }
                         },
-                        onLongPress = { selectedIds = selectedIds + item.id },
+                        onLongPress = { selectedIds = dragSelect.start(item.id, selectedIds) },
                         onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
                         onDelete = { requestDelete(setOf(item.id)) },
                         onDeleteFromPhone = { requestDeleteFromPhone(setOf(item.id)) },
@@ -650,7 +663,16 @@ fun DownloadsHistoryScreen(
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(top = topPaddingWhileSelecting, bottom = navBarClearance()),
-                modifier = Modifier.fillMaxSize(),
+                // While a drag selects, the list doesn't scroll by the finger (DragSelect.kt).
+                userScrollEnabled = !dragSelect.active,
+                modifier = Modifier.fillMaxSize().dragToSelect(
+                    dragSelect, visibleIds,
+                    itemAt = { listState.idAt(it) },
+                    scrollBy = { listState.scrollBy(it) },
+                    onSelectionChange = { selectedIds = it },
+                    topInset = topPaddingWhileSelecting,
+                    bottomInset = navBarClearance(),
+                ),
             ) {
                 item(key = "library_header", contentType = "header") { fullHeaderContent() }
                 items(visibleItems, key = { it.id }) { item ->
@@ -679,7 +701,7 @@ fun DownloadsHistoryScreen(
                                     selectedIds = if (item.id in selectedIds) selectedIds - item.id else selectedIds + item.id
                                 }
                             },
-                            onLongPress = { selectedIds = selectedIds + item.id },
+                            onLongPress = { selectedIds = dragSelect.start(item.id, selectedIds) },
                             onOpen = { openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(visibleItems, item.id)) },
                             durationMs = shapes[item.id]?.durationMs,
                             onDelete = { requestDelete(setOf(item.id)) },
