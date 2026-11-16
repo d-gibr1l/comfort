@@ -473,7 +473,7 @@ fun WebBrowser(
                                 }
                             }
                             Box {
-                                IconButton(onClick = { menuOpen = true }) {
+                                IconButton(onClick = { menuOpen = true }, colors = menuButtonColors(menuOpen)) {
                                     Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {

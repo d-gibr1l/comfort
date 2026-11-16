@@ -1045,7 +1045,8 @@ fun MediaViewerScreen(
                                 Icon(ImageVector.vectorResource(R.drawable.ic_ms_delete), contentDescription = stringResource(R.string.delete))
                             }
                             Box {
-                                IconButton(onClick = { showMoreMenu = true }) {
+                                // On the toolbar's secondaryContainer: the primary colour.
+                                IconButton(onClick = { showMoreMenu = true }, colors = com.comfort.app.ui.main.menuButtonColors(showMoreMenu, MaterialTheme.colorScheme.primary)) {
                                     Icon(ImageVector.vectorResource(R.drawable.ic_ms_more_vert), contentDescription = stringResource(R.string.more_options))
                                 }
                                 androidx.compose.material3.DropdownMenu(

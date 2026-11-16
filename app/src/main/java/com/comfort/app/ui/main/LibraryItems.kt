@@ -321,11 +321,18 @@ internal fun HistoryGridItem(
             }
             if (!selectionMode) Box {
                 IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
+                    // The pill fills in while its menu is open (menuButtonColors' look, on a tile).
+                    val pill by androidx.compose.animation.animateColorAsState(
+                        if (menuExpanded) MaterialTheme.colorScheme.secondaryContainer else Color.Black.copy(alpha = 0.5f), label = "tileMenuPill",
+                    )
+                    val dots by androidx.compose.animation.animateColorAsState(
+                        if (menuExpanded) MaterialTheme.colorScheme.onSecondaryContainer else Color.White, label = "tileMenuDots",
+                    )
                     Box(
-                        modifier = Modifier.size(24.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
+                        modifier = Modifier.size(24.dp).clip(CircleShape).background(pill),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options), tint = dots, modifier = Modifier.size(16.dp))
                     }
                 }
                 if (menuExpanded) {
@@ -646,7 +653,7 @@ internal fun HistoryRow(
 
         // Bulk actions in the selection-mode top bar replace the per-item menu while selecting.
         if (!selectionMode) Box {
-            IconButton(onClick = { menuExpanded = true }) {
+            IconButton(onClick = { menuExpanded = true }, colors = menuButtonColors(menuExpanded)) {
                 Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
             }
             if (menuExpanded) {

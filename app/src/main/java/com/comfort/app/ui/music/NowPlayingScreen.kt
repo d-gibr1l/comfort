@@ -600,7 +600,8 @@ private fun SongMenu(song: Song?) {
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }) {
+        // Over the artwork's dark backdrop: a light fill while the menu is open, the dots stay white.
+        IconButton(onClick = { open = true }, colors = com.comfort.app.ui.main.menuButtonColors(open, Color.White.copy(alpha = 0.2f))) {
             Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White)
         }
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

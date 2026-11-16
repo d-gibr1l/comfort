@@ -373,7 +373,7 @@ internal fun StoppedRow(
                     Icon(Icons.Outlined.PlayArrow, contentDescription = stringResource(R.string.resume))
                 }
                 Box {
-                    IconButton(onClick = { menuExpanded = true }) {
+                    IconButton(onClick = { menuExpanded = true }, colors = menuButtonColors(menuExpanded)) {
                         Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.more_options))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
