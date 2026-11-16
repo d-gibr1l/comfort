@@ -378,7 +378,11 @@ fun MainScreen(
     // the Library page (where the music is) rather than sitting on every page, until something plays.
     val playedThisRun by com.comfort.app.music.MusicPlayer.playedThisRun.collectAsState()
     val showMiniPlayer = music.song != null && !showNowPlaying && mediaViewer == null &&
-        (playedThisRun || (selectedTab == 1 && !showQueueScreen))
+        (playedThisRun || ((selectedTab == 1 || outgoingTab == 1) && !showQueueScreen))
+    // Shown or hidden by a change of page (the Library-only case above): it fades with the
+    // Library page itself, and only the Library keeps room for it. Sliding it down over the navigation pill while the
+    // space under every page shrank frame by frame, during the page change itself, stuttered.
+    val miniPlayerByPage = !playedThisRun
 
     // Completed download notification tap or "Open" action button: open in Comfort.
     LaunchedEffect(openDownload) {
@@ -440,6 +444,7 @@ fun MainScreen(
         // Animated with the bar's own slide: switched at once, pages' bottom space jumped.
         LocalMiniPlayerInset provides androidx.compose.animation.core.animateDpAsState(
             if (showMiniPlayer) com.comfort.app.ui.music.MINI_PLAYER_HEIGHT else 0.dp,
+            animationSpec = if (miniPlayerByPage) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(visibilityThreshold = 0.5.dp),
             label = "miniPlayerInset",
         ).value,
     ) {
@@ -477,6 +482,9 @@ fun MainScreen(
             // Remembered, so Home doesn't see new lambdas on every MainScreen recomposition.
             val onConfigureUrl = remember(router) { { url: String -> router.open(url) } }
             val onOpenLibraryTab = remember { { selectedTab = 1 } }
+            // Library-only mini player: Home keeps no room for it (its Paste button sat raised
+            // until a page change from the Library had ended, then dropped).
+            CompositionLocalProvider(LocalMiniPlayerInset provides if (miniPlayerByPage) 0.dp else LocalMiniPlayerInset.current) {
             ConstrainedWidth {
             HomeScreen(
                 onConfigure = onConfigureUrl,
@@ -488,6 +496,7 @@ fun MainScreen(
                 // recomposed all of it (6.4 ms of the Library's opening frame, traced).
                 active = { (selectedTab == 0 || pageSwipe.involves(0)) && !showQueueScreen && mediaViewer == null && !showNowPlaying },
             )
+            }
             }
         }
 
@@ -552,7 +561,7 @@ fun MainScreen(
                         openSearchSignal = librarySearchSignal,
                         isVisible = tab == selectedTab || tab == outgoingTab,
                     )
-                    2 -> ConstrainedWidth {
+                    2 -> CompositionLocalProvider(LocalMiniPlayerInset provides if (miniPlayerByPage) 0.dp else LocalMiniPlayerInset.current) { ConstrainedWidth {
                     val onNavigateSettings = remember { { route: SettingsRoute, key: String? -> settingsRoute = route; settingsHighlightKey = key } }
                     MoreScreen(
                         route = settingsRoute,
@@ -560,7 +569,7 @@ fun MainScreen(
                         onNavigate = onNavigateSettings,
                         isVisible = selectedTab == 2,
                     )
-                    }
+                    } }
                 }
             }
         }
@@ -593,13 +602,32 @@ fun MainScreen(
         // Just above the navigation pill (or the bottom edge, beside a rail), on every page.
         androidx.compose.animation.AnimatedVisibility(
             visible = showMiniPlayer,
-            enter = androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut(),
+            // Shown by the page: it fades in with the page itself (the alpha below), nothing of its own.
+            enter = if (miniPlayerByPage) androidx.compose.animation.EnterTransition.None
+                else androidx.compose.animation.slideInVertically { it } + androidx.compose.animation.fadeIn(),
+            // Gone at once: it has already faded with the page (the alpha below). A fade of its own,
+            // started as the page change ended, brought it back at full for a moment first.
+            exit = if (miniPlayerByPage) androidx.compose.animation.ExitTransition.None
+                else androidx.compose.animation.slideOutVertically { it } + androidx.compose.animation.fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = navBarOnlyClearance() - if (useNavRail) 0.dp else 8.dp)
                 .padding(horizontal = 16.dp)
-                .widthIn(max = CONTENT_MAX_WIDTH),
+                .widthIn(max = CONTENT_MAX_WIDTH)
+                // Library-only (miniPlayerByPage): it fades with the Library page, frame for frame, as
+                // Home is opened or a back swipe drags it — it stayed up over Home for ~200 ms before,
+                // since the page counts as left only once that transition is over.
+                // Read as it's drawn: in the frame the page change lands, it's no longer the Library
+                // and draws nothing, though it's only removed in the next frame (it flashed back).
+                // Leaving the Library for another tab (Settings): that page fades in over it, so this
+                // fades out as it does, rather than going before the Library has.
+                .graphicsLayer {
+                    if (miniPlayerByPage) alpha = when {
+                        selectedTab == 1 -> tabBack.frontAlpha.value
+                        outgoingTab == 1 -> 1f - tabBack.frontAlpha.value
+                        else -> 0f
+                    }
+                },
         ) {
             com.comfort.app.ui.music.MiniPlayer(onOpen = { showNowPlaying = true })
         }
