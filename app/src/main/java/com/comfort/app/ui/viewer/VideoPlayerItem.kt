@@ -79,6 +79,8 @@ fun VideoPlayerItem(
     onPlayingChange: (Boolean) -> Unit = {},
     // Comfort: the audio and subtitle tracks of the video on screen, for the viewer's ⋮ menu.
     onTracksChange: (VideoTracks?) -> Unit = {},
+    /** Comfort: on the video itself, not its controls (the viewer's zoom). */
+    videoModifier: Modifier = Modifier,
     onTap: (() -> Unit)? = null,
 ) {
     VideoPlayerItemWithResolvedUri(
@@ -92,6 +94,7 @@ fun VideoPlayerItem(
         onTracksChange = onTracksChange,
         controlsBottomPadding = controlsBottomPadding,
         modifier = modifier,
+        videoModifier = videoModifier,
         onTap = onTap
     )
 }
@@ -109,6 +112,7 @@ fun VideoPlayerItemWithResolvedUri(
     onMutedChange: (Boolean) -> Unit = {},
     onPlayingChange: (Boolean) -> Unit = {},
     onTracksChange: (VideoTracks?) -> Unit = {},
+    videoModifier: Modifier = Modifier,
     onTap: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -285,16 +289,16 @@ fun VideoPlayerItemWithResolvedUri(
             .fillMaxSize()
             // Comfort: transparent, so the viewer's backdrop shows (black with the controls hidden).
             .background(Color.Transparent)
-            .clickable(
-                onClick = {
-                    onTap?.invoke()
-                },
+            // Comfort: none without an onTap: the viewer's zoom takes the taps then (a clickable
+            // here took them first).
+            .then(if (onTap == null) Modifier else Modifier.clickable(
+                onClick = { onTap() },
                 indication = null,
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-            )
+            ))
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().then(videoModifier),
             contentAlignment = Alignment.Center
         ) {
             // Comfort: the largest box of the video's shape that fits (the Box above centres it).
