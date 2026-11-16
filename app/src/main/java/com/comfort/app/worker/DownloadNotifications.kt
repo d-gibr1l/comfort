@@ -217,7 +217,9 @@ object DownloadNotifications {
         val safeDownloadedItems = downloadedItems.coerceAtLeast(0)
         ensureChannel(context)
         val sizeText = if (expectedBytes > 0) context.getString(R.string.x_of_x, formatFileSize(currentBytes), formatFileSize(expectedBytes)) else null
-        val speedText = if (speedMbs > 0.01f) com.comfort.app.util.LocalFormat.measure(speedMbs.toDouble(), android.icu.util.MeasureUnit.MEGABYTE, 1, perSecond = true) else null
+        // In KB/s under 1 MB/s, like the Queue card ("512 KB/s", not "0.5 MB/s"), and shown from
+        // 1 KB/s: under 10 KB/s it used to show no speed at all.
+        val speedText = if (speedMbs > 1f / 1024f) com.comfort.app.util.LocalFormat.speed(speedMbs, if (speedMbs < 1f) 0 else 1) else null
         val byteDetail = listOfNotNull(sizeText, speedText).joinToString(" · ")
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notif_logo)
