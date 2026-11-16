@@ -100,7 +100,13 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
         val powerManager = context.getSystemService(PowerManager::class.java) ?: return true
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
-    var batteryUnrestricted by remember { mutableStateOf(isIgnoringBatteryOptimizations()) }
+    var batteryUnrestricted by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        val unrestricted = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            isIgnoringBatteryOptimizations()
+        }
+        batteryUnrestricted = unrestricted
+    }
     val batteryOptimizationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { batteryUnrestricted = isIgnoringBatteryOptimizations() }

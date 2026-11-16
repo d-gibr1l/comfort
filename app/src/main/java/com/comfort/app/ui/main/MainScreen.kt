@@ -323,14 +323,15 @@ fun MainScreen(
             }
             index == selectedTab -> Unit
             // Home is the page every other tab sits on: going there is a back.
-            index == 0 -> tabBack.animateBack()
+            // A plain crossfade between tabs, no slide.
+            index == 0 -> tabBack.animateBack(slide = false)
             // Another tab opens with the push, the page it covers sliding away behind it:
             // Home, or when switching between two tabs, the tab being left (outgoingTab).
-            selectedTab == 0 -> enterTab(index) { tabBack.animateEnter { selectedTab = index } }
+            selectedTab == 0 -> enterTab(index) { tabBack.animateEnter(slide = false) { selectedTab = index } }
             else -> {
                 val leaving = selectedTab
                 enterTab(index) {
-                    tabBack.animateEnter(onFinished = { outgoingTab = null }) {
+                    tabBack.animateEnter(slide = false, onFinished = { outgoingTab = null }) {
                         outgoingTab = leaving
                         selectedTab = index
                     }
@@ -464,11 +465,14 @@ fun MainScreen(
                 }
             )
         ) {
+            // Remembered, so Home doesn't see new lambdas on every MainScreen recomposition.
+            val onConfigureUrl = remember(router) { { url: String -> router.open(url) } }
+            val onOpenLibraryTab = remember { { selectedTab = 1 } }
             ConstrainedWidth {
             HomeScreen(
-                onConfigure = { url -> router.open(url) },
+                onConfigure = onConfigureUrl,
                 viewModel = viewModel,
-                onOpenLibrary = { selectedTab = 1 },
+                onOpenLibrary = onOpenLibraryTab,
                 onOpenQueue = openQueue,
                 pasteDownloadSignal = pasteDownloadSignal,
                 // A lambda, read only by the strip's drift: as a plain value, leaving Home
@@ -540,10 +544,11 @@ fun MainScreen(
                         isVisible = tab == selectedTab || tab == outgoingTab,
                     )
                     2 -> ConstrainedWidth {
+                    val onNavigateSettings = remember { { route: SettingsRoute, key: String? -> settingsRoute = route; settingsHighlightKey = key } }
                     MoreScreen(
                         route = settingsRoute,
                         highlightKey = settingsHighlightKey,
-                        onNavigate = { route, key -> settingsRoute = route; settingsHighlightKey = key },
+                        onNavigate = onNavigateSettings,
                         isVisible = selectedTab == 2,
                     )
                     }

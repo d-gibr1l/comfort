@@ -89,9 +89,10 @@ class BackRevealState internal constructor(
         running = scope.launch(block = block)
     }
 
-    /** An on-screen back button: the same transition as releasing a back swipe, from the start. */
-    fun animateBack() {
-        startExclusive { commit() }
+    /** An on-screen back button: the same transition as releasing a back swipe, from the start.
+     * [slide] false: a plain crossfade, no sideways movement (switching tabs). */
+    fun animateBack(slide: Boolean = true) {
+        startExclusive { commit(slide) }
     }
 
     /** Opens the page in front — J2K's push, the mirror of its back: the new page comes in from
@@ -99,11 +100,12 @@ class BackRevealState internal constructor(
      * 200ms. [change] is what makes the new page appear; it runs after the starting values are
      * set, in the same frame, so the page never shows for a frame at rest first.
      * [behindVisible] is false when the page behind is already hidden (switching between two
-     * pages that both sit on top of it, e.g. Library to Settings), so only the new page moves. */
-    fun animateEnter(behindVisible: Boolean = true, onFinished: () -> Unit = {}, change: () -> Unit) {
+     * pages that both sit on top of it, e.g. Library to Settings), so only the new page moves.
+     * [slide] false: a plain crossfade, no sideways movement (switching tabs). */
+    fun animateEnter(behindVisible: Boolean = true, slide: Boolean = true, onFinished: () -> Unit = {}, change: () -> Unit) {
         startExclusive {
             try {
-                frontX.snapTo(ENTER_FROM_X)
+                frontX.snapTo(if (slide) ENTER_FROM_X else 0f)
                 frontAlpha.snapTo(0f)
                 behindX.snapTo(0f)
                 behindAlpha.snapTo(if (behindVisible) 1f else 0f)
@@ -112,9 +114,9 @@ class BackRevealState internal constructor(
                 withFrameNanos { }
                 val spec = tween<Float>(ENTER_MS, easing = DECELERATE)
                 coroutineScope {
-                    launch { frontX.animateTo(0f, spec) }
+                    if (slide) launch { frontX.animateTo(0f, spec) }
                     launch { frontAlpha.animateTo(1f, spec) }
-                    launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
+                    if (slide && behindVisible) launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
                     launch { behindAlpha.animateTo(0f, spec) }
                 }
             } finally {
@@ -157,14 +159,14 @@ class BackRevealState internal constructor(
         }
     }
 
-    private suspend fun commit() {
+    private suspend fun commit(slide: Boolean = true) {
         // Time scales with the distance still to cover, like CrossFadeChangeHandler's pop.
-        val remaining = ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f)
+        val remaining = if (slide) ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f) else 1f
         val spec = tween<Float>((remaining * COMMIT_MS).roundToInt().coerceAtLeast(60), easing = DECELERATE)
         coroutineScope {
-            launch { frontX.animateTo(EXIT_X, spec) }
+            if (slide) launch { frontX.animateTo(EXIT_X, spec) }
             launch { frontAlpha.animateTo(0f, spec) }
-            launch { behindX.animateTo(0f, spec) }
+            if (slide) launch { behindX.animateTo(0f, spec) }
             launch { behindAlpha.animateTo(1f, spec) }
             launch { shadow.animateTo(0f, spec) }
         }

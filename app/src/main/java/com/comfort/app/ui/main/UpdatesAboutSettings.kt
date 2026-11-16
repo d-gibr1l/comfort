@@ -757,7 +757,7 @@ internal fun QuickAppUpdateSection() {
     val downloadProgress by updates.appDownloadProgress.collectAsState()
     val downloadError by updates.appDownloadError.collectAsState()
 
-    LaunchedEffect(Unit) { updates.ensureAppChecked() }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(2_000); updates.ensureAppChecked() }
 
     val current = status
     if (current == null || !current.updateAvailable) return
@@ -875,7 +875,7 @@ internal fun QuickEngineUpdateSection() {
     val errorText by updates.engineError.collectAsState()
 
     // Installs what it finds when auto-update is on, so opening Settings needs no manual tap.
-    LaunchedEffect(Unit) { updates.ensureEnginesChecked() }
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(2_000); updates.ensureEnginesChecked() }
 
     val outdated = statuses?.filter { it.updateAvailable && EngineUpdater.isOn(context, it.engine) } ?: return
     if (outdated.isEmpty()) return
