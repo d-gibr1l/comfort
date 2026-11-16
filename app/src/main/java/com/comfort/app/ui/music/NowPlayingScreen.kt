@@ -323,23 +323,22 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                                 )
                             }
                         }
-                        // Title, artist and album, left-aligned (Auxio's), with the song's menu.
+                        // Title and artist, left-aligned (Auxio's), with the song's menu.
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SongTransition(modifier = Modifier.weight(1f).sharedBounds(rememberSharedContentState("title"), anim)) { shown ->
                                 Column {
+                                    // Google Sans, as the lyric lines above: the system font's bold
+                                    // looked light beside them.
                                     Text(
                                         shown?.title ?: "",
-                                        style = MaterialTheme.typography.headlineSmall,
+                                        style = MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         maxLines = 1,
                                         modifier = Modifier.fillMaxWidth().basicMarquee(),
                                     )
                                     shown?.artist?.takeIf { it.isNotBlank() }?.let {
-                                        Text(it, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                    shown?.album?.takeIf { it.isNotBlank() }?.let {
-                                        Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(it, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }
@@ -368,16 +367,32 @@ fun NowPlayingScreen(onClose: () -> Unit) {
                     }
 
                     // Auxio's "Queue" handle along the bottom (a tap, or a swipe up anywhere, opens it).
+                    // A pill with the queue's icon, plainer to see than a caption under a handle.
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { showQueue = true }
-                            .padding(vertical = 10.dp),
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { showQueue = true }
+                            .padding(top = 6.dp, bottom = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(Modifier.size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.5f)))
-                        Spacer(Modifier.height(6.dp))
-                        Text(stringResource(R.string.queue), style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
+                        Box(Modifier.size(width = 36.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.6f)))
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(Color.White.copy(alpha = 0.14f))
+                                .clickable { showQueue = true }
+                                .padding(horizontal = 18.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text(
+                                stringResource(R.string.queue),
+                                style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                                color = Color.White,
+                            )
+                        }
                     }
                 }
                     } else {

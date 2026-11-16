@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,9 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -157,49 +162,117 @@ private const val FOLLOW_AGAIN_AFTER_MS = 3_000L
 
 /**
  * Spotify's lyric line under the cover, as two: the line being sung, bright, and the next one,
- * dimmed under it. When the song moves on, both slide up a line. Before the first line starts,
- * the first two show dimmed. A tap opens the full lyrics.
+ * dimmed under it. When the song moves on to the next line, it rolls up (Apple Music's): the next
+ * line rises into the sung line's place, growing and brightening as it goes, while the old one
+ * slides up and fades out, and the line after comes in dimmed below. Any other move (a seek, back
+ * a line) just shows the new lines. Before the first line starts, the first two show dimmed. A tap
+ * opens the full lyrics.
  */
 @Composable
 internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val lines = lyrics.lines ?: return
-    val current = lyrics.lineAt(positionMs)
-    androidx.compose.animation.AnimatedContent(
-        targetState = current,
-        transitionSpec = {
-            val forward = targetState > initialState
-            (androidx.compose.animation.slideInVertically(tween(320)) { if (forward) it / 2 else -it / 2 } +
-                androidx.compose.animation.fadeIn(tween(320))) togetherWith
-                (androidx.compose.animation.slideOutVertically(tween(320)) { if (forward) -it / 2 else it / 2 } +
-                    androidx.compose.animation.fadeOut(tween(200))) using
-                androidx.compose.animation.SizeTransform(clip = true)
-        },
-        label = "lyricsPreview",
-        modifier = modifier
+    val target = lyrics.lineAt(positionMs)
+    // The line shown as being sung; it follows [target], with the roll in between for a step on.
+    var shown by remember(lyrics) { androidx.compose.runtime.mutableIntStateOf(target) }
+    val roll = remember(lyrics) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(lyrics, target) {
+        if (target == shown) return@LaunchedEffect
+        if (shown >= 0 && target == shown + 1) {
+            roll.snapTo(0f)
+            roll.animateTo(1f, tween(420, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
+        // Rolled, or anything else (a seek, back a line, several on): the new lines, at rest.
+        shown = target
+        roll.snapTo(0f)
+    }
+    val p = roll.value
+
+    val nextStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
+    val currentStyle = MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
+    val density = LocalDensity.current
+    val gapPx = with(density) { 6.dp.toPx() }
+    // Room for the line being sung on two lines and the next on one, whatever they hold: the
+    // cover above takes what's left, so a line wrapping or not would make it jump.
+    val height = with(density) { (currentStyle.lineHeight * 2).toDp() + nextStyle.lineHeight.toDp() } + 6.dp
+    fun text(i: Int) = lines.getOrNull(i)?.text?.ifBlank { "♪" } ?: ""
+    // Before the first line: the first two, the first dimmed until it starts.
+    val first = shown.coerceAtLeast(0)
+    val firstAlpha by animateFloatAsState(if (shown < 0) 0.55f else 1f, tween(320), label = "lyricFirstLine")
+    var outgoingHeight by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    // Lines are laid out once at the sung line's size and only drawn smaller, never re-wrapped:
+    // growing the font itself re-broke a long line at every step, words hopping between its two
+    // lines as it rose, and again as it settled.
+    val nextScale = (nextStyle.fontSize.value / currentStyle.fontSize.value).coerceIn(0.5f, 1f)
+
+    Box(
+        modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
-    ) { index ->
-        val first = lines.getOrNull(index)
-        val second = lines.getOrNull(index + 1)
-        val style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
-        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
-            Text(
-                (if (index < 0) lines[0] else first)?.text?.ifBlank { "♪" } ?: "",
-                style = style,
-                fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = if (index < 0) 0.55f else 1f),
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-            Text(
-                (if (index < 0) lines.getOrNull(1) else second)?.text?.ifBlank { "♪" } ?: "",
-                style = style,
-                fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.55f),
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                .clipToBounds()
+                // A long next line runs past the bottom: it fades out there rather than being cut.
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val fade = 18.dp.toPx()
+                    drawRect(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to Color.Black, 1f to Color.Transparent,
+                            startY = size.height - fade, endY = size.height,
+                        ),
+                        topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fade),
+                        size = androidx.compose.ui.geometry.Size(size.width, fade),
+                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                    )
+                },
+        ) {
+            androidx.compose.foundation.layout.Column(
+                Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(androidx.compose.ui.Alignment.Top, unbounded = true)
+                    // Up by the sung line and the gap under it: the next line ends where it was.
+                    .graphicsLayer { translationY = -(outgoingHeight + gapPx) * p },
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+            ) {
+                // The line being sung, whole: on two lines if need be.
+                LyricPreviewLine(
+                    text(first), currentStyle, scale = 1f, alpha = firstAlpha * (1f - p),
+                    modifier = Modifier.onSizeChanged { outgoingHeight = it.height },
+                )
+                // The next line, which grows into the sung one as it rolls up.
+                LyricPreviewLine(text(first + 1), currentStyle, scale = nextScale + (1f - nextScale) * p, alpha = 0.55f + 0.45f * p)
+                // The one after, coming in dimmed below as the others rise.
+                LyricPreviewLine(text(first + 2), currentStyle, scale = nextScale, alpha = 0.55f * p)
+            }
         }
     }
+}
+
+/** One line of [LyricsPreview], drawn at [scale] of its laid-out size from its top-left corner, and
+ * taking up only that scaled space, so the lines under it sit right below what shows. */
+@Composable
+private fun LyricPreviewLine(text: String, style: androidx.compose.ui.text.TextStyle, scale: Float, alpha: Float, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = style,
+        fontWeight = FontWeight.Bold,
+        color = Color.White.copy(alpha = alpha.coerceIn(0f, 1f)),
+        maxLines = 2,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        modifier = modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            layout((placeable.width * scale).toInt(), (placeable.height * scale).toInt()) {
+                placeable.placeWithLayer(0, 0) {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                }
+            }
+        },
+    )
 }
