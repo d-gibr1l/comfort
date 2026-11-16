@@ -511,8 +511,12 @@ internal fun HistoryRow(
             // into the page. The selected state used an alpha-blended primaryContainer, which
             // breaks the tonal-pairing contract other content on this row (onSurface title text,
             // not onPrimaryContainer) assumes a fully-opaque container guarantees — full-opacity
-            // primaryContainer instead.
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
+            // primaryContainer instead — mixed into the row's own colour (still opaque): at full
+            // strength it read too deep (reported).
+            .background(
+                if (selected) androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.primaryContainer, 0.45f)
+                else MaterialTheme.colorScheme.surfaceContainerHigh
+            )
             .swipeRemoveAction()
             .then(
                 if (selectionMode) {
