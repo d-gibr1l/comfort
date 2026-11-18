@@ -102,7 +102,11 @@ import androidx.compose.ui.graphics.graphicsLayer
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
-fun NowPlayingScreen(onClose: () -> Unit) {
+fun NowPlayingScreen(
+    onClose: () -> Unit,
+    // Whether it's (being) shown: false while it slides out after closing.
+    showing: Boolean = true,
+) {
     val state by MusicPlayer.state.collectAsState()
     val song = state.song
     BackHandler(onBack = onClose)
@@ -137,6 +141,10 @@ fun NowPlayingScreen(onClose: () -> Unit) {
     // Swipe down: the screen follows and, far enough, closes to the mini player. Swipe up: the queue.
     var showQueue by remember { mutableStateOf(false) }
     val dragY = remember { androidx.compose.animation.core.Animatable(0f) }
+    // Shown again before its slide out had finished (a song tapped right after a swipe down): the
+    // same screen comes back, still pushed down off the bottom by that swipe — open, but out of
+    // sight, the mini player hidden under it. Back where it belongs as it reopens.
+    LaunchedEffect(showing) { if (showing && dragY.value != 0f) dragY.snapTo(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val density = androidx.compose.ui.platform.LocalDensity.current
     val closeAfter = with(density) { 120.dp.toPx() }

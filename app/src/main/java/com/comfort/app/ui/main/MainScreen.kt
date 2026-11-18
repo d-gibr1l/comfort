@@ -806,7 +806,10 @@ fun MainScreen(
         ) { it },
         exit = androidx.compose.animation.slideOutVertically { it },
     ) {
-        com.comfort.app.ui.music.NowPlayingScreen(onClose = { showNowPlaying = false })
+        com.comfort.app.ui.music.NowPlayingScreen(
+            onClose = { showNowPlaying = false },
+            showing = transition.targetState == androidx.compose.animation.EnterExitState.Visible,
+        )
     }
     }
     }
@@ -1751,11 +1754,11 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
             .size(76.dp)
             // No ripple: unclipped (below), it would spread past the shape as a square.
             .clickable(
+                interactionSource = null,
+                indication = null,
                 role = Role.Button,
                 onClickLabel = stringResource(R.string.open),
                 onClick = onClick,
-                interactionSource = null,
-                indication = null,
             ),
     ) {
         // The Library's Arch, drawn through the shape rather than clipped to it, as the Library
