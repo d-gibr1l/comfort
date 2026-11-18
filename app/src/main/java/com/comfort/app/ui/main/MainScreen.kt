@@ -47,6 +47,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
@@ -891,12 +892,14 @@ private fun FloatingNavBar(
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().height(68.dp),
-            shape = PillShape,
-            color = MaterialTheme.colorScheme.primary,
-            tonalElevation = 4.dp,
-            shadowElevation = 12.dp,
+        // Ends that flow into the sides (ContinuousCapsuleShape). Drawn in that shape, not clipped
+        // to it (nothing inside reaches the ends): a clip to a path costs a mask every frame.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(68.dp)
+                .shadow(12.dp, com.comfort.app.theme.ContinuousCapsuleShape, clip = false)
+                .background(MaterialTheme.colorScheme.primary, com.comfort.app.theme.ContinuousCapsuleShape),
         ) {
             Row(
                 modifier = Modifier
