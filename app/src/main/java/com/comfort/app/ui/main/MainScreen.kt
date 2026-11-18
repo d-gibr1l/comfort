@@ -38,6 +38,9 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.zIndex
@@ -86,14 +89,22 @@ import com.comfort.app.viewmodel.DownloadsViewModel
 // downloadable-at-runtime families, so it ships as a bundled resource like any other static asset.
 private val CrystalRadioKit = FontFamily(Font(R.font.crystal_radio_kit))
 
-private data class NavTab(@androidx.annotation.StringRes val labelRes: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+private data class NavTab(
+    @androidx.annotation.StringRes val labelRes: Int,
+    @androidx.annotation.DrawableRes val iconRes: Int,
+    @androidx.annotation.DrawableRes val selectedIconRes: Int,
+) {
     val label: String @Composable get() = stringResource(labelRes)
+    val icon: androidx.compose.ui.graphics.vector.ImageVector @Composable get() = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = iconRes)
+    val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector @Composable get() = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = selectedIconRes)
 }
 
+// Material Symbols (res/drawable/ic_nav_*): Home, Photo Library and Settings Heart, outlined, and
+// filled for the open tab.
 private val tabs = listOf(
-    NavTab(R.string.nav_home, Icons.Outlined.Home),
-    NavTab(R.string.nav_library, Icons.Outlined.Image),
-    NavTab(R.string.nav_settings, Icons.Outlined.Settings),
+    NavTab(R.string.nav_home, R.drawable.ic_nav_home, R.drawable.ic_nav_home_filled),
+    NavTab(R.string.nav_library, R.drawable.ic_nav_photo_library, R.drawable.ic_nav_photo_library_filled),
+    NavTab(R.string.nav_settings, R.drawable.ic_nav_settings_heart, R.drawable.ic_nav_settings_heart_filled),
 )
 
 
@@ -311,7 +322,14 @@ fun MainScreen(
         allowed = !showQueueScreen && outgoingTab == null && preparingTab == null && !tabBack.busy && !queueBack.busy,
         onSettled = { selectedTab = it },
     )
+    // Home as the nav bar's open tab from the moment it's tapped: selectedTab only becomes 0 once
+    // the page before it has faded out (~150 ms), and the bar waited for it, showing only the
+    // tap's ripple. The other tabs open in two frames (enterTab) — moved at the tap, the highlight
+    // ran through those frames' page building and jumped.
+    var navTab by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(selectedTab) { navTab = null }
     val onTabSelect: (Int) -> Unit = { index ->
+        if (index == 0 && pageSwipe.neighbor == null && selectedTab != 0) navTab = 0
         when {
             // A swipe still settling would set its own page when it lands, over this tap's.
             pageSwipe.neighbor != null -> Unit
@@ -593,7 +611,7 @@ fun MainScreen(
                 }
         )
         if (!useNavRail) FloatingNavBar(
-            selectedTab = selectedTab,
+            selectedTab = navTab ?: selectedTab,
             activeDownloadsCount = activeDownloadsCount,
             hasEngineUpdate = anyUpdateAvailable,
             onSelect = onTabSelect,
@@ -837,6 +855,9 @@ private fun SideNavRail(
     }
 }
 
+/** The floating navigation bar: a pill in the theme's colour, the open tab's icon filled and
+ * named in a lighter pill. That pill is one shape that slides from tab to tab, its front end first,
+ * so it stretches as it goes and closes up on arrival (no overshoot, no wobble). */
 @Composable
 private fun FloatingNavBar(
     selectedTab: Int,
@@ -847,13 +868,26 @@ private fun FloatingNavBar(
 ) {
     val activeDownloadsDescription = pluralStringResource(R.plurals.active_downloads_count, activeDownloadsCount, activeDownloadsCount)
     val updatesAvailableDescription = stringResource(R.string.updates_available)
+    // Where each tab sits in the row (px), as laid out: the open one widens as its label shows.
+    val bounds = remember { androidx.compose.runtime.mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+    // The pill's two ends, moved apart: the one in front gets there quickly, the one behind follows.
+    // Both critically damped. As states, which follow a moving target (the widening tab) without
+    // starting over.
+    val previousTab = remember { androidx.compose.runtime.mutableIntStateOf(selectedTab) }
+    val movingRight = remember(selectedTab) { selectedTab > previousTab.intValue }
+    SideEffect { previousTab.intValue = selectedTab }
+    val lead = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 700f)
+    val trail = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 260f)
+    val target = bounds[selectedTab]
+    // Only once laid out, so they start where the tab is rather than sliding in from the edge.
+    val leftState = if (target != null) androidx.compose.animation.core.animateFloatAsState(target.left, if (movingRight) trail else lead, label = "navLeft") else null
+    val rightState = if (target != null) androidx.compose.animation.core.animateFloatAsState(target.right, if (movingRight) lead else trail, label = "navRight") else null
+    val indicatorColor = MaterialTheme.colorScheme.primaryContainer
     Box(
         modifier = modifier
             .fillMaxWidth()
-            // Real system nav bar inset first (so the pill sits clear of it on every device, not
-            // just this one, where the fixed 16dp below happened to already be enough), then this
-            // bar's own fixed visual margin on top of that — see NAV_BAR_RESERVED_HEIGHT's doc
-            // comment for the full story.
+            // Real system nav bar inset first (so the pill sits clear of it on every device), then
+            // this bar's own fixed margin — see NAV_BAR_RESERVED_HEIGHT.
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
@@ -865,7 +899,22 @@ private fun FloatingNavBar(
             shadowElevation = 12.dp,
         ) {
             Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
+                    // The one highlight pill, under the tabs: a plain rounded rectangle, no layer.
+                    .drawBehind {
+                        val l = leftState?.value ?: return@drawBehind
+                        val r = rightState?.value ?: return@drawBehind
+                        val t = bounds[selectedTab] ?: return@drawBehind
+                        if (r <= l) return@drawBehind
+                        drawRoundRect(
+                            color = indicatorColor,
+                            topLeft = androidx.compose.ui.geometry.Offset(l, t.top),
+                            size = androidx.compose.ui.geometry.Size(r - l, t.height),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(t.height / 2f),
+                        )
+                    },
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -876,21 +925,20 @@ private fun FloatingNavBar(
                         animationSpec = tween(200),
                         label = "navTint",
                     )
-                    val bg by animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                        animationSpec = tween(200),
-                        label = "navBg",
-                    )
-
                     Row(
                         modifier = Modifier
-                            .clip(PillShape)
-                            .background(bg)
+                            .onGloballyPositioned { c ->
+                                val pos = c.positionInParent()
+                                bounds[index] = androidx.compose.ui.geometry.Rect(pos.x, pos.y, pos.x + c.size.width, pos.y + c.size.height)
+                            }
                             .semantics {
                                 role = Role.Tab
                                 this.selected = selected
                             }
+                            // No ripple: the sliding pill answers the tap.
                             .clickable(
+                                interactionSource = null,
+                                indication = null,
                                 role = Role.Tab,
                                 onClickLabel = if (selected) {
                                     if (index == 1) stringResource(R.string.open_queue) else if (index == 2) stringResource(R.string.reset_settings) else null
@@ -899,38 +947,34 @@ private fun FloatingNavBar(
                             .padding(horizontal = if (selected) 20.dp else 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        val icon = if (selected) tab.selectedIcon else tab.icon
                         val iconModifier = Modifier.size(22.dp)
                         if (index == 1 && activeDownloadsCount > 0) {
                             BadgedBox(badge = {
                                 Badge(
                                     containerColor = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.semantics {
-                                        contentDescription = activeDownloadsDescription
-                                    },
-                                ) {
-                                    Text(badgeCountText(activeDownloadsCount))
-                                }
-                            }) {
-                                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
-                            }
+                                    modifier = Modifier.semantics { contentDescription = activeDownloadsDescription },
+                                ) { Text(badgeCountText(activeDownloadsCount)) }
+                            }) { Icon(icon, contentDescription = tab.label, tint = tint, modifier = iconModifier) }
                         } else if (index == 2 && hasEngineUpdate) {
                             BadgedBox(badge = {
                                 Badge(
                                     containerColor = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.semantics {
-                                        contentDescription = updatesAvailableDescription
-                                    },
+                                    modifier = Modifier.semantics { contentDescription = updatesAvailableDescription },
                                 )
-                            }) {
-                                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
-                            }
+                            }) { Icon(icon, contentDescription = tab.label, tint = tint, modifier = iconModifier) }
                         } else {
-                            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
+                            Icon(icon, contentDescription = tab.label, tint = tint, modifier = iconModifier)
                         }
-                        AnimatedVisibility(visible = selected) {
+                        // From its start, next to the icon (the default grew it from its end).
+                        AnimatedVisibility(
+                            visible = selected,
+                            enter = androidx.compose.animation.expandHorizontally(expandFrom = Alignment.Start) + androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.shrinkHorizontally(shrinkTowards = Alignment.Start) + androidx.compose.animation.fadeOut(),
+                        ) {
                             Row {
                                 Spacer(Modifier.width(8.dp))
-                                Text(tab.label, color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                                Text(tab.label, color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
                             }
                         }
                     }
