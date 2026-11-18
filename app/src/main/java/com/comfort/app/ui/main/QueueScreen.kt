@@ -154,6 +154,8 @@ fun QueueScreen(
         current = filters.indexOf(selectedFilter),
         allowed = !selectionMode,
         pageCount = filters.size,
+        // Quick swipes one after another each move a filter on, as swiping songs does.
+        quickSwipes = true,
         onSettled = { selectedFilter = filters[it] },
     )
 

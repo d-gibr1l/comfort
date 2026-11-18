@@ -55,6 +55,8 @@ class PageSwipeState internal constructor(
     private val pageCount: State<Int>,
     private val allowed: State<Boolean>,
     private val onSettled: State<(Int) -> Unit>,
+    // A new swipe may cut short the settling of the one before (see [catchSettle]).
+    private val quickSwipes: Boolean = false,
 ) {
     /** The drag as a fraction of the page width; negative is toward the next page. Read only
      * while drawing ([pageSwipeLayer]), so following the finger recomposes nothing. */
@@ -81,6 +83,20 @@ class PageSwipeState internal constructor(
 
     internal fun canStart() = allowed.value && !blocked && neighbor == null
 
+    // The settle running after a release, and what it does when it lands.
+    private var settleJob: kotlinx.coroutines.Job? = null
+    private var settleEnd: (() -> Unit)? = null
+
+    /** A finger down while the last swipe is still settling: with [quickSwipes], it lands at once
+     * (the little that's left of its slide skipped), so the new swipe can start from the page it
+     * was going to. Swipes one after another each turn a page instead of waiting for the slide. */
+    internal fun catchSettle() {
+        if (!quickSwipes) return
+        val end = settleEnd ?: return
+        settleJob?.cancel()
+        end()
+    }
+
     internal fun neighborFor(dx: Float): Int? {
         val page = if (dx < 0) current.value + 1 else current.value - 1
         return page.takeIf { it in 0 until pageCount.value }
@@ -105,19 +121,24 @@ class PageSwipeState internal constructor(
         val flung = velocity * toward > FLING_WIDTHS_PER_SECOND
         val flungBack = velocity * toward < -FLING_WIDTHS_PER_SECOND
         val commit = !cancelled && !flungBack && (progress > 0.5f || (flung && progress > FLING_MIN_PROGRESS))
-        scope.launch {
-            animate(
-                initialValue = offset,
-                targetValue = if (commit) toward else 0f,
-                initialVelocity = if (cancelled) 0f else velocity,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-            ) { value, _ -> offset = value }
+        val end = {
+            settleEnd = null
             // One snapshot, so no frame shows the new page selected but still shifted aside.
             Snapshot.withMutableSnapshot {
                 if (commit) onSettled.value(target)
                 neighbor = null
                 offset = 0f
             }
+        }
+        settleEnd = end
+        settleJob = scope.launch {
+            animate(
+                initialValue = offset,
+                targetValue = if (commit) toward else 0f,
+                initialVelocity = if (cancelled) 0f else velocity,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+            ) { value, _ -> offset = value }
+            end()
         }
     }
 
@@ -130,14 +151,14 @@ class PageSwipeState internal constructor(
 }
 
 @Composable
-fun rememberPageSwipeState(current: Int, allowed: Boolean, pageCount: Int = 3, onSettled: (Int) -> Unit): PageSwipeState {
+fun rememberPageSwipeState(current: Int, allowed: Boolean, pageCount: Int = 3, quickSwipes: Boolean = false, onSettled: (Int) -> Unit): PageSwipeState {
     val scope = rememberCoroutineScope()
     val currentState = rememberUpdatedState(current)
     val pageCountState = rememberUpdatedState(pageCount)
     val allowedState = rememberUpdatedState(allowed)
     val onSettledState = rememberUpdatedState(onSettled)
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
-    return remember { PageSwipeState(scope, currentState, pageCountState, allowedState, onSettledState) }
+    return remember { PageSwipeState(scope, currentState, pageCountState, allowedState, onSettledState, quickSwipes) }
         .also { it.dir = if (rtl) -1f else 1f }
 }
 
@@ -162,6 +183,7 @@ fun Modifier.pageSwipeArea(state: PageSwipeState): Modifier = pointerInput(state
         // Cards add to this as they see the same down, after this (they're further in).
         state.edgeDowns.clear()
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        state.catchSettle()
         if (!state.canStart()) return@awaitEachGesture
         val tracker = VelocityTracker()
         tracker.addPosition(down.uptimeMillis, down.position)
