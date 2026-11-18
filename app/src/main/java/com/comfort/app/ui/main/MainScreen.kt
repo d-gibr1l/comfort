@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -879,10 +880,33 @@ private fun FloatingNavBar(
     SideEffect { previousTab.intValue = selectedTab }
     val lead = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 700f)
     val trail = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 260f)
-    val target = bounds[selectedTab]
+    // Hold and drag: while held, the pill follows the finger (x in the row, px) and the tab it's
+    // let go over opens.
+    var dragX by remember { mutableStateOf<Float?>(null) }
+    // The tab under the finger while dragging.
+    var dragTab by remember { mutableStateOf<Int?>(null) }
+    // A tab's own tap still lands when a hold is let go without moving: this drops it, the release
+    // having opened the tab already.
+    var swallowClick by remember { mutableStateOf(false) }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // The gesture below is set up once: it reads these at the release, not the values of its start.
+    val currentTab by androidx.compose.runtime.rememberUpdatedState(selectedTab)
+    val currentOnSelect by androidx.compose.runtime.rememberUpdatedState(onSelect)
+    fun tabAt(x: Float): Int? = bounds.entries.minByOrNull { kotlin.math.abs(it.value.center.x - x) }?.key
+    // Sized to the tab it's on: the one under the finger while dragging, which opens out to its name.
+    val home = bounds[dragTab ?: selectedTab]
+    val target = home?.let { t ->
+        val x = dragX ?: return@let t
+        val first = bounds[0]?.left ?: t.left
+        val last = bounds[tabs.lastIndex]?.right ?: t.right
+        val left = (x - t.width / 2f).coerceIn(first, (last - t.width).coerceAtLeast(first))
+        androidx.compose.ui.geometry.Rect(left, t.top, left + t.width, t.bottom)
+    }
+    // Under the finger, both ends follow it quickly.
+    val follow = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 1500f)
     // Only once laid out, so they start where the tab is rather than sliding in from the edge.
-    val leftState = if (target != null) androidx.compose.animation.core.animateFloatAsState(target.left, if (movingRight) trail else lead, label = "navLeft") else null
-    val rightState = if (target != null) androidx.compose.animation.core.animateFloatAsState(target.right, if (movingRight) lead else trail, label = "navRight") else null
+    val leftState = if (target != null) androidx.compose.animation.core.animateFloatAsState(target.left, if (dragX != null) follow else if (movingRight) trail else lead, label = "navLeft") else null
+    val rightState = if (target != null) androidx.compose.animation.core.animateFloatAsState(target.right, if (dragX != null) follow else if (movingRight) lead else trail, label = "navRight") else null
     val indicatorColor = MaterialTheme.colorScheme.primaryContainer
     Box(
         modifier = modifier
@@ -905,6 +929,37 @@ private fun FloatingNavBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 8.dp)
+                    .pointerInput(Unit) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { pos ->
+                                swallowClick = true
+                                dragX = pos.x
+                                dragTab = tabAt(pos.x)
+                                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                dragX = change.position.x
+                                val over = tabAt(change.position.x)
+                                if (over != dragTab) {
+                                    dragTab = over
+                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                }
+                            },
+                            onDragEnd = {
+                                val over = dragTab
+                                dragX = null
+                                dragTab = null
+                                swallowClick = false
+                                if (over != null && over != currentTab) currentOnSelect(over)
+                            },
+                            onDragCancel = {
+                                dragX = null
+                                dragTab = null
+                                swallowClick = false
+                            },
+                        )
+                    }
                     // The one highlight pill, under the tabs: a plain rounded rectangle, no layer.
                     .drawBehind {
                         val l = leftState?.value ?: return@drawBehind
@@ -923,8 +978,10 @@ private fun FloatingNavBar(
             ) {
                 tabs.forEachIndexed { index, tab ->
                     val selected = selectedTab == index
+                    // While dragging, the tab under the finger is lit (colour, filled icon, its name).
+                    val lit = (dragTab ?: selectedTab) == index
                     val tint by animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f),
+                        targetValue = if (lit) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f),
                         animationSpec = tween(200),
                         label = "navTint",
                     )
@@ -946,11 +1003,15 @@ private fun FloatingNavBar(
                                 onClickLabel = if (selected) {
                                     if (index == 1) stringResource(R.string.open_queue) else if (index == 2) stringResource(R.string.reset_settings) else null
                                 } else stringResource(R.string.switch_to_x, tab.label),
-                            ) { onSelect(index) }
-                            .padding(horizontal = if (selected) 20.dp else 16.dp, vertical = 12.dp),
+                            ) {
+                                // After a hold let go without moving: the tab still opens, but the open
+                                // tab's second action (the queue, resetting Settings) doesn't run.
+                                if (!swallowClick) onSelect(index) else { swallowClick = false; if (index != selectedTab) onSelect(index) }
+                            }
+                            .padding(horizontal = if (lit) 20.dp else 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val icon = if (selected) tab.selectedIcon else tab.icon
+                        val icon = if (lit) tab.selectedIcon else tab.icon
                         val iconModifier = Modifier.size(22.dp)
                         if (index == 1 && activeDownloadsCount > 0) {
                             BadgedBox(badge = {
@@ -971,7 +1032,7 @@ private fun FloatingNavBar(
                         }
                         // From its start, next to the icon (the default grew it from its end).
                         AnimatedVisibility(
-                            visible = selected,
+                            visible = lit,
                             enter = androidx.compose.animation.expandHorizontally(expandFrom = Alignment.Start) + androidx.compose.animation.fadeIn(),
                             exit = androidx.compose.animation.shrinkHorizontally(shrinkTowards = Alignment.Start) + androidx.compose.animation.fadeOut(),
                         ) {
