@@ -61,6 +61,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -738,12 +739,34 @@ private fun QueueLayout(
         )
         }
         Spacer(Modifier.height(8.dp))
+        // A pull down on the list once it's at its top closes the queue too, as one on the header
+        // above does (the list took those drags for itself, so only the header did). Watched, not
+        // taken: the list still stretches under the finger as it's pulled.
+        val closeAfter = with(androidx.compose.ui.platform.LocalDensity.current) { 120.dp.toPx() }
+        val pullToClose = remember(onCloseQueue) {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                var pulled = 0f
+                override fun onPostScroll(consumed: androidx.compose.ui.geometry.Offset, available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                    if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && available.y > 0f) pulled += available.y
+                    return androidx.compose.ui.geometry.Offset.Zero
+                }
+                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                    // Not when flung back up at the end of it.
+                    if (pulled > closeAfter && available.y >= 0f) {
+                        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureThresholdActivate)
+                        onCloseQueue()
+                    }
+                    pulled = 0f
+                    return androidx.compose.ui.unit.Velocity.Zero
+                }
+            }
+        }
         // See-through: the queue stays on the player's own dark, blurred-cover backdrop.
         androidx.compose.material3.Surface(
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             color = Color.White.copy(alpha = 0.06f),
             contentColor = Color.White,
-            modifier = panelModifier.fillMaxSize(),
+            modifier = panelModifier.fillMaxSize().nestedScroll(pullToClose),
         ) {
             QueuePanel()
         }
