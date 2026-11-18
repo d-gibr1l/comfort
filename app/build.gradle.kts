@@ -70,6 +70,15 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
         }
+        // The benchmark build installed beside another Comfort (a release whose data must stay):
+        // its own package name, and leave to read that install's media (src/perf's manifest),
+        // for measuring on someone's phone without replacing their app.
+        create("perf") {
+            initWith(getByName("benchmark"))
+            applicationIdSuffix = ".perf"
+            versionNameSuffix = "-perf"
+            matchingFallbacks += listOf("release")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
