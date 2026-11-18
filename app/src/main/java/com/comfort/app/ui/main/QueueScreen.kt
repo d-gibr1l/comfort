@@ -533,7 +533,7 @@ fun QueueScreen(
                         FilterChip(
                             selected = selectedFilter == filter,
                             onClick = { selectedFilter = filter },
-                            label = { Text(queueFilterLabel(filter)) },
+                            label = { Text(queueFilterLabel(filter), fontFamily = com.comfort.app.theme.HeaderFontFamily) },
                             shape = com.comfort.app.theme.PillShape
                         )
                     }

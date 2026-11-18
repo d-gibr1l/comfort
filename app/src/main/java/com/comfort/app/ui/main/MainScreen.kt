@@ -1374,7 +1374,7 @@ fun HomeScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             if (url.isNotBlank() && looksLikeLink(url)) stringResource(R.string.open_this_link_in_the_browser) else stringResource(R.string.browse_the_web),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
@@ -1402,7 +1402,7 @@ fun HomeScreen(
 
             Text(
                 stringResource(R.string.supported_sources),
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
@@ -1496,7 +1496,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(24.dp))
                 Text(
                     stringResource(R.string.recently_downloaded),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))

@@ -608,7 +608,7 @@ private fun LibraryToolbarChip(
                 // gets from the label.
                 Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
             },
-            label = { Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium) },
+            label = { Text(label, style = MaterialTheme.typography.labelLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Medium) },
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
