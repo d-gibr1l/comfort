@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlaylistRemove
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Pause
@@ -126,10 +127,20 @@ internal fun QueuePanel() {
                 )
             }
             if (state.count > 1) {
-                androidx.compose.material3.TextButton(
+                // A pill with an icon, as Now Playing's Queue one: plain text was easy to miss.
+                androidx.compose.material3.FilledTonalButton(
                     onClick = MusicPlayer::clearQueue,
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.85f)),
-                ) { Text(stringResource(R.string.search_clear), fontFamily = com.comfort.app.theme.HeaderFontFamily) }
+                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.16f),
+                        contentColor = Color.White,
+                    ),
+                    contentPadding = PaddingValues(start = 14.dp, end = 18.dp),
+                    modifier = Modifier.padding(end = 12.dp),
+                ) {
+                    Icon(Icons.Rounded.PlaylistRemove, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.search_clear), fontFamily = com.comfort.app.theme.HeaderFontFamily, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
         Row(
