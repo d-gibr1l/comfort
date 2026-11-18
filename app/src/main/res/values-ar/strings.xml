@@ -130,6 +130,8 @@
     <string name="search_download">تنزيل</string>
     <string name="lyrics_show">إظهار الكلمات</string>
     <string name="lyrics_hide">إخفاء الكلمات</string>
+    <string name="lyrics_line_show">إظهار سطر كلمات الأغنية</string>
+    <string name="lyrics_line_hide">إخفاء سطر كلمات الأغنية</string>
     <string name="action_back">رجوع</string>
     <string name="action_save">حفظ</string>
     <string name="action_cancel">إلغاء</string>

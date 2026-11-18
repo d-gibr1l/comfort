@@ -130,6 +130,8 @@
     <string name="search_download">Tải xuống</string>
     <string name="lyrics_show">Hiện lời bài hát</string>
     <string name="lyrics_hide">Ẩn lời bài hát</string>
+    <string name="lyrics_line_show">Hiện dòng lời bài hát</string>
+    <string name="lyrics_line_hide">Ẩn dòng lời bài hát</string>
     <string name="action_back">Quay lại</string>
     <string name="action_save">Lưu</string>
     <string name="action_cancel">Hủy</string>

@@ -130,6 +130,8 @@
     <string name="search_download">डाउनलोड करें</string>
     <string name="lyrics_show">बोल दिखाएँ</string>
     <string name="lyrics_hide">बोल छिपाएँ</string>
+    <string name="lyrics_line_show">गीत की पंक्ति दिखाएँ</string>
+    <string name="lyrics_line_hide">गीत की पंक्ति छिपाएँ</string>
     <string name="action_back">वापस</string>
     <string name="action_save">सहेजें</string>
     <string name="action_cancel">रद्द करें</string>

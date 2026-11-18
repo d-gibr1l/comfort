@@ -130,6 +130,8 @@
     <string name="search_download">ダウンロード</string>
     <string name="lyrics_show">歌詞を表示</string>
     <string name="lyrics_hide">歌詞を隠す</string>
+    <string name="lyrics_line_show">歌詞の行を表示</string>
+    <string name="lyrics_line_hide">歌詞の行を非表示</string>
     <string name="action_back">戻る</string>
     <string name="action_save">保存</string>
     <string name="action_cancel">キャンセル</string>

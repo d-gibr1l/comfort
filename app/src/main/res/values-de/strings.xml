@@ -143,6 +143,8 @@
     </plurals>
     <string name="lyrics_show">Songtext zeigen</string>
     <string name="lyrics_hide">Songtext ausblenden</string>
+    <string name="lyrics_line_show">Liedzeile einblenden</string>
+    <string name="lyrics_line_hide">Liedzeile ausblenden</string>
     <string name="action_back">Zurück</string>
     <string name="action_save">Speichern</string>
     <string name="action_cancel">Abbrechen</string>

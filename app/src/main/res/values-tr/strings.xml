@@ -130,6 +130,8 @@
     <string name="search_download">İndir</string>
     <string name="lyrics_show">Sözleri göster</string>
     <string name="lyrics_hide">Sözleri gizle</string>
+    <string name="lyrics_line_show">Şarkı sözü satırını göster</string>
+    <string name="lyrics_line_hide">Şarkı sözü satırını gizle</string>
     <string name="action_back">Geri</string>
     <string name="action_save">Kaydet</string>
     <string name="action_cancel">İptal</string>

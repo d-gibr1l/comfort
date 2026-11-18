@@ -130,6 +130,8 @@
     <string name="search_download">הורדה</string>
     <string name="lyrics_show">הצגת מילים</string>
     <string name="lyrics_hide">הסתרת מילים</string>
+    <string name="lyrics_line_show">הצגת שורת המילים</string>
+    <string name="lyrics_line_hide">הסתרת שורת המילים</string>
     <string name="action_back">חזרה</string>
     <string name="action_save">שמירה</string>
     <string name="action_cancel">ביטול</string>

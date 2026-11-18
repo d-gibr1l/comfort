@@ -130,6 +130,8 @@
     <string name="search_download">下载</string>
     <string name="lyrics_show">显示歌词</string>
     <string name="lyrics_hide">隐藏歌词</string>
+    <string name="lyrics_line_show">显示歌词行</string>
+    <string name="lyrics_line_hide">隐藏歌词行</string>
     <string name="action_back">返回</string>
     <string name="action_save">保存</string>
     <string name="action_cancel">取消</string>

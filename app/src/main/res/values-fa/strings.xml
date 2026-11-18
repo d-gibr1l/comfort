@@ -130,6 +130,8 @@
     <string name="search_download">دانلود</string>
     <string name="lyrics_show">نمایش متن ترانه</string>
     <string name="lyrics_hide">پنهان کردن متن ترانه</string>
+    <string name="lyrics_line_show">نمایش خط متن ترانه</string>
+    <string name="lyrics_line_hide">پنهان کردن خط متن ترانه</string>
     <string name="action_back">بازگشت</string>
     <string name="action_save">ذخیره</string>
     <string name="action_cancel">لغو</string>

@@ -154,6 +154,8 @@
     </plurals>
     <string name="lyrics_show">Показать текст</string>
     <string name="lyrics_hide">Скрыть текст</string>
+    <string name="lyrics_line_show">Показать строку текста песни</string>
+    <string name="lyrics_line_hide">Скрыть строку текста песни</string>
     <string name="action_back">Назад</string>
     <string name="action_save">Сохранить</string>
     <string name="action_cancel">Отмена</string>

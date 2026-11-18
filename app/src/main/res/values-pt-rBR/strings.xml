@@ -150,6 +150,8 @@
     </plurals>
     <string name="lyrics_show">Mostrar letra</string>
     <string name="lyrics_hide">Ocultar letra</string>
+    <string name="lyrics_line_show">Mostrar a linha da letra</string>
+    <string name="lyrics_line_hide">Ocultar a linha da letra</string>
     <string name="action_back">Voltar</string>
     <string name="action_save">Salvar</string>
     <string name="action_cancel">Cancelar</string>

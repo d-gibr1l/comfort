@@ -121,6 +121,9 @@ fun NowPlayingScreen(
         lyrics = song?.let { com.comfort.app.music.Lyrics.load(context, it.uri) }
     }
     var showLyrics by remember { mutableStateOf(false) }
+    // The two lyric lines under the cover, on or off (the top bar's lyrics button), kept.
+    val playerPrefs = androidx.compose.ui.platform.LocalContext.current.let { remember { it.getSharedPreferences("music_player", android.content.Context.MODE_PRIVATE) } }
+    var lyricLine by remember { mutableStateOf(playerPrefs.getBoolean(KEY_LYRIC_LINE, true)) }
     val lyricsShown = showLyrics && lyrics != null
 
     var position by remember { mutableLongStateOf(0L) }
@@ -244,25 +247,45 @@ fun NowPlayingScreen(
                                 color = Color.White.copy(alpha = 0.7f),
                             )
                         }
-                        if (lyrics != null) {
+                        // Synced lyrics: turns the lyric lines under the cover on and off (a tap on
+                        // them opens the full lyrics). Plain ones have no lines there: it opens them.
+                        // The queue's button that sat beside it went: the Queue pill at the bottom
+                        // (or a swipe up) opens it.
+                        val shownLyrics = lyrics
+                        if (shownLyrics != null) {
+                            val lit = if (lyricsShown) true else shownLyrics.synced && lyricLine
                             IconButton(
-                                onClick = { showLyrics = !showLyrics },
+                                onClick = {
+                                    when {
+                                        lyricsShown -> showLyrics = false
+                                        shownLyrics.synced -> {
+                                            lyricLine = !lyricLine
+                                            playerPrefs.edit().putBoolean(KEY_LYRIC_LINE, lyricLine).apply()
+                                        }
+                                        else -> showLyrics = true
+                                    }
+                                },
                                 modifier = Modifier.size(48.dp),
                                 colors = IconButtonDefaults.iconButtonColors(
-                                    containerColor = if (lyricsShown) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+                                    containerColor = if (lit) Color.White.copy(alpha = 0.2f) else Color.Transparent,
                                 ),
                             ) {
                                 Icon(
                                     Icons.Outlined.Lyrics,
                                     contentDescription = androidx.compose.ui.res.stringResource(
-                                        if (lyricsShown) com.comfort.app.R.string.lyrics_hide else com.comfort.app.R.string.lyrics_show,
+                                        when {
+                                            lyricsShown -> com.comfort.app.R.string.lyrics_hide
+                                            !shownLyrics.synced -> com.comfort.app.R.string.lyrics_show
+                                            lyricLine -> com.comfort.app.R.string.lyrics_line_hide
+                                            else -> com.comfort.app.R.string.lyrics_line_show
+                                        },
                                     ),
                                     tint = Color.White,
                                 )
                             }
-                        }
-                        IconButton(onClick = { showQueue = true }, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = stringResource(R.string.queue), tint = Color.White)
+                        } else {
+                            // Keeps "Now playing" centred, opposite the close button.
+                            Spacer(Modifier.size(48.dp))
                         }
                     }
 
@@ -318,7 +341,7 @@ fun NowPlayingScreen(
                         // a tap opens the full lyrics. Not while those are up.
                         val previewLyrics = lyrics
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = previewLyrics?.synced == true && !lyricsShown,
+                            visible = previewLyrics?.synced == true && !lyricsShown && lyricLine,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
                             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
                         ) {
@@ -783,3 +806,6 @@ private fun QueueLayout(
         }
     }
 }
+
+/** In "music_player" (MusicService's prefs, as LyricsView's zoom): whether the lyric lines under the cover are shown. */
+private const val KEY_LYRIC_LINE = "lyric_line"

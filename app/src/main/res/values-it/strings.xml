@@ -130,6 +130,8 @@
     <string name="search_download">Scarica</string>
     <string name="lyrics_show">Mostra testo</string>
     <string name="lyrics_hide">Nascondi testo</string>
+    <string name="lyrics_line_show">Mostra la riga del testo</string>
+    <string name="lyrics_line_hide">Nascondi la riga del testo</string>
     <string name="action_back">Indietro</string>
     <string name="action_save">Salva</string>
     <string name="action_cancel">Annulla</string>

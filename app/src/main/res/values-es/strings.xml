@@ -147,6 +147,8 @@
     </plurals>
     <string name="lyrics_show">Ver letra</string>
     <string name="lyrics_hide">Ocultar letra</string>
+    <string name="lyrics_line_show">Mostrar la línea de la letra</string>
+    <string name="lyrics_line_hide">Ocultar la línea de la letra</string>
     <string name="action_back">Atrás</string>
     <string name="action_save">Guardar</string>
     <string name="action_cancel">Cancelar</string>
