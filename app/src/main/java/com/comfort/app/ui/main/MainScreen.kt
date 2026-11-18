@@ -1749,18 +1749,19 @@ private fun RecentDownloadThumbnail(item: com.comfort.app.data.DownloadEntity, o
     Box(
         modifier = Modifier
             .size(76.dp)
-            // shapes.large (16dp) — same fix, same magic-number/size pairing, as the Library
-            // screen's own equivalent thumbnail box (DownloadsHistoryScreen.kt's HistoryRow).
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            // No ripple: unclipped (below), it would spread past the shape as a square.
             .clickable(
                 role = Role.Button,
                 onClickLabel = stringResource(R.string.open),
                 onClick = onClick,
+                interactionSource = null,
+                indication = null,
             ),
     ) {
-        // A finished download's file (a song's cover): the Library's own thumbnail.
-        LibraryThumbnail(item, Modifier.fillMaxSize())
+        // The Library's Arch, drawn through the shape rather than clipped to it, as the Library
+        // does (ShapedThumbnail): this strip drifts all the time, and a clip to a path rebuilds a
+        // mask every frame.
+        ShapedThumbnail(item, thumbnailShape(), MaterialTheme.colorScheme.surfaceContainer, Modifier.fillMaxSize())
     }
 }
 
