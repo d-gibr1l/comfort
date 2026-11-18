@@ -918,13 +918,17 @@ private fun FloatingNavBar(
     ) {
         // Ends that flow into the sides (ContinuousCapsuleShape). Drawn in that shape, not clipped
         // to it (nothing inside reaches the ends): a clip to a path costs a mask every frame.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(68.dp)
-                .shadow(12.dp, com.comfort.app.theme.ContinuousCapsuleShape, clip = false)
-                .background(MaterialTheme.colorScheme.primary, com.comfort.app.theme.ContinuousCapsuleShape),
-        ) {
+        Box(modifier = Modifier.fillMaxWidth().height(68.dp)) {
+            // The bar's own shape, 28dp in from the tabs' space at each end: the tabs stay where
+            // they were, the ends close in to about the highlight's gap above and below (11dp)
+            // when the outer tab is open.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 28.dp)
+                    .shadow(12.dp, com.comfort.app.theme.ContinuousCapsuleShape, clip = false)
+                    .background(MaterialTheme.colorScheme.primary, com.comfort.app.theme.ContinuousCapsuleShape)
+            )
             Row(
                 modifier = Modifier
                     .fillMaxSize()
