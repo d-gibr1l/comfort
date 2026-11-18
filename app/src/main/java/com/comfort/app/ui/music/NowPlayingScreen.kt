@@ -688,6 +688,8 @@ private fun QueueLayout(
                 .padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Swipe the song (cover and title) sideways to change it, as on the mini player.
+            Row(modifier = Modifier.weight(1f).swipeToSkip(), verticalAlignment = Alignment.CenterVertically) {
             Box(coverModifier.size(52.dp).clip(RoundedCornerShape(10.dp))) {
                 CoverImage(state.song, blurred = false, modifier = Modifier.fillMaxSize())
             }
@@ -695,6 +697,7 @@ private fun QueueLayout(
             Column(modifier = Modifier.weight(1f).then(titleModifier)) {
                 Text(state.song?.title.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 state.song?.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
             }
             // Previous, play, next in any language (see MediaLtr).
             com.comfort.app.ui.MediaLtr { Row(verticalAlignment = Alignment.CenterVertically) {
