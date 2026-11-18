@@ -58,6 +58,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalDensity
@@ -547,12 +549,14 @@ internal fun HistoryRow(
                 modifier = Modifier
                     .fillMaxSize()
                     // The shared thumbnail shape (Components.kt thumbnailShape).
-                    .clip(thumbnailShape())
-                    // A step above the card's own surfaceContainerHigh, so an empty tile still shows.
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    // Not clipped: the thumbnail and its empty tile are drawn through the shape
+                    // (ShapedThumbnail). A clip to it made every frame of a scroll rebuild and
+                    // re-upload a mask per thumbnail on the render thread (7 a frame, traced on a
+                    // Galaxy A03 Core), and the main thread waited on it: half the frames late.
+                    .then(if (hasThumbnail) Modifier else Modifier.clip(thumbnailShape()).background(MaterialTheme.colorScheme.surfaceContainerHighest)),
             ) {
                 if (hasThumbnail) {
-                    LibraryThumbnail(item, Modifier.fillMaxSize())
+                    ShapedThumbnail(item, thumbnailShape(), MaterialTheme.colorScheme.surfaceContainerHighest, Modifier.fillMaxSize())
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         val icon = when (item.status) {
@@ -884,6 +888,68 @@ internal val LIBRARY_CARD_SHAPE = RoundedCornerShape(20.dp)
 
 /** A Library item's thumbnail: for a song, its cover (AppImageLoader's AudioCover), and a music
  * note when it has none — a song with no cover used to leave an empty tile. */
+@Composable
+internal fun ShapedThumbnail(item: DownloadEntity, shape: Shape, emptyColor: Color, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
+        val width = constraints.maxWidth.coerceAtLeast(1)
+        val height = constraints.maxHeight.coerceAtLeast(1)
+        val request = remember(item.id, item.thumbnailPath, item.mediaUri, item.isAudio, width, height) {
+            coil.request.ImageRequest.Builder(context)
+                .data(item.thumbnailModel())
+                .crossfade(false)
+                // A size of its own: the painter isn't drawn as an image, so it can't take its size
+                // from that. Filled (cropped), as ContentScale.Crop would.
+                .size(width, height)
+                .scale(coil.size.Scale.FILL)
+                // Drawn through a shader below, which a hardware bitmap can't always be.
+                .allowHardware(false)
+                // Under the file's key, so the media viewer can show it at once while it loads.
+                .memoryCacheKey(com.comfort.app.util.thumbnailCacheKey(item.id))
+                .build()
+        }
+        val painter = coil.compose.rememberAsyncImagePainter(request, contentScale = ContentScale.Crop)
+        val state = painter.state
+        val bitmap = ((state as? coil.compose.AsyncImagePainter.State.Success)?.result?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+        androidx.compose.foundation.layout.Spacer(
+            Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = item.title }
+                .drawWithCache {
+                    val outline = shape.createOutline(size, layoutDirection, this)
+                    val path = when (outline) {
+                        is androidx.compose.ui.graphics.Outline.Generic -> outline.path
+                        is androidx.compose.ui.graphics.Outline.Rounded -> androidx.compose.ui.graphics.Path().apply { addRoundRect(outline.roundRect) }
+                        is androidx.compose.ui.graphics.Outline.Rectangle -> androidx.compose.ui.graphics.Path().apply { addRect(outline.rect) }
+                    }
+                    val brush = bitmap?.let { b ->
+                        // Centre-cropped to fill, as ContentScale.Crop.
+                        val scale = maxOf(size.width / b.width, size.height / b.height)
+                        val matrix = android.graphics.Matrix().apply {
+                            setScale(scale, scale)
+                            postTranslate((size.width - b.width * scale) / 2f, (size.height - b.height * scale) / 2f)
+                        }
+                        val shader = android.graphics.BitmapShader(b, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+                            .apply { setLocalMatrix(matrix) }
+                        androidx.compose.ui.graphics.ShaderBrush(shader)
+                    }
+                    onDrawBehind {
+                        if (brush != null) drawPath(path, brush) else drawPath(path, emptyColor)
+                    }
+                },
+        )
+        if (state is coil.compose.AsyncImagePainter.State.Error) {
+            Icon(
+                if (item.isAudio) Icons.Outlined.MusicNote else Icons.Outlined.Image,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(26.dp),
+            )
+        }
+    }
+}
+
+/** A Library item's thumbnail, filling its box (cut to a shape, if at all, by the caller). */
 @Composable
 internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifier) {
     var failed by remember(item.id, item.thumbnailPath, item.mediaUri) { mutableStateOf(false) }
