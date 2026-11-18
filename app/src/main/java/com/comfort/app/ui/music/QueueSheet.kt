@@ -118,10 +118,10 @@ internal fun QueuePanel() {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.queue_up_next), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(stringResource(R.string.queue_up_next), style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Bold, color = Color.White)
                 Text(
                     androidx.compose.ui.res.pluralStringResource(R.plurals.queue_songs_count, upcoming, upcoming),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                     color = Color.White.copy(alpha = 0.6f),
                 )
             }
@@ -129,7 +129,7 @@ internal fun QueuePanel() {
                 androidx.compose.material3.TextButton(
                     onClick = MusicPlayer::clearQueue,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.85f)),
-                ) { Text(stringResource(R.string.search_clear)) }
+                ) { Text(stringResource(R.string.search_clear), fontFamily = com.comfort.app.theme.HeaderFontFamily) }
             }
         }
         Row(
@@ -254,7 +254,7 @@ private fun ModeChip(selected: Boolean, label: String, icon: ImageVector, onClic
     androidx.compose.material3.FilterChip(
         selected = selected,
         onClick = onClick,
-        label = { Text(label) },
+        label = { Text(label, fontFamily = com.comfort.app.theme.HeaderFontFamily) },
         leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
         shape = RoundedCornerShape(50),
         colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
