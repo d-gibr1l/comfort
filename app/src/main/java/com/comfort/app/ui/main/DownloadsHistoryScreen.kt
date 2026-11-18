@@ -183,11 +183,19 @@ fun DownloadsHistoryScreen(
     val scrollTopScope = rememberCoroutineScope()
     // Only when the Queue actually closes, not each time this screen is built (it ran then too,
     // so coming back to the Library always landed at the top).
+    // And only when something finished while it was open: otherwise there's nothing new up there,
+    // and the Library keeps the place you left it at.
     var queueWasOpen by remember { mutableStateOf(isQueueOpen) }
+    var idsBeforeQueue by remember { mutableStateOf<Set<String>?>(null) }
     LaunchedEffect(isQueueOpen) {
+        if (isQueueOpen && !queueWasOpen) idsBeforeQueue = historyItems.mapTo(HashSet()) { it.id }
         if (queueWasOpen && !isQueueOpen) {
-            listState.scrollToItem(0)
-            gridState.scrollToItem(0)
+            val before = idsBeforeQueue
+            if (before == null || historyItems.any { it.id !in before }) {
+                listState.scrollToItem(0)
+                gridState.scrollToItem(0)
+            }
+            idsBeforeQueue = null
         }
         queueWasOpen = isQueueOpen
     }
