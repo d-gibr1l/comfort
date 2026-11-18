@@ -746,6 +746,8 @@ private fun DownloadActionsMenu(
     if (compressOpen && fileUri != null) {
         CompressDialog(item = item, fileUri = Uri.parse(fileUri), onDismiss = { compressOpen = false })
     }
+    // Google Sans for its items (DropdownMenuItem reads labelLarge), as the Library's chips.
+    MaterialTheme(typography = MaterialTheme.typography.let { it.copy(labelLarge = it.labelLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)) }) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         if (fileGone) {
             DropdownMenuItem(
@@ -831,6 +833,7 @@ private fun DownloadActionsMenu(
                 onClick = { onDismiss(); onDeleteFromPhone() },
             )
         }
+    }
     }
 }
 
