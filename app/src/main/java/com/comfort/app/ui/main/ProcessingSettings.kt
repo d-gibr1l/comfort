@@ -732,8 +732,7 @@ private fun AudioLanguageSetting() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable { picking = true }
+            .rowTapTarget { picking = true }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -761,8 +760,7 @@ private fun AudioLanguageSetting() {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.medium)
-                                .clickable {
+                                .rowTapTarget {
                                     picking = false
                                     current = value
                                     GalleryDlPreferences.setAudioLanguage(context, value)
@@ -784,6 +782,24 @@ private fun AudioLanguageSetting() {
         )
     }
 }
+
+/** A whole row as one tap target. Its highlight reaches 12dp past the row each side, with 16dp
+ * corners: clipped to the row itself (the theme's medium shape, 32dp in Expressive), the corners
+ * cut into the text along its edges ("udio language"). The row's content stays where it was. */
+private fun Modifier.rowTapTarget(onClick: () -> Unit): Modifier = this
+    .layout { measurable, constraints ->
+        val e = 12.dp.roundToPx()
+        val placeable = measurable.measure(
+            constraints.copy(
+                minWidth = (constraints.minWidth + 2 * e).coerceAtMost(constraints.maxWidth + 2 * e),
+                maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth + 2 * e else constraints.maxWidth,
+            )
+        )
+        layout((placeable.width - 2 * e).coerceAtLeast(0), placeable.height) { placeable.place(-e, 0) }
+    }
+    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+    .clickable(onClick = onClick)
+    .padding(horizontal = 12.dp)
 
 /** The value of a row that opens a list of choices (Audio language, Subtitle languages), as a
  * button: it read as plain coloured text, nothing that looked tappable. */
@@ -818,8 +834,7 @@ private fun SubtitleLanguagesSetting(current: String?, customLabel: String?, onP
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable { picking = true }
+            .rowTapTarget { picking = true }
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -843,8 +858,7 @@ private fun SubtitleLanguagesSetting(current: String?, customLabel: String?, onP
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.medium)
-                                .clickable {
+                                .rowTapTarget {
                                     picking = false
                                     onPick(value)
                                 }
