@@ -370,6 +370,11 @@ fun MainScreen(
     var pasteDownloadSignal by remember { mutableIntStateOf(0) }
     // The music player's full screen (ui/music), over everything; the mini player opens it.
     var showNowPlaying by remember { mutableStateOf(false) }
+    // The player fully up, settled and not being dragged: it covers everything, so what's under it
+    // isn't drawn. It was, every frame, the Library's list and all (~a third of each frame's
+    // drawing time on a Galaxy A22).
+    var playerSettled by remember { mutableStateOf(false) }
+    var playerDragged by remember { mutableStateOf(false) }
     val music by com.comfort.app.music.MusicPlayer.state.collectAsState()
     // Shows music already playing when the app is reopened.
     LaunchedEffect(Unit) { com.comfort.app.music.MusicPlayer.connect(context) }
@@ -420,7 +425,7 @@ fun MainScreen(
             selectedTab = 1
             if (entity.isAudio) {
                 mediaViewer = null
-                val audioList = if (history.any { it.id == entity.id }) {
+                val audioList = if (history.any { it.id == entity.id } && !com.comfort.app.music.MusicSettings.playTappedOnly.current) {
                     history.filter { it.isAudio }
                 } else {
                     listOf(entity)
@@ -451,7 +456,9 @@ fun MainScreen(
         com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { request ->
             val tapped = request.downloads.firstOrNull { it.id == request.startId }
             if (tapped?.isAudio == true) {
-                com.comfort.app.music.MusicPlayer.play(context, request.downloads, tapped.id)
+                // Music settings: Play only the tapped song.
+                val queue = if (com.comfort.app.music.MusicSettings.playTappedOnly.current) listOf(tapped) else request.downloads
+                com.comfort.app.music.MusicPlayer.play(context, queue, tapped.id)
                 showNowPlaying = true
             } else {
                 mediaViewer = request.copy(downloads = request.downloads.filter { !it.isAudio })
@@ -471,7 +478,7 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize()) {
     // No background of its own: MainActivity's Surface paints it, and every page paints its own
     // over that — a third full-screen fill under each frame for nothing.
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (playerSettled && !playerDragged) 0f else 1f }) {
     if (useNavRail) {
         SideNavRail(
             selectedTab = selectedTab,
@@ -806,9 +813,14 @@ fun MainScreen(
         ) { it },
         exit = androidx.compose.animation.slideOutVertically { it },
     ) {
+        val settled = transition.currentState == androidx.compose.animation.EnterExitState.Visible &&
+            transition.targetState == androidx.compose.animation.EnterExitState.Visible
+        SideEffect { playerSettled = settled }
+        DisposableEffect(Unit) { onDispose { playerSettled = false; playerDragged = false } }
         com.comfort.app.ui.music.NowPlayingScreen(
             onClose = { showNowPlaying = false },
             showing = transition.targetState == androidx.compose.animation.EnterExitState.Visible,
+            onDragged = { playerDragged = it },
         )
     }
     }

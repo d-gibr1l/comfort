@@ -219,6 +219,7 @@ object MusicPlayer {
     /** Connects, so the state shows music already playing (the app reopened while it played). */
     fun connect(context: Context) {
         appContext = context.applicationContext
+        MusicSettings.init(context)
         if (controller == null && future == null) withController(context) {}
     }
 
@@ -252,6 +253,8 @@ object MusicPlayer {
      * otherwise stay paused; a pause of the user's own isn't undone. */
     fun resumeAfterInterruption() {
         if (!pausedByFocus) return
+        // Music settings: Resume after a video or call.
+        if (!MusicSettings.resumeAfterInterruption.current) { pausedByFocus = false; return }
         pausedByFocus = false
         controller?.play()
     }

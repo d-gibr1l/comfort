@@ -36,10 +36,14 @@ import org.json.JSONObject
  */
 class MusicService : MediaSessionService() {
     private var session: MediaSession? = null
+    // The player itself, for what only an ExoPlayer has (skip silence, its volume, the shuffle
+    // order); the session plays it through [PreviousSetting].
+    private var exo: ExoPlayer? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onCreate() {
         super.onCreate()
+        MusicSettings.init(this)
         val player = ExoPlayer.Builder(this)
             // Music: takes audio focus (pauses for a call, ducks under navigation), and pauses
             // when headphones come out.
@@ -47,18 +51,20 @@ class MusicService : MediaSessionService() {
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 true,
             )
-            .setHandleAudioBecomingNoisy(true)
+            // Music settings: Pause when headphones disconnect.
+            .setHandleAudioBecomingNoisy(MusicSettings.pauseOnDisconnect.current)
             // Keeps the CPU up while playing with the screen off (Auxio's setting).
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
         player.addListener(listener)
+        exo = player
         val openNowPlaying = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).setAction(MainActivity.ACTION_OPEN_NOW_PLAYING)
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaSession.Builder(this, player)
+        session = MediaSession.Builder(this, PreviousSetting(player))
             .setSessionActivity(openNowPlaying)
             .setCallback(sessionCallback)
             .setBitmapLoader(CoverBitmapLoader(this))
@@ -70,6 +76,8 @@ class MusicService : MediaSessionService() {
             }
         )
         openAudioEffectSession(player.audioSessionId)
+        MusicSettings.setAudioSessionId(player.audioSessionId)
+        applySettings(player)
         restore(player)
         // Where in the song, every few seconds while playing: what a killed process comes back to.
         scope.launch {
@@ -106,7 +114,7 @@ class MusicService : MediaSessionService() {
         ): com.google.common.util.concurrent.ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
             val result = com.google.common.util.concurrent.SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
             scope.launch {
-                val saved = loadSaved()
+                val saved = if (MusicSettings.keepQueue.current) loadSaved() else null
                 if (saved == null) {
                     result.setException(IllegalStateException("Nothing saved to resume"))
                 } else {
@@ -130,7 +138,7 @@ class MusicService : MediaSessionService() {
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             // A new queue played shuffled: the song picked plays first, the rest after it.
             if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
-                val p = session?.player as? ExoPlayer
+                val p = exo
                 if (p != null && p.shuffleModeEnabled && p.currentTimeline.getFirstWindowIndex(true) != p.currentMediaItemIndex &&
                     p.currentPosition < 1000 && !restoring
                 ) reshuffle()
@@ -139,8 +147,17 @@ class MusicService : MediaSessionService() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // Into the next song by itself: it fades in (Fade between songs).
+            fadingIn = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
             save()
             updateWidget()
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // The sleep timer's "End of song" has stopped the music: it's done.
+            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && MusicSettings.sleepAtEndOfSong.value) {
+                MusicSettings.clearSleepTimer()
+            }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -148,11 +165,14 @@ class MusicService : MediaSessionService() {
             updateWidget()
         }
         override fun onRepeatModeChanged(repeatMode: Int) = save()
-        override fun onAudioSessionIdChanged(audioSessionId: Int) = openAudioEffectSession(audioSessionId)
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            openAudioEffectSession(audioSessionId)
+            MusicSettings.setAudioSessionId(audioSessionId)
+        }
     }
 
     private fun reshuffle() {
-        val p = session?.player as? ExoPlayer ?: return
+        val p = exo ?: return
         if (p.mediaItemCount > 0) p.setShuffleOrder(BetterShuffleOrder(p.mediaItemCount, p.currentMediaItemIndex))
     }
 
@@ -201,7 +221,8 @@ class MusicService : MediaSessionService() {
     private fun restore(player: ExoPlayer) {
         restoring = true
         scope.launch {
-            val saved = loadSaved()
+            // Music settings: Keep the queue. Off, the app opens with nothing queued.
+            val saved = if (MusicSettings.keepQueue.current) loadSaved() else null
             if (saved != null && player.mediaItemCount == 0) {
                 player.setMediaItems(saved.items, saved.index, saved.position)
                 player.repeatMode = saved.repeat
@@ -273,6 +294,79 @@ class MusicService : MediaSessionService() {
         android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
     }.getOrNull()
 
+    // --- The music settings (MusicSettings) --------------------------------------------------------
+
+    /** Whether the song on came in by itself after the last one, so fades in. */
+    private var fadingIn = false
+    private var levelling: android.media.audiofx.DynamicsProcessing? = null
+
+    /** Follows the music settings as they change, and runs the sleep timer and the fades. */
+    private fun applySettings(player: ExoPlayer) {
+        scope.launch { MusicSettings.skipSilence.value.collect { player.skipSilenceEnabled = it } }
+        scope.launch { MusicSettings.pauseOnDisconnect.value.collect { player.setHandleAudioBecomingNoisy(it) } }
+        scope.launch {
+            kotlinx.coroutines.flow.combine(MusicSettings.speed.value, MusicSettings.pitch.value) { sp, pi -> sp to pi }
+                .collect { (sp, pi) -> player.playbackParameters = androidx.media3.common.PlaybackParameters(sp, pi) }
+        }
+        scope.launch {
+            kotlinx.coroutines.flow.combine(MusicSettings.volumeLevelling.value, MusicSettings.audioSessionId) { on, id -> on to id }
+                .collect { (on, id) -> setLevelling(on, id) }
+        }
+        scope.launch { MusicSettings.sleepAtEndOfSong.collect { player.pauseAtEndOfMediaItems = it } }
+        // The sleep timer and the fades: often while either has something to do, rarely otherwise.
+        scope.launch {
+            while (true) {
+                val sleepAt = MusicSettings.sleepAt.value
+                if (sleepAt != null && android.os.SystemClock.elapsedRealtime() >= sleepAt) {
+                    player.pause()
+                    MusicSettings.clearSleepTimer()
+                }
+                val fadeMs = MusicSettings.fadeSeconds.current * 1000L
+                val fading = fadeMs > 0 && player.isPlaying
+                player.volume = if (!fading) 1f else {
+                    val pos = player.currentPosition
+                    val dur = player.duration
+                    // Out at the end only when another song follows (not the very last one).
+                    val out = if (dur > 0 && (player.hasNextMediaItem() || player.repeatMode == Player.REPEAT_MODE_ONE)) {
+                        ((dur - pos).toFloat() / fadeMs).coerceIn(0f, 1f)
+                    } else 1f
+                    val inn = if (fadingIn) (pos.toFloat() / fadeMs).coerceIn(0f, 1f) else 1f
+                    if (fadingIn && pos >= fadeMs) fadingIn = false
+                    minOf(out, inn)
+                }
+                kotlinx.coroutines.delay(if (fading) 50 else if (sleepAt != null) 1000 else 500)
+            }
+        }
+    }
+
+    /** Volume levelling: a gentle compressor on the music's audio session, then a limiter so the
+     * gain it adds back never clips. Android 9 and up (DynamicsProcessing). */
+    private fun setLevelling(on: Boolean, sessionId: Int) {
+        levelling?.let { runCatching { it.release() } }
+        levelling = null
+        if (!on || sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId == 0 || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.P) return
+        levelling = runCatching {
+            val dp = android.media.audiofx.DynamicsProcessing.Config.Builder(
+                android.media.audiofx.DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                2, false, 0, true, 1, false, 0, true,
+            ).build().let { android.media.audiofx.DynamicsProcessing(0, sessionId, it) }
+            // One band over everything: above -28 dB squeezed 3:1 (slow enough not to pump), the
+            // level lost given back after it.
+            dp.setMbcBandAllChannelsTo(0, android.media.audiofx.DynamicsProcessing.MbcBand(true, 20000f, 20f, 400f, 3f, -28f, 8f, -90f, 1f, 0f, 9f))
+            dp.setLimiterAllChannelsTo(android.media.audiofx.DynamicsProcessing.Limiter(true, true, 0, 1f, 80f, 10f, -1.5f, 0f))
+            dp.enabled = true
+            dp
+        }.getOrNull()
+    }
+
+    /** The player as the session (the notification, headphones, a car, the app) sees it: Previous
+     * goes straight to the song before when Music settings › Previous restarts the song is off. */
+    private class PreviousSetting(player: Player) : androidx.media3.common.ForwardingPlayer(player) {
+        override fun seekToPrevious() {
+            if (!MusicSettings.previousRestarts.current && hasPreviousMediaItem()) seekToPreviousMediaItem() else super.seekToPrevious()
+        }
+    }
+
     // --- Equalizers ------------------------------------------------------------------------------
 
     private var openSessionId = C.AUDIO_SESSION_ID_UNSET
@@ -313,6 +407,8 @@ class MusicService : MediaSessionService() {
     override fun onDestroy() {
         save()
         closeAudioEffectSession()
+        levelling?.let { runCatching { it.release() } }
+        levelling = null
         scope.cancel()
         session?.run {
             player.removeListener(listener)
@@ -320,6 +416,7 @@ class MusicService : MediaSessionService() {
             release()
         }
         session = null
+        exo = null
         super.onDestroy()
     }
 

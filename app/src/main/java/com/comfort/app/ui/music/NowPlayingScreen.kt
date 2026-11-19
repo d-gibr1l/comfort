@@ -42,6 +42,13 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.outlined.Lyrics
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,6 +71,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -106,6 +114,8 @@ fun NowPlayingScreen(
     onClose: () -> Unit,
     // Whether it's (being) shown: false while it slides out after closing.
     showing: Boolean = true,
+    // Whether it's being dragged away from its place (what's under it then shows).
+    onDragged: (Boolean) -> Unit = {},
 ) {
     val state by MusicPlayer.state.collectAsState()
     val song = state.song
@@ -148,6 +158,8 @@ fun NowPlayingScreen(
     // same screen comes back, still pushed down off the bottom by that swipe — open, but out of
     // sight, the mini player hidden under it. Back where it belongs as it reopens.
     LaunchedEffect(showing) { if (showing && dragY.value != 0f) dragY.snapTo(0f) }
+    val latestOnDragged by androidx.compose.runtime.rememberUpdatedState(onDragged)
+    LaunchedEffect(Unit) { androidx.compose.runtime.snapshotFlow { dragY.value != 0f }.collect { latestOnDragged(it) } }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val density = androidx.compose.ui.platform.LocalDensity.current
     val closeAfter = with(density) { 120.dp.toPx() }
@@ -200,8 +212,12 @@ fun NowPlayingScreen(
                     scope.launch { dragY.snapTo(dragY.value + amount) }
                 }
             },
-    ) {
-        CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().blur(60.dp).scale(1.2f))
+    ) { PlayerSheetHost {
+        // Blurred once, small (SmallBlur), not by a blur on the layer: that ran again on every frame
+        // drawn, the whole screen each time (~20 ms a frame on a Galaxy A22).
+        // Cut to the screen: scaled up, it showed past its top while the player was dragged down
+        // (the blur on the layer cut it before).
+        CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().clipToBounds().scale(1.2f))
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
@@ -240,10 +256,10 @@ fun NowPlayingScreen(
                             Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.close_player), tint = Color.White, modifier = Modifier.size(30.dp))
                         }
                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold, color = Color.White)
                             Text(
                                 if (state.count > 1) stringResource(R.string.song_x_of_x, state.index + 1, state.count) else stringResource(R.string.your_library),
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                                 color = Color.White.copy(alpha = 0.7f),
                             )
                         }
@@ -374,7 +390,14 @@ fun NowPlayingScreen(
                                     }
                                 }
                             }
-                            SongMenu(song)
+                            SongMenu(
+                                song = song,
+                                lyricLine = lyricLine,
+                                onLyricLineChange = {
+                                    lyricLine = it
+                                    playerPrefs.edit().putBoolean(KEY_LYRIC_LINE, it).apply()
+                                },
+                            )
                         }
 
                         Spacer(Modifier.height(16.dp))
@@ -443,7 +466,7 @@ fun NowPlayingScreen(
                 }
             }
         }
-    }
+    } }
 }
 
 /** A song's cover for Coil (its Library thumbnail shown at once), or a music note without one. */
@@ -451,8 +474,10 @@ fun NowPlayingScreen(
 internal fun CoverImage(song: Song?, blurred: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var failed by remember(song?.id) { mutableStateOf(false) }
-    val request = remember(song?.id) {
-        coil.request.ImageRequest.Builder(context).data(song?.cover).placeholderMemoryCacheKey(song?.placeholderKey).build()
+    val request = remember(song?.id, blurred) {
+        coil.request.ImageRequest.Builder(context).data(song?.cover)
+            .apply { if (blurred) transformations(SmallBlur) else placeholderMemoryCacheKey(song?.placeholderKey) }
+            .build()
     }
     if (song?.cover != null && !failed) {
         AsyncImage(
@@ -507,12 +532,18 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
     val amplitude by animateFloatAsState(if (playing) 1f else 0f, label = "waveAmplitude")
     com.comfort.app.ui.MediaLtr {
     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(40.dp)) {
+        // The wave drifts while it shows (playing, or flattening out after a pause) and stands still
+        // once flat, so a paused player draws nothing. The indicator takes its speed once, as it's
+        // first drawn (opened paused, the wave never drifted, and showed only as the position
+        // ticked over), so it's built again each time that changes.
+        val moving = playing || amplitude > 0.01f
+        androidx.compose.runtime.key(moving) {
         androidx.compose.material3.LinearWavyProgressIndicator(
             progress = { fraction },
             amplitude = { amplitude },
             // Calmer than the default (a wavelength a second): longer waves, drifting slowly.
             wavelength = 40.dp,
-            waveSpeed = 10.dp,
+            waveSpeed = if (moving) 10.dp else 0.dp,
             color = Color.White,
             trackColor = Color.White.copy(alpha = 0.25f),
             modifier = Modifier
@@ -537,6 +568,7 @@ private fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDrag
                     )
                 },
         )
+        }
         val thumbInteraction = remember { MutableInteractionSource() }
         val colors = SliderDefaults.colors(
             thumbColor = Color.White,
@@ -664,32 +696,382 @@ private fun ToggleButton(
     }
 }
 
-/** The song's ⋯ menu: share the file. */
+/** The song's ⋯ menu, as Auxio's: a sheet from the bottom with the song at its top (cover, "Song",
+ * title, artist and album), then the player's settings, song properties and share. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun SongMenu(song: Song?) {
+private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolean) -> Unit) {
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
-    Box {
-        // Over the artwork's dark backdrop: a light fill while the menu is open, the dots stay white.
-        IconButton(onClick = { open = true }, colors = com.comfort.app.ui.main.menuButtonColors(open, Color.White.copy(alpha = 0.2f))) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White)
+    var settingsOpen by remember { mutableStateOf(false) }
+    var propertiesOpen by remember { mutableStateOf(false) }
+    var sleepOpen by remember { mutableStateOf(false) }
+    var speedOpen by remember { mutableStateOf(false) }
+    val hasFile = song != null && song.uri != android.net.Uri.EMPTY
+    // Over the artwork's dark backdrop: a light fill while the menu is open, the dots stay white.
+    IconButton(onClick = { open = true }, colors = com.comfort.app.ui.main.menuButtonColors(open, Color.White.copy(alpha = 0.2f))) {
+        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White)
+    }
+    if (open && song != null) {
+        // An option takes this sheet's place with its own (or does its thing).
+        fun pick(action: () -> Unit) { open = false; action() }
+        InWindowSheet(onDismiss = { open = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(64.dp).clip(RoundedCornerShape(12.dp))) {
+                        CoverImage(song, blurred = false, modifier = Modifier.fillMaxSize())
+                    }
+                    Spacer(Modifier.size(16.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.song),
+                            style = MaterialTheme.typography.labelMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                        Text(
+                            song.title,
+                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        song.subtitle?.let {
+                            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                androidx.compose.material3.HorizontalDivider()
+                Spacer(Modifier.height(8.dp))
+                SongMenuOption(Icons.Outlined.Settings, stringResource(R.string.nav_settings)) { pick { settingsOpen = true } }
+                SongMenuOption(Icons.Outlined.Bedtime, stringResource(R.string.sleep_timer), value = sleepTimerLabel()) { pick { sleepOpen = true } }
+                val speed by com.comfort.app.music.MusicSettings.speed.value.collectAsState()
+                val pitch by com.comfort.app.music.MusicSettings.pitch.value.collectAsState()
+                SongMenuOption(
+                    Icons.Outlined.Speed,
+                    stringResource(R.string.speed_and_pitch),
+                    value = if (speed == 1f && pitch == 1f) null else "${formatFactor(speed)} · ${formatFactor(pitch)}",
+                ) { pick { speedOpen = true } }
+                SongMenuOption(Icons.Outlined.Info, stringResource(R.string.song_properties), enabled = hasFile) { pick { propertiesOpen = true } }
+                SongMenuOption(Icons.Rounded.Share, stringResource(R.string.share), enabled = hasFile) {
+                    pick {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                            .setType("audio/*")
+                            .putExtra(android.content.Intent.EXTRA_STREAM, song.uri)
+                            .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        runCatching { context.startActivity(android.content.Intent.createChooser(send, song.title)) }
+                    }
+                }
+            }
         }
-        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            androidx.compose.material3.DropdownMenuItem(
-                text = { Text(stringResource(R.string.share)) },
-                leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
-                enabled = song != null && song.uri != android.net.Uri.EMPTY,
-                onClick = {
-                    open = false
-                    val s = song ?: return@DropdownMenuItem
-                    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
-                        .setType("audio/*")
-                        .putExtra(android.content.Intent.EXTRA_STREAM, s.uri)
-                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    runCatching { context.startActivity(android.content.Intent.createChooser(send, s.title)) }
-                },
+    }
+    if (settingsOpen) MusicSettingsSheet(lyricLine, onLyricLineChange, onDismiss = { settingsOpen = false })
+    if (sleepOpen) SleepTimerSheet(onDismiss = { sleepOpen = false })
+    if (speedOpen) SpeedPitchSheet(onDismiss = { speedOpen = false })
+    if (propertiesOpen && song != null) SongPropertiesSheet(song, onDismiss = { propertiesOpen = false })
+}
+
+/** One of the song menu's options: an icon and its name, the whole row a tap target. */
+@Composable
+private fun SongMenuOption(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean = true, value: String? = null, onClick: () -> Unit) {
+    val alpha = if (enabled) 1f else 0.38f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha), modifier = Modifier.size(24.dp))
+        Spacer(Modifier.size(20.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            modifier = Modifier.weight(1f),
+        )
+        value?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** 1.25 as "1.25×". */
+private fun formatFactor(f: Float): String = "%.2f×".format(java.util.Locale.ROOT, f).replace(".00×", "×").replace("0×", "×")
+
+/** What the sleep timer is set to, for the menu: the time left, "End of song", or null when off. */
+@Composable
+private fun sleepTimerLabel(): String? {
+    val at by com.comfort.app.music.MusicSettings.sleepAt.collectAsState()
+    val endOfSong by com.comfort.app.music.MusicSettings.sleepAtEndOfSong.collectAsState()
+    if (endOfSong) return stringResource(R.string.sleep_end_of_song)
+    val until = at ?: return null
+    var now by remember { mutableStateOf(android.os.SystemClock.elapsedRealtime()) }
+    LaunchedEffect(until) {
+        while (true) {
+            now = android.os.SystemClock.elapsedRealtime()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val left = ((until - now) / 1000).coerceAtLeast(0)
+    return "%d:%02d".format(left / 60, left % 60)
+}
+
+/** A sheet of the player's, titled, its content scrolling when it's taller than the screen. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerSheet(title: String, onDismiss: () -> Unit, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    InWindowSheet(onDismiss = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
+    }
+}
+
+/** The sleep timer: off, a number of minutes, or the end of the song on. */
+@Composable
+private fun SleepTimerSheet(onDismiss: () -> Unit) {
+    val at by com.comfort.app.music.MusicSettings.sleepAt.collectAsState()
+    val endOfSong by com.comfort.app.music.MusicSettings.sleepAtEndOfSong.collectAsState()
+    // Which choice set the timer that's running (the minutes it was set for), for its tick.
+    var chosen by remember { mutableStateOf<Int?>(null) }
+    PlayerSheet(stringResource(R.string.sleep_timer), onDismiss) {
+        sleepTimerLabel()?.let {
+            Text(stringResource(R.string.sleep_stops_in, it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+        }
+        @Composable
+        fun choice(label: String, selected: Boolean, onPick: () -> Unit) = Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { onPick(); onDismiss() }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.RadioButton(selected = selected, onClick = null)
+            Spacer(Modifier.size(16.dp))
+            Text(label, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily))
+        }
+        choice(stringResource(R.string.subtitles_off_short), at == null && !endOfSong) { com.comfort.app.music.MusicSettings.setSleepTimer(null); chosen = null }
+        for (min in listOf(15, 30, 45, 60, 90)) {
+            choice(stringResource(R.string.sleep_x_min, min), at != null && chosen == min) { com.comfort.app.music.MusicSettings.setSleepTimer(min); chosen = min }
+        }
+        choice(stringResource(R.string.sleep_end_of_song), endOfSong) { com.comfort.app.music.MusicSettings.setSleepAtEndOfSong(); chosen = null }
+    }
+}
+
+/** Playback speed and pitch, each from half to double, and back to normal. */
+@Composable
+private fun SpeedPitchSheet(onDismiss: () -> Unit) {
+    val speed by com.comfort.app.music.MusicSettings.speed.value.collectAsState()
+    val pitch by com.comfort.app.music.MusicSettings.pitch.value.collectAsState()
+    PlayerSheet(stringResource(R.string.speed_and_pitch), onDismiss) {
+        FactorSlider(stringResource(R.string.speed), speed) { com.comfort.app.music.MusicSettings.speed.set(it) }
+        FactorSlider(stringResource(R.string.pitch), pitch) { com.comfort.app.music.MusicSettings.pitch.set(it) }
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.material3.FilledTonalButton(
+            onClick = { com.comfort.app.music.MusicSettings.speed.set(1f); com.comfort.app.music.MusicSettings.pitch.set(1f) },
+            enabled = speed != 1f || pitch != 1f,
+            modifier = Modifier.align(Alignment.End),
+        ) { Text(stringResource(R.string.reset_to_normal), fontFamily = com.comfort.app.theme.HeaderFontFamily) }
+    }
+}
+
+/** A 0.5–2× slider in 0.05 steps, its value beside its name. */
+@Composable
+private fun FactorSlider(label: String, value: Float, onChange: (Float) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), modifier = Modifier.weight(1f))
+            Text(formatFactor(value), style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
+        }
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = { onChange((Math.round(it * 20f) / 20f).coerceIn(0.5f, 2f)) },
+            valueRange = 0.5f..2f,
+        )
+    }
+}
+
+/** The player's settings (Now Playing › ⋮ › Settings): playback, sound, lyrics and the queue. */
+@Composable
+private fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean) -> Unit, onDismiss: () -> Unit) {
+    val m = com.comfort.app.music.MusicSettings
+    val context = LocalContext.current
+    PlayerSheet(stringResource(R.string.music_settings), onDismiss) {
+        SettingsGroup(stringResource(R.string.music_group_playback))
+        SettingSwitch(stringResource(R.string.skip_silence), stringResource(R.string.skip_silence_subtitle), m.skipSilence)
+        val fade by m.fadeSeconds.value.collectAsState()
+        SettingRow(stringResource(R.string.fade_between), stringResource(R.string.fade_between_subtitle)) {
+            Text(if (fade == 0) stringResource(R.string.subtitles_off_short) else stringResource(R.string.x_seconds_short, fade), style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
+        }
+        androidx.compose.material3.Slider(value = fade.toFloat(), onValueChange = { m.fadeSeconds.set(Math.round(it)) }, valueRange = 0f..12f, steps = 11)
+        SettingSwitch(stringResource(R.string.resume_after_interruption), stringResource(R.string.resume_after_interruption_subtitle), m.resumeAfterInterruption)
+        SettingSwitch(stringResource(R.string.pause_on_disconnect), stringResource(R.string.pause_on_disconnect_subtitle), m.pauseOnDisconnect)
+
+        SettingsGroup(stringResource(R.string.music_group_sound))
+        val sessionId by m.audioSessionId.collectAsState()
+        SettingRow(
+            stringResource(R.string.equalizer),
+            stringResource(R.string.equalizer_subtitle),
+            onClick = {
+                val panel = android.content.Intent(android.media.audiofx.AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL)
+                    .putExtra(android.media.audiofx.AudioEffect.EXTRA_AUDIO_SESSION, sessionId)
+                    .putExtra(android.media.audiofx.AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                    .putExtra(android.media.audiofx.AudioEffect.EXTRA_CONTENT_TYPE, android.media.audiofx.AudioEffect.CONTENT_TYPE_MUSIC)
+                val opened = runCatching { context.startActivity(panel) }.isSuccess
+                if (!opened) android.widget.Toast.makeText(context, R.string.no_equalizer, android.widget.Toast.LENGTH_SHORT).show()
+            },
+        ) {}
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            SettingSwitch(stringResource(R.string.volume_levelling), stringResource(R.string.volume_levelling_subtitle), m.volumeLevelling)
+        }
+
+        SettingsGroup(stringResource(R.string.lyrics))
+        SettingRow(stringResource(R.string.lyric_lines), stringResource(R.string.lyric_lines_subtitle), onClick = { onLyricLineChange(!lyricLine) }) {
+            androidx.compose.material3.Switch(checked = lyricLine, onCheckedChange = null)
+        }
+        // The full lyrics' size, as pinching them sets it (LyricsView's "lyrics_zoom").
+        val zoomPrefs = remember { context.getSharedPreferences("music_player", android.content.Context.MODE_PRIVATE) }
+        var zoom by remember { mutableStateOf(zoomPrefs.getFloat("lyrics_zoom", 1f).coerceIn(0.7f, 1.8f)) }
+        SettingRow(stringResource(R.string.lyrics_text_size), null) {
+            Text("${Math.round(zoom * 100)}%", style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
+        }
+        androidx.compose.material3.Slider(
+            value = zoom,
+            onValueChange = { zoom = (Math.round(it * 20f) / 20f).coerceIn(0.7f, 1.8f) },
+            onValueChangeFinished = { zoomPrefs.edit().putFloat("lyrics_zoom", zoom).apply() },
+            valueRange = 0.7f..1.8f,
+        )
+
+        SettingsGroup(stringResource(R.string.queue))
+        SettingSwitch(stringResource(R.string.previous_restarts), stringResource(R.string.previous_restarts_subtitle), m.previousRestarts)
+        SettingSwitch(stringResource(R.string.play_tapped_only), stringResource(R.string.play_tapped_only_subtitle), m.playTappedOnly)
+        SettingSwitch(stringResource(R.string.keep_queue), stringResource(R.string.keep_queue_subtitle), m.keepQueue)
+    }
+}
+
+@Composable
+private fun SettingsGroup(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+    )
+}
+
+/** A setting's name and what it does, with [trailing] at its end; a tap target when [onClick] is set. */
+@Composable
+private fun SettingRow(title: String, subtitle: String?, onClick: (() -> Unit)? = null, trailing: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily))
+            subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Spacer(Modifier.size(12.dp))
+        trailing()
+    }
+}
+
+@Composable
+private fun SettingSwitch(title: String, subtitle: String, setting: com.comfort.app.music.MusicSettings.Setting<Boolean>) {
+    val on by setting.value.collectAsState()
+    SettingRow(title, subtitle, onClick = { setting.set(!on) }) {
+        androidx.compose.material3.Switch(checked = on, onCheckedChange = null)
+    }
+}
+
+/** What a song's file is: its name and where it's saved, format, length, bitrate, sample rate and
+ * size (Auxio's "Song properties"). */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun SongPropertiesSheet(song: Song, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val props by androidx.compose.runtime.produceState<List<Pair<Int, String>>?>(null, song.uri) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { songProperties(context, song.uri) }
+    }
+    InWindowSheet(onDismiss = onDismiss) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
+            Text(
+                stringResource(R.string.song_properties),
+                style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                fontWeight = FontWeight.Bold,
             )
+            Spacer(Modifier.height(16.dp))
+            props?.forEach { (label, value) ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text(stringResource(label), style = MaterialTheme.typography.labelLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(2.dp))
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(value, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
         }
+    }
+}
+
+/** The song file's properties, labelled; those that can't be read are left out. */
+private fun songProperties(context: android.content.Context, uri: android.net.Uri): List<Pair<Int, String>> {
+    var name: String? = null
+    var folder: String? = null
+    var size: Long? = null
+    runCatching {
+        val cols = buildList {
+            add(android.provider.MediaStore.MediaColumns.DISPLAY_NAME)
+            add(android.provider.MediaStore.MediaColumns.SIZE)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) add(android.provider.MediaStore.MediaColumns.RELATIVE_PATH)
+        }.toTypedArray()
+        context.contentResolver.query(uri, cols, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                name = c.getString(0)
+                size = c.getLong(1).takeIf { it > 0 }
+                if (cols.size > 2) folder = c.getString(2)
+            }
+        }
+    }
+    var duration: Long? = null
+    var bitrate: Long? = null
+    var sampleRate: Int? = null
+    val retriever = android.media.MediaMetadataRetriever()
+    runCatching {
+        retriever.setDataSource(context, uri)
+        duration = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        bitrate = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toLongOrNull()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            sampleRate = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)?.toIntOrNull()
+        }
+    }
+    runCatching { retriever.release() }
+    val format = name?.substringAfterLast('.', "")?.takeIf { it.isNotEmpty() && it.length <= 5 }?.uppercase()
+    return buildList {
+        name?.let { add(R.string.prop_file to it) }
+        folder?.let { add(R.string.path to it.trimEnd('/')) }
+        format?.let { add(R.string.prop_format to it) }
+        duration?.takeIf { it > 0 }?.let { ms ->
+            val total = ms / 1000
+            add(R.string.prop_length to if (total >= 3600) "%d:%02d:%02d".format(total / 3600, total % 3600 / 60, total % 60) else "%d:%02d".format(total / 60, total % 60))
+        }
+        bitrate?.takeIf { it > 0 }?.let { add(R.string.prop_bitrate to "${(it + 500) / 1000} kbps") }
+        sampleRate?.takeIf { it > 0 }?.let { hz -> add(R.string.prop_sample_rate to (if (hz % 1000 == 0) "${hz / 1000} kHz" else "%.1f kHz".format(hz / 1000f))) }
+        size?.let { add(R.string.sort_size to android.text.format.Formatter.formatFileSize(context, it)) }
     }
 }
 
@@ -809,3 +1191,41 @@ private fun QueueLayout(
 
 /** In "music_player" (MusicService's prefs, as LyricsView's zoom): whether the lyric lines under the cover are shown. */
 private const val KEY_LYRIC_LINE = "lyric_line"
+
+/** A cover blurred for the player's backdrop: shrunk to 48 px and box-blurred there (three passes,
+ * close to a Gaussian), then drawn scaled up, which smooths it further. Done once per cover, not
+ * on every frame as a blur on the layer was. */
+private object SmallBlur : coil.transform.Transformation {
+    override val cacheKey = "player-backdrop-blur-1"
+
+    override suspend fun transform(input: android.graphics.Bitmap, size: coil.size.Size): android.graphics.Bitmap {
+        val scale = 48f / maxOf(input.width, input.height)
+        val w = (input.width * scale).toInt().coerceAtLeast(1)
+        val h = (input.height * scale).toInt().coerceAtLeast(1)
+        val small = android.graphics.Bitmap.createScaledBitmap(input.copy(android.graphics.Bitmap.Config.ARGB_8888, false), w, h, true)
+        val px = IntArray(w * h)
+        small.getPixels(px, 0, w, 0, 0, w, h)
+        val tmp = IntArray(w * h)
+        repeat(3) {
+            boxBlur(px, tmp, w, h, 3, horizontal = true)
+            boxBlur(tmp, px, w, h, 3, horizontal = false)
+        }
+        return android.graphics.Bitmap.createBitmap(px, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    }
+
+    private fun boxBlur(src: IntArray, dst: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
+        val lines = if (horizontal) h else w
+        val len = if (horizontal) w else h
+        for (line in 0 until lines) {
+            for (i in 0 until len) {
+                var a = 0; var rr = 0; var g = 0; var b = 0; var n = 0
+                for (k in -r..r) {
+                    val j = (i + k).coerceIn(0, len - 1)
+                    val c = src[if (horizontal) line * w + j else j * w + line]
+                    a += c ushr 24; rr += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++
+                }
+                dst[if (horizontal) line * w + i else i * w + line] = ((a / n) shl 24) or ((rr / n) shl 16) or ((g / n) shl 8) or (b / n)
+            }
+        }
+    }
+}
