@@ -913,7 +913,15 @@ internal fun ShapedThumbnail(item: DownloadEntity, shape: Shape, emptyColor: Col
         }
         val painter = coil.compose.rememberAsyncImagePainter(request, contentScale = ContentScale.Crop)
         val state = painter.state
-        val bitmap = ((state as? coil.compose.AsyncImagePainter.State.Success)?.result?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+        // Already in memory (scrolled away and back): drawn from there in the card's first frame.
+        // The loader only hands it back a frame or more later, and the card showed empty until it
+        // did — thumbnails blinking out on a quick scroll down and back up.
+        val cached = remember(item.id, item.thumbnailPath, item.mediaUri) {
+            runCatching {
+                coil.Coil.imageLoader(context).memoryCache?.get(coil.memory.MemoryCache.Key(com.comfort.app.util.thumbnailCacheKey(item.id)))?.bitmap
+            }.getOrNull()
+        }
+        val bitmap = ((state as? coil.compose.AsyncImagePainter.State.Success)?.result?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: cached
         androidx.compose.foundation.layout.Spacer(
             Modifier
                 .fillMaxSize()
