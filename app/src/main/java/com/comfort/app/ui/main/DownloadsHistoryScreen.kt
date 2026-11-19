@@ -97,6 +97,7 @@ import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -690,12 +691,31 @@ fun DownloadsHistoryScreen(
                     // Always wrap in SwipeToDeleteCard — just disable it while selecting.
                     // Keeping the wrapper alive and passing enabled = !selectionMode lets the slot
                     // table stay intact; only drag-gesture handling flips on or off.
+                    // The thumbnail's parallax (LibraryScrollMotion.kt), read as it's drawn.
+                    val parallax = remember(item.id) { { listState.viewportPosition(item.id) } }
+                    // The rise's own clock: from the moment the card starts coming up, ~0.3 s to full,
+                    // so it's seen however fast the list is flung. A card that's already up when it's
+                    // first composed (the list opened, or scrolled back down to it) starts there.
+                    val rise = remember(item.id) { androidx.compose.animation.core.Animatable(0f) }
+                    val riseDensity = androidx.compose.ui.platform.LocalDensity.current
+                    LaunchedEffect(item.id) {
+                        val first = listState.riseProgress(item.id, riseDensity)
+                        if (first != null && first >= 1f) {
+                            rise.snapTo(1f)
+                            return@LaunchedEffect
+                        }
+                        androidx.compose.runtime.snapshotFlow { (listState.riseProgress(item.id, riseDensity) ?: 0f) > 0f }.first { it }
+                        rise.animateTo(1f, tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    }
+                    androidx.compose.runtime.CompositionLocalProvider(LocalThumbnailParallax provides parallax) {
                     SwipeToDeleteCard(
                         onDelete = { requestDelete(setOf(item.id)) },
                         shape = LIBRARY_CARD_SHAPE,
                         enabled = !selectionMode,
                         modifier = Modifier
                             .animateItem(fadeInSpec = null, fadeOutSpec = null)
+                            // Rises in from the bottom edge (LibraryScrollMotion.kt).
+                            .riseIn(listState, item.id) { rise.value }
                             .fillMaxWidth()
                             .wrapContentWidth(Alignment.CenterHorizontally)
                             .widthIn(max = CONTENT_MAX_WIDTH)
@@ -720,6 +740,7 @@ fun DownloadsHistoryScreen(
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
                             onDownloadMissing = { viewModel.retryDownload(item.id) },
                         )
+                    }
                     }
                 }
             }

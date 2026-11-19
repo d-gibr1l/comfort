@@ -922,6 +922,8 @@ internal fun ShapedThumbnail(item: DownloadEntity, shape: Shape, emptyColor: Col
             }.getOrNull()
         }
         val bitmap = ((state as? coil.compose.AsyncImagePainter.State.Success)?.result?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: cached
+        // In the Library list: the picture slides a little against its card as it scrolls.
+        val parallax = LocalThumbnailParallax.current
         androidx.compose.foundation.layout.Spacer(
             Modifier
                 .fillMaxSize()
@@ -933,19 +935,26 @@ internal fun ShapedThumbnail(item: DownloadEntity, shape: Shape, emptyColor: Col
                         is androidx.compose.ui.graphics.Outline.Rounded -> androidx.compose.ui.graphics.Path().apply { addRoundRect(outline.roundRect) }
                         is androidx.compose.ui.graphics.Outline.Rectangle -> androidx.compose.ui.graphics.Path().apply { addRect(outline.rect) }
                     }
-                    val brush = bitmap?.let { b ->
-                        // Centre-cropped to fill, as ContentScale.Crop.
-                        val scale = maxOf(size.width / b.width, size.height / b.height)
-                        val matrix = android.graphics.Matrix().apply {
-                            setScale(scale, scale)
-                            postTranslate((size.width - b.width * scale) / 2f, (size.height - b.height * scale) / 2f)
-                        }
-                        val shader = android.graphics.BitmapShader(b, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
-                            .apply { setLocalMatrix(matrix) }
-                        androidx.compose.ui.graphics.ShaderBrush(shader)
-                    }
+                    // Centre-cropped to fill, as ContentScale.Crop; with parallax, a little larger,
+                    // so there's picture to slide over.
+                    val b = bitmap
+                    val scale = if (b == null) 1f else maxOf(size.width / b.width, size.height / b.height) * (if (parallax != null) 1.18f else 1f)
+                    val slack = if (b == null) 0f else (b.height * scale - size.height) / 2f
+                    val shader = b?.let { android.graphics.BitmapShader(it, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP) }
+                    val brush = shader?.let { androidx.compose.ui.graphics.ShaderBrush(it) }
+                    val matrix = android.graphics.Matrix()
                     onDrawBehind {
-                        if (brush != null) drawPath(path, brush) else drawPath(path, emptyColor)
+                        if (b != null && shader != null && brush != null) {
+                            // Lower on screen, the picture sits higher in its window: moving up, it
+                            // lags behind the card.
+                            val shift = -(parallax?.invoke() ?: 0f) * slack
+                            matrix.setScale(scale, scale)
+                            matrix.postTranslate((size.width - b.width * scale) / 2f, (size.height - b.height * scale) / 2f + shift)
+                            shader.setLocalMatrix(matrix)
+                            drawPath(path, brush)
+                        } else {
+                            drawPath(path, emptyColor)
+                        }
                     }
                 },
         )
