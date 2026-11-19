@@ -1,0 +1,9 @@
+Comfort is a fast, full-featured media and music downloader for Android built with Jetpack Compose (Material 3 Expressive). It supports downloading videos, images, galleries, and songs with real quality, format, and trim control.
+
+<b>Key Features</b>
+• <b>Video & Gallery Downloads:</b> Download from hundreds of sites using gallery-dl, yt-dlp, and Instaloader with automatic engine routing.
+• <b>Music & Lyrics:</b> Download audio tracks with automatic metadata tagging, album art, and synchronized LRC lyrics (powered by LRCLIB).
+• <b>Built-in Music Player:</b> Background audio playback with synchronized lyrics support and media session integration.
+• <b>Queue Management:</b> Pause, resume, and schedule downloads with configurable concurrency and scheduled download windows.
+• <b>In-App Trimmer:</b> Trim videos or audio clips before downloading.
+• <b>Complete Privacy:</b> 100% free and open-source software (GPLv3). Zero tracking, zero ads, zero analytics, and no Google Play Services required.
