@@ -152,8 +152,8 @@
     <string name="music_group_playback">التشغيل</string>
     <string name="skip_silence">تخطي الصمت</string>
     <string name="skip_silence_subtitle">يتجاوز المقاطع الصامتة، مثل الهدوء في نهاية كثير من المقاطع.</string>
-    <string name="fade_between">التلاشي بين الأغاني</string>
-    <string name="fade_between_subtitle">تتلاشى كل أغنية وتظهر التالية تدريجيًا.</string>
+    <string name="fade_between">التلاشي المتداخل</string>
+    <string name="fade_between_subtitle">تبدأ الأغنية التالية تدريجيًا بينما تتلاشى الحالية.</string>
     <string name="x_seconds_short">%1$d ث</string>
     <string name="resume_after_interruption">الاستئناف بعد فيديو أو مكالمة</string>
     <string name="resume_after_interruption_subtitle">يستمر التشغيل بعد انتهاء ما أوقف الموسيقى.</string>

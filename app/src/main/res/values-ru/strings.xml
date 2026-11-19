@@ -176,8 +176,8 @@
     <string name="music_group_playback">Воспроизведение</string>
     <string name="skip_silence">Пропускать тишину</string>
     <string name="skip_silence_subtitle">Перескакивает тихие участки, например в конце многих загрузок.</string>
-    <string name="fade_between">Плавный переход</string>
-    <string name="fade_between_subtitle">Каждый трек плавно затихает, а следующий плавно начинается.</string>
+    <string name="fade_between">Кроссфейд</string>
+    <string name="fade_between_subtitle">Следующий трек плавно начинается, пока этот затихает.</string>
     <string name="x_seconds_short">%1$d с</string>
     <string name="resume_after_interruption">Продолжать после видео или звонка</string>
     <string name="resume_after_interruption_subtitle">Играет дальше, когда закончится то, что поставило музыку на паузу.</string>

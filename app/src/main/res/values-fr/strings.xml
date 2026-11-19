@@ -172,8 +172,8 @@
     <string name="music_group_playback">Lecture</string>
     <string name="skip_silence">Ignorer les silences</string>
     <string name="skip_silence_subtitle">Saute les passages silencieux, comme la fin de nombreuses vidéos.</string>
-    <string name="fade_between">Fondu entre les titres</string>
-    <string name="fade_between_subtitle">Chaque titre s\'efface et le suivant arrive en fondu.</string>
+    <string name="fade_between">Fondu enchaîné</string>
+    <string name="fade_between_subtitle">Le titre suivant arrive pendant que celui-ci s\'efface.</string>
     <string name="x_seconds_short">%1$d s</string>
     <string name="resume_after_interruption">Reprendre après une vidéo ou un appel</string>
     <string name="resume_after_interruption_subtitle">Reprend la lecture une fois l\'interruption terminée.</string>

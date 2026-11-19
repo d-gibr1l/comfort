@@ -22,7 +22,8 @@ object MusicSettings {
 
     /** Jumps over silent stretches (ExoPlayer's skip silence). */
     val skipSilence = bool("skip_silence", false)
-    /** Seconds each song fades out at its end and the next fades in; 0 is off. */
+    /** Seconds the end of each song and the start of the next play over each other, one fading
+     * out as the other fades in (a crossfade); 0 is off. */
     val fadeSeconds = int("fade_seconds", 0)
     /** Plays on after a video with sound or a call paused the music. */
     val resumeAfterInterruption = bool("resume_after_interruption", true)

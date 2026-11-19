@@ -152,8 +152,8 @@
     <string name="music_group_playback">Oynatma</string>
     <string name="skip_silence">Sessizliği atla</string>
     <string name="skip_silence_subtitle">Birçok yüklemenin sonundaki gibi sessiz bölümleri atlar.</string>
-    <string name="fade_between">Şarkılar arası geçiş</string>
-    <string name="fade_between_subtitle">Her şarkı yavaşça kısılır, sonraki yavaşça başlar.</string>
+    <string name="fade_between">Çapraz geçiş</string>
+    <string name="fade_between_subtitle">Bu şarkı kısılırken sonraki şarkı yavaşça başlar.</string>
     <string name="x_seconds_short">%1$d sn</string>
     <string name="resume_after_interruption">Video veya aramadan sonra devam et</string>
     <string name="resume_after_interruption_subtitle">Müziği durduran şey bitince çalmaya devam eder.</string>

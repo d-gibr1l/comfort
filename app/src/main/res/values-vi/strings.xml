@@ -152,8 +152,8 @@
     <string name="music_group_playback">Phát</string>
     <string name="skip_silence">Bỏ qua khoảng lặng</string>
     <string name="skip_silence_subtitle">Bỏ qua đoạn im lặng, như phần cuối của nhiều video tải lên.</string>
-    <string name="fade_between">Chuyển mờ giữa các bài</string>
-    <string name="fade_between_subtitle">Mỗi bài nhỏ dần và bài tiếp theo to dần.</string>
+    <string name="fade_between">Chuyển tiếp chồng</string>
+    <string name="fade_between_subtitle">Bài tiếp theo to dần trong khi bài này nhỏ dần.</string>
     <string name="x_seconds_short">%1$d giây</string>
     <string name="resume_after_interruption">Tiếp tục sau video hoặc cuộc gọi</string>
     <string name="resume_after_interruption_subtitle">Phát tiếp khi thứ làm dừng nhạc kết thúc.</string>

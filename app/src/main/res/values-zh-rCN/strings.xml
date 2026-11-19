@@ -152,8 +152,8 @@
     <string name="music_group_playback">播放</string>
     <string name="skip_silence">跳过静音</string>
     <string name="skip_silence_subtitle">跳过无声片段，例如许多上传内容结尾的静音。</string>
-    <string name="fade_between">歌曲间淡入淡出</string>
-    <string name="fade_between_subtitle">每首歌渐弱结束，下一首渐强开始。</string>
+    <string name="fade_between">交叉淡入淡出</string>
+    <string name="fade_between_subtitle">本曲渐弱时，下一首渐强开始。</string>
     <string name="x_seconds_short">%1$d 秒</string>
     <string name="resume_after_interruption">视频或通话后继续</string>
     <string name="resume_after_interruption_subtitle">让音乐暂停的内容结束后继续播放。</string>

@@ -152,8 +152,8 @@
     <string name="music_group_playback">הפעלה</string>
     <string name="skip_silence">דילוג על שקט</string>
     <string name="skip_silence_subtitle">מדלג על קטעים שקטים, כמו בסוף העלאות רבות.</string>
-    <string name="fade_between">מעבר הדרגתי בין שירים</string>
-    <string name="fade_between_subtitle">כל שיר דועך והבא נכנס בהדרגה.</string>
+    <string name="fade_between">מעבר מוצלב</string>
+    <string name="fade_between_subtitle">השיר הבא נכנס בהדרגה בזמן שהשיר הזה דועך.</string>
     <string name="x_seconds_short">%1$d ש׳</string>
     <string name="resume_after_interruption">המשך אחרי סרטון או שיחה</string>
     <string name="resume_after_interruption_subtitle">ממשיך לנגן כשמה שהשהה את המוזיקה מסתיים.</string>

@@ -152,8 +152,8 @@
     <string name="music_group_playback">پخش</string>
     <string name="skip_silence">رد شدن از سکوت</string>
     <string name="skip_silence_subtitle">از بخش‌های بی‌صدا، مثل سکوت پایان بسیاری از ویدیوها، می‌گذرد.</string>
-    <string name="fade_between">محو شدن بین آهنگ‌ها</string>
-    <string name="fade_between_subtitle">هر آهنگ آرام محو می‌شود و بعدی آرام شروع می‌شود.</string>
+    <string name="fade_between">محو متقاطع</string>
+    <string name="fade_between_subtitle">آهنگ بعدی آرام شروع می‌شود در حالی که این یکی محو می‌شود.</string>
     <string name="x_seconds_short">%1$d ث</string>
     <string name="resume_after_interruption">ادامه پس از ویدیو یا تماس</string>
     <string name="resume_after_interruption_subtitle">وقتی چیزی که موسیقی را متوقف کرده تمام شود، پخش ادامه می‌یابد.</string>

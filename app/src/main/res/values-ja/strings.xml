@@ -152,8 +152,8 @@
     <string name="music_group_playback">再生</string>
     <string name="skip_silence">無音をスキップ</string>
     <string name="skip_silence_subtitle">多くのアップロードの終わりにある無音などを飛ばします。</string>
-    <string name="fade_between">曲間のフェード</string>
-    <string name="fade_between_subtitle">曲がフェードアウトし、次の曲がフェードインします。</string>
+    <string name="fade_between">クロスフェード</string>
+    <string name="fade_between_subtitle">この曲がフェードアウトする間に次の曲がフェードインします。</string>
     <string name="x_seconds_short">%1$d 秒</string>
     <string name="resume_after_interruption">動画や通話の後に再開</string>
     <string name="resume_after_interruption_subtitle">音楽を止めたものが終わると再生を続けます。</string>

@@ -169,8 +169,8 @@
     <string name="music_group_playback">Reproducción</string>
     <string name="skip_silence">Omitir silencios</string>
     <string name="skip_silence_subtitle">Salta los tramos en silencio, como el final de muchas subidas.</string>
-    <string name="fade_between">Fundido entre canciones</string>
-    <string name="fade_between_subtitle">Cada canción se desvanece y la siguiente entra poco a poco.</string>
+    <string name="fade_between">Fundido cruzado</string>
+    <string name="fade_between_subtitle">La siguiente canción entra mientras esta se desvanece.</string>
     <string name="x_seconds_short">%1$d s</string>
     <string name="resume_after_interruption">Reanudar tras un vídeo o una llamada</string>
     <string name="resume_after_interruption_subtitle">Sigue sonando cuando termina lo que pausó la música.</string>

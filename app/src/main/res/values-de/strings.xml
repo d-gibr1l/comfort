@@ -166,7 +166,7 @@
     <string name="skip_silence">Stille überspringen</string>
     <string name="skip_silence_subtitle">Überspringt stille Stellen, etwa am Ende vieler Uploads.</string>
     <string name="fade_between">Überblenden</string>
-    <string name="fade_between_subtitle">Jeder Song wird aus- und der nächste eingeblendet.</string>
+    <string name="fade_between_subtitle">Der nächste Song wird eingeblendet, während dieser ausgeblendet wird.</string>
     <string name="x_seconds_short">%1$d s</string>
     <string name="resume_after_interruption">Nach Video oder Anruf fortsetzen</string>
     <string name="resume_after_interruption_subtitle">Spielt weiter, sobald das vorbei ist, was die Musik pausiert hat.</string>

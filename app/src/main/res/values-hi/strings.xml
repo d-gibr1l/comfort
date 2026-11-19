@@ -152,8 +152,8 @@
     <string name="music_group_playback">प्लेबैक</string>
     <string name="skip_silence">खामोशी छोड़ें</string>
     <string name="skip_silence_subtitle">खामोश हिस्सों को छोड़ देता है, जैसे कई अपलोड के अंत की खामोशी।</string>
-    <string name="fade_between">गानों के बीच फ़ेड</string>
-    <string name="fade_between_subtitle">हर गाना धीरे से खत्म होता है और अगला धीरे से शुरू।</string>
+    <string name="fade_between">क्रॉसफ़ेड</string>
+    <string name="fade_between_subtitle">यह गाना धीमा होते हुए अगला गाना धीरे से शुरू होता है।</string>
     <string name="x_seconds_short">%1$d से.</string>
     <string name="resume_after_interruption">वीडियो या कॉल के बाद फिर चलाएँ</string>
     <string name="resume_after_interruption_subtitle">संगीत रोकने वाली चीज़ खत्म होते ही फिर से चलता है।</string>

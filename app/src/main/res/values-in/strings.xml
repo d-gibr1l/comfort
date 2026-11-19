@@ -164,8 +164,8 @@
     <string name="music_group_playback">Pemutaran</string>
     <string name="skip_silence">Lewati senyap</string>
     <string name="skip_silence_subtitle">Melompati bagian senyap, seperti di akhir banyak unggahan.</string>
-    <string name="fade_between">Pudar antar lagu</string>
-    <string name="fade_between_subtitle">Setiap lagu memudar dan lagu berikutnya masuk perlahan.</string>
+    <string name="fade_between">Crossfade</string>
+    <string name="fade_between_subtitle">Lagu berikutnya masuk perlahan saat lagu ini memudar.</string>
     <string name="x_seconds_short">%1$d dtk</string>
     <string name="resume_after_interruption">Lanjutkan setelah video atau panggilan</string>
     <string name="resume_after_interruption_subtitle">Lanjut diputar setelah yang menjeda musik selesai.</string>

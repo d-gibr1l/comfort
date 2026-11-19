@@ -178,8 +178,8 @@
     <string name="music_group_playback">Playback</string>
     <string name="skip_silence">Skip silence</string>
     <string name="skip_silence_subtitle">Jumps over silent stretches, like the quiet at the end of many uploads.</string>
-    <string name="fade_between">Fade between songs</string>
-    <string name="fade_between_subtitle">Each song fades out and the next fades in.</string>
+    <string name="fade_between">Crossfade</string>
+    <string name="fade_between_subtitle">The next song fades in as this one fades out.</string>
     <string name="x_seconds_short">%1$d s</string>
     <string name="resume_after_interruption">Resume after a video or call</string>
     <string name="resume_after_interruption_subtitle">Plays on once whatever paused the music is over.</string>

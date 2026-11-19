@@ -147,13 +147,23 @@ class MusicService : MediaSessionService() {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            // Into the next song by itself: it fades in (Fade between songs).
-            fadingIn = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+            // Into the next song by itself, or by the crossfade's own move on: it fades in. Anything
+            // else (a skip, a pick in the queue) cuts the crossfade's tail short.
+            if (crossfadeSkip) {
+                crossfadeSkip = false
+                fadingIn = false
+            } else {
+                fadingIn = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+                endTail()
+            }
             save()
             updateWidget()
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // Paused mid-crossfade: the old song's tail stops with it (it isn't picked up again).
+            // Not on isPlaying: that's false for a moment as the next song loads, the crossfade's own.
+            if (!playWhenReady) endTail()
             // The sleep timer's "End of song" has stopped the music: it's done.
             if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM && MusicSettings.sleepAtEndOfSong.value) {
                 MusicSettings.clearSleepTimer()
@@ -163,6 +173,12 @@ class MusicService : MediaSessionService() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             save()
             updateWidget()
+        }
+
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            // A seek within the song: a tail readied for where it was is dropped (one already playing
+            // is the crossfade's own move on, or ended by the change of song).
+            if (reason == Player.DISCONTINUITY_REASON_SEEK && tailStartedAt == 0L) endTail()
         }
         override fun onRepeatModeChanged(repeatMode: Int) = save()
         override fun onAudioSessionIdChanged(audioSessionId: Int) {
@@ -298,6 +314,77 @@ class MusicService : MediaSessionService() {
 
     /** Whether the song on came in by itself after the last one, so fades in. */
     private var fadingIn = false
+
+    // --- Crossfade ---------------------------------------------------------------------------------
+    // The player plays one song at a time, so the end of the one going out is played by a second
+    // player ("the tail"): readied a few seconds before, paused at the point the crossfade starts;
+    // there it plays on, fading out, while the main player moves to the next song and fades it in.
+    private var tail: ExoPlayer? = null
+    private var tailFor: String? = null
+    // When the tail started playing (silent, a moment ahead of the crossfade) and when the
+    // crossfade itself began; 0 before.
+    private var tailRollingAt = 0L
+    private var tailStartedAt = 0L
+    private var crossfadeSkip = false
+    private var crossfade: android.animation.ValueAnimator? = null
+
+    /** Stops and lets go of the tail, whatever it was doing; the song on back at full volume. */
+    private fun endTail() {
+        crossfade?.let { it.removeAllUpdateListeners(); it.removeAllListeners(); it.cancel() }
+        if (crossfade != null) exo?.volume = 1f
+        crossfade = null
+        tail?.let { runCatching { it.release() } }
+        tail = null
+        tailFor = null
+        tailRollingAt = 0L
+        tailStartedAt = 0L
+    }
+
+    /** The crossfade itself: the next song (the main player, moved on) in, the tail out, along an
+     * equal-power curve (sine in, cosine out) so the two together stay as loud as one song — a
+     * straight line dips in the middle, two unrelated songs each at half adding up to less. Set
+     * every frame by an animator, not in steps. */
+    private fun startCrossfade(main: ExoPlayer, t: ExoPlayer, fadeMs: Long) {
+        crossfade = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = fadeMs
+            interpolator = android.view.animation.LinearInterpolator()
+            addUpdateListener {
+                val v = it.animatedValue as Float
+                val a = v * (Math.PI.toFloat() / 2f)
+                main.volume = kotlin.math.sin(a)
+                t.volume = kotlin.math.cos(a)
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (crossfade === animation) {
+                        crossfade = null
+                        main.volume = 1f
+                        endTail()
+                    }
+                }
+            })
+            start()
+        }
+    }
+
+    /** A tail for [player]'s song, paused at [at] ms, on the same audio session (so the equalizer
+     * and volume levelling apply to it too), speed, pitch and skip silence as the main player. */
+    private fun readyTail(player: ExoPlayer, at: Long) {
+        val item = player.currentMediaItem ?: return
+        endTail()
+        val t = ExoPlayer.Builder(this)
+            // Not its own audio focus: it's the same music, and it would take it from the main player.
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false)
+            .build()
+        runCatching { if (player.audioSessionId != C.AUDIO_SESSION_ID_UNSET) t.setAudioSessionId(player.audioSessionId) }
+        t.playbackParameters = player.playbackParameters
+        t.skipSilenceEnabled = player.skipSilenceEnabled
+        t.setMediaItem(item, at)
+        t.playWhenReady = false
+        t.prepare()
+        tail = t
+        tailFor = item.mediaId
+    }
     private var levelling: android.media.audiofx.DynamicsProcessing? = null
 
     /** Follows the music settings as they change, and runs the sleep timer and the fades. */
@@ -323,16 +410,58 @@ class MusicService : MediaSessionService() {
                 }
                 val fadeMs = MusicSettings.fadeSeconds.current * 1000L
                 val fading = fadeMs > 0 && player.isPlaying
-                player.volume = if (!fading) 1f else {
+                if (!fading) {
+                    player.volume = 1f
+                    if (fadeMs == 0L) endTail()
+                } else {
                     val pos = player.currentPosition
                     val dur = player.duration
-                    // Out at the end only when another song follows (not the very last one).
-                    val out = if (dur > 0 && (player.hasNextMediaItem() || player.repeatMode == Player.REPEAT_MODE_ONE)) {
+                    // Crossfades into a next song (not past the last one, nor a song on repeat, nor
+                    // when the sleep timer stops at the end of this one), and only a song longer
+                    // than two fades.
+                    val canCross = dur > fadeMs * 2 && player.hasNextMediaItem() &&
+                        player.repeatMode != Player.REPEAT_MODE_ONE && !MusicSettings.sleepAtEndOfSong.value
+                    val crossAt = dur - fadeMs
+                    val id = player.currentMediaItem?.mediaId
+                    if (canCross && tailStartedAt == 0L) {
+                        // Readied a few seconds ahead, paused a moment before the crossfade point;
+                        // played from there, silent, so it's already sounding when the crossfade
+                        // starts (an audio track takes a moment to start: started at the crossfade
+                        // itself, the old song went quiet for it).
+                        val preroll = 400L
+                        if (pos >= crossAt - 4000 && pos < crossAt - preroll && tailFor != id) readyTail(player, crossAt - preroll)
+                        val t = tail
+                        if (t != null && tailFor == id) {
+                            if (tailRollingAt == 0L && pos >= crossAt - preroll && t.playbackState == Player.STATE_READY) {
+                                t.volume = 0f
+                                t.play()
+                                tailRollingAt = android.os.SystemClock.elapsedRealtime()
+                            }
+                            if (tailRollingAt != 0L && pos >= crossAt && t.isPlaying) {
+                                tailStartedAt = android.os.SystemClock.elapsedRealtime()
+                                crossfadeSkip = true
+                                player.volume = 0f
+                                t.volume = 1f
+                                player.seekToNextMediaItem()
+                                startCrossfade(player, t, fadeMs)
+                            } else if (pos >= crossAt + 300) {
+                                // Not sounding in time: no crossfade this once (it fades out below).
+                                endTail()
+                                tailFor = id
+                            }
+                        }
+                    }
+                    // Not crossfading (the last song, or the tail not ready in time): faded out at
+                    // its end only when another song follows.
+                    val out = if (tailRollingAt == 0L && dur > 0 && pos >= crossAt && (player.hasNextMediaItem() || player.repeatMode == Player.REPEAT_MODE_ONE)) {
                         ((dur - pos).toFloat() / fadeMs).coerceIn(0f, 1f)
                     } else 1f
-                    val inn = if (fadingIn) (pos.toFloat() / fadeMs).coerceIn(0f, 1f) else 1f
-                    if (fadingIn && pos >= fadeMs) fadingIn = false
-                    minOf(out, inn)
+                    // The position from before any move on just now: the song that came in starts at 0.
+                    val now = if (fadingIn) player.currentPosition else pos
+                    val inn = if (fadingIn) (now.toFloat() / fadeMs).coerceIn(0f, 1f) else 1f
+                    if (fadingIn && now >= fadeMs) fadingIn = false
+                    // During the crossfade its animator sets the volumes.
+                    if (crossfade == null) player.volume = minOf(out, inn)
                 }
                 kotlinx.coroutines.delay(if (fading) 50 else if (sleepAt != null) 1000 else 500)
             }
@@ -405,6 +534,7 @@ class MusicService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        endTail()
         save()
         closeAudioEffectSession()
         levelling?.let { runCatching { it.release() } }
