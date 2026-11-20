@@ -258,6 +258,13 @@ object GalleryDlListing {
     private val listingCache = java.util.concurrent.ConcurrentHashMap<String, CachedListing>()
     private const val LISTING_CACHE_MS = 20 * 60 * 1000L
 
+    // The picker first enumerates items and then asks for the preview card. Both need the same
+    // yt-dlp extraction; keeping its parsed JSON briefly avoids a second network round-trip and
+    // another Python process for the exact same URL/playlist page.
+    private data class CachedYtDlpInfo(val info: JSONObject, val atMs: Long)
+    private val ytDlpInfoCache = java.util.concurrent.ConcurrentHashMap<String, CachedYtDlpInfo>()
+    private const val YTDLP_INFO_CACHE_MS = 2 * 60 * 1000L
+
     /** [resources]: the language its explanations (EngineErrors) and generic "not usable" line are
      * in; without, the engine's own text or English (enough for callers that only check whether
      * the message changed). */
@@ -861,6 +868,11 @@ object GalleryDlListing {
     }
 
     private suspend fun runYtDlpListInfo(context: Context, url: String, onStatus: ((String) -> Unit)? = null, limit: Int? = null): JSONObject? {
+        val cacheKey = url + "|" + (limit ?: 0)
+        ytDlpInfoCache[cacheKey]?.let { cached ->
+            if (System.currentTimeMillis() - cached.atMs < YTDLP_INFO_CACHE_MS) return cached.info
+            ytDlpInfoCache.remove(cacheKey, cached)
+        }
         val extraArgs = GalleryDlPreferences.getExtraArgsFor(context, DownloadEngine.YT_DLP)
         // Same JS-challenge runtime the real download() call gets — without it, extraction on
         // sites that require solving one (Instagram, YouTube, ...) fails outright rather than
@@ -904,10 +916,18 @@ object GalleryDlListing {
                 lines.lastOrNull { it.isNotBlank() }
             }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return null
     
-            return runCatching { JSONObject(lastLine.trim()) }.getOrElse {
-                android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
+            val parsed = runCatching { JSONObject(lastLine.trim()) }.getOrElse {
+                android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\\n${lines.joinToString("\\n")}", it)
                 null
             }
+            if (parsed != null && !parsed.has("error")) {
+                if (ytDlpInfoCache.size >= 32) {
+                    val oldest = ytDlpInfoCache.entries.minByOrNull { it.value.atMs }?.key
+                    if (oldest != null) ytDlpInfoCache.remove(oldest)
+                }
+                ytDlpInfoCache[cacheKey] = CachedYtDlpInfo(parsed, System.currentTimeMillis())
+            }
+            parsed
         } finally {
             tempCookieFile?.delete()
         }
