@@ -891,7 +891,7 @@ object GalleryDlListing {
 
 
         val (cookiesArg, tempCookieFile) = effectiveCookiesPath(context)
-        try {
+        return try {
             // list_info()'s own json.dumps() call is the *last* thing list()'s __main__ branch ever
             // prints (see yt_dlp_wrapper.py) - but PythonRuntime.run() merges the subprocess's stderr
             // into this same stream (redirectErrorStream(true)), and "no_warnings"/the try/except
