@@ -5,6 +5,9 @@ import com.comfort.app.data.AppDatabase
 import com.comfort.app.data.EngineUpdateChannel
 import com.comfort.app.data.GalleryDlPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -325,25 +328,31 @@ object EngineUpdater {
     }
 
     suspend fun checkAll(context: Context): List<VersionStatus> = withContext(Dispatchers.IO) {
-        ALL.map { engine ->
-            val channel = channelFor(context, engine)
-            val installed = installedVersion(context, engine)
-            val latest = when (channel) {
-                EngineUpdateChannel.STABLE -> fetchLatestStable(engine)
-                EngineUpdateChannel.BLEEDING_EDGE -> when (engine) {
-                    YT_DLP -> fetchLatestYtDlpNightly()
-                    INSTALOADER -> fetchLatestInstaloaderMaster()
-                    else -> fetchLatestGalleryDlMaster()
+        // The three metadata endpoints (PyPI, GitHub and Codeberg) are independent. Fetch them
+        // concurrently so a slow host cannot hold up the other engines' update status.
+        coroutineScope {
+            ALL.map { engine ->
+                async {
+                    val channel = channelFor(context, engine)
+                    val installed = installedVersion(context, engine)
+                    val latest = when (channel) {
+                        EngineUpdateChannel.STABLE -> fetchLatestStable(engine)
+                        EngineUpdateChannel.BLEEDING_EDGE -> when (engine) {
+                            YT_DLP -> fetchLatestYtDlpNightly()
+                            INSTALOADER -> fetchLatestInstaloaderMaster()
+                            else -> fetchLatestGalleryDlMaster()
+                        }
+                        // Offered for yt-dlp only (EngineChannelPicker); for the others it's what
+                        // BLEEDING_EDGE already is.
+                        EngineUpdateChannel.MASTER -> when (engine) {
+                            YT_DLP -> fetchLatestYtDlpNightly("yt-dlp/yt-dlp-master-builds")
+                            INSTALOADER -> fetchLatestInstaloaderMaster()
+                            else -> fetchLatestGalleryDlMaster()
+                        }
+                    }
+                    VersionStatus(engine, channel, installed, latest?.version, latest?.artifactUrl, latest?.artifactKind, latest?.sha256)
                 }
-                // Offered for yt-dlp only (EngineChannelPicker); for the others it's what
-                // BLEEDING_EDGE already is.
-                EngineUpdateChannel.MASTER -> when (engine) {
-                    YT_DLP -> fetchLatestYtDlpNightly("yt-dlp/yt-dlp-master-builds")
-                    INSTALOADER -> fetchLatestInstaloaderMaster()
-                    else -> fetchLatestGalleryDlMaster()
-                }
-            }
-            VersionStatus(engine, channel, installed, latest?.version, latest?.artifactUrl, latest?.artifactKind, latest?.sha256)
+            }.awaitAll()
         }
     }
 
