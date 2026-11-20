@@ -917,7 +917,7 @@ object GalleryDlListing {
             }.onFailure { if (it is CancellationException) throw it }.getOrNull() ?: return null
     
             val parsed = runCatching { JSONObject(lastLine.trim()) }.getOrElse {
-                android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\\n${lines.joinToString("\\n")}", it)
+                android.util.Log.w("GalleryDlListing", "Failed to parse yt-dlp JSON while listing $url (all ${lines.size} lines):\n${lines.joinToString("\n")}", it)
                 null
             }
             if (parsed != null && !parsed.has("error")) {
