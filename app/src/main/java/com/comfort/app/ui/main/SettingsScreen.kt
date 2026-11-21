@@ -605,7 +605,12 @@ internal fun SettingsListRow(
             // spacing fix available.
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = onContainerColor, fontWeight = FontWeight.SemiBold)
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                    color = onContainerColor,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 if (summary != null) {
                     Spacer(Modifier.height(2.dp))
                     Text(

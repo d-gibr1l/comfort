@@ -1350,7 +1350,7 @@ object GalleryDlPreferences {
      * time. "" means disabled (the default — matches YTDLnis's own default of unset/disabled). See
      * StagingCleanupWorker. */
     fun getCleanupLeftoverInterval(context: Context): String {
-        return prefs(context).getString(KEY_CLEANUP_LEFTOVER_INTERVAL, "") ?: ""
+        return prefs(context).getString(KEY_CLEANUP_LEFTOVER_INTERVAL, "weekly") ?: "weekly"
     }
 
     fun setCleanupLeftoverInterval(context: Context, interval: String) {

@@ -783,7 +783,7 @@ fun DownloadsHistoryScreen(
                         }
                     }
                 },
-                shape = androidx.compose.material3.MaterialShapes.Arch.toShape(),
+                shape = com.comfort.app.theme.ContinuousCapsuleShape,
             ) {
                 Icon(Icons.Outlined.ArrowUpward, contentDescription = stringResource(R.string.scroll_to_top))
             }

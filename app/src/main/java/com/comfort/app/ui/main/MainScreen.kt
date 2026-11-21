@@ -1631,7 +1631,13 @@ fun HomeScreen(
                 }
             },
             icon = { Icon(Icons.Outlined.ContentPaste, contentDescription = null) },
-            text = { Text(if (clipboardSuggestion != null) stringResource(R.string.paste_copied_link) else stringResource(R.string.paste)) },
+            text = {
+                Text(
+                    if (clipboardSuggestion != null) stringResource(R.string.paste_copied_link) else stringResource(R.string.paste),
+                    fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                )
+            },
+            shape = com.comfort.app.theme.ContinuousCapsuleShape,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = navBarClearance(), end = 24.dp),

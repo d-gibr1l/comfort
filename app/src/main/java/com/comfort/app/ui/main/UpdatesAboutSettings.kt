@@ -1048,7 +1048,11 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
         AppIconTile(size = 32.dp)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text("Comfort", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "Comfort",
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 "v${status.installedVersion}",
                 style = MaterialTheme.typography.bodySmall,
@@ -1221,7 +1225,11 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
             Spacer(Modifier.width(12.dp))
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                status.engine.displayName,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 status.installedVersion?.let { "v$it" } ?: stringResource(R.string.version_unknown),
                 style = MaterialTheme.typography.bodySmall,
@@ -1276,7 +1284,11 @@ private fun EngineCard(
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(status.engine.displayName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        status.engine.displayName,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     Text(
                         status.installedVersion?.let { "v$it" } ?: stringResource(R.string.version_unknown),
                         style = MaterialTheme.typography.bodySmall,

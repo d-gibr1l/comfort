@@ -536,7 +536,8 @@ fun WebBrowser(
                                     ExtendedFloatingActionButton(
                                         onClick = { primaryAction.onClick(currentUrl) },
                                         icon = { Icon(primaryAction.icon, contentDescription = null) },
-                                        text = { Text(primaryAction.label) },
+                                        text = { Text(primaryAction.label, fontFamily = com.comfort.app.theme.HeaderFontFamily) },
+                                        shape = com.comfort.app.theme.ContinuousCapsuleShape,
                                         containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
                                         elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
                                     )
@@ -547,7 +548,8 @@ fun WebBrowser(
                                     ExtendedFloatingActionButton(
                                         onClick = { mediaSheetOpen = true },
                                         icon = { Icon(Icons.Outlined.Download, contentDescription = null) },
-                                        text = { Text(stringResource(R.string.search_download)) },
+                                        text = { Text(stringResource(R.string.search_download), fontFamily = com.comfort.app.theme.HeaderFontFamily) },
+                                        shape = com.comfort.app.theme.ContinuousCapsuleShape,
                                         containerColor = BottomAppBarDefaults.bottomAppBarFabColor,
                                         elevation = FloatingActionButtonDefaults.bottomAppBarFabElevation(),
                                     )

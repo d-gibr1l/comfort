@@ -249,6 +249,19 @@ class DownloadWorker(
         return title.startsWith(parts[0]) && title.endsWith(parts[1]) && title.length > parts[0].length + parts[1].length
     }
 
+    override suspend fun getForegroundInfo(): ForegroundInfo = createForegroundInfo()
+
+    private fun createForegroundInfo(): ForegroundInfo = ForegroundInfo(
+        DownloadNotifications.FOREGROUND_SERVICE_NOTIFICATION_ID,
+        DownloadNotifications.foregroundServiceNotification(applicationContext),
+        // Service types are Android 10+ (WorkManager ignores one before it anyway).
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        } else {
+            0
+        },
+    )
+
     override suspend fun doWork(): Result {
         // Result.success() here too (never expected to actually trigger — WorkManager's own input
         // is always set by DownloadDispatcher) — same reasoning throughout this file: failure()
@@ -307,14 +320,7 @@ class DownloadWorker(
         // Android's background execution limits can kill outright before the worker ever gets to
         // become a real foreground service. Promoting first means the wait itself happens under
         // foreground-service protection.
-        setForegroundSafely(
-            ForegroundInfo(
-                DownloadNotifications.FOREGROUND_SERVICE_NOTIFICATION_ID,
-                DownloadNotifications.foregroundServiceNotification(applicationContext),
-                // Service types are Android 10+ (WorkManager ignores one before it anyway).
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0,
-            )
-        )
+        setForegroundSafely(createForegroundInfo())
         // Reproduced live: WorkManager's own teardown of the shared foreground notification once
         // this (or every concurrently running) worker finishes isn't reliable on this device/OS
         // build — dumpsys still showed it stuck with ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE

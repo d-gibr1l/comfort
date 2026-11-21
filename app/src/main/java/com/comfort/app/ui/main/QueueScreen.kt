@@ -284,7 +284,8 @@ fun QueueScreen(
                     ExtendedFloatingActionButton(
                         onClick = { viewModel.retryAll(retryAllStatus) },
                         icon = { Icon(Icons.Outlined.Refresh, contentDescription = null) },
-                        text = { Text(stringResource(R.string.retry_all)) },
+                        text = { Text(stringResource(R.string.retry_all), fontFamily = com.comfort.app.theme.HeaderFontFamily) },
+                        shape = com.comfort.app.theme.ContinuousCapsuleShape,
                     )
                 } else if (hasActiveDownload || hasPausedDownload || isGloballyPaused) {
                     // isGloballyPaused on its own (queue otherwise empty) still needs this FAB shown —
@@ -302,7 +303,13 @@ fun QueueScreen(
                             )
                         },
                         // "All": it pauses or resumes the whole queue, not one download.
-                        text = { Text(if (showResumeAction) stringResource(R.string.resume_all) else stringResource(R.string.pause_all)) },
+                        text = {
+                            Text(
+                                if (showResumeAction) stringResource(R.string.resume_all) else stringResource(R.string.pause_all),
+                                fontFamily = com.comfort.app.theme.HeaderFontFamily,
+                            )
+                        },
+                        shape = com.comfort.app.theme.ContinuousCapsuleShape,
                     )
                 }
             }
