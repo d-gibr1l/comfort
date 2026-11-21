@@ -125,14 +125,34 @@ private class MediaStoreThumbnailFetcher(
     private val options: Options,
 ) : Fetcher {
     override suspend fun fetch(): FetchResult? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-        // Thumbnail-sized requests only: an unknown or large target (a full-screen view) must get
-        // the real full-quality image, so it goes back to the normal path.
+        // Thumbnail-sized requests only: full-screen requests use the original media.
         val width = options.size.width.pxOrElse { return null }
         val height = options.size.height.pxOrElse { return null }
         if (width <= 0 || height <= 0 || width > MAX_PX || height > MAX_PX) return null
+        val resolver = options.context.contentResolver
         val bitmap = runCatching {
-            options.context.contentResolver.loadThumbnail(uri, android.util.Size(width, height), null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                resolver.loadThumbnail(uri, android.util.Size(width, height), null)
+            } else {
+                // Android 7–9 lack loadThumbnail(); use MediaStore's cached thumbnail tables
+                // instead of decoding the full-resolution file while the Library scrolls.
+                val mediaId = android.content.ContentUris.parseId(uri)
+                when {
+                    resolver.getType(uri)?.startsWith("image/") == true -> {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Images.Thumbnails.getThumbnail(
+                            resolver, mediaId, MediaStore.Images.Thumbnails.MINI_KIND, null,
+                        )
+                    }
+                    resolver.getType(uri)?.startsWith("video/") == true -> {
+                        @Suppress("DEPRECATION")
+                        MediaStore.Video.Thumbnails.getThumbnail(
+                            resolver, mediaId, MediaStore.Video.Thumbnails.MINI_KIND, null,
+                        )
+                    }
+                    else -> null
+                }
+            }
         }.getOrNull() ?: return null
         return DrawableResult(
             drawable = bitmap.forDrawing(options).toDrawable(options.context.resources),
@@ -143,8 +163,7 @@ private class MediaStoreThumbnailFetcher(
 
     class Factory : Fetcher.Factory<Uri> {
         override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                data.scheme == "content" && data.authority == MediaStore.AUTHORITY &&
+            if (data.scheme == "content" && data.authority == MediaStore.AUTHORITY &&
                 options.parameters.value<Boolean>(AppImageLoader.PARAM_VIDEO_FRAME) != true
             ) {
                 MediaStoreThumbnailFetcher(data, options)
