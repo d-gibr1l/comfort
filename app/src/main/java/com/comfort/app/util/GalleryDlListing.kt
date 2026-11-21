@@ -7,6 +7,8 @@ import com.comfort.app.data.GalleryDlPreferences
 import com.comfort.app.data.VideoSiteRouter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -349,35 +351,27 @@ object GalleryDlListing {
             DownloadEngine.GALLERY_DL -> if (!GalleryDlPreferences.isEngineEnabled(context, DownloadEngine.GALLERY_DL)) {
                 ListingResult(emptyList(), errorMessage = context.getString(com.comfort.app.R.string.gallery_dl_off_no_preview), timedOut = true)
             } else {
-                val result = listViaGalleryDl(context, url)
-                if (result.items.isNotEmpty()) {
-                    // Only worth the extra process + network round trip when there's actually a
-                    // video item to fix a thumbnail for - most gallery-dl sources are
-                    // image-only galleries and never hit this at all. Enrichment failing (auth,
-                    // network, ...) is treated as a soft miss, not surfaced as an error - the
-                    // primary listing already succeeded, so there's a real gallery to show; the
-                    // affected item(s) just keep gallery-dl's own unfetchable placeholder URL
-                    // instead of a real thumbnail.
-                    // Not for a gallery-dl-only site: yt-dlp never runs for those.
-                    if (!VideoSiteRouter.isGalleryDlOnly(url) && result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
-                        result.copy(items = enrichVideoThumbnails(context, url, result.items))
+                coroutineScope {
+                    // Start yt-dlp metadata extraction alongside gallery-dl's listing. Mixed
+                    // carousels previously waited for one complete Python/network round trip and
+                    // only then started a second one for video thumbnails and sizes.
+                    val videoInfo = if (!VideoSiteRouter.isGalleryDlOnly(url)) {
+                        async { runYtDlpListInfo(context, url) }
+                    } else null
+                    val result = listViaGalleryDl(context, url)
+                    if (result.items.isNotEmpty()) {
+                        if (videoInfo != null && result.items.any { it.filename?.let(VideoSiteRouter::isVideoFilename) == true }) {
+                            result.copy(items = enrichVideoThumbnails(result.items, videoInfo.await()))
+                        } else {
+                            videoInfo?.cancel()
+                            result
+                        }
                     } else {
-                        result
-                    }
-                } else {
-                    // gallery-dl found 0 items - the real download (DownloadWorker) tries yt-dlp
-                    // as a fallback whenever gallery-dl saves 0 items, regardless of whether
-                    // gallery-dl threw an error (like "Unsupported URL") or just came back empty.
-                    // The preview needs to match that, otherwise a site unknown to gallery-dl but
-                    // supported by yt-dlp (like xnxx) will fail in preview but work in download.
-                    val fallback = listViaYtDlp(context, url)
-                    if (fallback.items.isNotEmpty()) {
-                        fallback
-                    } else {
-                        // Both failed. If gallery-dl had an explicit error (like "Login required"),
-                        // keep it rather than yt-dlp's downstream error, as it's usually the root
-                        // cause for domains primarily handled by gallery-dl.
-                        if (result.errorMessage != null) result else fallback
+                        videoInfo?.cancel()
+                        // Match DownloadWorker's yt-dlp fallback when gallery-dl found no items.
+                        val fallback = listViaYtDlp(context, url)
+                        if (fallback.items.isNotEmpty()) fallback
+                        else if (result.errorMessage != null) result else fallback
                     }
                 }
             }
@@ -667,8 +661,8 @@ object GalleryDlListing {
      * top-to-bottom, so the Nth video gallery-dl found should be the Nth video yt-dlp found too. A
      * mismatch (yt-dlp failing entirely, or the counts not lining up) just leaves the original
      * items untouched rather than guessing wrong. */
-    private suspend fun enrichVideoThumbnails(context: Context, url: String, items: List<GalleryItem>): List<GalleryItem> {
-        val info = runYtDlpListInfo(context, url) ?: return items
+    private fun enrichVideoThumbnails(items: List<GalleryItem>, info: JSONObject?): List<GalleryItem> {
+        info ?: return items
         val ytEntries = info.optJSONArray("entries")?.let { arr ->
             (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
         } ?: listOfNotNull(info.takeIf { !it.has("error") })
