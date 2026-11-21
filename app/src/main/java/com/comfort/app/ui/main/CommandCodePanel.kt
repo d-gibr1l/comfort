@@ -1,6 +1,10 @@
 package com.comfort.app.ui.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -90,11 +94,26 @@ internal fun CommandCodePanel(
         ) {
             Box {
                 SelectionContainer {
+                    val scrollState = rememberScrollState()
+                    val flingBehavior = ScrollableDefaults.flingBehavior()
                     Text(
                         highlight(shown?.text.orEmpty(), codeColors()),
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(scrollState, enabled = false)
+                            .draggable(
+                                state = rememberDraggableState { delta ->
+                                    scrollState.dispatchRawDelta(-delta)
+                                },
+                                orientation = Orientation.Vertical,
+                                onDragStopped = { velocity ->
+                                    scrollState.scroll {
+                                        with(flingBehavior) {
+                                            performFling(-velocity)
+                                        }
+                                    }
+                                },
+                            )
                             // Room on the right of the first lines for the copy button.
                             .padding(start = 16.dp, top = 16.dp, end = 56.dp, bottom = 16.dp),
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),

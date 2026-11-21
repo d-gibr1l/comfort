@@ -5,6 +5,54 @@
 
 ## Features & Enhancements
 - [x] **Instagram File Sizes:** *(done in a914351 — sizes come from the media servers in parallel; shown on the picker/preview Download buttons, track rows and the single-item card, and Instaloader downloads report their total up front)* Add HTTP HEAD requests to instaloader_wrapper.py and gallery_dl_wrapper.py to fetch Content-Length of media files prior to downloading. This will allow the app to display file sizes for Instagram/Reddit links on the preview card and during the active download progress bar.
+- [x] Rename the queue floating action buttons to "Pause All" and "Resume All."
+- [x] Set weekly as the default interval for "clean up leftover downloads."
+- [ ] Apply a light highlight color to the background of the Later button on the app and engine update sheet. Also add some space between Download and Later.
+- [ ] Add a "Report an issue" option to the app's About page.
+- [ ] Add Pictures folder to the download locations in Settings.
+- [x] Apply Google Sans (HeaderFontFamily) to the main headings and card titles in Settings (e.g., Cookies & Login, Updates and engines, Backup & restore, Subscriptions, About, and update cards).
+- [x] Apply Google Sans to all Floating Action Buttons (FABs) across the app and make their shape a continuous circle/capsule like the floating navigation bar.
+- [ ] Make the audio format picker scrollable when there is not enough space so parts of long format names are not cut off.
+- [ ] Fix the awkward text wrapping and oversized button on the "Updates available" engine card when an engine is on a commit or branch version (e.g. gallery-dl on Master): don't prepend "v" to non-numeric versions (avoids "vmaster-..."), shorten commit hashes or compact the button text so it doesn't squish the left column, and prevent the installed version text from breaking onto a second line ("08").
+- [ ] Add tactile vibrations to buttons and sliders in music settings, as well as to the lyrics icon on the main settings page.
+- [ ] Update the lyrics icon on the Now Playing sheet so that when "lyrics line" is off in settings, tapping it opens the full lyrics view, and when "lyrics line" is on, tapping it acts as a toggle.
+- [ ] Add a snackbar notification when an engine is updating.
+- [ ] Combine or aggregate update notifications so updating two or more engines at once shows a single consolidated snackbar instead of conflicting messages.
+- [ ] Add an option in Music settings to toggle the music player's adaptive background.
+- [ ] Add settings to toggle swipe gestures in the Library and Queue.
+- [ ] Add a custom duration option to the music player sleep timer.
+- [ ] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
+- [x] Prevent scrolling inside the "Current Command" code box from passing through to the mini header or outer page on the Advanced screen, and prevent downward scrolling on it from pulling down or dismissing the preview bottom sheet (isolate command box scrolling).
+- [ ] Prevent continuous downward scrolling on content inside a bottom modal sheet from pulling the sheet down to dismiss it.
+- [ ] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
+- [ ] Redesign the new template popup into a bottom modal sheet.
+- [ ] Redesign the audio language picker into a bottom modal sheet.
+- [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings.
+- [ ] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
+- [ ] Add an incognito option to the download preview sheet.
+- [ ] Fix the visual flicker when an item is moved in the music queue.
+- [ ] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players.
+- [ ] Add a "Block" option to the More Options menu in the supported sites sheet so the app refuses to download from blocked sites.
+- [ ] Prevent thumbnails from showing before the video starts playing in the video viewer.
+- [ ] Make video scrubbing land on the exact timestamp being scrubbed rather than snapping away.
+- [ ] Apply a horizontal slide-in transition across all applicable navigation routes so that the moment you tap, the new screen immediately slides in from the right while pushing the current screen out to the left along a smooth, fast-to-slow curve with zero delay.
+- [ ] Make lyrics and the progress bar progress smoothly to their current playback position instead of snapping when the app was playing in the background before opening.
+- [ ] Update the deep EXIF metadata view to display genuinely useful information on videos.
+- [ ] Redesign the time wheel for scheduling.
+- [ ] Fix the brief pause or stutter in the currently playing song right as the next song begins playing when crossfade is enabled.
+- [ ] Update the item count for multi-item downloads so it automatically decreases when individual files are deleted from the device.
+- [ ] Label playlist downloads with the playlist title and uploader name rather than the first item's details, and include a fallback so it still names properly if either value is missing.
+- [ ] When canceling a playlist download that already has completed items, move the finished tracks into the Library instead of marking the entire batch as canceled, allowing users to download any remaining items using the "Download Missing Items" button.
+- [ ] Add a "Download missing items" action to More Options on the download sheets in the Library.
+- [ ] Investigate and fix why music does not appear after a backup is restored.
+- [ ] Investigate and fix why restored backup items fail to appear in the Library even though they show up in the homepage's recently downloaded section.
+- [ ] Investigate and resolve slow music download speeds across the downloader pipeline and network layer.
+- [ ] Create a welcome screen for first-time installers with key initial options like choosing default download quality and setup preferences.
+- [ ] Add proper support for landscape mode across the app, especially in the music player layout.
+- [ ] Add a view mode for multi-item downloads so users can browse or inspect all items in a batch instead of only seeing the download count and the first item (for the queue check "C:\Users\domin\Downloads\multi_download_batch_view_implementation.md" and for the library check "C:\Users\domin\Downloads\library_card_trailing_stack_icon_batch_view.md").
+- [ ] Add a setting in Settings (e.g. Processing / Downloads) to package chapters into `.cbz` archives using `ZipOutputStream` instead of leaving loose image files in the gallery, pre-configured with known manga sites (MangaDex, MangaFire, etc.) and allowing sites to be added and removed (similar to "Which engine each site uses").
+- [ ] Add native support for reading `.cbz` files with a built-in comic/manga viewer (supporting right-to-left manga paging, webtoon vertical scrolling, and cover thumbnails in the Library).
+- [ ] Change the loading indicator on the "Looking at what's there…" preview sheet to the Material 3 Expressive loading indicator that morphs and cycles through shapes.
 
 ## Technical Debt & Refactoring
 - [x] **Componentize Monoliths:** *(done in e5a97ec — MoreScreen.kt split into SettingsScreen, SettingsComponents and one file per Settings page)* Break up massive files, specifically MoreScreen.kt (4,350+ lines) into separate feature screens (e.g., SettingsScreen.kt, AboutScreen.kt, EnginesScreen.kt) and move reusable UI components into Components.kt.
