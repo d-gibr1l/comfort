@@ -291,7 +291,17 @@ class MusicService : MediaSessionService() {
         val embedded = runCatching {
             android.media.MediaMetadataRetriever().run {
                 try {
-                    setDataSource(this@MusicService, audio)
+                    // Match AudioCoverFetcher: use the exact row's path on Android 9 so playlist
+                    // tracks cannot inherit stale embedded artwork from another MediaStore row.
+                    val sourcePath = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P &&
+                        audio.scheme == "content" && audio.authority == android.provider.MediaStore.AUTHORITY
+                    ) {
+                        runCatching {
+                            contentResolver.query(audio, arrayOf(android.provider.MediaStore.MediaColumns.DATA), null, null, null)
+                                ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null }
+                        }.getOrNull()
+                    } else null
+                    if (sourcePath != null) setDataSource(sourcePath) else setDataSource(this@MusicService, audio)
                     embeddedPicture
                 } finally {
                     release()
