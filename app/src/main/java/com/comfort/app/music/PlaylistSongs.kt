@@ -38,7 +38,20 @@ private fun songFromFile(context: Context, download: DownloadEntity, uri: Uri, i
     if (mime != null && !mime.startsWith("audio/")) return null
     val retriever = MediaMetadataRetriever()
     val tags = try {
-        retriever.setDataSource(context, uri)
+        // On Android 9/EMUI, reading consecutive playlist tracks through their MediaStore
+        // content URIs can return stale metadata/artwork from a previously scanned row. Resolve
+        // the exact row to its filesystem path and read that file directly; retain the URI path
+        // for newer scoped-storage Android versions and as a safe fallback.
+        val sourcePath = if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+            runCatching {
+                context.contentResolver.query(
+                    uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null,
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null
+                }
+            }.getOrNull()
+        } else null
+        if (sourcePath != null) retriever.setDataSource(sourcePath) else retriever.setDataSource(context, uri)
         Triple(
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST),
