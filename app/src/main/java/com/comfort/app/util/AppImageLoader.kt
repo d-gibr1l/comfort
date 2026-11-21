@@ -231,7 +231,17 @@ private class AudioCoverFetcher(
         }
         val embedded = android.media.MediaMetadataRetriever().let { retriever ->
             try {
-                retriever.setDataSource(context, audio)
+                // On Android 9, resolve the exact MediaStore row to its path before reading
+                // embedded artwork; the URI-based retriever can return a previous playlist row.
+                val sourcePath = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                    audio.scheme == "content" && audio.authority == MediaStore.AUTHORITY
+                ) {
+                    runCatching {
+                        resolver.query(audio, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null }
+                    }.getOrNull()
+                } else null
+                if (sourcePath != null) retriever.setDataSource(sourcePath) else retriever.setDataSource(context, audio)
                 retriever.embeddedPicture
             } catch (e: Exception) {
                 null
