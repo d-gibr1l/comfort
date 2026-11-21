@@ -98,7 +98,7 @@ internal fun ErrorDetailsSheet(
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     
-    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberSturdySheetState()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             // The download's name under the title, so it's clear which one failed.
             SheetHeader(
@@ -114,8 +114,9 @@ internal fun ErrorDetailsSheet(
             // card only shows one summary line, which could be a fallback engine's less relevant
             // message. Older failures have none: the summary is shown instead.
             val engineErrors = remember(item.errorDetails) { parseEngineErrors(item.errorDetails) }
+            val errorScrollState = rememberScrollState()
             Column(
-                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.heightIn(max = 420.dp).isolatedVerticalScroll(errorScrollState),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (engineErrors.isEmpty()) {

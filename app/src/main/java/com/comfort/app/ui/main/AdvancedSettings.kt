@@ -438,7 +438,7 @@ private fun ExtraArgsSheetField() {
         val galleryDlHasUnclosedQuotes = hasUnmatchedQuotes(draftGalleryDl)
         val hasAnyQuoteError = bothHasUnclosedQuotes || ytDlpHasUnclosedQuotes || galleryDlHasUnclosedQuotes
 
-        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+        ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = rememberSturdySheetState()) {
             Column(
                 modifier = Modifier
                     .padding(horizontal = 16.dp)

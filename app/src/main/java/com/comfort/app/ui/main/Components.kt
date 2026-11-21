@@ -20,6 +20,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -635,4 +640,30 @@ fun rememberSturdySheetState(minDismissDrag: androidx.compose.ui.unit.Dp = 160.d
         }
     }
     return state
+}
+
+/**
+ * A vertical scroll modifier that isolates scrolling from Compose's nested scroll tree:
+ * it handles dragging and flinging directly on [state] without passing scroll deltas
+ * up to parent containers (e.g. preventing child scrolls from moving collapsing headers
+ * or pulling down parent bottom sheets).
+ */
+@Composable
+fun Modifier.isolatedVerticalScroll(state: ScrollState): Modifier {
+    val flingBehavior = ScrollableDefaults.flingBehavior()
+    return this
+        .verticalScroll(state, enabled = false)
+        .draggable(
+            orientation = Orientation.Vertical,
+            state = rememberDraggableState { delta ->
+                state.dispatchRawDelta(-delta)
+            },
+            onDragStopped = { velocity ->
+                state.scroll {
+                    with(flingBehavior) {
+                        performFling(-velocity)
+                    }
+                }
+            },
+        )
 }

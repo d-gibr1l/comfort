@@ -23,8 +23,8 @@
 - [ ] Add a custom duration option to the music player sleep timer.
 - [ ] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
 - [x] Prevent scrolling inside the "Current Command" code box from passing through to the mini header or outer page on the Advanced screen, and prevent downward scrolling on it from pulling down or dismissing the preview bottom sheet (isolate command box scrolling).
-- [ ] Prevent continuous downward scrolling on content inside a bottom modal sheet from pulling the sheet down to dismiss it.
-- [ ] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
+- [x] Prevent continuous downward scrolling on content inside a bottom modal sheet from pulling the sheet down to dismiss it.
+- [x] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
 - [ ] Redesign the new template popup into a bottom modal sheet.
 - [ ] Redesign the audio language picker into a bottom modal sheet.
 - [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings.

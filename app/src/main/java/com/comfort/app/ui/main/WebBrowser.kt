@@ -584,7 +584,7 @@ private fun CaughtMediaSheet(
 ) {
     val context = LocalContext.current
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberSturdySheetState()) {
         SheetHeader(
             icon = Icons.Outlined.PermMedia,
             title = stringResource(R.string.media_on_this_page),

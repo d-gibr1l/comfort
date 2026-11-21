@@ -112,63 +112,7 @@ internal fun LogViewer(onDismiss: () -> Unit) {
     // gesture that started on the log lines may close the sheet only if listPullCloses says so:
     // how far it was pulled when let go, never the speed. The handle and title, Back and a tap
     // above the sheet close it as usual.
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val gestureOnList = remember { booleanArrayOf(false) }
-    val listPullCloses = remember { booleanArrayOf(false) }
-    // Where the sheet was as this gesture's finger came down: each pull is measured from there, so
-    // flicks in quick succession (each starting before the last has sprung back) don't add up.
-    val pullStartPx = remember { floatArrayOf(Float.NaN) }
-    val sheetState = remember {
-        SheetState(
-            skipPartiallyExpanded = true,
-            // A slow drag closes the sheet only past this far (Material's default is much shorter).
-            positionalThreshold = { with(density) { 200.dp.toPx() } },
-            velocityThreshold = { with(density) { 800.dp.toPx() } },
-            initialValue = SheetValue.Hidden,
-            confirmValueChange = { target -> target != SheetValue.Hidden || !gestureOnList[0] || listPullCloses[0] },
-            skipHiddenState = false,
-        )
-    }
-    // Where the sheet sits open, read whenever it comes to rest there.
-    var openOffsetPx by remember { mutableFloatStateOf(Float.NaN) }
-    LaunchedEffect(sheetState) {
-        snapshotFlow { sheetState.currentValue to sheetState.isAnimationRunning }.collect { (value, animating) ->
-            if (value == SheetValue.Expanded && !animating) {
-                runCatching { sheetState.requireOffset() }.getOrNull()?.let { openOffsetPx = it }
-                // Settled open: the gesture that moved it is over (Back or a tap above may follow).
-                gestureOnList[0] = false
-            }
-        }
-    }
-    val closePullPx = with(density) { 200.dp.toPx() }
-    // A drag past the list's top still pulls the sheet with the finger; on letting go, how far it was
-    // pulled decides — past closePullPx it closes, short of it it springs back.
-    val pullNotFling = remember {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPostScroll(
-                consumed: androidx.compose.ui.geometry.Offset,
-                available: androidx.compose.ui.geometry.Offset,
-                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
-            ) = if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) {
-                androidx.compose.ui.geometry.Offset.Zero // the drag: the sheet follows it
-            } else available // the fling: kept from the sheet
-
-            override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                val offset = runCatching { sheetState.requireOffset() }.getOrNull()
-                if (offset != null && !openOffsetPx.isNaN() && offset > openOffsetPx + 1f) {
-                    val start = pullStartPx[0].takeUnless { it.isNaN() } ?: openOffsetPx
-                    if (offset - start >= closePullPx) {
-                        listPullCloses[0] = true
-                        sheetState.hide()
-                        onDismiss()
-                    } else {
-                        sheetState.expand()
-                    }
-                }
-                return available
-            }
-        }
-    }
+    val sheetState = rememberSturdySheetState()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -176,9 +120,7 @@ internal fun LogViewer(onDismiss: () -> Unit) {
     ) {
         // Tall, but a sheet: the page it opened from still shows above it.
         val height = (LocalConfiguration.current.screenHeightDp * 0.85f).dp
-        // Each touch on the sheet first counts as not on the list; the list's own check below (which
-        // sees it after this one) says otherwise.
-        Column(Modifier.fillMaxWidth().height(height).onTouchDown { gestureOnList[0] = false }) {
+        Column(Modifier.fillMaxWidth().height(height)) {
             SheetHeader(
                 icon = Icons.AutoMirrored.Outlined.Article,
                 title = stringResource(R.string.logs_title),
@@ -202,19 +144,7 @@ internal fun LogViewer(onDismiss: () -> Unit) {
                 else -> LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
-                    modifier = Modifier.fillMaxSize().onTouchDown(
-                        onUp = {
-                            // Lifted with the sheet where it sits open: that gesture is over, and
-                            // Back or a tap above may close the sheet again. It used to stay marked
-                            // as a list gesture after any scroll, and Back did nothing. (Lifted
-                            // with the sheet pulled down, it's cleared once it springs back open.)
-                            val offset = runCatching { sheetState.requireOffset() }.getOrNull()
-                            if (offset == null || openOffsetPx.isNaN() || offset <= openOffsetPx + 1f) gestureOnList[0] = false
-                        },
-                    ) {
-                        gestureOnList[0] = true
-                        pullStartPx[0] = runCatching { sheetState.requireOffset() }.getOrDefault(Float.NaN)
-                    }.nestedScroll(pullNotFling).pinchToZoomText(zoom),
+                    modifier = Modifier.fillMaxSize().pinchToZoomText(zoom),
                 ) {
                     itemsIndexed(shown) { index, line ->
                         LogRow(

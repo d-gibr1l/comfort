@@ -480,7 +480,7 @@ private fun SiteCookiesSheet(
     val changed = edits.filter { (cookie, value) -> value != cookie.value }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberSturdySheetState(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).imePadding()) {
             SheetHeader(

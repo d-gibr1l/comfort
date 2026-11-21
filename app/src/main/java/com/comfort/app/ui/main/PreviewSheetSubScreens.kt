@@ -883,11 +883,12 @@ internal fun ViewTemplatesScreen(
                 )
             }
         } else {
+            val templateScrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 320.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .isolatedVerticalScroll(templateScrollState),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 templates.forEach { template ->

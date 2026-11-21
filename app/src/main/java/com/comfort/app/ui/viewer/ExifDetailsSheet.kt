@@ -478,7 +478,7 @@ fun ExifDetailsSheet(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = com.comfort.app.ui.main.rememberSturdySheetState()
     var showDeepMetadataSheet by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -996,8 +996,10 @@ private fun DeepMetadataInspectorSheet(
         }
     }
 
+    val deepSheetState = com.comfort.app.ui.main.rememberSturdySheetState()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = deepSheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         shape = ShapeEdgeTop,
         dragHandle = { BottomSheetDefaults.DragHandle() }
