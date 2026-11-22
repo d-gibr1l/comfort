@@ -575,7 +575,8 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        // Material 3 Expressive's shape-morphing indicator.
+                        androidx.compose.material3.LoadingIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
                         Spacer(Modifier.height(16.dp))
                         Text(
                             stringResource(R.string.looking_at_what_s_there),

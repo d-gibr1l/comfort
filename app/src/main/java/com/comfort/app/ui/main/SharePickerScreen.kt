@@ -287,9 +287,10 @@ fun SharePickerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        CircularWavyProgressIndicator(
+                        // Material 3 Expressive's shape-morphing indicator.
+                        androidx.compose.material3.LoadingIndicator(
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.semantics {
+                            modifier = Modifier.size(56.dp).semantics {
                                 contentDescription = context.getString(R.string.loading_gallery_preview)
                             },
                         )

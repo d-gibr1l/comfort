@@ -317,11 +317,14 @@ fun MainScreen(
     }
     // Swiping sideways between the pages (PageSwipe.kt). Not while the Queue covers them or a
     // tap's own transition is still running.
+    // Settings › Look & feel › Swipe between pages.
+    remember { com.comfort.app.data.GestureSettings.init(context) }
+    val swipePages by com.comfort.app.data.GestureSettings.swipeBetweenPages.collectAsState()
     val pageSwipe = rememberPageSwipeState(
         current = selectedTab,
         // Nor while a back or an open moves the pages: a swipe took them over mid-way (a jump),
         // and the back's selectedTab = 0 then landed under it.
-        allowed = !showQueueScreen && outgoingTab == null && preparingTab == null && !tabBack.busy && !queueBack.busy,
+        allowed = swipePages && !showQueueScreen && outgoingTab == null && preparingTab == null && !tabBack.busy && !queueBack.busy,
         onSettled = { selectedTab = it },
     )
     // Home as the nav bar's open tab from the moment it's tapped: selectedTab only becomes 0 once
@@ -732,7 +735,8 @@ fun MainScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    // Material 3 Expressive's shape-morphing indicator.
+                    androidx.compose.material3.LoadingIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
                     Spacer(Modifier.height(16.dp))
                     Text(
                         stringResource(R.string.looking_at_what_s_there),

@@ -44,6 +44,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
     var downloadLocationUri by remember { mutableStateOf(GalleryDlPreferences.getDownloadLocationUri(context)) }
     var audioLocationUri by remember { mutableStateOf(GalleryDlPreferences.getAudioLocationUri(context)) }
     var videoLocationUri by remember { mutableStateOf(GalleryDlPreferences.getVideoLocationUri(context)) }
+    var picturesLocationUri by remember { mutableStateOf(GalleryDlPreferences.getPicturesLocationUri(context)) }
 
     // Choosing another folder or going back to the default never releases the old folder's
     // permission: everything already saved there is still in the Library, and opening,
@@ -92,6 +93,20 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
             }
             videoLocationUri = uri
             GalleryDlPreferences.setVideoLocationUri(context, uri)
+        }
+    }
+    val picturesLocationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            picturesLocationUri = uri
+            GalleryDlPreferences.setPicturesLocationUri(context, uri)
         }
     }
 
@@ -261,6 +276,23 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
                     onUseDefault = {
                         videoLocationUri = null
                         GalleryDlPreferences.setVideoLocationUri(context, null)
+                    },
+                )
+
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(16.dp))
+
+                // Pictures from galleries and image posts: e.g. the phone's own Pictures folder,
+                // where photo apps look first.
+                FolderOverrideRow(
+                    label = stringResource(R.string.pictures_folder),
+                    fallbackDescription = stringResource(R.string.picture_downloads_land_in_the_folder),
+                    uri = picturesLocationUri,
+                    onChoose = { picturesLocationLauncher.launch(android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary%3APictures")) },
+                    onUseDefault = {
+                        picturesLocationUri = null
+                        GalleryDlPreferences.setPicturesLocationUri(context, null)
                     },
                 )
             }

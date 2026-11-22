@@ -37,6 +37,8 @@ object MusicSettings {
     val playTappedOnly = bool("play_tapped_only", false)
     /** The last queue comes back, paused, when the app opens again. */
     val keepQueue = bool("keep_queue", true)
+    /** The player's backdrop is the song's cover, blurred; off, a plain dark one. */
+    val coverBackground = bool("cover_background", true)
     /** Playback speed and pitch, 1 being normal. */
     val speed = float("speed", 1f)
     val pitch = float("pitch", 1f)
@@ -77,7 +79,7 @@ object MusicSettings {
     }
 
     private val all: List<Setting<*>> by lazy {
-        listOf(skipSilence, fadeSeconds, resumeAfterInterruption, pauseOnDisconnect, volumeLevelling, previousRestarts, playTappedOnly, keepQueue, speed, pitch)
+        listOf(coverBackground, skipSilence, fadeSeconds, resumeAfterInterruption, pauseOnDisconnect, volumeLevelling, previousRestarts, playTappedOnly, keepQueue, speed, pitch)
     }
 
     /** One setting: its value as a flow, set (and kept) with [set]. */

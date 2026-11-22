@@ -124,6 +124,8 @@ fun VideoPlayerItemWithResolvedUri(
             .setRenderersFactory(renderersFactory)
             
         builder.build().apply {
+            // Lands on the frame asked for, not the nearest keyframe before it.
+            setSeekParameters(androidx.media3.exoplayer.SeekParameters.EXACT)
             // Subtitles start off: a downloaded video's are shown when picked in the ⋮ menu (an
             // embedded track is flagged "default", which would otherwise show it right away).
             trackSelectionParameters = trackSelectionParameters.buildUpon()
@@ -252,9 +254,21 @@ fun VideoPlayerItemWithResolvedUri(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Where a scrub let go: the bar stays there until the player has caught up with it (its own
+    // position read back the old place for a moment, and the handle jumped back, then forward).
+    var seekTarget by remember(uri) { mutableStateOf<Long?>(null) }
+    // Live scrubbing (the seek bar below): whether to play on once let go, and when it last moved
+    // the picture.
+    var scrubResume by remember(uri) { mutableStateOf(false) }
+    var lastScrubSeek by remember(uri) { mutableStateOf(0L) }
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
-            currentPosition = exoPlayer.currentPosition
+            val pos = exoPlayer.currentPosition
+            val target = seekTarget
+            if (target == null || kotlin.math.abs(pos - target) < 400) {
+                seekTarget = null
+                currentPosition = pos
+            }
             delay(100)
         }
     }
@@ -436,13 +450,32 @@ fun VideoPlayerItemWithResolvedUri(
 
                     Slider(
                         value = (dragPosition ?: currentPosition).toFloat(),
-                        onValueChange = { dragPosition = it.toLong() },
+                        // Live scrubbing: paused while dragged, the picture follows the finger
+                        // (to the nearest keyframe, quick to find, at most every ~80 ms); let go,
+                        // it lands on the exact frame and plays on if it was playing.
+                        onValueChange = {
+                            if (dragPosition == null) {
+                                scrubResume = exoPlayer.playWhenReady
+                                exoPlayer.pause()
+                                exoPlayer.setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
+                            }
+                            dragPosition = it.toLong()
+                            val now = android.os.SystemClock.uptimeMillis()
+                            if (now - lastScrubSeek >= 80) {
+                                lastScrubSeek = now
+                                exoPlayer.seekTo(it.toLong())
+                            }
+                        },
                         onValueChangeFinished = {
+                            exoPlayer.setSeekParameters(androidx.media3.exoplayer.SeekParameters.EXACT)
                             dragPosition?.let {
+                                seekTarget = it
                                 exoPlayer.seekTo(it)
                                 currentPosition = it
                             }
                             dragPosition = null
+                            if (scrubResume) exoPlayer.play()
+                            scrubResume = false
                         },
                         valueRange = 0f..videoDuration.toFloat().coerceAtLeast(1f),
                         colors = SliderDefaults.colors(

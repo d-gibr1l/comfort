@@ -134,6 +134,9 @@ fun NowPlayingScreen(
     // The two lyric lines under the cover, on or off (the top bar's lyrics button), kept.
     val playerPrefs = androidx.compose.ui.platform.LocalContext.current.let { remember { it.getSharedPreferences("music_player", android.content.Context.MODE_PRIVATE) } }
     var lyricLine by remember { mutableStateOf(playerPrefs.getBoolean(KEY_LYRIC_LINE, true)) }
+    // The lines hidden from the top bar's lyrics button, with Lyric lines on in Music settings
+    // (that setting is whether the button works the lines at all); kept for next time.
+    var linesHidden by remember { mutableStateOf(playerPrefs.getBoolean(KEY_LYRIC_LINE_HIDDEN, false)) }
     val lyricsShown = showLyrics && lyrics != null
 
     var position by remember { mutableLongStateOf(0L) }
@@ -217,7 +220,9 @@ fun NowPlayingScreen(
         // drawn, the whole screen each time (~20 ms a frame on a Galaxy A22).
         // Cut to the screen: scaled up, it showed past its top while the player was dragged down
         // (the blur on the layer cut it before).
-        CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().clipToBounds().scale(1.2f))
+        // Music settings › Player background: off, a plain dark backdrop instead of the cover's.
+        val coverBackdrop by com.comfort.app.music.MusicSettings.coverBackground.value.collectAsState()
+        if (coverBackdrop) CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().clipToBounds().scale(1.2f))
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
@@ -269,16 +274,19 @@ fun NowPlayingScreen(
                         // (or a swipe up) opens it.
                         val shownLyrics = lyrics
                         if (shownLyrics != null) {
-                            val lit = if (lyricsShown) true else shownLyrics.synced && lyricLine
+                            // With Lyric lines on in Music settings (and synced lyrics), it shows and hides
+                            // the lines under the cover; otherwise it opens and closes the full lyrics.
+                            // A tap on the lines opens the full lyrics either way.
+                            val worksLines = shownLyrics.synced && lyricLine && !lyricsShown
+                            val lit = if (worksLines) !linesHidden else lyricsShown
                             IconButton(
                                 onClick = {
-                                    when {
-                                        lyricsShown -> showLyrics = false
-                                        shownLyrics.synced -> {
-                                            lyricLine = !lyricLine
-                                            playerPrefs.edit().putBoolean(KEY_LYRIC_LINE, lyricLine).apply()
-                                        }
-                                        else -> showLyrics = true
+                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick)
+                                    if (worksLines) {
+                                        linesHidden = !linesHidden
+                                        playerPrefs.edit().putBoolean(KEY_LYRIC_LINE_HIDDEN, linesHidden).apply()
+                                    } else {
+                                        showLyrics = !lyricsShown
                                     }
                                 },
                                 modifier = Modifier.size(48.dp),
@@ -290,10 +298,10 @@ fun NowPlayingScreen(
                                     Icons.Outlined.Lyrics,
                                     contentDescription = androidx.compose.ui.res.stringResource(
                                         when {
+                                            worksLines && linesHidden -> com.comfort.app.R.string.lyrics_line_show
+                                            worksLines -> com.comfort.app.R.string.lyrics_line_hide
                                             lyricsShown -> com.comfort.app.R.string.lyrics_hide
-                                            !shownLyrics.synced -> com.comfort.app.R.string.lyrics_show
-                                            lyricLine -> com.comfort.app.R.string.lyrics_line_hide
-                                            else -> com.comfort.app.R.string.lyrics_line_show
+                                            else -> com.comfort.app.R.string.lyrics_show
                                         },
                                     ),
                                     tint = Color.White,
@@ -357,7 +365,7 @@ fun NowPlayingScreen(
                         // a tap opens the full lyrics. Not while those are up.
                         val previewLyrics = lyrics
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = previewLyrics?.synced == true && !lyricsShown && lyricLine,
+                            visible = previewLyrics?.synced == true && !lyricsShown && lyricLine && !linesHidden,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
                             exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
                         ) {
@@ -865,8 +873,51 @@ private fun SleepTimerSheet(onDismiss: () -> Unit) {
             choice(stringResource(R.string.sleep_x_min, min), at != null && chosen == min) { com.comfort.app.music.MusicSettings.setSleepTimer(min); chosen = min }
         }
         choice(stringResource(R.string.sleep_end_of_song), endOfSong) { com.comfort.app.music.MusicSettings.setSleepAtEndOfSong(); chosen = null }
+        // Any length, 5 minutes to 3 hours: a slider, then Start.
+        var custom by remember { mutableStateOf(false) }
+        var minutes by remember { mutableStateOf(20) }
+        val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { custom = !custom }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.RadioButton(selected = custom || (at != null && chosen != null && chosen !in listOf(15, 30, 45, 60, 90)), onClick = null)
+            Spacer(Modifier.size(16.dp))
+            Text(stringResource(R.string.sleep_custom), style = MaterialTheme.typography.bodyLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), modifier = Modifier.weight(1f))
+            if (custom) Text(formatMinutes(minutes), style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
+        }
+        androidx.compose.animation.AnimatedVisibility(visible = custom) {
+            Column {
+                androidx.compose.material3.Slider(
+                    value = minutes.toFloat(),
+                    onValueChange = {
+                        val v = (Math.round(it / 5f) * 5).coerceIn(5, 180)
+                        if (v != minutes) {
+                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
+                            minutes = v
+                        }
+                    },
+                    valueRange = 5f..180f,
+                )
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { com.comfort.app.music.MusicSettings.setSleepTimer(minutes); chosen = minutes; onDismiss() },
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text(stringResource(R.string.sleep_start), fontFamily = com.comfort.app.theme.HeaderFontFamily) }
+            }
+        }
     }
 }
+
+/** 95 as "1 h 35 min", 40 as "40 min". */
+@Composable
+private fun formatMinutes(minutes: Int): String =
+    if (minutes < 60) stringResource(R.string.sleep_x_min, minutes)
+    else if (minutes % 60 == 0) stringResource(R.string.sleep_x_h, minutes / 60)
+    else stringResource(R.string.sleep_x_h_y_min, minutes / 60, minutes % 60)
 
 /** Playback speed and pitch, each from half to double, and back to normal. */
 @Composable
@@ -893,9 +944,16 @@ private fun FactorSlider(label: String, value: Float, onChange: (Float) -> Unit)
             Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), modifier = Modifier.weight(1f))
             Text(formatFactor(value), style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
         }
+        val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
         androidx.compose.material3.Slider(
             value = value,
-            onValueChange = { onChange((Math.round(it * 20f) / 20f).coerceIn(0.5f, 2f)) },
+            onValueChange = {
+                val v = (Math.round(it * 20f) / 20f).coerceIn(0.5f, 2f)
+                if (v != value) {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
+                    onChange(v)
+                }
+            },
             valueRange = 0.5f..2f,
         )
     }
@@ -906,6 +964,9 @@ private fun FactorSlider(label: String, value: Float, onChange: (Float) -> Unit)
 private fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean) -> Unit, onDismiss: () -> Unit) {
     val m = com.comfort.app.music.MusicSettings
     val context = LocalContext.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // A tick each time a slider moves on a step.
+    val tick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick) }
     PlayerSheet(stringResource(R.string.music_settings), onDismiss) {
         SettingsGroup(stringResource(R.string.music_group_playback))
         SettingSwitch(stringResource(R.string.skip_silence), stringResource(R.string.skip_silence_subtitle), m.skipSilence)
@@ -913,7 +974,12 @@ private fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean) 
         SettingRow(stringResource(R.string.fade_between), stringResource(R.string.fade_between_subtitle)) {
             Text(if (fade == 0) stringResource(R.string.subtitles_off_short) else stringResource(R.string.x_seconds_short, fade), style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = MaterialTheme.colorScheme.primary)
         }
-        androidx.compose.material3.Slider(value = fade.toFloat(), onValueChange = { m.fadeSeconds.set(Math.round(it)) }, valueRange = 0f..12f, steps = 11)
+        androidx.compose.material3.Slider(
+            value = fade.toFloat(),
+            onValueChange = { val v = Math.round(it); if (v != fade) { tick(); m.fadeSeconds.set(v) } },
+            valueRange = 0f..12f,
+            steps = 11,
+        )
         SettingSwitch(stringResource(R.string.resume_after_interruption), stringResource(R.string.resume_after_interruption_subtitle), m.resumeAfterInterruption)
         SettingSwitch(stringResource(R.string.pause_on_disconnect), stringResource(R.string.pause_on_disconnect_subtitle), m.pauseOnDisconnect)
 
@@ -935,8 +1001,14 @@ private fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean) 
             SettingSwitch(stringResource(R.string.volume_levelling), stringResource(R.string.volume_levelling_subtitle), m.volumeLevelling)
         }
 
+        SettingsGroup(stringResource(R.string.appearance))
+        SettingSwitch(stringResource(R.string.player_background), stringResource(R.string.player_background_subtitle), m.coverBackground)
+
         SettingsGroup(stringResource(R.string.lyrics))
-        SettingRow(stringResource(R.string.lyric_lines), stringResource(R.string.lyric_lines_subtitle), onClick = { onLyricLineChange(!lyricLine) }) {
+        SettingRow(stringResource(R.string.lyric_lines), stringResource(R.string.lyric_lines_subtitle), onClick = {
+            haptics.performHapticFeedback(if (lyricLine) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
+            onLyricLineChange(!lyricLine)
+        }) {
             androidx.compose.material3.Switch(checked = lyricLine, onCheckedChange = null)
         }
         // The full lyrics' size, as pinching them sets it (LyricsView's "lyrics_zoom").
@@ -947,7 +1019,7 @@ private fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean) 
         }
         androidx.compose.material3.Slider(
             value = zoom,
-            onValueChange = { zoom = (Math.round(it * 20f) / 20f).coerceIn(0.7f, 1.8f) },
+            onValueChange = { val v = (Math.round(it * 20f) / 20f).coerceIn(0.7f, 1.8f); if (v != zoom) { tick(); zoom = v } },
             onValueChangeFinished = { zoomPrefs.edit().putFloat("lyrics_zoom", zoom).apply() },
             valueRange = 0.7f..1.8f,
         )
@@ -993,7 +1065,11 @@ private fun SettingRow(title: String, subtitle: String?, onClick: (() -> Unit)? 
 @Composable
 private fun SettingSwitch(title: String, subtitle: String, setting: com.comfort.app.music.MusicSettings.Setting<Boolean>) {
     val on by setting.value.collectAsState()
-    SettingRow(title, subtitle, onClick = { setting.set(!on) }) {
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    SettingRow(title, subtitle, onClick = {
+        haptics.performHapticFeedback(if (on) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
+        setting.set(!on)
+    }) {
         androidx.compose.material3.Switch(checked = on, onCheckedChange = null)
     }
 }
@@ -1191,6 +1267,9 @@ private fun QueueLayout(
 
 /** In "music_player" (MusicService's prefs, as LyricsView's zoom): whether the lyric lines under the cover are shown. */
 private const val KEY_LYRIC_LINE = "lyric_line"
+
+/** In "music_player": the lyric lines hidden from the top bar's button (with Lyric lines on). */
+private const val KEY_LYRIC_LINE_HIDDEN = "lyric_line_hidden"
 
 /** A cover blurred for the player's backdrop: shrunk to 48 px and box-blurred there (three passes,
  * close to a Gaussian), then drawn scaled up, which smooths it further. Done once per cover, not

@@ -552,9 +552,27 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
+                    // Each chip at least its share of the width, as wide as its name needs: when the
+                    // names don't fit (a long translation, large text), the row scrolls sideways
+                    // instead of cutting them off.
+                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val formatCount = AudioFormat.entries.size
+                    val share = (maxWidth - 2.dp * (formatCount - 1)) / (formatCount + 0.7f)
+                    // Whether every name fits in its share (plus the chip's own 16dp padding a side).
+                    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+                    val labelStyle = MaterialTheme.typography.labelLarge
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val labels = AudioFormat.entries.map { it to it.displayLabel }
+                    val fits = remember(maxWidth, labelStyle, density, labels) {
+                        labels.all { (f, label) ->
+                            val textWidth = with(density) { measurer.measure(label, labelStyle, maxLines = 1, softWrap = false).size.width.toDp() }
+                            textWidth + 32.dp <= share * (if (f == AudioFormat.ORIGINAL) 1.7f else 1f)
+                        }
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .then(if (fits) Modifier else Modifier.horizontalScroll(rememberScrollState()))
                             .selectableGroup(),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
@@ -570,13 +588,13 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                                 },
                                 // "Original" gets a wider share: five equal chips cut it short.
                                 modifier = Modifier
-                                    .weight(if (format == AudioFormat.ORIGINAL) 1.7f else 1f)
+                                    .then(if (fits) Modifier.weight(if (format == AudioFormat.ORIGINAL) 1.7f else 1f) else Modifier)
                                     .height(40.dp)
                                     .semantics { role = Role.RadioButton },
                                 interactionSource = interactionSource,
                                 shape = rememberMorphingChipShape(index, formats.size, selected = selected, interactionSource = interactionSource, height = 40.dp),
                                 label = {
-                                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                    Box(modifier = if (fits) Modifier.fillMaxWidth() else Modifier, contentAlignment = Alignment.Center) {
                                         Text(format.displayLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
                                     }
                                 },
@@ -589,6 +607,7 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
                                 border = null,
                             )
                         }
+                    }
                     }
                 }
 

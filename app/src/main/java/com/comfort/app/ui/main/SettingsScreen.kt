@@ -47,7 +47,7 @@ enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADV
 @androidx.annotation.StringRes
 private fun SettingsRoute.displayName(): Int = when (this) {
     SettingsRoute.ROOT -> R.string.backup_part_settings
-    SettingsRoute.APPEARANCE -> R.string.appearance
+    SettingsRoute.APPEARANCE -> R.string.look_and_feel
     SettingsRoute.FOLDERS -> R.string.folders
     SettingsRoute.DOWNLOADS -> R.string.downloads
     SettingsRoute.PROCESSING -> R.string.processing
@@ -288,7 +288,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     // Not remembered: their text comes from resources, read while composing (a cheap list).
     val mainItems = run {
         listOf(
-            SettingsItemSpec(Icons.Outlined.WbSunny, stringResource(R.string.appearance), themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
+            SettingsItemSpec(Icons.Outlined.WbSunny, stringResource(R.string.look_and_feel), themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
             SettingsItemSpec(Icons.Outlined.Folder, stringResource(R.string.folders), filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
             SettingsItemSpec(Icons.Outlined.Download, stringResource(R.string.downloads), stringResource(R.string.network_scheduling_and_queue_behavior), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
             SettingsItemSpec(Icons.Outlined.Movie, stringResource(R.string.processing), stringResource(R.string.quality_format_and_embedding), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },

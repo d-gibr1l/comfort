@@ -290,6 +290,8 @@ object MediaStoreHelper {
                 ?: GalleryDlPreferences.getDownloadLocationUri(context)
             mimeType.startsWith("video/") -> GalleryDlPreferences.getVideoLocationUri(context)
                 ?: GalleryDlPreferences.getDownloadLocationUri(context)
+            mimeType.startsWith("image/") -> GalleryDlPreferences.getPicturesLocationUri(context)
+                ?: GalleryDlPreferences.getDownloadLocationUri(context)
             else -> GalleryDlPreferences.getDownloadLocationUri(context)
         }
         if (customTreeUri != null) {

@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -265,12 +266,15 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             Spacer(Modifier.height(16.dp))
             LanguageRow()
 
+            Spacer(Modifier.height(16.dp))
+            GesturesCard()
+
             Spacer(Modifier.height(navBarClearance()))
         }
         }
         StatusBarScrim(alpha = { 1f - headerState.reveal.fraction }, modifier = Modifier.align(Alignment.TopStart))
         SettingsSubPageHeader(
-            title = stringResource(R.string.appearance),
+            title = stringResource(R.string.look_and_feel),
             topicIcon = Icons.Outlined.WbSunny,
             onBack = onBack,
             topPadding = headerState.topPadding,
@@ -289,6 +293,39 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
 
 /** Settings › Appearance › Language: the app's own language, apart from the phone's (AppLanguage).
  * Each language is listed in its own language, so it can be found whatever the app is set to. */
+@Composable
+private fun GesturesCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    remember { com.comfort.app.data.GestureSettings.init(context) }
+    val swipeRemove by com.comfort.app.data.GestureSettings.swipeToRemove.collectAsState()
+    val swipePages by com.comfort.app.data.GestureSettings.swipeBetweenPages.collectAsState()
+    Surface(
+        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(stringResource(R.string.gestures))),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(stringResource(R.string.gestures), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            IconToggleRow(
+                icon = Icons.Outlined.SwipeLeft,
+                title = stringResource(R.string.swipe_to_remove),
+                subtitle = stringResource(R.string.swipe_to_remove_subtitle),
+                checked = swipeRemove,
+                onCheckedChange = { com.comfort.app.data.GestureSettings.setSwipeToRemove(context, it) },
+            )
+            Spacer(Modifier.height(12.dp))
+            IconToggleRow(
+                icon = Icons.Outlined.SwipeRight,
+                title = stringResource(R.string.swipe_between_pages),
+                subtitle = stringResource(R.string.swipe_between_pages_subtitle),
+                checked = swipePages,
+                onCheckedChange = { com.comfort.app.data.GestureSettings.setSwipeBetweenPages(context, it) },
+            )
+        }
+    }
+}
+
 @Composable
 private fun LanguageRow() {
     val context = androidx.compose.ui.platform.LocalContext.current

@@ -926,6 +926,23 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
         }
 
+        // The project's issue forms, one row each, opening that form with this version filled in.
+        item {
+            SettingsSection(title = stringResource(R.string.report_an_issue), icon = Icons.Outlined.BugReport) {
+                Text(
+                    stringResource(R.string.report_an_issue_subtitle, versionName),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IssueFormRow(Icons.Outlined.BugReport, stringResource(R.string.issue_bug), stringResource(R.string.issue_bug_subtitle), "bug_report.yml", versionName)
+                    IssueFormRow(Icons.Outlined.LinkOff, stringResource(R.string.issue_site), stringResource(R.string.issue_site_subtitle), "site_not_working.yml", versionName)
+                    IssueFormRow(Icons.Outlined.Lightbulb, stringResource(R.string.issue_idea), stringResource(R.string.issue_idea_subtitle), "feature_request.yml", versionName)
+                }
+            }
+        }
+
         // gallery-dl was the only credit here before — a real gap for an app that's really built on
         // six separately-licensed open-source projects, not one: yt-dlp does just as much of the
         // actual downloading (see VideoSiteRouter), and PythonRuntime's own doc comment describes
@@ -960,6 +977,39 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                     }
                 }
             }
+        }
+    }
+}
+
+/** One of the project's issue forms, opened on GitHub with the app's version filled in. */
+@Composable
+private fun IssueFormRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, template: String, version: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    Surface(
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+            // The form's version field, filled in (the site form names it "versions").
+            val field = when (template) { "bug_report.yml" -> "version"; "site_not_working.yml" -> "versions"; else -> null }
+            val url = "https://github.com/d-gibr1l/comfort/issues/new?template=$template" + (field?.let { "&$it=" + Uri.encode(if (it == "versions") "Comfort $version" else version) } ?: "")
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(22.dp)) }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -1054,7 +1104,7 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "v${status.installedVersion}",
+                shownVersion(status.installedVersion.orEmpty()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1219,6 +1269,26 @@ private fun EnginesSection() {
  * Engines section, which needs the channel picker too. */
 @Composable
 private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boolean, onUpdate: () -> Unit) {
+    EngineUpdateRowContent(status, updating, onUpdate)
+}
+
+/** A version as shown: "v2026.10.26" for a release; a branch build ("master-3f9c2e1d…") as the
+ * branch and a short commit, "master · 3f9c2e1", no "v" (it read "vmaster-…", and the long hash
+ * squeezed the card). */
+internal fun shownVersion(version: String, withV: Boolean = true): String {
+    if (version.firstOrNull()?.isDigit() == true) return if (withV) "v$version" else version
+    val branch = version.substringBefore('-', version)
+    val rest = version.substringAfter('-', "")
+    val hash = Regex("[0-9a-fA-F]{7,}").find(rest)?.value
+    return when {
+        hash != null -> "$branch · ${hash.take(7)}"
+        rest.isNotEmpty() -> "$branch · ${rest.take(12)}"
+        else -> branch
+    }
+}
+
+@Composable
+private fun EngineUpdateRowContent(status: EngineUpdater.VersionStatus, updating: Boolean, onUpdate: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         engineIconByName(status.engine.displayName)?.let {
             Icon(it, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
@@ -1231,17 +1301,28 @@ private fun EngineUpdateRow(status: EngineUpdater.VersionStatus, updating: Boole
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                status.installedVersion?.let { "v$it" } ?: stringResource(R.string.version_unknown),
+                status.installedVersion?.let { shownVersion(it) } ?: stringResource(R.string.version_unknown),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
+        Spacer(Modifier.width(8.dp))
         when {
             updating -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             status.updateAvailable -> Button(
                 onClick = onUpdate,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-            ) { Text(stringResource(R.string.update_to_x, status.latestVersion.orEmpty()), style = MaterialTheme.typography.labelMedium) }
+                modifier = Modifier.widthIn(max = 190.dp),
+            ) {
+                Text(
+                    stringResource(R.string.update_to_x, shownVersion(status.latestVersion.orEmpty(), withV = false)),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            }
             status.latestVersion != null -> Text(
                 stringResource(R.string.up_to_date),
                 style = MaterialTheme.typography.labelMedium,
@@ -1290,7 +1371,7 @@ private fun EngineCard(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        status.installedVersion?.let { "v$it" } ?: stringResource(R.string.version_unknown),
+                        status.installedVersion?.let { shownVersion(it) } ?: stringResource(R.string.version_unknown),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1300,7 +1381,7 @@ private fun EngineCard(
                     status.updateAvailable -> Button(
                         onClick = onUpdate,
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    ) { Text(stringResource(R.string.update_to_x, status.latestVersion.orEmpty()), style = MaterialTheme.typography.labelMedium) }
+                    ) { Text(stringResource(R.string.update_to_x, shownVersion(status.latestVersion.orEmpty(), withV = false)), style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
                     status.latestVersion != null -> Surface(
                         shape = MaterialTheme.shapes.small,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),

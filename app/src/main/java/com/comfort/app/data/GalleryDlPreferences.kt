@@ -160,6 +160,7 @@ object GalleryDlPreferences {
     const val KEY_REMEMBER_DOWNLOAD_TYPE = "remember_download_type"
     const val KEY_AUDIO_LOCATION_URI = "audio_location_uri"
     const val KEY_VIDEO_LOCATION_URI = "video_location_uri"
+    const val KEY_PICTURES_LOCATION_URI = "pictures_location_uri"
     const val KEY_RESTRICT_FILENAMES = "restrict_filenames"
     const val KEY_TRIM_FILENAMES = "trim_filenames"
     const val KEY_DOWNLOAD_DELAY_ENABLED = "download_delay_enabled"
@@ -1400,6 +1401,16 @@ object GalleryDlPreferences {
 
     fun setVideoLocationUri(context: Context, uri: Uri?) {
         prefs(context).edit().putString(KEY_VIDEO_LOCATION_URI, uri?.toString()).apply()
+    }
+
+    /** A user-chosen SAF folder for pictures (gallery and image downloads) — see [getAudioLocationUri]. */
+    fun getPicturesLocationUri(context: Context): Uri? {
+        val stored = prefs(context).getString(KEY_PICTURES_LOCATION_URI, null) ?: return null
+        return runCatching { Uri.parse(stored) }.getOrNull()
+    }
+
+    fun setPicturesLocationUri(context: Context, uri: Uri?) {
+        prefs(context).edit().putString(KEY_PICTURES_LOCATION_URI, uri?.toString()).apply()
     }
 
     /** yt-dlp's --restrict-filenames (ASCII-only, no spaces/special characters in the output

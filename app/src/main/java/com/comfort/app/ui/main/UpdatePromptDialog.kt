@@ -167,9 +167,19 @@ private fun UpdatePromptSheet(
                     Text(confirmLabel, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 }
             }
-            TextButton(onClick = close, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                Text(stringResource(R.string.later))
+            // A light fill, so it reads as a button of its own, and a gap from the one above.
+            Spacer(Modifier.height(10.dp))
+            androidx.compose.material3.FilledTonalButton(
+                onClick = close,
+                colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) {
+                Text(stringResource(R.string.later), style = MaterialTheme.typography.titleMedium, maxLines = 1)
             }
+            Spacer(Modifier.height(8.dp))
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
     }

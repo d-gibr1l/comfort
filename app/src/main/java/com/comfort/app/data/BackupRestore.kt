@@ -32,6 +32,7 @@ object BackupRestore {
         GalleryDlPreferences.KEY_DOWNLOAD_LOCATION_URI,
         GalleryDlPreferences.KEY_AUDIO_LOCATION_URI,
         GalleryDlPreferences.KEY_VIDEO_LOCATION_URI,
+        GalleryDlPreferences.KEY_PICTURES_LOCATION_URI,
     )
 
     /** The app's own state, not the user's choices: never restored. A backup made while Pause all

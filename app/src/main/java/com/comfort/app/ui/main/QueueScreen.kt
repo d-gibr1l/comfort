@@ -152,7 +152,7 @@ fun QueueScreen(
     // selecting: a selection belongs to one filter.
     val filterSwipe = rememberPageSwipeState(
         current = filters.indexOf(selectedFilter),
-        allowed = !selectionMode,
+        allowed = !selectionMode && com.comfort.app.data.GestureSettings.swipeBetweenPages.collectAsState().value,
         pageCount = filters.size,
         // Quick swipes one after another each move a filter on, as swiping songs does.
         quickSwipes = true,

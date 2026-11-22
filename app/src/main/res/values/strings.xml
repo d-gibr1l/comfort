@@ -198,6 +198,27 @@
     <string name="play_tapped_only_subtitle">Otherwise the Library\'s other songs follow it.</string>
     <string name="keep_queue">Keep the queue</string>
     <string name="keep_queue_subtitle">Brings back the last queue, paused, when Comfort opens again.</string>
+    <string name="report_an_issue">Report an issue</string>
+    <string name="issue_bug">Something\'s not working</string>
+    <string name="issue_bug_subtitle">A crash, a button that does nothing, a screen that looks wrong.</string>
+    <string name="issue_site">A site won\'t download</string>
+    <string name="issue_site_subtitle">Links from one site fail, or download the wrong thing.</string>
+    <string name="issue_idea">Suggest an idea</string>
+    <string name="issue_idea_subtitle">Something Comfort could do, or do better.</string>
+    <string name="report_an_issue_subtitle">Opens a short form on GitHub with your version (%1$s) filled in.</string>
+    <string name="player_background">Cover background</string>
+    <string name="player_background_subtitle">The player\'s backdrop is the song\'s cover, blurred. Off, a plain dark one.</string>
+    <string name="sleep_custom">Custom</string>
+    <string name="sleep_start">Start</string>
+    <string name="sleep_x_h">%1$d h</string>
+    <string name="sleep_x_h_y_min">%1$d h %2$d min</string>
+    <string name="gestures">Gestures</string>
+    <string name="swipe_to_remove">Swipe to remove</string>
+    <string name="swipe_to_remove_subtitle">Swipe a Library card sideways to remove it.</string>
+    <string name="swipe_between_pages">Swipe between pages</string>
+    <string name="swipe_between_pages_subtitle">Swipe sideways to move between Home, Library and Settings, and between the Queue\'s tabs.</string>
+    <string name="pictures_folder">Pictures folder</string>
+    <string name="picture_downloads_land_in_the_folder">picture downloads land in the folder above (or the default) unless this is set.</string>
     <string name="action_back">Back</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
@@ -346,6 +367,7 @@
     <string name="pure_black_dark_mode">Pure black dark mode</string>
     <string name="use_true_black_backgrounds_in_dark">Use true black backgrounds in dark theme.</string>
     <string name="appearance">Appearance</string>
+    <string name="look_and_feel">Look &amp; feel</string>
     <string name="active">Active</string>
     <!-- SettingsComponents.kt -->
     <string name="unlimited">Unlimited</string>

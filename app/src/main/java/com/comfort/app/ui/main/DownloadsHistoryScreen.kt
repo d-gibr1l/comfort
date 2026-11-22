@@ -691,6 +691,7 @@ fun DownloadsHistoryScreen(
                     // Always wrap in SwipeToDeleteCard — just disable it while selecting.
                     // Keeping the wrapper alive and passing enabled = !selectionMode lets the slot
                     // table stay intact; only drag-gesture handling flips on or off.
+                    val swipeToRemove by com.comfort.app.data.GestureSettings.swipeToRemove.collectAsState()
                     // The thumbnail's parallax (LibraryScrollMotion.kt), read as it's drawn.
                     val parallax = remember(item.id) { { listState.viewportPosition(item.id) } }
                     // The rise's own clock: from the moment the card starts coming up, ~0.3 s to full,
@@ -711,7 +712,8 @@ fun DownloadsHistoryScreen(
                     SwipeToDeleteCard(
                         onDelete = { requestDelete(setOf(item.id)) },
                         shape = LIBRARY_CARD_SHAPE,
-                        enabled = !selectionMode,
+                        // Settings › Look & feel › Swipe to remove.
+                        enabled = !selectionMode && swipeToRemove,
                         modifier = Modifier
                             .animateItem(fadeInSpec = null, fadeOutSpec = null)
                             // Rises in from the bottom edge (LibraryScrollMotion.kt).
