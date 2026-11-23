@@ -230,7 +230,10 @@ fun NowPlayingScreen(
         // (the blur on the layer cut it before).
         // Music settings › Player background: off, a plain dark backdrop instead of the cover's.
         val coverBackdrop by com.comfort.app.music.MusicSettings.coverBackground.value.collectAsState()
-        if (coverBackdrop) CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().clipToBounds().scale(1.2f))
+        // The song before's backdrop stays up while the next one loads (black showed in between).
+        val seenBackdrop = remember { arrayOfNulls<String>(1) }
+        val priorBackdrop = remember(song?.id) { seenBackdrop[0].also { seenBackdrop[0] = song?.id } }
+        if (coverBackdrop) CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().clipToBounds().scale(1.2f), priorId = priorBackdrop)
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
@@ -551,12 +554,21 @@ fun NowPlayingScreen(
 
 /** A song's cover for Coil (its Library thumbnail shown at once), or a music note without one. */
 @Composable
-internal fun CoverImage(song: Song?, blurred: Boolean, modifier: Modifier = Modifier) {
+internal fun CoverImage(song: Song?, blurred: Boolean, modifier: Modifier = Modifier, priorId: String? = null) {
     val context = LocalContext.current
     var failed by remember(song?.id) { mutableStateOf(false) }
     val request = remember(song?.id, blurred) {
         coil.request.ImageRequest.Builder(context).data(song?.cover)
-            .apply { if (blurred) transformations(SmallBlur) else placeholderMemoryCacheKey(song?.placeholderKey) }
+            .apply {
+                if (blurred) {
+                    transformations(SmallBlur)
+                    // Its own key, so the next song's backdrop can show this one while it loads.
+                    song?.id?.let { memoryCacheKey("backdrop:$it") }
+                    priorId?.let { placeholderMemoryCacheKey("backdrop:$it") }
+                } else {
+                    placeholderMemoryCacheKey(song?.placeholderKey)
+                }
+            }
             .build()
     }
     if (song?.cover != null && !failed) {

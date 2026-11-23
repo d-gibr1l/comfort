@@ -154,6 +154,12 @@ object MusicPlayer {
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // A queue change that leaves the same song on (a song dragged past it): not a change of
+            // song. Counted as one, the player's cover and backdrop reloaded (a black flash).
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && mediaItem?.mediaId == _state.value.song?.id) return
+            // Nor one while a move settles (see move): it comes back to the same song.
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED && movingSongId != null &&
+                android.os.SystemClock.uptimeMillis() <= movingUntil) return
             playId++
             // Which way: a command of ours says; a song ending goes forward; anything else (the
             // notification, a headset) from where the two sit in play order, wraps included.
@@ -308,7 +314,23 @@ object MusicPlayer {
 
     /** Moves the queue's song at [from] to [to] (queue indices; a drag in the queue). */
     fun move(from: Int, to: Int) {
-        if (from != to) controller?.moveMediaItem(from, to)
+        if (from == to) return
+        // The song on stays on through a move; the queue settles over a moment, during which the
+        // player can report the song that took its old place as playing (caught on video: the
+        // title and backdrop flicked to it for two frames, a dark flash). Held over that moment.
+        movingSongId = _state.value.song?.id
+        movingUntil = android.os.SystemClock.uptimeMillis() + 800
+        controller?.moveMediaItem(from, to)
+    }
+
+    private var movingSongId: String? = null
+    private var movingUntil = 0L
+
+    /** Just after a move, a report that another song is playing: the queue still settling. */
+    private fun settlingMove(player: Player): Boolean {
+        val id = movingSongId ?: return false
+        if (android.os.SystemClock.uptimeMillis() > movingUntil) { movingSongId = null; return false }
+        return player.currentMediaItem?.mediaId != id
     }
 
     /** Songs queued under links that were moved ([moves]: old link → new, MediaAccess.rehome after
@@ -355,6 +377,8 @@ object MusicPlayer {
     private fun songOf(item: MediaItem): Song = songs[item.mediaId] ?: Song.from(item).also { songs[it.id] = it }
 
     private fun publish(player: Player) {
+        // Mid-move, the wrong song reported as playing: not shown (the right one follows).
+        if (settlingMove(player)) return
         val song = player.currentMediaItem?.let(::songOf)
         // Play order: the timeline walked with shuffle as it is, so a shuffled queue lists what plays next.
         val timeline = player.currentTimeline
