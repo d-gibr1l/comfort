@@ -1269,4 +1269,17 @@
     <string name="welcome_notifications_allow">सूचनाओं की अनुमति दें</string>
     <string name="welcome_notifications_on">सूचनाएँ चालू हैं</string>
     <string name="welcome_battery_body">ताकि दूसरे ऐप इस्तेमाल करते समय भी डाउनलोड चलते रहें और समय पर शुरू हों। इसके बिना Android का बैटरी सेवर उन्हें रोक सकता है।</string>
+    <string name="comic">कॉमिक</string>
+    <string name="comics">कॉमिक्स</string>
+    <string name="save_chapters_as_cbz">अध्याय .cbz के रूप में सेव करें</string>
+    <string name="save_chapters_as_cbz_subtitle">मंगा या कॉमिक का अध्याय एक कॉमिक फ़ाइल के रूप में सेव होता है, जिसे Comfort या किसी भी कॉमिक ऐप में पढ़ें — गैलरी में अलग-अलग तस्वीरों के बजाय।</string>
+    <string name="comic_sites">कॉमिक साइटें</string>
+    <string name="comic_sites_subtitle">इन साइटों के अध्याय .cbz के रूप में सेव होते हैं।</string>
+    <string name="comic_site_add_hint">साइट जोड़ें या लिंक पेस्ट करें</string>
+    <string name="comic_cant_open">यह कॉमिक नहीं खुल सका</string>
+    <string name="comic_no_pages">इस कॉमिक में कोई पेज नहीं</string>
+    <string name="reading_mode">पढ़ने का तरीका</string>
+    <string name="reading_right_to_left">दाएँ से बाएँ (मंगा)</string>
+    <string name="reading_left_to_right">बाएँ से दाएँ</string>
+    <string name="reading_vertical">ऊर्ध्वाधर (वेबटून)</string>
 </resources>

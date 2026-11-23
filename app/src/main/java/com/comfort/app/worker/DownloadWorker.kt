@@ -799,6 +799,10 @@ class DownloadWorker(
                     }
                 }
 
+                // A manga / comic site's chapter (Settings › Processing › Comics): its pages are held
+                // to the end and saved as one .cbz (packComic), not as loose pictures.
+                val comicMode = engine == DownloadEngine.GALLERY_DL && com.comfort.app.data.ComicSites.packs(applicationContext, url)
+
                 // Last file first: galleries put the newest first, so a carousel's first picture ends
                 // up first in the gallery too. Saved last, the first file still sets the thumbnail.
                 val firstBatchSaved = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -837,6 +841,65 @@ class DownloadWorker(
                             android.util.Log.e("DownloadEngine", "Failed to save ${file.name}", e)
                         }
                     }
+                    }
+                }
+
+                /** A comic chapter's held pages, in their order, zipped into "<title>.cbz" (stored, not
+                 * compressed: pictures don't shrink, and a reader opens stored entries fastest) and
+                 * saved as the download's one file, its first page kept as the Library's cover. */
+                suspend fun packComic() {
+                    val held = synchronized(heldFiles) { heldFiles.toList().also { heldFiles.clear() } }
+                    val pages = held.filter { (f, isAudio, _) -> !isAudio && f.isFile && f.extension.lowercase() in SWEEP_IMAGE_EXTENSIONS }
+                        .sortedWith(compareBy<Triple<File, Boolean, Int>> { it.third }.thenBy { it.first.name })
+                    val others = held - pages.toSet()
+                    if (pages.isEmpty()) {
+                        synchronized(heldFiles) { heldFiles.addAll(others) }
+                        saveHeldFiles()
+                        return
+                    }
+                    // Named after the chapter ("<manga> c001", from COMIC_FILENAME_FORMAT's page names).
+                    val chapterName = pages.first().first.nameWithoutExtension.substringBeforeLast(" - p", "").takeIf { it.isNotBlank() }
+                    val safeTitle = (chapterName ?: liveTitle.get()).replace(Regex("""[\\/:*?"<>|\n\r\t]"""), " ").trim().take(120).ifBlank { "Comic" }
+                    val cbz = File(stagingDir, "$safeTitle.cbz")
+                    DownloadDispatcher.withStagingLock(downloadId) {
+                        java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(cbz.outputStream())).use { zip ->
+                            pages.forEachIndexed { i, (f, _, _) ->
+                                // Numbered, so every reader keeps the order: "0001.jpg", "0002.jpg"…
+                                val name = "%04d.%s".format(i + 1, f.extension.lowercase())
+                                val entry = java.util.zip.ZipEntry(name).apply {
+                                    method = java.util.zip.ZipEntry.STORED
+                                    size = f.length()
+                                    compressedSize = f.length()
+                                    crc = java.util.zip.CRC32().also { c -> f.inputStream().use { input ->
+                                        val buf = ByteArray(64 * 1024)
+                                        while (true) { val n = input.read(buf); if (n < 0) break; c.update(buf, 0, n) }
+                                    } }.value
+                                }
+                                zip.putNextEntry(entry)
+                                f.inputStream().use { it.copyTo(zip) }
+                                zip.closeEntry()
+                            }
+                        }
+                    }
+                    // The cover: the first page, kept with the app (the .cbz itself is no picture).
+                    val coverDir = File(applicationContext.filesDir, "comic_covers").apply { mkdirs() }
+                    val cover = File(coverDir, "$downloadId.${pages.first().first.extension.lowercase()}")
+                    runCatching { pages.first().first.copyTo(cover, overwrite = true) }
+                    pages.forEach { (f, _, _) -> f.delete() }
+                    DownloadLog.line(applicationContext, downloadId, "packed ${pages.size} pages into ${cbz.name}")
+                    savedCount.set(savedCount.get() - pages.size + 1)
+                    // The .cbz first in the batch: it's the download's first item (its picture).
+                    synchronized(heldFiles) { heldFiles.add(Triple(cbz, false, 1)); heldFiles.addAll(others) }
+                    saveHeldFiles()
+                    // One item now: the comic. Its picture is the cover; its file the .cbz.
+                    dao.setDownloadedItems(downloadId, savedCount.get())
+                    dao.setTotalItems(downloadId, 0)
+                    // The Library shows the chapter's name, not "Downloading from …".
+                    if (chapterName != null) dao.updateTitle(downloadId, chapterName)
+                    val saved = dao.savedFiles(downloadId).firstOrNull { it.path == cbz.name }
+                    if (saved != null) {
+                        dao.setMediaUri(downloadId, saved.uri)
+                        if (cover.isFile) dao.setThumbnail(downloadId, android.net.Uri.fromFile(cover).toString())
                     }
                 }
 
@@ -1021,7 +1084,8 @@ class DownloadWorker(
                                     )
                                     // A big download (a whole profile) saves in batches rather than
                                     // filling the phone's storage with all of it first.
-                                    val shouldSave = synchronized(heldFiles) {
+                                    // A comic's chapter is held whole: its pages go into one .cbz.
+                                    val shouldSave = !comicMode && synchronized(heldFiles) {
                                         heldFiles.size >= HOLD_MAX_FILES || heldFiles.sumOf { it.first.length() } >= HOLD_MAX_BYTES
                                     }
                                     if (shouldSave) {
@@ -1191,7 +1255,12 @@ class DownloadWorker(
                             plan.execute(executor)
                         } finally {
                             DownloadNotes.clear(downloadId)
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { saveHeldFiles() }
+                            // A comic that ran to the end is packed below, after the staging sweep;
+                            // stopped part-way (a pause, a cancel), its pages are saved as they are,
+                            // as a partial .cbz would be one more file when it carries on.
+                            if (!(comicMode && !isStopped)) {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { saveHeldFiles() }
+                            }
                         }
                     } finally {
                         stallWatchdog.cancel()
@@ -1230,11 +1299,15 @@ class DownloadWorker(
                         heldFiles += Triple(f, isAudio, saveFailures[f.name] ?: nextPosition())
                         swept++
                     }
-                    if (swept > 0) {
+                    if (swept > 0 && !comicMode) {
                         DownloadLog.line(applicationContext, downloadId, "saved $swept file(s) left in staging by an earlier run")
                         withContext(NonCancellable) { saveHeldFiles() }
                         dao.setDownloadedItems(downloadId, savedCount.get())
                     }
+                }
+                // The chapter's pages as one .cbz (the rest of what was held saved as usual).
+                if (comicMode && !isStopped) {
+                    withContext(NonCancellable) { packComic() }
                 }
 
                 if (commands.writeInfoFiles || commands.saveThumbnail || commands.saveSubtitleFiles || commands.extrasWriteSidecars) {

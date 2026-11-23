@@ -168,7 +168,10 @@ internal class EngineCommands(
 
     fun galleryDlArgs(excludeVideo: Boolean) = GalleryDlArgs(
         url = url, downloadDir = stagingDir.absolutePath, cookies = cookiesArg,
-        filenameFormat = filenameFormat, extraArgs = galleryDlExtraArgs, archive = galleryArchivePath, limitRate = limitRate,
+        // A comic chapter's pages (packed into one .cbz): named by their page number, as their own
+        // names can all be the same (MangaFire's are all "p"), and gallery-dl skips a name it has.
+        filenameFormat = if (com.comfort.app.data.ComicSites.packs(context, url)) COMIC_FILENAME_FORMAT else filenameFormat,
+        extraArgs = galleryDlExtraArgs, archive = galleryArchivePath, limitRate = limitRate,
         itemFilter = entity?.itemFilter.orEmpty(), excludeVideo = excludeVideo,
         retries = networkRetries, maxFilesize = maxFilesize, writeInfoFiles = writeInfoFiles, proxy = proxyUrl,
         socketTimeout = socketTimeoutSeconds,
@@ -270,3 +273,7 @@ internal class EngineCommands(
         val SIDECAR_FLAG_RE = Regex("""(?<!\S)--write-(description|info-json|subs|auto-subs|thumbnail|all-thumbnails|metadata|tags)(?!\S)""")
     }
 }
+
+/** A comic chapter's page: "<manga> c001 - p0001.jpg". [DownloadWorker.packComic] names the .cbz
+ * after the part before " - p". */
+internal const val COMIC_FILENAME_FORMAT = "{manga|title|category}{chapter:? c//>03}{chapter_minor} - p{page|num:>04}.{extension}"

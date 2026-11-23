@@ -129,6 +129,7 @@ object MediaStoreHelper {
         return when {
             ext == "lrc" -> "Music"
             ext == "srt" || ext == "vtt" -> "Videos"
+            ext == "cbz" -> "Comics"
             mime.startsWith("image/") -> "Pictures"
             mime.startsWith("video/") -> "Videos"
             mime.startsWith("audio/") -> "Music"
@@ -257,6 +258,8 @@ object MediaStoreHelper {
                 "webm" -> "video/webm"
                 "mka" -> "audio/x-matroska"
                 "mp3" -> "audio/mpeg"
+                // A comic chapter (ComicSites): the comic-book archive type readers open.
+                "cbz" -> com.comfort.app.data.ComicSites.MIME
                 "m4a" -> "audio/mp4"
                 "flac" -> "audio/flac"
                 "wav" -> "audio/wav"

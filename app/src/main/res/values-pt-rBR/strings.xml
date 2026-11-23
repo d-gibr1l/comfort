@@ -1303,4 +1303,17 @@
     <string name="welcome_notifications_allow">Permitir notificações</string>
     <string name="welcome_notifications_on">Notificações ativadas</string>
     <string name="welcome_battery_body">Para os downloads continuarem enquanto você usa outros apps e começarem na hora. Sem isso, a economia de bateria do Android pode pausá-los.</string>
+    <string name="comic">Quadrinho</string>
+    <string name="comics">Quadrinhos</string>
+    <string name="save_chapters_as_cbz">Salvar capítulos como .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">Um capítulo de mangá ou quadrinho é salvo como um único arquivo, para ler no Comfort ou em qualquer app de quadrinhos, em vez de imagens soltas na galeria.</string>
+    <string name="comic_sites">Sites de quadrinhos</string>
+    <string name="comic_sites_subtitle">Os capítulos destes sites são salvos como .cbz.</string>
+    <string name="comic_site_add_hint">Adicione um site ou cole um link</string>
+    <string name="comic_cant_open">Não foi possível abrir este quadrinho</string>
+    <string name="comic_no_pages">Este quadrinho não tem páginas</string>
+    <string name="reading_mode">Modo de leitura</string>
+    <string name="reading_right_to_left">Da direita para a esquerda (mangá)</string>
+    <string name="reading_left_to_right">Da esquerda para a direita</string>
+    <string name="reading_vertical">Vertical (webtoon)</string>
 </resources>

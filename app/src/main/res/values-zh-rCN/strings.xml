@@ -1235,4 +1235,17 @@
     <string name="welcome_notifications_allow">允许通知</string>
     <string name="welcome_notifications_on">通知已开启</string>
     <string name="welcome_battery_body">让下载在你使用其他应用时继续进行，并按时开始。否则 Android 的省电功能可能会暂停它们。</string>
+    <string name="comic">漫画</string>
+    <string name="comics">漫画</string>
+    <string name="save_chapters_as_cbz">将章节保存为 .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">漫画章节保存为一个漫画文件，可在 Comfort 或任意漫画应用中阅读，而不是图库中零散的图片。</string>
+    <string name="comic_sites">漫画网站</string>
+    <string name="comic_sites_subtitle">这些网站的章节会保存为 .cbz。</string>
+    <string name="comic_site_add_hint">添加网站或粘贴链接</string>
+    <string name="comic_cant_open">无法打开此漫画</string>
+    <string name="comic_no_pages">此漫画没有页面</string>
+    <string name="reading_mode">阅读模式</string>
+    <string name="reading_right_to_left">从右到左（日漫）</string>
+    <string name="reading_left_to_right">从左到右</string>
+    <string name="reading_vertical">竖向（条漫）</string>
 </resources>

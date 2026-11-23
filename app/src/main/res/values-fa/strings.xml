@@ -1269,4 +1269,17 @@
     <string name="welcome_notifications_allow">اجازهٔ اعلان‌ها</string>
     <string name="welcome_notifications_on">اعلان‌ها روشن است</string>
     <string name="welcome_battery_body">تا دانلودها هنگام استفاده از برنامه‌های دیگر ادامه پیدا کنند و سر وقت شروع شوند. بدون آن، صرفه‌جوی باتری Android ممکن است متوقفشان کند.</string>
+    <string name="comic">کمیک</string>
+    <string name="comics">کمیک‌ها</string>
+    <string name="save_chapters_as_cbz">ذخیرهٔ فصل‌ها به‌صورت ‎.cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">هر فصل مانگا یا کمیک به‌صورت یک فایل کمیک ذخیره می‌شود که در Comfort یا هر برنامهٔ کمیک خوانده می‌شود، نه عکس‌های پراکنده در گالری.</string>
+    <string name="comic_sites">سایت‌های کمیک</string>
+    <string name="comic_sites_subtitle">فصل‌های این سایت‌ها به‌صورت ‎.cbz ذخیره می‌شوند.</string>
+    <string name="comic_site_add_hint">سایتی اضافه کنید یا پیوندی بچسبانید</string>
+    <string name="comic_cant_open">این کمیک باز نشد</string>
+    <string name="comic_no_pages">این کمیک صفحه‌ای ندارد</string>
+    <string name="reading_mode">حالت خواندن</string>
+    <string name="reading_right_to_left">راست به چپ (مانگا)</string>
+    <string name="reading_left_to_right">چپ به راست</string>
+    <string name="reading_vertical">عمودی (وبتون)</string>
 </resources>

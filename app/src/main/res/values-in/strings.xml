@@ -1266,4 +1266,17 @@
     <string name="welcome_notifications_allow">Izinkan notifikasi</string>
     <string name="welcome_notifications_on">Notifikasi aktif</string>
     <string name="welcome_battery_body">Agar unduhan tetap berjalan saat Anda memakai aplikasi lain, dan mulai tepat waktu. Tanpa ini, penghemat baterai Android bisa menjedanya.</string>
+    <string name="comic">Komik</string>
+    <string name="comics">Komik</string>
+    <string name="save_chapters_as_cbz">Simpan bab sebagai .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">Bab manga atau komik disimpan sebagai satu file komik, dibaca di Comfort atau aplikasi komik apa pun, bukan gambar lepas di galeri.</string>
+    <string name="comic_sites">Situs komik</string>
+    <string name="comic_sites_subtitle">Bab dari situs ini disimpan sebagai .cbz.</string>
+    <string name="comic_site_add_hint">Tambah situs atau tempel link</string>
+    <string name="comic_cant_open">Komik ini tidak bisa dibuka</string>
+    <string name="comic_no_pages">Tidak ada halaman di komik ini</string>
+    <string name="reading_mode">Mode baca</string>
+    <string name="reading_right_to_left">Kanan ke kiri (manga)</string>
+    <string name="reading_left_to_right">Kiri ke kanan</string>
+    <string name="reading_vertical">Vertikal (webtoon)</string>
 </resources>

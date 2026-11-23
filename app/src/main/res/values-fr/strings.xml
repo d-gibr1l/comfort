@@ -1303,4 +1303,17 @@
     <string name="welcome_notifications_allow">Autoriser les notifications</string>
     <string name="welcome_notifications_on">Notifications activées</string>
     <string name="welcome_battery_body">Pour que les téléchargements continuent pendant que vous utilisez d\'autres apps, et démarrent à l\'heure. Sans cela, l\'économiseur de batterie d\'Android peut les mettre en pause.</string>
+    <string name="comic">BD</string>
+    <string name="comics">BD et mangas</string>
+    <string name="save_chapters_as_cbz">Enregistrer les chapitres en .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">Un chapitre de manga ou de BD est enregistré en un seul fichier BD, lisible dans Comfort ou toute app de BD, au lieu d\'images éparses dans la galerie.</string>
+    <string name="comic_sites">Sites de BD</string>
+    <string name="comic_sites_subtitle">Les chapitres de ces sites sont enregistrés en .cbz.</string>
+    <string name="comic_site_add_hint">Ajoutez un site ou collez un lien</string>
+    <string name="comic_cant_open">Impossible d\'ouvrir cette BD</string>
+    <string name="comic_no_pages">Aucune page dans cette BD</string>
+    <string name="reading_mode">Mode de lecture</string>
+    <string name="reading_right_to_left">De droite à gauche (manga)</string>
+    <string name="reading_left_to_right">De gauche à droite</string>
+    <string name="reading_vertical">Vertical (webtoon)</string>
 </resources>

@@ -1319,4 +1319,17 @@
     <string name="welcome_notifications_allow">Allow notifications</string>
     <string name="welcome_notifications_on">Notifications are on</string>
     <string name="welcome_battery_body">So downloads keep going while you use other apps, and start on time. Without it, Android\'s battery saver can pause them.</string>
+    <string name="comic">Comic</string>
+    <string name="comics">Comics</string>
+    <string name="save_chapters_as_cbz">Save chapters as .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">A manga or comic chapter is saved as one comic file, read in Comfort or any comic app, instead of loose pictures in your gallery.</string>
+    <string name="comic_sites">Comic sites</string>
+    <string name="comic_sites_subtitle">Chapters from these sites are saved as .cbz.</string>
+    <string name="comic_site_add_hint">Add a site or paste a link</string>
+    <string name="comic_cant_open">Couldn\'t open this comic</string>
+    <string name="comic_no_pages">No pages in this comic</string>
+    <string name="reading_mode">Reading mode</string>
+    <string name="reading_right_to_left">Right to left (manga)</string>
+    <string name="reading_left_to_right">Left to right</string>
+    <string name="reading_vertical">Vertical (webtoon)</string>
 </resources>

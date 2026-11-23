@@ -1272,4 +1272,17 @@
     <string name="welcome_notifications_allow">Consenti notifiche</string>
     <string name="welcome_notifications_on">Notifiche attive</string>
     <string name="welcome_battery_body">Così i download continuano mentre usi altre app e partono in orario. Senza, il risparmio energetico di Android può metterli in pausa.</string>
+    <string name="comic">Fumetto</string>
+    <string name="comics">Fumetti</string>
+    <string name="save_chapters_as_cbz">Salva i capitoli come .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">Un capitolo di manga o fumetto viene salvato come un unico file, da leggere in Comfort o in qualsiasi app di fumetti, invece di immagini sparse nella galleria.</string>
+    <string name="comic_sites">Siti di fumetti</string>
+    <string name="comic_sites_subtitle">I capitoli di questi siti vengono salvati come .cbz.</string>
+    <string name="comic_site_add_hint">Aggiungi un sito o incolla un link</string>
+    <string name="comic_cant_open">Impossibile aprire questo fumetto</string>
+    <string name="comic_no_pages">Nessuna pagina in questo fumetto</string>
+    <string name="reading_mode">Modalità di lettura</string>
+    <string name="reading_right_to_left">Da destra a sinistra (manga)</string>
+    <string name="reading_left_to_right">Da sinistra a destra</string>
+    <string name="reading_vertical">Verticale (webtoon)</string>
 </resources>

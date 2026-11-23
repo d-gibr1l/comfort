@@ -1235,4 +1235,17 @@
     <string name="welcome_notifications_allow">Cho phép thông báo</string>
     <string name="welcome_notifications_on">Đã bật thông báo</string>
     <string name="welcome_battery_body">Để tải xuống tiếp tục khi bạn dùng ứng dụng khác và bắt đầu đúng giờ. Nếu không, trình tiết kiệm pin của Android có thể tạm dừng chúng.</string>
+    <string name="comic">Truyện tranh</string>
+    <string name="comics">Truyện tranh</string>
+    <string name="save_chapters_as_cbz">Lưu chương dưới dạng .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">Mỗi chương manga hoặc truyện tranh được lưu thành một tệp truyện, đọc trong Comfort hoặc ứng dụng truyện bất kỳ, thay vì ảnh rời trong thư viện.</string>
+    <string name="comic_sites">Trang truyện tranh</string>
+    <string name="comic_sites_subtitle">Các chương từ những trang này được lưu dưới dạng .cbz.</string>
+    <string name="comic_site_add_hint">Thêm trang hoặc dán liên kết</string>
+    <string name="comic_cant_open">Không mở được truyện này</string>
+    <string name="comic_no_pages">Truyện này không có trang nào</string>
+    <string name="reading_mode">Chế độ đọc</string>
+    <string name="reading_right_to_left">Phải sang trái (manga)</string>
+    <string name="reading_left_to_right">Trái sang phải</string>
+    <string name="reading_vertical">Dọc (webtoon)</string>
 </resources>

@@ -1303,4 +1303,17 @@
     <string name="welcome_notifications_allow">אישור התראות</string>
     <string name="welcome_notifications_on">ההתראות פועלות</string>
     <string name="welcome_battery_body">כדי שהורדות ימשיכו בזמן שאתה משתמש באפליקציות אחרות ויתחילו בזמן. בלי זה, חיסכון הסוללה של Android עלול להשהות אותן.</string>
+    <string name="comic">קומיקס</string>
+    <string name="comics">קומיקס</string>
+    <string name="save_chapters_as_cbz">שמירת פרקים כ-‎.cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">פרק מנגה או קומיקס נשמר כקובץ קומיקס אחד, לקריאה ב-Comfort או בכל אפליקציית קומיקס, במקום תמונות נפרדות בגלריה.</string>
+    <string name="comic_sites">אתרי קומיקס</string>
+    <string name="comic_sites_subtitle">פרקים מאתרים אלה נשמרים כ-‎.cbz.</string>
+    <string name="comic_site_add_hint">הוספת אתר או הדבקת קישור</string>
+    <string name="comic_cant_open">לא ניתן לפתוח את הקומיקס</string>
+    <string name="comic_no_pages">אין עמודים בקומיקס הזה</string>
+    <string name="reading_mode">מצב קריאה</string>
+    <string name="reading_right_to_left">מימין לשמאל (מנגה)</string>
+    <string name="reading_left_to_right">משמאל לימין</string>
+    <string name="reading_vertical">אנכי (וובטון)</string>
 </resources>

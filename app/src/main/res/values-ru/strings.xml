@@ -1337,4 +1337,17 @@
     <string name="welcome_notifications_allow">Разрешить уведомления</string>
     <string name="welcome_notifications_on">Уведомления включены</string>
     <string name="welcome_battery_body">Чтобы загрузки продолжались, пока вы в других приложениях, и начинались вовремя. Без этого экономия заряда Android может их приостановить.</string>
+    <string name="comic">Комикс</string>
+    <string name="comics">Комиксы</string>
+    <string name="save_chapters_as_cbz">Сохранять главы в .cbz</string>
+    <string name="save_chapters_as_cbz_subtitle">Глава манги или комикса сохраняется одним файлом комикса для чтения в Comfort или любом приложении для комиксов, а не россыпью картинок в галерее.</string>
+    <string name="comic_sites">Сайты комиксов</string>
+    <string name="comic_sites_subtitle">Главы с этих сайтов сохраняются в .cbz.</string>
+    <string name="comic_site_add_hint">Добавьте сайт или вставьте ссылку</string>
+    <string name="comic_cant_open">Не удалось открыть комикс</string>
+    <string name="comic_no_pages">В этом комиксе нет страниц</string>
+    <string name="reading_mode">Режим чтения</string>
+    <string name="reading_right_to_left">Справа налево (манга)</string>
+    <string name="reading_left_to_right">Слева направо</string>
+    <string name="reading_vertical">Вертикально (вебтун)</string>
 </resources>

@@ -1269,4 +1269,17 @@
     <string name="welcome_notifications_allow">Bildirimlere izin ver</string>
     <string name="welcome_notifications_on">Bildirimler açık</string>
     <string name="welcome_battery_body">İndirmeler siz başka uygulamaları kullanırken sürsün ve zamanında başlasın diye. Bu olmadan Android\'in pil tasarrufu onları duraklatabilir.</string>
+    <string name="comic">Çizgi roman</string>
+    <string name="comics">Çizgi romanlar</string>
+    <string name="save_chapters_as_cbz">Bölümleri .cbz olarak kaydet</string>
+    <string name="save_chapters_as_cbz_subtitle">Bir manga ya da çizgi roman bölümü, galeride dağınık resimler yerine Comfort\'ta ya da herhangi bir çizgi roman uygulamasında okunan tek bir dosya olarak kaydedilir.</string>
+    <string name="comic_sites">Çizgi roman siteleri</string>
+    <string name="comic_sites_subtitle">Bu sitelerin bölümleri .cbz olarak kaydedilir.</string>
+    <string name="comic_site_add_hint">Site ekleyin ya da bağlantı yapıştırın</string>
+    <string name="comic_cant_open">Bu çizgi roman açılamadı</string>
+    <string name="comic_no_pages">Bu çizgi romanda sayfa yok</string>
+    <string name="reading_mode">Okuma modu</string>
+    <string name="reading_right_to_left">Sağdan sola (manga)</string>
+    <string name="reading_left_to_right">Soldan sağa</string>
+    <string name="reading_vertical">Dikey (webtoon)</string>
 </resources>

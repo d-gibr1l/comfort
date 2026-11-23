@@ -1235,4 +1235,17 @@
     <string name="welcome_notifications_allow">通知を許可</string>
     <string name="welcome_notifications_on">通知はオンです</string>
     <string name="welcome_battery_body">他のアプリを使っている間もダウンロードが続き、時間どおりに始まるようにします。許可しないと、Android の省電力機能が一時停止することがあります。</string>
+    <string name="comic">コミック</string>
+    <string name="comics">コミック</string>
+    <string name="save_chapters_as_cbz">チャプターを .cbz で保存</string>
+    <string name="save_chapters_as_cbz_subtitle">マンガやコミックのチャプターを、ギャラリーにバラバラの画像としてではなく、Comfort や他のコミックアプリで読める 1 つのファイルとして保存します。</string>
+    <string name="comic_sites">コミックサイト</string>
+    <string name="comic_sites_subtitle">これらのサイトのチャプターは .cbz で保存されます。</string>
+    <string name="comic_site_add_hint">サイトを追加またはリンクを貼り付け</string>
+    <string name="comic_cant_open">このコミックを開けませんでした</string>
+    <string name="comic_no_pages">このコミックにはページがありません</string>
+    <string name="reading_mode">読み方</string>
+    <string name="reading_right_to_left">右から左（マンガ）</string>
+    <string name="reading_left_to_right">左から右</string>
+    <string name="reading_vertical">縦スクロール（ウェブトゥーン）</string>
 </resources>

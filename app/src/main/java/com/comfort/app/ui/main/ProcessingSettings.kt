@@ -541,6 +541,9 @@ internal fun ProcessingSettingsScreen(onBack: () -> Unit, highlightKey: String? 
             }
         }
 
+        // Manga and comic chapters as one .cbz each (ComicSettings).
+        item { ComicsSection() }
+
         item {
             SettingsSection(title = stringResource(R.string.music_downloads), icon = Icons.Outlined.MusicNote) {
                 // The whole setting (title, text, choices) lights up when Settings search jumps here.
