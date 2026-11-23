@@ -115,6 +115,12 @@ class MainActivity : ComponentActivity() {
     super.attachBaseContext(com.comfort.app.util.AppLanguage.wrap(newBase))
   }
 
+  override fun onStart() {
+    super.onStart()
+    // Back from outside the app (or opened): the players glide to the song's position.
+    com.comfort.app.ui.music.markAppStarted()
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Must be called before super.onCreate() — it reads the activity's theme (Theme.App.Starting,
     // set in the manifest) to know which splash to show, and installs the exit-animation hook

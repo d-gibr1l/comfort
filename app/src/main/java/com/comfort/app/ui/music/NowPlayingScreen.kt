@@ -139,7 +139,10 @@ fun NowPlayingScreen(
     var linesHidden by remember { mutableStateOf(playerPrefs.getBoolean(KEY_LYRIC_LINE_HIDDEN, false)) }
     val lyricsShown = showLyrics && lyrics != null
 
-    var position by remember { mutableLongStateOf(0L) }
+    var position by remember { mutableLongStateOf(MusicPlayer.position()) }
+    // What the bar and the lyrics show: glides to [position] as the player opens or the app comes
+    // back, instead of jumping there.
+    val shownPosition by rememberGlidingPosition { position }
     var dragPosition by remember { mutableStateOf<Float?>(null) }
     // Synced lyrics move on line by line (the full view, or the two lines under the cover), so
     // the position is read more often for them.
@@ -334,7 +337,7 @@ fun NowPlayingScreen(
                         if (showingLyrics && shownLyrics != null) {
                             LyricsView(
                                 lyrics = shownLyrics,
-                                positionMs = position,
+                                positionMs = shownPosition,
                                 onSeek = { target ->
                                     MusicPlayer.seekTo(target)
                                     position = target
@@ -372,7 +375,7 @@ fun NowPlayingScreen(
                             if (previewLyrics != null) {
                                 LyricsPreview(
                                     lyrics = previewLyrics,
-                                    positionMs = position,
+                                    positionMs = shownPosition,
                                     onClick = { showLyrics = true },
                                     // Clear of the cover above and the title below.
                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
@@ -410,7 +413,7 @@ fun NowPlayingScreen(
 
                         Spacer(Modifier.height(16.dp))
                         WavySeekBar(
-                            position = dragPosition?.let { (it * state.duration).toLong() } ?: position,
+                            position = dragPosition?.let { (it * state.duration).toLong() } ?: shownPosition,
                             duration = state.duration,
                             playing = state.isPlaying,
                             onDrag = { dragPosition = it },
@@ -461,7 +464,7 @@ fun NowPlayingScreen(
                     } else {
                         QueueLayout(
                             state = state,
-                            position = position,
+                            position = shownPosition,
                             onCloseQueue = { showQueue = false },
                             coverModifier = Modifier.sharedElement(rememberSharedContentState("cover"), anim),
                             titleModifier = Modifier.sharedBounds(rememberSharedContentState("title"), anim),

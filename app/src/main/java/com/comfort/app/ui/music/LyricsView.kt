@@ -177,13 +177,18 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
     val roll = remember(lyrics) { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(lyrics, target) {
         if (target == shown) return@LaunchedEffect
-        if (shown >= 0 && target == shown + 1) {
-            roll.snapTo(0f)
-            roll.animateTo(1f, tween(420, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        try {
+            if (shown >= 0 && target == shown + 1) {
+                roll.snapTo(0f)
+                roll.animateTo(1f, tween(420, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            }
+        } finally {
+            // Rolled, cut short by the next line (the position gliding in as the player opens
+            // runs through them fast: each rolls on from the last), or anything else (a seek,
+            // back a line, several on): the new lines, at rest.
+            shown = target
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { roll.snapTo(0f) }
         }
-        // Rolled, or anything else (a seek, back a line, several on): the new lines, at rest.
-        shown = target
-        roll.snapTo(0f)
     }
     val p = roll.value
 

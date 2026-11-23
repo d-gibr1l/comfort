@@ -58,7 +58,9 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val state by MusicPlayer.state.collectAsState()
     val song = state.song ?: return
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
-    var position by remember { mutableLongStateOf(0L) }
+    var position by remember { mutableLongStateOf(MusicPlayer.position()) }
+    // Glides there as the app comes back, as Now Playing's does.
+    val shownPosition by rememberGlidingPosition { position }
     val openPlayerDescription = stringResource(R.string.now_playing_x_open_player, song.title)
     LaunchedEffect(state.isPlaying, song.id, state.seekId) {
         position = MusicPlayer.position()
@@ -98,7 +100,7 @@ fun MiniPlayer(onOpen: () -> Unit, modifier: Modifier = Modifier) {
             // How far into the song, along the top edge (Auxio's mini player).
             com.comfort.app.ui.MediaLtr {
             LinearProgressIndicator(
-                progress = { if (state.duration > 0) (position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f },
+                progress = { if (state.duration > 0) (shownPosition.toFloat() / state.duration).coerceIn(0f, 1f) else 0f },
                 strokeCap = StrokeCap.Butt,
                 gapSize = 0.dp,
                 drawStopIndicator = {},
