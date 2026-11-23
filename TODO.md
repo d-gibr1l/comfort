@@ -61,6 +61,21 @@
 - [ ] Add a view mode for multi-item downloads so users can browse or inspect all items in a batch instead of only seeing the download count and the first item (for the queue check "C:\Users\domin\Downloads\multi_download_batch_view_implementation.md" and for the library check "C:\Users\domin\Downloads\library_card_trailing_stack_icon_batch_view.md"). *(Library half done 2026-11-23, to be tested; the Queue half left)*
 - [ ] Add a setting in Settings (e.g. Processing / Downloads) to package chapters into `.cbz` archives using `ZipOutputStream` instead of leaving loose image files in the gallery, pre-configured with known manga sites (MangaDex, MangaFire, etc.) and allowing sites to be added and removed (similar to "Which engine each site uses"). *(Done 2026-11-23, to be tested: Settings › Processing › Comics; chapters land in Pictures/Comfort/Comics as one .cbz, its first page the Library picture)*
 - [ ] Add native support for reading `.cbz` files with a built-in comic/manga viewer (supporting right-to-left manga paging, webtoon vertical scrolling, and cover thumbnails in the Library). *(Done 2026-11-23, to be tested: tap a comic in the Library, or open a .cbz from a file manager; the ⋮ in the reader switches the reading mode, and the last page read is remembered)*
+- [ ] Comic reader: pinch and double-tap zoom in the vertical (webtoon) mode too. *(Done 2026-11-23, builds, not on the phone yet)*
+- [ ] Comic reader: turn the reading mode button (bottom right) into a reader settings bottom sheet, designed like the music settings (SheetHeader, icon sections, the reading mode as three chips at the top; settings for the other modes hidden). Settings, after TachiyomiJ2K's reader (defaults in brackets):
+  - Reading mode: right to left / left to right / vertical (webtoon) [right to left]
+  - Page scale (paged modes): fit screen / fit width / fit height / original size / smart fit [fit screen]
+  - Background: black / white / gray / automatic, from the page's edges [automatic]
+  - Tap zones: left-right / L-shape / Kindle / edges / off, with "invert" [L-shape]
+  - Volume keys turn pages [off]
+  - Crop borders, paged and webtoon separately [off]
+  - Webtoon side padding: 0 / 5 / 10 / 15 / 20 / 25 % [0]
+  - Page transitions, animated page turns [on]
+  - Orientation: free / portrait / landscape / locked portrait / locked landscape [free]
+  - Keep screen on [on]
+  - Show page number [on]
+  - Fullscreen, system bars hidden [on]
+  - Maybe later: brightness and color filters, grayscale, inverted colors, two-page spreads in landscape, zoom start position (left / right / center).
 - [x] Change the loading indicator on the "Looking at what's there…" preview sheet to the Material 3 Expressive loading indicator that morphs and cycles through shapes.
 - [x] Fix long-press selecting in the Library on a card near the bottom (under the nav bar): pressing it starts the drag-select's auto-scroll at once, so the list scrolls down and selects every item below. The bottom edge zone that scrolls should start above the nav bar, not include it (seen on the Library list, 2026-11-23).
 

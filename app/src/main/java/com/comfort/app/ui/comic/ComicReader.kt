@@ -1,5 +1,15 @@
 package com.comfort.app.ui.comic
 
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.composed
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import android.content.Context
@@ -92,6 +102,9 @@ class ComicPageFetcher(private val page: ComicPage, private val options: Options
  * one long strip scrolled down. */
 enum class ReadingMode { RIGHT_TO_LEFT, LEFT_TO_RIGHT, VERTICAL }
 
+/** How long a double-tap zoom takes. */
+private const val ZOOM_MS = 320
+
 private const val PREFS = "comic_reader"
 private val IMAGE = Regex("""\.(jpe?g|png|webp|gif|avif|bmp)$""", RegexOption.IGNORE_CASE)
 
@@ -169,7 +182,7 @@ fun ComicReader(request: ComicRequest, onClose: () -> Unit) {
                     }
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { bars = !bars }) },
+                        modifier = Modifier.fillMaxSize().webtoonZoom(listState, onTap = { bars = !bars }),
                     ) {
                         items(pages.size) { i ->
                             coil.compose.AsyncImage(
@@ -288,6 +301,7 @@ private fun BoxScope.BottomBar(current: Int, count: Int, rtl: Boolean, visible: 
  * normal size), double-tap to zoom in where tapped and back out. */
 @Composable
 private fun ZoomablePage(page: ComicPage, onTap: () -> Unit) {
+    val zoomScope = rememberCoroutineScope()
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     val state = rememberTransformableState { zoom, pan, _ ->
@@ -301,9 +315,15 @@ private fun ZoomablePage(page: ComicPage, onTap: () -> Unit) {
                 detectTapGestures(
                     onTap = { onTap() },
                     onDoubleTap = { at ->
-                        if (scale > 1f) { scale = 1f; offset = Offset.Zero } else {
-                            scale = 2.5f
-                            offset = Offset((size.width / 2f - at.x) * 1.5f, (size.height / 2f - at.y) * 1.5f)
+                        // Eased in (or out) toward where it was tapped, not snapped there.
+                        val s0 = scale; val o0 = offset
+                        val s1 = if (scale > 1f) 1f else 2.5f
+                        val o1 = if (s1 == 1f) Offset.Zero else Offset((size.width / 2f - at.x) * (s1 - 1f), (size.height / 2f - at.y) * (s1 - 1f))
+                        zoomScope.launch {
+                            androidx.compose.animation.core.animate(0f, 1f, animationSpec = androidx.compose.animation.core.tween(ZOOM_MS)) { t, _ ->
+                                scale = s0 + (s1 - s0) * t
+                                offset = o0 + (o1 - o0) * t
+                            }
                         }
                     },
                 )
@@ -321,4 +341,104 @@ private fun ZoomablePage(page: ComicPage, onTap: () -> Unit) {
             },
         )
     }
+}
+
+/** Zoom for the vertical (webtoon) strip: pinch or double-tap to zoom the whole strip, then drag
+ * to move sideways and scroll; at normal size the list scrolls and flings as usual. Zoomed, one
+ * finger's drag is taken here so the strip follows the finger (the list alone would move a zoomed
+ * strip [scale] times faster), with a fling of its own on release. A pinch zooms in where the
+ * fingers are, and the zoomed strip also moves up and down by itself ([offsetY]) where the list
+ * can't scroll further: the first page's top and the last page's bottom (zoomed around the middle,
+ * they were off the screen with no way to reach them). */
+private fun Modifier.webtoonZoom(listState: androidx.compose.foundation.lazy.LazyListState, onTap: () -> Unit): Modifier = composed {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    var width by remember { mutableIntStateOf(0) }
+    var height by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val decay = androidx.compose.animation.rememberSplineBasedDecay<Float>()
+    fun clampX(x: Float) = (width * (scale - 1f) / 2f).let { max -> x.coerceIn(-max, max) }
+    fun clampY(y: Float) = (height * (scale - 1f) / 2f).let { max -> y.coerceIn(-max, max) }
+    // A vertical move on the screen (down is positive): the strip's own offset back toward the
+    // middle first, then the list, and what the list can't take (at its top or end) the offset.
+    fun moveY(dy: Float) {
+        var rest = dy
+        if (rest > 0f && offsetY < 0f) { val m = minOf(rest, -offsetY); offsetY += m; rest -= m }
+        if (rest < 0f && offsetY > 0f) { val m = maxOf(rest, -offsetY); offsetY += m; rest -= m }
+        if (rest != 0f) rest += listState.dispatchRawDelta(-rest / scale) * scale
+        if (rest != 0f) offsetY = clampY(offsetY + rest)
+    }
+    this
+        .onSizeChanged { width = it.width; height = it.height }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onTap = { onTap() },
+                onDoubleTap = { at ->
+                    // Eased in (or out) toward where it was tapped, not snapped there.
+                    val s0 = scale; val x0 = offsetX; val y0 = offsetY
+                    val s1 = if (scale > 1f) 1f else 2.5f
+                    val x1 = if (s1 == 1f) 0f else ((width / 2f - at.x) * (s1 - 1f)).coerceIn(-width * (s1 - 1f) / 2f, width * (s1 - 1f) / 2f)
+                    val y1 = if (s1 == 1f) 0f else ((height / 2f - at.y) * (s1 - 1f)).coerceIn(-height * (s1 - 1f) / 2f, height * (s1 - 1f) / 2f)
+                    scope.launch {
+                        androidx.compose.animation.core.animate(0f, 1f, animationSpec = androidx.compose.animation.core.tween(ZOOM_MS)) { t, _ ->
+                            scale = s0 + (s1 - s0) * t
+                            offsetX = x0 + (x1 - x0) * t
+                            offsetY = y0 + (y1 - y0) * t
+                        }
+                    }
+                },
+            )
+        }
+        .pointerInput(Unit) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                var dragged = false
+                do {
+                    val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    val pressed = event.changes.count { it.pressed }
+                    if (pressed >= 2) {
+                        // Zoomed around the fingers: the point between them stays under them.
+                        val newScale = (scale * event.calculateZoom()).coerceIn(1f, 5f)
+                        val z = newScale / scale
+                        val c = event.calculateCentroid()
+                        if (c != Offset.Unspecified) {
+                            offsetX = c.x - width / 2f - (c.x - width / 2f - offsetX) * z
+                            offsetY = c.y - height / 2f - (c.y - height / 2f - offsetY) * z
+                        }
+                        scale = newScale
+                        val pan = event.calculatePan()
+                        offsetX = clampX(offsetX + pan.x)
+                        offsetY = clampY(offsetY)
+                        moveY(pan.y)
+                        if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+                        event.changes.forEach { it.consume() }
+                        dragged = false
+                    } else if (scale > 1f && pressed == 1) {
+                        val change = event.changes.first { it.pressed }
+                        tracker.addPosition(change.uptimeMillis, change.position)
+                        val d = change.positionChange()
+                        if (d != Offset.Zero) {
+                            dragged = true
+                            offsetX = clampX(offsetX + d.x)
+                            moveY(d.y)
+                            change.consume()
+                        }
+                    }
+                } while (event.changes.any { it.pressed })
+                if (dragged && scale > 1f) {
+                    val vy = tracker.calculateVelocity().y / scale
+                    scope.launch {
+                        listState.scroll {
+                            var last = 0f
+                            androidx.compose.animation.core.AnimationState(0f, -vy).animateDecay(decay) {
+                                scrollBy(value - last); last = value
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .graphicsLayer { scaleX = scale; scaleY = scale; translationX = offsetX; translationY = offsetY }
 }
