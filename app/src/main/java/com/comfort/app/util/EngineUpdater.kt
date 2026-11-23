@@ -397,7 +397,9 @@ object EngineUpdater {
                             onUpdated(status, newVersion)
                             status.copy(installedVersion = newVersion)
                         } ?: run {
-                            if (res.exceptionOrNull()?.message?.contains("download running", ignoreCase = true) == true) {
+                            // A download started meanwhile (the message is translated, so not
+                            // matched on its words: it never matched, and showed as a failure).
+                            if (res.exceptionOrNull() is DownloadRunningException) {
                                 deferredDueToRunning = true
                                 // Not a failure: it waits for the download to end.
                                 onUpdated(status, "")
@@ -418,6 +420,10 @@ object EngineUpdater {
         }
         statuses
     }
+
+    /** An update put off because a download is running (replacing an engine under it would crash
+     * it): not a failure; it's tried again once downloads are done. */
+    class DownloadRunningException(message: String) : IllegalStateException(message)
 
     /** Which app engine [info] is — for its on/off switch. */
     fun downloadEngineOf(info: EngineInfo): com.comfort.app.data.DownloadEngine = when (info) {
@@ -459,7 +465,7 @@ object EngineUpdater {
                 // stop being true between when the user opened this screen and when they tapped
                 // Update.
                 if (AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()) {
-                    error(context.getString(com.comfort.app.R.string.engine_update_download_running))
+                    throw DownloadRunningException(context.getString(com.comfort.app.R.string.engine_update_download_running))
                 }
                 if (!PythonRuntime.ensureProvisioned(context)) error("Python runtime isn't provisioned yet")
 
@@ -511,7 +517,7 @@ object EngineUpdater {
                     // Atomic swap with automatic rollback protection
                     PythonRuntime.withProvisionLock {
                         if (AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()) {
-                            error(context.getString(com.comfort.app.R.string.engine_update_download_running))
+                            throw DownloadRunningException(context.getString(com.comfort.app.R.string.engine_update_download_running))
                         }
 
                         val backupDir = File(sitePackages.parentFile, ".backup-${engine.packageDirName}-${System.nanoTime()}").apply {

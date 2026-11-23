@@ -102,7 +102,25 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             },
         )
         summarizeIfDone()
+        // Put off for a running download: checked again once downloads are done.
+        // Only while one is running (a real failure isn't retried over and over).
+        if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context) &&
+            statuses.any { it.updateAvailable && it.artifactUrl != null && EngineUpdater.isOn(context, it.engine) } &&
+            withContext(Dispatchers.IO) { com.comfort.app.data.AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty() }
+        ) retryWhenIdle { viewModelScope.launch { publishEngines(checkAndAutoUpdate()) } }
         return statuses
+    }
+
+    private var idleRetry: kotlinx.coroutines.Job? = null
+
+    /** [action] once no download is running (checked every few seconds), once. */
+    private fun retryWhenIdle(action: () -> Unit) {
+        if (idleRetry?.isActive == true) return
+        idleRetry = viewModelScope.launch {
+            val dao = com.comfort.app.data.AppDatabase.getDatabase(context).downloadDao()
+            do { kotlinx.coroutines.delay(5_000) } while (withContext(Dispatchers.IO) { dao.getRunningOnce().isNotEmpty() })
+            action()
+        }
     }
 
     /** The engines updating now, by name (for "Updating yt-dlp and gallery-dl…"). */
@@ -234,6 +252,11 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
                     publishEngines(updated)
                 }
                 result.onFailure { e ->
+                    if (e is EngineUpdater.DownloadRunningException) {
+                        // A download is running: no "Couldn't update"; tried again once it's done.
+                        retryWhenIdle { updateEngine(status) }
+                        return@onFailure
+                    }
                     announceFailure(status)
                     _engineError.value = getApplication<Application>().getString(com.comfort.app.R.string.couldn_t_update_engine, status.engine.displayName, e.message ?: getApplication<Application>().getString(com.comfort.app.R.string.unknown_error))
                 }
