@@ -45,7 +45,7 @@
 - [x] Make video scrubbing land on the exact timestamp being scrubbed rather than snapping away.
 - [x] Apply a horizontal slide-in transition across all applicable navigation routes so that the moment you tap, the new screen immediately slides in from the right while pushing the current screen out to the left along a smooth, fast-to-slow curve with zero delay.
 - [x] Make lyrics and the progress bar progress smoothly to their current playback position instead of snapping when the app was playing in the background before opening.
-- [ ] Redesign the time wheel for scheduling. *(Done 2026-11-23, to be tested)*
+- [x] Redesign the time wheel for scheduling. *(Done and confirmed 2026-11-23: a drum on a capsule, tap to type, AM/PM sliding as the nav bar; the schedule's picker a compact sheet)*
 - [x] Fix the brief pause or stutter in the currently playing song right as the next song begins playing when crossfade is enabled.
 - [x] Update the item count for multi-item downloads so it automatically decreases when individual files are deleted from the device.
 - [x] Label playlist downloads with the playlist title and uploader name rather than the first item's details, and include a fallback so it still names properly if either value is missing.
