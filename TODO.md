@@ -15,8 +15,8 @@
 - [x] Make the audio format picker scrollable when there is not enough space so parts of long format names are not cut off.
 - [x] Fix the awkward text wrapping and oversized button on the "Updates available" engine card when an engine is on a commit or branch version (e.g. gallery-dl on Master): don't prepend "v" to non-numeric versions (avoids "vmaster-..."), shorten commit hashes or compact the button text so it doesn't squish the left column, and prevent the installed version text from breaking onto a second line ("08").
 - [x] Add tactile vibrations to buttons and sliders in music settings, as well as to the lyrics icon on the main settings page.
-- [ ] Turn the FAB on the library page back to the arch shape.
-- [ ] There are two incognito buttons on the download sheet, remove all.
+- [ ] Turn the FAB on the library page back to the arch shape. *(Done 2026-11-23, to be tested)*
+- [ ] There are two incognito buttons on the download sheet, remove all. *(Done 2026-11-23, to be tested: the duplicate chip removed, one Incognito chip left)*
 - [x] Update the lyrics icon on the Now Playing sheet so that when "lyrics line" is off in settings, tapping it opens the full lyrics view, and when "lyrics line" is on, tapping it acts as a toggle.
 - [x] Add a snackbar notification when an engine is updating.
 - [x] Combine or aggregate update notifications so updating two or more engines at once shows a single consolidated snackbar instead of conflicting messages.
@@ -24,40 +24,41 @@
 - [x] Add settings to toggle swipe gestures in the Library and Queue.
 - [x] Add a custom duration option to the music player sleep timer.
 - [x] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
-- [ ] Prevent yt-dlp and gallery-dl from running instagram links when instaloader is on.
-- [ ] Add an option to view logs for each download in library.
-- [ ] I deleted the item thats the thumbnail in the library of comfort and when i tapped on it, it opened the first item in the library instead of opening the items left of that download.
+- [ ] Prevent yt-dlp and gallery-dl from running instagram links when instaloader is on. *(Done 2026-11-23, to be tested)*
+- [ ] Add an option to view logs for each download in library. *(Done 2026-11-23, to be tested)*
+- [ ] I deleted the item thats the thumbnail in the library of comfort and when i tapped on it, it opened the first item in the library instead of opening the items left of that download. *(Done 2026-11-23, to be tested)*
 - [x] Prevent scrolling inside the "Current Command" code box from passing through to the mini header or outer page on the Advanced screen, and prevent downward scrolling on it from pulling down or dismissing the preview bottom sheet (isolate command box scrolling).
 - [x] Prevent continuous downward scrolling on content inside a bottom modal sheet from pulling the sheet down to dismiss it.
 - [x] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
 - [x] Redesign the new template popup into a bottom modal sheet.
 - [x] Redesign the audio language picker into a bottom modal sheet.
-- [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings, and a video details section there showing genuinely useful information (resolution, codec, frame rate, bitrate, duration, size) in place of the deep EXIF view's (moved from its own line).
+- [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings, and a video details section there showing genuinely useful information (resolution, codec, frame rate, bitrate, duration, size) in place of the deep EXIF view's (moved from its own line). *(Done 2026-11-23, to be tested)*
 - [x] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
 - [x] Add an incognito option to the download preview sheet.
 - [x] Fix the visual flicker when an item is moved in the music queue.
-- [ ] There's a flicker when moving an already played item below the currently playing one.t
-- [ ] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players.
-- [ ] Let the apps snackbar for finished or failed downloads show even when im not in the queue page, also prevent snackbars from appearing in the video player.
-- [ ] When im playing a video and i leave the app and open a downloaded video from the notification it goes back to playing the video that was playing before i left the app.
+- [ ] There's a flicker when moving an already played item below the currently playing one.t *(Done 2026-11-23, to be tested)*
+- [ ] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players. *(Done 2026-11-23, to be tested: Settings › Look & feel › Players)*
+- [ ] Let the apps snackbar for finished or failed downloads show even when im not in the queue page, also prevent snackbars from appearing in the video player. *(Done 2026-11-23, to be tested)*
+- [ ] When im playing a video and i leave the app and open a downloaded video from the notification it goes back to playing the video that was playing before i left the app. *(Done 2026-11-23, to be tested)*
+- [ ] Opening a sub-page in the music settings and going back closes the main one too, fix that. *(Done 2026-11-23, to be tested)*
 - [x] Add a "Block" option to the More Options menu in the supported sites sheet so the app refuses to download from blocked sites.
 - [x] Prevent thumbnails from showing before the video starts playing in the video viewer.
 - [x] Make video scrubbing land on the exact timestamp being scrubbed rather than snapping away.
 - [x] Apply a horizontal slide-in transition across all applicable navigation routes so that the moment you tap, the new screen immediately slides in from the right while pushing the current screen out to the left along a smooth, fast-to-slow curve with zero delay.
 - [x] Make lyrics and the progress bar progress smoothly to their current playback position instead of snapping when the app was playing in the background before opening.
-- [ ] Redesign the time wheel for scheduling.
+- [ ] Redesign the time wheel for scheduling. *(Done 2026-11-23, to be tested)*
 - [x] Fix the brief pause or stutter in the currently playing song right as the next song begins playing when crossfade is enabled.
 - [x] Update the item count for multi-item downloads so it automatically decreases when individual files are deleted from the device.
 - [x] Label playlist downloads with the playlist title and uploader name rather than the first item's details, and include a fallback so it still names properly if either value is missing.
 - [x] When canceling a playlist download that already has completed items, move the finished tracks into the Library instead of marking the entire batch as canceled, allowing users to download any remaining items using the "Download Missing Items" button.
 - [x] Add a "Download missing items" action to More Options on the download sheets in the Library.
 - [x] **Deleted files in multi-item downloads (one task, covers the two items above about the item count and "Download missing items"):** notice when some of a download's files have been deleted from the phone (each saved file is recorded with its place in the download, saved_files.position — check each still exists). Then (1) the card's item count drops to what's really there, and (2) "Download missing items" appears in the card's ⋮ menu and fetches exactly those items again: re-run the download limited to the missing item numbers (the same itemFilter a gallery pick uses) with the engines' memory of those items cleared, since each skips what its archive says it already fetched (yt-dlp's .ytdlp.txt, gallery-dl's .sqlite3, Instaloader's .instaloader.txt — that's why trying it on a complete download did nothing). Only offer it when something is actually missing. Older downloads that recorded only their first file can't say which item a deleted file was.
-- [ ] Investigate and fix why music does not appear after a backup is restored.
-- [ ] Investigate and fix why restored backup items fail to appear in the Library even though they show up in the homepage's recently downloaded section.
-- [ ] Investigate and resolve slow music download speeds across the downloader pipeline and network layer.
-- [ ] Create a welcome screen for first-time installers with key initial options like choosing default download quality and setup preferences.
-- [ ] Add proper support for landscape mode across the app, especially in the music player layout.
-- [ ] Add a view mode for multi-item downloads so users can browse or inspect all items in a batch instead of only seeing the download count and the first item (for the queue check "C:\Users\domin\Downloads\multi_download_batch_view_implementation.md" and for the library check "C:\Users\domin\Downloads\library_card_trailing_stack_icon_batch_view.md").
+- [ ] Investigate and fix why music does not appear after a backup is restored. *(Fix done 2026-11-23, to be tested: files hidden from the app after a reinstall were taken for deleted)*
+- [ ] Investigate and fix why restored backup items fail to appear in the Library even though they show up in the homepage's recently downloaded section. *(Fix done 2026-11-23, to be tested: same cause as the line above)*
+- [ ] Investigate and resolve slow music download speeds across the downloader pipeline and network layer. *(Investigated 2026-11-23, nothing changed yet: per song ~6.5 s solving YouTube's JS challenge, ~3.5 s of page and player requests, ~4.4 s downloading at ~1 MB/s; needs the phone to try changes)*
+- [ ] Create a welcome screen for first-time installers with key initial options like choosing default download quality and setup preferences. *(Done 2026-11-23, to be tested: also asks for unrestricted battery)*
+- [ ] Add proper support for landscape mode across the app, especially in the music player layout. *(Music player done 2026-11-23, to be tested; the rest of the app left)*
+- [ ] Add a view mode for multi-item downloads so users can browse or inspect all items in a batch instead of only seeing the download count and the first item (for the queue check "C:\Users\domin\Downloads\multi_download_batch_view_implementation.md" and for the library check "C:\Users\domin\Downloads\library_card_trailing_stack_icon_batch_view.md"). *(Library half done 2026-11-23, to be tested; the Queue half left)*
 - [ ] Add a setting in Settings (e.g. Processing / Downloads) to package chapters into `.cbz` archives using `ZipOutputStream` instead of leaving loose image files in the gallery, pre-configured with known manga sites (MangaDex, MangaFire, etc.) and allowing sites to be added and removed (similar to "Which engine each site uses").
 - [ ] Add native support for reading `.cbz` files with a built-in comic/manga viewer (supporting right-to-left manga paging, webtoon vertical scrolling, and cover thumbnails in the Library).
 - [x] Change the loading indicator on the "Looking at what's there…" preview sheet to the Material 3 Expressive loading indicator that morphs and cycles through shapes.
