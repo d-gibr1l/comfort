@@ -656,7 +656,12 @@ internal fun HistoryRow(
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.title.ifBlank { item.url },
+                // A song: the title without "Artist - " in front when the line below already
+                // names the artist (it read "Julianna Joy - Cherry Bomb" over "Julianna Joy —
+                // Cherry Bomb", the artist twice).
+                text = remember(item.title, item.artist, item.isAudio) {
+                    songTitle(item.title, item.artist.takeIf { item.isAudio })
+                }.ifBlank { item.url },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -1000,4 +1005,14 @@ internal fun LibraryThumbnail(item: DownloadEntity, modifier: Modifier = Modifie
             )
         }
     }
+}
+
+/** [title] without its leading "[artist] - " (any case, any dash), when it has one and something
+ * is left after it; otherwise [title] as it is. */
+internal fun songTitle(title: String, artist: String?): String {
+    val name = artist?.trim()?.takeIf { it.isNotEmpty() } ?: return title
+    if (!title.startsWith(name, ignoreCase = true)) return title
+    val rest = title.substring(name.length)
+    val m = Regex("""^\s*[-–—]\s*""").find(rest) ?: return title
+    return rest.substring(m.range.last + 1).trim().ifEmpty { title }
 }
