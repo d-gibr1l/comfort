@@ -54,6 +54,7 @@
 - [ ] Add a setting in Settings (e.g. Processing / Downloads) to package chapters into `.cbz` archives using `ZipOutputStream` instead of leaving loose image files in the gallery, pre-configured with known manga sites (MangaDex, MangaFire, etc.) and allowing sites to be added and removed (similar to "Which engine each site uses").
 - [ ] Add native support for reading `.cbz` files with a built-in comic/manga viewer (supporting right-to-left manga paging, webtoon vertical scrolling, and cover thumbnails in the Library).
 - [x] Change the loading indicator on the "Looking at what's there…" preview sheet to the Material 3 Expressive loading indicator that morphs and cycles through shapes.
+- [ ] Fix long-press selecting in the Library on a card near the bottom (under the nav bar): pressing it starts the drag-select's auto-scroll at once, so the list scrolls down and selects every item below. The bottom edge zone that scrolls should start above the nav bar, not include it (seen on the Library list, 2026-11-23).
 
 ## Technical Debt & Refactoring
 - [x] **Componentize Monoliths:** *(done in e5a97ec — MoreScreen.kt split into SettingsScreen, SettingsComponents and one file per Settings page)* Break up massive files, specifically MoreScreen.kt (4,350+ lines) into separate feature screens (e.g., SettingsScreen.kt, AboutScreen.kt, EnginesScreen.kt) and move reusable UI components into Components.kt.
