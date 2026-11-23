@@ -589,7 +589,6 @@ fun MediaViewerScreen(
                     Box(modifier = Modifier.fillMaxSize()) {
                         VideoPlayerItem(
                             uri = resolvedUri,
-                            placeholderKey = com.comfort.app.util.thumbnailCacheKey(item.id),
                             isCurrentPage = page == pagerState.currentPage,
                             showControls = showUi,
                             muted = videosMuted,

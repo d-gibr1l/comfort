@@ -66,8 +66,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 @Composable
 fun VideoPlayerItem(
     uri: Uri,
-    /** Comfort: the memory-cache key of its Library thumbnail, shown at once until the first frame. */
-    placeholderKey: String? = null,
     isCurrentPage: Boolean,
     showControls: Boolean,
     modifier: Modifier = Modifier,
@@ -85,7 +83,6 @@ fun VideoPlayerItem(
 ) {
     VideoPlayerItemWithResolvedUri(
         uri = uri,
-        placeholderKey = placeholderKey,
         isCurrentPage = isCurrentPage,
         showControls = showControls,
         muted = muted,
@@ -103,7 +100,6 @@ fun VideoPlayerItem(
 @Composable
 fun VideoPlayerItemWithResolvedUri(
     uri: Uri,
-    placeholderKey: String? = null,
     isCurrentPage: Boolean,
     showControls: Boolean,
     modifier: Modifier = Modifier,
@@ -330,9 +326,36 @@ fun VideoPlayerItemWithResolvedUri(
                 if (videoAspectRatio == null) delay(400)
                 surfaceReady = true
             }
+            // Comfort: the video's own first frame until the player's is up, beneath the player
+            // (a TextureView: see viewer_player_view.xml), which covers it once it draws. Not the
+            // Library's thumbnail: for a download with an embedded cover that's the site's
+            // thumbnail, which flashed up before the video (reported). The frame is where playback
+            // starts, so the video takes over from it without a change. Full size and fitted, as
+            // the video is: the same place, whatever the player's box.
+            var frameGone by remember(uri) { mutableStateOf(false) }
+            LaunchedEffect(firstFrameShown) {
+                // A moment after the first frame, so it's surely on screen over this one.
+                if (firstFrameShown) { delay(300); frameGone = true }
+            }
+            if (!frameGone) {
+                coil.compose.AsyncImage(
+                    model = remember(uri) {
+                        coil.request.ImageRequest.Builder(context).data(uri).size(720)
+                            .setParameter(com.comfort.app.util.AppImageLoader.PARAM_VIDEO_FRAME, true, memoryCacheKey = "frame")
+                            // The same frame the viewer showed while opening (MediaViewerHost), at
+                            // once: decoded again, the page was black for a few frames meanwhile.
+                            .placeholderMemoryCacheKey(viewerOpeningKey(uri.toString()))
+                            .crossfade(false)
+                            .build()
+                    },
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (surfaceReady) AndroidView(
                 factory = { ctx ->
-                    PlayerView(ctx).apply {
+                    (android.view.LayoutInflater.from(ctx).inflate(R.layout.viewer_player_view, null) as PlayerView).apply {
                         // Comfort: the built-in controller off before the player is attached:
                         // attaching it first showed the controller, and turning it off after
                         // only faded it out, so it flashed on every video swiped to.
@@ -357,21 +380,6 @@ fun VideoPlayerItemWithResolvedUri(
                 },
                 modifier = playerModifier
             )
-            // Comfort: the thumbnail until the first frame is up — over the player, not under it:
-            // the surface is a hole in the window, black until it draws, and it hid a thumbnail
-            // drawn beneath it. The Library's thumbnail shows at once (placeholderMemoryCacheKey).
-            if (!firstFrameShown) {
-                coil.compose.AsyncImage(
-                    model = remember(uri) {
-                        coil.request.ImageRequest.Builder(context).data(uri).size(720)
-                            .placeholderMemoryCacheKey(placeholderKey)
-                            .build()
-                    },
-                    contentDescription = null,
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                    modifier = if (surfaceReady) playerModifier.background(Color.Black) else Modifier.fillMaxSize(),
-                )
-            }
         }
 
         // Center Play/Pause button
@@ -521,3 +529,7 @@ private fun formatTime(ms: Long): String {
     val seconds = totalSeconds % 60
     return String.format("%02d:%02d", minutes, seconds)
 }
+
+/** The memory-cache key of the picture MediaViewerHost shows while the viewer opens on [file]; the
+ * page then uses it until its own is ready, so nothing blank shows in between. */
+internal fun viewerOpeningKey(file: String) = "viewer-opening:$file"

@@ -21,6 +21,11 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
 object AppImageLoader {
+    /** A request parameter: the video's own first frame (VideoFrameDecoder), not its MediaStore
+     * thumbnail — which for a download with an embedded cover is that cover (the site's thumbnail),
+     * nothing like the video. The viewer's stand-in until playback starts uses it. */
+    const val PARAM_VIDEO_FRAME = "comfort.video_frame"
+
     /** Coil's default OkHttp dispatcher caps at 5 concurrent requests per host, which throttles
      * the share picker badly — a dozen-plus preview thumbnails all come from the same CDN host,
      * so most of them just queue behind the first 5 instead of loading in parallel. */
@@ -136,7 +141,8 @@ private class MediaStoreThumbnailFetcher(
     class Factory : Fetcher.Factory<Uri> {
         override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                data.scheme == "content" && data.authority == MediaStore.AUTHORITY
+                data.scheme == "content" && data.authority == MediaStore.AUTHORITY &&
+                options.parameters.value<Boolean>(AppImageLoader.PARAM_VIDEO_FRAME) != true
             ) {
                 MediaStoreThumbnailFetcher(data, options)
             } else {

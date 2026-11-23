@@ -109,10 +109,22 @@ fun MediaViewerHost(
             request.downloads.firstOrNull { it.id == request.startId }?.let { tapped ->
                 val file = tapped.mediaUri ?: tapped.thumbnailPath
                 if (file != null) {
+                    // A video: its first frame, as its page will show it until it plays — not the
+                    // Library thumbnail meanwhile, which for one with an embedded cover is the
+                    // site's thumbnail (it flashed up first, reported).
+                    val isVideo = remember(file) {
+                        tapped.mediaUri?.let { runCatching { context.contentResolver.getType(android.net.Uri.parse(it)) }.getOrNull() }
+                            ?.startsWith("video/") == true
+                    }
                     coil.compose.AsyncImage(
                         model = remember(file) {
                             coil.request.ImageRequest.Builder(context).data(file)
-                                .placeholderMemoryCacheKey(com.comfort.app.util.thumbnailCacheKey(tapped.id))
+                                // The page picks this up at once (see viewerOpeningKey).
+                                .memoryCacheKey(viewerOpeningKey(file))
+                                .apply {
+                                    if (isVideo) setParameter(com.comfort.app.util.AppImageLoader.PARAM_VIDEO_FRAME, true, memoryCacheKey = "frame")
+                                    else placeholderMemoryCacheKey(com.comfort.app.util.thumbnailCacheKey(tapped.id))
+                                }
                                 .build()
                         },
                         contentDescription = null,
