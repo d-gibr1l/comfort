@@ -160,10 +160,13 @@ internal fun LibraryHeader(
         Column(modifier = Modifier.fillMaxWidth()) {
         run {
             val expanded = searchExpanded
+            // Landscape: the title up beside the buttons, not under them (76dp down left a phone on
+            // its side with one card under the header); the row stops short of the buttons.
+            val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 12.dp, top = 76.dp, bottom = 2.dp),
+                    .padding(start = 20.dp, end = if (landscape) 176.dp else 12.dp, top = if (landscape) 8.dp else 76.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (expanded) {

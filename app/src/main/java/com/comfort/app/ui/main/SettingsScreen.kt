@@ -561,6 +561,38 @@ private fun ExpressiveSettingsList(items: List<SettingsItemSpec>, emptyMessage: 
         }
         return
     }
+    // Landscape: two columns of rows (one, full width, left a phone on its side with three rows
+    // on screen). Each pair is one row of the group, its corners as one row's would be.
+    val landscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    if (landscape) {
+        val rows = items.chunked(2)
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            rows.forEachIndexed { r, pair ->
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                    pair.forEach { item ->
+                        val (containerColor, onContainerColor) = when (item.color) {
+                            SettingsItemColor.PRIMARY -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+                            SettingsItemColor.TERTIARY -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+                            SettingsItemColor.SURFACE_HIGH -> MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurface
+                        }
+                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                            SettingsListRow(
+                                icon = item.icon,
+                                title = item.title,
+                                summary = item.summary,
+                                containerColor = containerColor,
+                                onContainerColor = onContainerColor,
+                                shape = expressiveListItemShape(r, rows.size),
+                                onClick = item.onClick,
+                            )
+                        }
+                    }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+        return
+    }
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         items.forEachIndexed { index, item ->
             val (containerColor, onContainerColor) = when (item.color) {

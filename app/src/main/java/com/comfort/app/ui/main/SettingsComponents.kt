@@ -191,6 +191,11 @@ internal fun Modifier.compactHeaderReveal(reveal: CompactHeaderReveal): Modifier
     .graphicsLayer { translationY = -reveal.hiddenPx }
     .onSizeChanged { reveal.heightPx = it.height.toFloat() }
 
+/** [top] as is in portrait; at most 12dp in landscape, where height is short. */
+@Composable
+internal fun landscapeHeaderTop(top: androidx.compose.ui.unit.Dp): androidx.compose.ui.unit.Dp =
+    if (androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) minOf(top, 12.dp) else top
+
 @Composable
 internal fun rememberCollapsingHeaderState(
     scrollState: ScrollState,
@@ -199,6 +204,10 @@ internal fun rememberCollapsingHeaderState(
     expandedBottomPadding: androidx.compose.ui.unit.Dp = 20.dp,
     collapsedBottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
 ): CollapsingHeaderState {
+    // Landscape: the room above the title kept small (a portrait page's 76-100dp above it
+    // left a phone on its side with one card under the header).
+    @Suppress("NAME_SHADOWING")
+    val expandedTopPadding = landscapeHeaderTop(expandedTopPadding)
     val density = androidx.compose.ui.platform.LocalDensity.current
     // 120dp, not the original 32dp — that was fine back when collapsing only meant a padding
     // change, but now that it also merges the back-button row into the title row and crossfades
@@ -241,6 +250,10 @@ internal fun rememberLazyCollapsingHeaderState(
     expandedBottomPadding: androidx.compose.ui.unit.Dp = 20.dp,
     collapsedBottomPadding: androidx.compose.ui.unit.Dp = 8.dp,
 ): CollapsingHeaderState {
+    // Landscape: the room above the title kept small (a portrait page's 76-100dp above it
+    // left a phone on its side with one card under the header).
+    @Suppress("NAME_SHADOWING")
+    val expandedTopPadding = landscapeHeaderTop(expandedTopPadding)
     val density = androidx.compose.ui.platform.LocalDensity.current
     val collapseRangePx = remember(density) { with(density) { 120.dp.toPx() } }
     val reveal = remember { CompactHeaderReveal() }
