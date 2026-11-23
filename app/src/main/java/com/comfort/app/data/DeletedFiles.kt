@@ -60,6 +60,20 @@ object DeletedFiles {
     private val PICTURE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
     private val SIDECAR_EXT = setOf("lrc", "srt", "vtt", "ass", "ssa")
 
+    private val AUDIO_EXT = setOf("mp3", "m4a", "opus", "ogg", "flac", "wav", "aac", "webm")
+
+    /** A song's saved thumbnail: a picture of the same name as a song in its download. Not one of
+     * the download's items (not counted), like lyrics. */
+    fun isSongCover(file: SavedFile, all: List<SavedFile>): Boolean {
+        val name = file.path ?: return false
+        if (name.substringAfterLast('.', "").lowercase() !in PICTURE_EXT) return false
+        val base = name.substringBeforeLast('.')
+        return all.any { other ->
+            val n = other.path ?: return@any false
+            other.uri != file.uri && n.substringBeforeLast('.') == base && n.substringAfterLast('.', "").lowercase() in AUDIO_EXT
+        }
+    }
+
     /** Lyrics or subtitles: saved with a download, but not one of its items (not counted). */
     fun isSidecarName(name: String?): Boolean = name?.substringAfterLast('.', "")?.lowercase() in SIDECAR_EXT
 

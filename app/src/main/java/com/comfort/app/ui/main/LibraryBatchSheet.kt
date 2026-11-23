@@ -88,12 +88,15 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity) = Velocity(0f, available.y)
         }
     }
+    // Lyrics, subtitles and a song's saved thumbnail: listed, but not items of their own.
+    fun uncounted(item: BatchItem) = item.isSidecar || (item.mime?.startsWith("image/") == true &&
+        items.orEmpty().any { it.mime?.startsWith("audio/") == true && it.name.substringBeforeLast('.') == item.name.substringBeforeLast('.') })
     // The file is gone: its record and the download's count and size follow.
     suspend fun forget(item: BatchItem) = withContext(Dispatchers.IO) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         dao.deleteSavedFile(download.id, item.uri.toString())
         // Lyrics and subtitles aren't counted as items.
-        if (!item.isSidecar) dao.decrementDownloadedItems(download.id, 1)
+        if (!uncounted(item)) dao.decrementDownloadedItems(download.id, 1)
         if (item.sizeBytes > 0) dao.addBytes(download.id, -item.sizeBytes)
     }
     // A file Android only deletes with the user's OK (its own dialog).
@@ -150,7 +153,7 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                     if (shown != null) {
                         val total = shown.sumOf { it.sizeBytes }
                         // Lyrics and subtitles are listed but aren't items of their own.
-                        val count = shown.count { !it.isSidecar }
+                        val count = shown.count { !uncounted(it) }
                         Text(
                             pluralStringResource(R.plurals.item_count, count, count) +
                                 (if (total > 0) " · " + android.text.format.Formatter.formatShortFileSize(context, total) else ""),

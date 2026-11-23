@@ -369,10 +369,13 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                     files = multi.chunked(500).flatMap { dao.savedFiles(it) }
                 }
                 val byDownload = files.groupBy { it.downloadId }
-                // Lyrics and subtitles counted as items by older saves: taken off the count (only
-                // where the count is still every saved file, so it's done once).
+                // Lyrics, subtitles and a song's saved thumbnail aren't items: taken off a count that
+                // included them (only where the count is still every saved file, so it's done once;
+                // a new download's song cover is counted as it arrives and comes off here).
                 for ((id, saved) in byDownload) {
-                    val sidecars = saved.count { com.comfort.app.data.DeletedFiles.isSidecarName(it.path) }
+                    val sidecars = saved.count {
+                        com.comfort.app.data.DeletedFiles.isSidecarName(it.path) || com.comfort.app.data.DeletedFiles.isSongCover(it, saved)
+                    }
                     if (sidecars == 0) continue
                     val entity = historyFlow.value.firstOrNull { it.id == id } ?: continue
                     if (entity.downloadedItems == saved.size) dao.setDownloadedItems(id, saved.size - sidecars)
