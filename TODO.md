@@ -16,7 +16,7 @@
 - [x] Fix the awkward text wrapping and oversized button on the "Updates available" engine card when an engine is on a commit or branch version (e.g. gallery-dl on Master): don't prepend "v" to non-numeric versions (avoids "vmaster-..."), shorten commit hashes or compact the button text so it doesn't squish the left column, and prevent the installed version text from breaking onto a second line ("08").
 - [x] Add tactile vibrations to buttons and sliders in music settings, as well as to the lyrics icon on the main settings page.
 - [ ] Turn the FAB on the library page back to the arch shape. *(Done 2026-11-23, to be tested)*
-- [ ] There are two incognito buttons on the download sheet, remove all. *(Done 2026-11-23, to be tested: the duplicate chip removed, one Incognito chip left)*
+- [x] There are two incognito buttons on the download sheet, remove all. *(Done 2026-11-23, to be tested: the duplicate chip removed, one Incognito chip left)*
 - [x] Update the lyrics icon on the Now Playing sheet so that when "lyrics line" is off in settings, tapping it opens the full lyrics view, and when "lyrics line" is on, tapping it acts as a toggle.
 - [x] Add a snackbar notification when an engine is updating.
 - [x] Combine or aggregate update notifications so updating two or more engines at once shows a single consolidated snackbar instead of conflicting messages.
@@ -24,7 +24,6 @@
 - [x] Add settings to toggle swipe gestures in the Library and Queue.
 - [x] Add a custom duration option to the music player sleep timer.
 - [x] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
-- [ ] Prevent yt-dlp and gallery-dl from running instagram links when instaloader is on. *(Done 2026-11-23, to be tested)*
 - [ ] Add an option to view logs for each download in library. *(Done 2026-11-23, to be tested)*
 - [ ] I deleted the item thats the thumbnail in the library of comfort and when i tapped on it, it opened the first item in the library instead of opening the items left of that download. *(Done 2026-11-23, to be tested)*
 - [x] Prevent scrolling inside the "Current Command" code box from passing through to the mini header or outer page on the Advanced screen, and prevent downward scrolling on it from pulling down or dismissing the preview bottom sheet (isolate command box scrolling).
@@ -32,14 +31,14 @@
 - [x] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
 - [x] Redesign the new template popup into a bottom modal sheet.
 - [x] Redesign the audio language picker into a bottom modal sheet.
-- [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings, and a video details section there showing genuinely useful information (resolution, codec, frame rate, bitrate, duration, size) in place of the deep EXIF view's (moved from its own line). *(Done 2026-11-23, to be tested)*
+- [x] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings, and a video details section there showing genuinely useful information (resolution, codec, frame rate, bitrate, duration, size) in place of the deep EXIF view's (moved from its own line). *(Done 2026-11-23, to be tested)*
 - [x] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
 - [x] Add an incognito option to the download preview sheet.
 - [x] Fix the visual flicker when an item is moved in the music queue.
 - [ ] There's a flicker when moving an already played item below the currently playing one.t *(Done 2026-11-23, to be tested)*
-- [ ] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players. *(Done 2026-11-23, to be tested: Settings › Look & feel › Players)*
-- [ ] Let the apps snackbar for finished or failed downloads show even when im not in the queue page, also prevent snackbars from appearing in the video player. *(Done 2026-11-23, to be tested)*
-- [ ] When im playing a video and i leave the app and open a downloaded video from the notification it goes back to playing the video that was playing before i left the app. *(Done 2026-11-23, to be tested)*
+- [x] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players. *(Done 2026-11-23, to be tested: Settings › Look & feel › Players)*
+- [x] Let the apps snackbar for finished or failed downloads show even when im not in the queue page, also prevent snackbars from appearing in the video player. *(Done 2026-11-23, to be tested)*
+- [x] When im playing a video and i leave the app and open a downloaded video from the notification it goes back to playing the video that was playing before i left the app. *(Done 2026-11-23, to be tested)*
 - [ ] Opening a sub-page in the music settings and going back closes the main one too, fix that. *(Done 2026-11-23, to be tested)*
 - [x] Add a "Block" option to the More Options menu in the supported sites sheet so the app refuses to download from blocked sites.
 - [x] Prevent thumbnails from showing before the video starts playing in the video viewer.
@@ -61,7 +60,7 @@
 - [ ] Add a view mode for multi-item downloads so users can browse or inspect all items in a batch instead of only seeing the download count and the first item (for the queue check "C:\Users\domin\Downloads\multi_download_batch_view_implementation.md" and for the library check "C:\Users\domin\Downloads\library_card_trailing_stack_icon_batch_view.md"). *(Library half done 2026-11-23, to be tested; the Queue half left)*
 - [ ] Add a setting in Settings (e.g. Processing / Downloads) to package chapters into `.cbz` archives using `ZipOutputStream` instead of leaving loose image files in the gallery, pre-configured with known manga sites (MangaDex, MangaFire, etc.) and allowing sites to be added and removed (similar to "Which engine each site uses"). *(Done 2026-11-23, to be tested: Settings › Processing › Comics; chapters land in Pictures/Comfort/Comics as one .cbz, its first page the Library picture)*
 - [ ] Add native support for reading `.cbz` files with a built-in comic/manga viewer (supporting right-to-left manga paging, webtoon vertical scrolling, and cover thumbnails in the Library). *(Done 2026-11-23, to be tested: tap a comic in the Library, or open a .cbz from a file manager; the ⋮ in the reader switches the reading mode, and the last page read is remembered)*
-- [ ] Comic reader: pinch and double-tap zoom in the vertical (webtoon) mode too. *(Done 2026-11-23, builds, not on the phone yet)*
+- [ ] Comic reader: pinch and double-tap zoom in the vertical (webtoon) mode too. *(Done 2026-11-23, to be tested)*
 - [ ] Comic reader: turn the reading mode button (bottom right) into a reader settings bottom sheet, designed like the music settings (SheetHeader, icon sections, the reading mode as three chips at the top; settings for the other modes hidden). Settings, after TachiyomiJ2K's reader (defaults in brackets):
   - Reading mode: right to left / left to right / vertical (webtoon) [right to left]
   - Page scale (paged modes): fit screen / fit width / fit height / original size / smart fit [fit screen]
