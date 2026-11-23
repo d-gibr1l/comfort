@@ -657,6 +657,8 @@
     <string name="extracting_audio">Audio wird extrahiert</string>
     <string name="downloading">Wird geladen</string>
     <string name="downloading_x">Wird geladen · %1$s</string>
+    <string name="cancelled_x_of_y_saved">Abgebrochen: %1$d von %2$d gespeichert</string>
+    <string name="cancelled_x_saved">Abgebrochen: %1$d gespeichert</string>
     <string name="fetching_info">Infos werden abgerufen…</string>
     <string name="no_internet_connection">Keine Internetverbindung</string>
     <string name="speed_x">Tempo: %1$s</string>

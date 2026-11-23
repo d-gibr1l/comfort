@@ -616,6 +616,8 @@
     <string name="extracting_audio">音声を抽出中</string>
     <string name="downloading">ダウンロード中</string>
     <string name="downloading_x">ダウンロード中 · %1$s</string>
+    <string name="cancelled_x_of_y_saved">キャンセル済み: %2$d 件中 %1$d 件を保存</string>
+    <string name="cancelled_x_saved">キャンセル済み: %1$d 件を保存</string>
     <string name="fetching_info">情報を取得中...</string>
     <string name="no_internet_connection">インターネットに接続されていません</string>
     <string name="speed_x">速度: %1$s</string>

@@ -616,6 +616,8 @@
     <string name="extracting_audio">در حال استخراج صدا</string>
     <string name="downloading">در حال دانلود</string>
     <string name="downloading_x">در حال دانلود · %1$s</string>
+    <string name="cancelled_x_of_y_saved">لغو شد: %1$d از %2$d ذخیره شد</string>
+    <string name="cancelled_x_saved">لغو شد: %1$d ذخیره شد</string>
     <string name="fetching_info">در حال دریافت اطلاعات...</string>
     <string name="no_internet_connection">اتصال اینترنت وجود ندارد</string>
     <string name="speed_x">سرعت: %1$s</string>

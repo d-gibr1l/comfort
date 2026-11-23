@@ -648,6 +648,18 @@ object DownloadDispatcher {
                 rows.filter { dao.updateStatusIfIn(it.id, DownloadStatus.CANCELLED, CANCELLABLE_STATUSES) > 0 }
                     .onEach { dao.resetSpeed(it.id) }
             }
+            // A playlist or gallery cancelled part-way, some of its items already saved: those go to
+            // the Library (a finished download, saying it was cancelled) instead of the whole lot
+            // being marked cancelled; "Download missing items" there fetches the rest (the
+            // engines' archives skip what's saved).
+            for (entity in stopped) {
+                val now = dao.getById(entity.id) ?: continue
+                val saved = now.downloadedItems
+                if (saved <= 0 || (now.totalItems <= 1 && saved <= 1)) continue
+                val note = if (now.totalItems > saved) context.getString(com.comfort.app.R.string.cancelled_x_of_y_saved, saved, now.totalItems)
+                    else context.getString(com.comfort.app.R.string.cancelled_x_saved, saved)
+                dao.markFinished(entity.id, note)
+            }
             stopped.forEach { entity ->
                 DownloadNotifications.cancel(context, entity.id)
                 // cancelWorkManagerJobs() just requests the stop — it doesn't wait for the worker's

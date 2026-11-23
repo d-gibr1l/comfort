@@ -616,6 +616,8 @@
     <string name="extracting_audio">正在提取音频</string>
     <string name="downloading">正在下载</string>
     <string name="downloading_x">正在下载 · %1$s</string>
+    <string name="cancelled_x_of_y_saved">已取消：已保存 %1$d 个（共 %2$d 个）</string>
+    <string name="cancelled_x_saved">已取消：已保存 %1$d 个</string>
     <string name="fetching_info">正在获取信息...</string>
     <string name="no_internet_connection">无网络连接</string>
     <string name="speed_x">速度：%1$s</string>
