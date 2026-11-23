@@ -724,8 +724,10 @@ private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolea
         Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White)
     }
     if (open && song != null) {
-        // An option takes this sheet's place with its own (or does its thing).
-        fun pick(action: () -> Unit) { open = false; action() }
+        // An option opens its own sheet over this one; Back (or a tap outside, or a pull down)
+        // from it comes back here, as a sub-page does. Closing this one too sent Back straight
+        // out of the menu (reported).
+        fun pick(action: () -> Unit) { action() }
         InWindowSheet(onDismiss = { open = false }) {
             Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -766,6 +768,8 @@ private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolea
                 SongMenuOption(Icons.Outlined.Info, stringResource(R.string.song_properties), enabled = hasFile) { pick { propertiesOpen = true } }
                 SongMenuOption(Icons.Rounded.Share, stringResource(R.string.share), enabled = hasFile) {
                     pick {
+                        // Leaves the app for the share sheet: the menu's done.
+                        open = false
                         val send = android.content.Intent(android.content.Intent.ACTION_SEND)
                             .setType("audio/*")
                             .putExtra(android.content.Intent.EXTRA_STREAM, song.uri)
