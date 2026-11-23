@@ -95,11 +95,20 @@ internal fun QueuePanel() {
     // stays in its slot (only drawn under the finger) and the rows it passes slide aside, so the
     // list never re-lays it out mid-drag (that shifted the finger's position by a row and rows
     // swapped back and forth); the queue is reordered once, on drop.
-    var rows by remember { mutableStateOf(state.queue) }
+    // Held only from a drag's start until the player has the new order: [heldRows] (the dragged
+    // order, then the dropped one) over [heldFrom] (the queue it was made from). Once the player's
+    // queue is no longer that one, it's shown as is, in the same frame: switching over a frame
+    // later (an effect) drew the old numbering for a frame — the "playing" highlight on the wrong
+    // song (the flicker on a drop).
+    var heldRows by remember { mutableStateOf<List<Pair<Int, com.comfort.app.music.Song>>?>(null) }
+    var heldFrom by remember { mutableStateOf<List<Pair<Int, com.comfort.app.music.Song>>?>(null) }
     var dragging by remember { mutableStateOf<Int?>(null) }
     var dragStart by remember { mutableStateOf(0) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(state.queue) { if (dragging == null) rows = state.queue }
+    // A function, not a value: the drag handlers below are made once and call it for the rows now.
+    fun shownRows() = heldRows?.takeIf { dragging != null || state.queue == heldFrom } ?: state.queue
+    val rows = shownRows()
+    LaunchedEffect(state.queue) { if (dragging == null && state.queue != heldFrom) { heldRows = null; heldFrom = null } }
     // Where the song on is, once (not per row).
     val currentPos = rows.indexOfFirst { it.first == state.index }
     val upcoming = if (currentPos >= 0) rows.size - currentPos - 1 else rows.size
@@ -217,7 +226,9 @@ internal fun QueuePanel() {
                         detectDragGestures(
                             onDragStart = {
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                dragStart = rows.indexOfFirst { it.first == index }
+                                heldFrom = state.queue
+                                heldRows = state.queue
+                                dragStart = state.queue.indexOfFirst { it.first == index }
                                 dragOffset = 0f
                                 dragging = index
                             },
@@ -225,23 +236,24 @@ internal fun QueuePanel() {
                                 // Worked out here, from the drag's state now: this handler was made
                                 // when the row was first drawn and doesn't see later recompositions.
                                 val from = dragStart
-                                val to = (from + kotlin.math.round(dragOffset / rowHeightPx).toInt()).coerceIn(0, rows.lastIndex)
+                                val current = shownRows()
+                                val to = (from + kotlin.math.round(dragOffset / rowHeightPx).toInt()).coerceIn(0, current.lastIndex)
                                 // The rows in their new order and the drag ended in one go: the
                                 // dropped row lands where it was drawn, the others where they slid.
                                 // No move: back to the player's queue (it may have changed meanwhile).
-                                rows = if (to != from && to >= 0) rows.toMutableList().also { it.add(to, it.removeAt(from)) } else state.queue
+                                heldRows = if (to != from && to >= 0) current.toMutableList().also { it.add(to, it.removeAt(from)) } else null
                                 dragging = null
                                 dragOffset = 0f
                                 // Without shuffle the rows are the queue's own order.
                                 if (to != from && to >= 0) MusicPlayer.move(from, to)
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.GestureEnd)
                             },
-                            onDragCancel = { dragging = null; dragOffset = 0f; rows = state.queue },
+                            onDragCancel = { dragging = null; dragOffset = 0f; heldRows = null },
                         ) { change, amount ->
                             change.consume()
                             // Not past the list's ends.
                             val before = kotlin.math.round(dragOffset / rowHeightPx).toInt()
-                            dragOffset = (dragOffset + amount.y).coerceIn(-dragStart * rowHeightPx, (rows.lastIndex - dragStart) * rowHeightPx)
+                            dragOffset = (dragOffset + amount.y).coerceIn(-dragStart * rowHeightPx, (shownRows().lastIndex - dragStart) * rowHeightPx)
                             // A tick each time the dragged song passes another.
                             if (kotlin.math.round(dragOffset / rowHeightPx).toInt() != before) {
                                 haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentTick)
@@ -251,7 +263,10 @@ internal fun QueuePanel() {
                     modifier = if (isDragged) {
                         Modifier.zIndex(1f).graphicsLayer { translationY = dragOffset }
                     } else {
-                        Modifier.graphicsLayer { translationY = shown }
+                        // None once the drag's over, at once: the animated value only caught up a
+                        // frame later, so on the drop the rows that had slid aside, already in their
+                        // new places, were drawn a slot off for a frame (the flicker).
+                        Modifier.graphicsLayer { translationY = if (dragging == null) 0f else shown }
                     },
                 )
             }
