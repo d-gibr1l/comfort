@@ -1270,4 +1270,15 @@
     <string name="music_in_phone_player">השמעת מוזיקה בנגן של הטלפון</string>
     <string name="music_in_phone_player_subtitle">במקום נגן המוזיקה של Comfort.</string>
     <string name="no_app_to_open_this">אין בטלפון אפליקציה שיכולה לפתוח את זה</string>
+    <string name="video_settings">הגדרות וידאו</string>
+    <string name="play_videos_with_sound_subtitle">סרטונים מתחילים עם קול, לא מושתקים.</string>
+    <string name="loop_videos">הפעלה חוזרת של סרטונים</string>
+    <string name="loop_videos_subtitle">סרטון מתחיל מחדש כשהוא נגמר.</string>
+    <string name="playback_speed">מהירות הפעלה</string>
+    <string name="playback_speed_subtitle">לכל הסרטונים.</string>
+    <string name="video_details">פרטי הסרטון</string>
+    <string name="prop_size">גודל</string>
+    <string name="video_codec">קודק וידאו</string>
+    <string name="audio_codec">אודיו</string>
+    <string name="frame_rate">קצב פריימים</string>
 </resources>

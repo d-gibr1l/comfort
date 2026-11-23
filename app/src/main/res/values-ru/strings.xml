@@ -1304,4 +1304,15 @@
     <string name="music_in_phone_player">Слушать музыку в проигрывателе телефона</string>
     <string name="music_in_phone_player_subtitle">Вместо музыкального проигрывателя Comfort.</string>
     <string name="no_app_to_open_this">На телефоне нет приложения, которое может это открыть</string>
+    <string name="video_settings">Настройки видео</string>
+    <string name="play_videos_with_sound_subtitle">Видео начинаются со звуком, а не без него.</string>
+    <string name="loop_videos">Повтор видео</string>
+    <string name="loop_videos_subtitle">Видео начинается сначала, когда заканчивается.</string>
+    <string name="playback_speed">Скорость воспроизведения</string>
+    <string name="playback_speed_subtitle">Для всех видео.</string>
+    <string name="video_details">Сведения о видео</string>
+    <string name="prop_size">Размер</string>
+    <string name="video_codec">Видеокодек</string>
+    <string name="audio_codec">Звук</string>
+    <string name="frame_rate">Частота кадров</string>
 </resources>

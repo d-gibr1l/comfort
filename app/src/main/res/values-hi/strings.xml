@@ -1236,4 +1236,15 @@
     <string name="music_in_phone_player">संगीत फ़ोन के प्लेयर में चलाएँ</string>
     <string name="music_in_phone_player_subtitle">Comfort के संगीत प्लेयर की जगह।</string>
     <string name="no_app_to_open_this">इस फ़ोन पर कोई ऐप इसे नहीं खोल सकता</string>
+    <string name="video_settings">वीडियो सेटिंग</string>
+    <string name="play_videos_with_sound_subtitle">वीडियो आवाज़ के साथ शुरू होते हैं, म्यूट नहीं।</string>
+    <string name="loop_videos">वीडियो दोहराएँ</string>
+    <string name="loop_videos_subtitle">खत्म होने पर वीडियो शुरू से फिर चलता है।</string>
+    <string name="playback_speed">चलाने की गति</string>
+    <string name="playback_speed_subtitle">सभी वीडियो के लिए।</string>
+    <string name="video_details">वीडियो विवरण</string>
+    <string name="prop_size">आकार</string>
+    <string name="video_codec">वीडियो कोडेक</string>
+    <string name="audio_codec">ऑडियो</string>
+    <string name="frame_rate">फ़्रेम दर</string>
 </resources>

@@ -1270,4 +1270,15 @@
     <string name="music_in_phone_player">Tocar música no player do celular</string>
     <string name="music_in_phone_player_subtitle">Em vez do player de música do Comfort.</string>
     <string name="no_app_to_open_this">Nenhum app do celular consegue abrir isto</string>
+    <string name="video_settings">Configurações de vídeo</string>
+    <string name="play_videos_with_sound_subtitle">Os vídeos começam com som, não silenciados.</string>
+    <string name="loop_videos">Repetir vídeos</string>
+    <string name="loop_videos_subtitle">Um vídeo recomeça do início quando termina.</string>
+    <string name="playback_speed">Velocidade de reprodução</string>
+    <string name="playback_speed_subtitle">Para todos os vídeos.</string>
+    <string name="video_details">Detalhes do vídeo</string>
+    <string name="prop_size">Tamanho</string>
+    <string name="video_codec">Codec de vídeo</string>
+    <string name="audio_codec">Áudio</string>
+    <string name="frame_rate">Taxa de quadros</string>
 </resources>

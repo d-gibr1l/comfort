@@ -1202,4 +1202,15 @@
     <string name="music_in_phone_player">Phát nhạc trong trình phát của điện thoại</string>
     <string name="music_in_phone_player_subtitle">Thay cho trình phát nhạc của Comfort.</string>
     <string name="no_app_to_open_this">Không có ứng dụng nào trên điện thoại mở được mục này</string>
+    <string name="video_settings">Cài đặt video</string>
+    <string name="play_videos_with_sound_subtitle">Video phát kèm âm thanh, không tắt tiếng.</string>
+    <string name="loop_videos">Lặp lại video</string>
+    <string name="loop_videos_subtitle">Video phát lại từ đầu khi kết thúc.</string>
+    <string name="playback_speed">Tốc độ phát</string>
+    <string name="playback_speed_subtitle">Cho mọi video.</string>
+    <string name="video_details">Chi tiết video</string>
+    <string name="prop_size">Kích thước</string>
+    <string name="video_codec">Codec video</string>
+    <string name="audio_codec">Âm thanh</string>
+    <string name="frame_rate">Tốc độ khung hình</string>
 </resources>

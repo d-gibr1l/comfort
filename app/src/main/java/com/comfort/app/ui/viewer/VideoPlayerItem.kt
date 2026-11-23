@@ -216,6 +216,14 @@ fun VideoPlayerItemWithResolvedUri(
         }
     }
 
+    // The viewer's ⋮ › Settings: loop and speed, followed at once.
+    val loop by VideoSettings.loop.collectAsState()
+    val speed by VideoSettings.speed.collectAsState()
+    LaunchedEffect(exoPlayer, loop) {
+        exoPlayer.repeatMode = if (loop) androidx.media3.common.Player.REPEAT_MODE_ONE else androidx.media3.common.Player.REPEAT_MODE_OFF
+    }
+    LaunchedEffect(exoPlayer, speed) { exoPlayer.setPlaybackSpeed(speed) }
+
     LaunchedEffect(isCurrentPage) {
         if (!isCurrentPage) {
             exoPlayer.pause()

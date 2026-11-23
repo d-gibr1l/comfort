@@ -13,6 +13,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.FilledTonalIconButton
 import android.content.Context
@@ -179,6 +181,8 @@ fun MediaViewerScreen(
     startMuted: Boolean = true,
     /** The ⋮ menu's "Play videos with sound": remembered for next time by the caller. */
     onSoundSettingChange: (Boolean) -> Unit = {},
+    /** The ⋮ sheet's Re-download: the item's download again, from the configure sheet. */
+    onRedownload: ((GalleryItem) -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -314,6 +318,9 @@ fun MediaViewerScreen(
 
     var showRenameDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    // The ⋮ sheet's Settings and Details (videos).
+    var videoSettingsOpen by remember { mutableStateOf(false) }
+    var videoDetailsOpen by remember { mutableStateOf(false) }
     // Comfort: the tracks of the video on screen (with its page, so a page swiped away doesn't
     // leave its tracks behind), and which picker of the ⋮ menu is open.
     var pageTracks by remember { mutableStateOf<Pair<Int, VideoTracks?>?>(null) }
@@ -913,8 +920,23 @@ fun MediaViewerScreen(
             }
         }
 
+        // A video's ⓘ: what it is (resolution, codecs, frame rate…), not camera EXIF it doesn't have.
+        val infoItem = galleryItems.getOrNull(pagerState.currentPage)
+        if (showInfoCard && infoItem?.isVideo == true) {
+            VideoDetailsSheet(uri = infoItem.uri, onDismiss = { showInfoCard = false })
+        }
+        if (videoDetailsOpen && infoItem != null) {
+            VideoDetailsSheet(uri = infoItem.uri, onDismiss = { videoDetailsOpen = false })
+        }
+        if (videoSettingsOpen) {
+            VideoSettingsSheet(
+                soundOn = !videosMuted,
+                onSoundChange = { on -> videosMuted = !on; onSoundSettingChange(on) },
+                onDismiss = { videoSettingsOpen = false },
+            )
+        }
         ExifDetailsSheet(
-            isOpen = showInfoCard,
+            isOpen = showInfoCard && infoItem?.isVideo != true,
             onDismiss = { showInfoCard = false },
             galleryItem = galleryItems.getOrNull(pagerState.currentPage),
             exifData = currentExif
@@ -1052,42 +1074,59 @@ fun MediaViewerScreen(
                                 IconButton(onClick = { showMoreMenu = true }, colors = com.comfort.app.ui.main.menuButtonColors(showMoreMenu, MaterialTheme.colorScheme.primary)) {
                                     Icon(ImageVector.vectorResource(R.drawable.ic_ms_more_vert), contentDescription = stringResource(R.string.more_options))
                                 }
-                                androidx.compose.material3.DropdownMenu(
-                                    expanded = showMoreMenu,
-                                    onDismissRequest = { showMoreMenu = false },
-                                    shape = MaterialTheme.shapes.large,
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                                ) {
-                                    if (currentItem != null) {
-                                        androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.open_with)) },
-                                            leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_open_in_new), contentDescription = null) },
-                                            enabled = currentItem.localExists,
-                                            onClick = {
-                                                showMoreMenu = false
-                                                val uri = resolvedCurrentUri ?: currentItem.uri
-                                                val mimeType = context.contentResolver.getType(uri) ?: if (currentItem.isVideo) "video/*" else "image/*"
-                                                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                                                    setDataAndType(uri, mimeType)
-                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                }
-                                                try {
-                                                    context.startActivity(Intent.createChooser(viewIntent, context.getString(R.string.open_with)))
-                                                } catch (e: Exception) {
-                                                    Toast.makeText(context, context.getString(R.string.no_app_available_to_open_this), Toast.LENGTH_SHORT).show()
-                                                }
+                                // A sheet, as the music player's song menu (it was a dropdown).
+                                if (showMoreMenu && currentItem != null) {
+                                    val menuItem = currentItem
+                                    fun close() { showMoreMenu = false }
+                                    ViewerMenuSheet(item = menuItem, title = renameText(menuItem).ifBlank { menuItem.name }, onDismiss = { close() }) {
+                                        if (menuItem.isVideo) {
+                                            // These open over the menu, so closing them comes back to it (as in the music player).
+                                            ViewerMenuOption(androidx.compose.material.icons.Icons.Outlined.Tune, stringResource(R.string.video_settings), onClick = { videoSettingsOpen = true })
+                                            ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_info), stringResource(R.string.video_details), enabled = menuItem.localExists, onClick = { videoDetailsOpen = true })
+                                        }
+                                        // The download again, from the configure sheet.
+                                        if (onRedownload != null) {
+                                            ViewerMenuOption(androidx.compose.material.icons.Icons.Outlined.Refresh, stringResource(R.string.redownload), onClick = { close(); onRedownload(menuItem) })
+                                        }
+                                        // Comfort: a downloaded video's subtitles, and its audio tracks when it has dubs.
+                                        val tracks = pageTracks?.takeIf { it.first == pagerState.currentPage }?.second
+                                        if (menuItem.isVideo && tracks != null) {
+                                            if (tracks.subtitles.isNotEmpty()) {
+                                                ViewerMenuOption(
+                                                    androidx.compose.material.icons.Icons.Outlined.Subtitles,
+                                                    stringResource(R.string.subtitles),
+                                                    value = tracks.subtitles.firstOrNull { it.selected }?.label ?: stringResource(R.string.subtitles_off_short),
+                                                    onClick = { trackPicker = androidx.media3.common.C.TRACK_TYPE_TEXT },
+                                                )
                                             }
-                                        )
-                                    }
-                                    if (currentItem != null && !currentItem.isVideo) {
-                                        androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.set_as_wallpaper)) },
-                                            leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_image), contentDescription = null) },
-                                            enabled = currentItem.localExists,
-                                            onClick = {
-                                                showMoreMenu = false
+                                            if (tracks.audio.size > 1) {
+                                                ViewerMenuOption(
+                                                    androidx.compose.material.icons.Icons.Outlined.Language,
+                                                    stringResource(R.string.audio_track),
+                                                    value = tracks.audio.firstOrNull { it.selected }?.label.orEmpty(),
+                                                    onClick = { trackPicker = androidx.media3.common.C.TRACK_TYPE_AUDIO },
+                                                )
+                                            }
+                                        }
+                                        ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_open_in_new), stringResource(R.string.open_with), enabled = menuItem.localExists, onClick = {
+                                            close()
+                                            val uri = resolvedCurrentUri ?: menuItem.uri
+                                            val mimeType = context.contentResolver.getType(uri) ?: if (menuItem.isVideo) "video/*" else "image/*"
+                                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(uri, mimeType)
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            try {
+                                                context.startActivity(Intent.createChooser(viewIntent, context.getString(R.string.open_with)))
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, context.getString(R.string.no_app_available_to_open_this), Toast.LENGTH_SHORT).show()
+                                            }
+                                        })
+                                        if (!menuItem.isVideo) {
+                                            ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_image), stringResource(R.string.set_as_wallpaper), enabled = menuItem.localExists, onClick = {
+                                                close()
                                                 val intent = Intent(Intent.ACTION_ATTACH_DATA).apply {
-                                                    setDataAndType(resolvedCurrentUri ?: currentItem.uri, "image/*")
+                                                    setDataAndType(resolvedCurrentUri ?: menuItem.uri, "image/*")
                                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                     putExtra("mimeType", "image/*")
                                                 }
@@ -1096,71 +1135,10 @@ fun MediaViewerScreen(
                                                 } catch (e: Exception) {
                                                     Toast.makeText(context, context.getString(R.string.no_app_available_to_set_wallpaper), Toast.LENGTH_SHORT).show()
                                                 }
-                                            }
-                                        )
-                                    }
-                                    if (currentItem != null) {
-                                        androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.rename)) },
-                                            leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_edit), contentDescription = null) },
-                                            onClick = {
-                                                showMoreMenu = false
-                                                showRenameDialog = true
-                                            }
-                                        )
-                                        extraMenuItems(currentItem) { showMoreMenu = false }
-                                        // Comfort: a downloaded video's subtitles, and its audio tracks when it has dubs.
-                                        val tracks = pageTracks?.takeIf { it.first == pagerState.currentPage }?.second
-                                        if (currentItem.isVideo && tracks != null) {
-                                            if (tracks.subtitles.isNotEmpty()) {
-                                                androidx.compose.material3.DropdownMenuItem(
-                                                    text = { Text(stringResource(R.string.subtitles)) },
-                                                    leadingIcon = { Icon(androidx.compose.material.icons.Icons.Outlined.Subtitles, contentDescription = null) },
-                                                    trailingIcon = {
-                                                        Text(
-                                                            tracks.subtitles.firstOrNull { it.selected }?.label ?: stringResource(R.string.subtitles_off_short),
-                                                            style = MaterialTheme.typography.labelMedium,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        showMoreMenu = false
-                                                        trackPicker = androidx.media3.common.C.TRACK_TYPE_TEXT
-                                                    }
-                                                )
-                                            }
-                                            if (tracks.audio.size > 1) {
-                                                androidx.compose.material3.DropdownMenuItem(
-                                                    text = { Text(stringResource(R.string.audio_track)) },
-                                                    leadingIcon = { Icon(androidx.compose.material.icons.Icons.Outlined.Language, contentDescription = null) },
-                                                    trailingIcon = {
-                                                        Text(
-                                                            tracks.audio.firstOrNull { it.selected }?.label.orEmpty(),
-                                                            style = MaterialTheme.typography.labelMedium,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        showMoreMenu = false
-                                                        trackPicker = androidx.media3.common.C.TRACK_TYPE_AUDIO
-                                                    }
-                                                )
-                                            }
+                                            })
                                         }
-                                        // Comfort: whether videos start with sound, here where they play.
-                                        var soundOn by remember { mutableStateOf(!startMuted) }
-                                        androidx.compose.material3.DropdownMenuItem(
-                                            text = { Text(stringResource(R.string.play_videos_with_sound)) },
-                                            leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_volume_up), contentDescription = null) },
-                                            trailingIcon = {
-                                                androidx.compose.material3.Checkbox(checked = soundOn, onCheckedChange = null)
-                                            },
-                                            onClick = {
-                                                soundOn = !soundOn
-                                                videosMuted = !soundOn
-                                                onSoundSettingChange(soundOn)
-                                            }
-                                        )
+                                        ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_edit), stringResource(R.string.rename), onClick = { close(); showRenameDialog = true })
+                                        extraMenuItems(menuItem) { close() }
                                     }
                                 }
                             }

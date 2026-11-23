@@ -1270,4 +1270,15 @@
     <string name="music_in_phone_player">Lire la musique dans le lecteur du téléphone</string>
     <string name="music_in_phone_player_subtitle">Au lieu du lecteur de musique de Comfort.</string>
     <string name="no_app_to_open_this">Aucune app de ce téléphone ne peut ouvrir ceci</string>
+    <string name="video_settings">Paramètres vidéo</string>
+    <string name="play_videos_with_sound_subtitle">Les vidéos démarrent avec le son, pas en sourdine.</string>
+    <string name="loop_videos">Lire en boucle</string>
+    <string name="loop_videos_subtitle">Une vidéo recommence au début quand elle se termine.</string>
+    <string name="playback_speed">Vitesse de lecture</string>
+    <string name="playback_speed_subtitle">Pour toutes les vidéos.</string>
+    <string name="video_details">Détails de la vidéo</string>
+    <string name="prop_size">Taille</string>
+    <string name="video_codec">Codec vidéo</string>
+    <string name="audio_codec">Audio</string>
+    <string name="frame_rate">Images par seconde</string>
 </resources>

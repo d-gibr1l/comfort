@@ -1372,4 +1372,15 @@
     <string name="music_in_phone_player">تشغيل الموسيقى في مشغّل الهاتف</string>
     <string name="music_in_phone_player_subtitle">بدلًا من مشغّل الموسيقى في Comfort.</string>
     <string name="no_app_to_open_this">لا يوجد تطبيق على هذا الهاتف يمكنه فتح هذا</string>
+    <string name="video_settings">إعدادات الفيديو</string>
+    <string name="play_videos_with_sound_subtitle">تبدأ الفيديوهات بالصوت، لا مكتومة.</string>
+    <string name="loop_videos">تكرار الفيديوهات</string>
+    <string name="loop_videos_subtitle">يُعاد تشغيل الفيديو من البداية عند انتهائه.</string>
+    <string name="playback_speed">سرعة التشغيل</string>
+    <string name="playback_speed_subtitle">لكل الفيديوهات.</string>
+    <string name="video_details">تفاصيل الفيديو</string>
+    <string name="prop_size">الحجم</string>
+    <string name="video_codec">ترميز الفيديو</string>
+    <string name="audio_codec">الصوت</string>
+    <string name="frame_rate">معدل الإطارات</string>
 </resources>

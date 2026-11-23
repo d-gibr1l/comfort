@@ -72,6 +72,8 @@ fun MediaViewerHost(
     requestDelete: (Set<String>) -> Unit,
     requestDeleteFromPhone: (Set<String>) -> Unit,
     onClose: () -> Unit,
+    /** The ⋮ sheet's Re-download: opens the link's configure sheet. */
+    onRedownload: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -149,34 +151,23 @@ fun MediaViewerHost(
                 onSoundSettingChange = { com.comfort.app.data.GalleryDlPreferences.setViewerSound(context, it) },
                 extraMenuItems = { item, close ->
                     val download = live[downloadIdOf(item)] ?: return@MediaViewerScreen
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.view_original_source_2)) },
-                        leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_open_in_new), contentDescription = null) },
-                        onClick = {
-                            close()
-                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(download.url))) }
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.copy_post_link_2)) },
-                        leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_content_copy), contentDescription = null) },
-                        onClick = {
-                            close()
-                            scope.launch {
-                                clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.post_link), download.url)))
-                            }
-                        },
-                    )
+                    ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_open_in_new), stringResource(R.string.view_original_source_2), onClick = {
+                        close()
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(download.url))) }
+                    })
+                    ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_content_copy), stringResource(R.string.copy_post_link_2), onClick = {
+                        close()
+                        scope.launch {
+                            clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.post_link), download.url)))
+                        }
+                    })
                     // The whole post's files, like the Library's (its Delete removes the entry only).
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.delete_from_phone), color = MaterialTheme.colorScheme.error) },
-                        leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_delete), contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        onClick = {
-                            close()
-                            requestDeleteFromPhone(setOf(download.id))
-                        },
-                    )
+                    ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_delete), stringResource(R.string.delete_from_phone), color = MaterialTheme.colorScheme.error, onClick = {
+                        close()
+                        requestDeleteFromPhone(setOf(download.id))
+                    })
                 },
+                onRedownload = onRedownload?.let { open -> { item -> live[downloadIdOf(item)]?.let { open(it.url) } } },
                 onBack = onClose,
             )
         }

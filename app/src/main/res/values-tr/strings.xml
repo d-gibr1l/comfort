@@ -1236,4 +1236,15 @@
     <string name="music_in_phone_player">Müziği telefonun oynatıcısında çal</string>
     <string name="music_in_phone_player_subtitle">Comfort\'un müzik çalarının yerine.</string>
     <string name="no_app_to_open_this">Bu telefonda bunu açabilecek uygulama yok</string>
+    <string name="video_settings">Video ayarları</string>
+    <string name="play_videos_with_sound_subtitle">Videolar sesi açık başlar, sessiz değil.</string>
+    <string name="loop_videos">Videoları tekrarla</string>
+    <string name="loop_videos_subtitle">Video bitince baştan yeniden oynar.</string>
+    <string name="playback_speed">Oynatma hızı</string>
+    <string name="playback_speed_subtitle">Tüm videolar için.</string>
+    <string name="video_details">Video ayrıntıları</string>
+    <string name="prop_size">Boyut</string>
+    <string name="video_codec">Video codec</string>
+    <string name="audio_codec">Ses</string>
+    <string name="frame_rate">Kare hızı</string>
 </resources>

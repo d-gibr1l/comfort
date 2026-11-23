@@ -1202,4 +1202,15 @@
     <string name="music_in_phone_player">音楽をスマートフォンのプレーヤーで再生</string>
     <string name="music_in_phone_player_subtitle">Comfort の音楽プレーヤーの代わりに。</string>
     <string name="no_app_to_open_this">このスマートフォンには開けるアプリがありません</string>
+    <string name="video_settings">動画の設定</string>
+    <string name="play_videos_with_sound_subtitle">動画をミュートではなく音声ありで再生します。</string>
+    <string name="loop_videos">動画をループ再生</string>
+    <string name="loop_videos_subtitle">動画が終わると最初から再生します。</string>
+    <string name="playback_speed">再生速度</string>
+    <string name="playback_speed_subtitle">すべての動画に適用します。</string>
+    <string name="video_details">動画の詳細</string>
+    <string name="prop_size">サイズ</string>
+    <string name="video_codec">動画コーデック</string>
+    <string name="audio_codec">音声</string>
+    <string name="frame_rate">フレームレート</string>
 </resources>

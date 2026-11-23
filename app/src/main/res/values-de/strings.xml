@@ -1236,4 +1236,15 @@
     <string name="music_in_phone_player">Musik im Player des Smartphones abspielen</string>
     <string name="music_in_phone_player_subtitle">Statt im Musikplayer von Comfort.</string>
     <string name="no_app_to_open_this">Keine App auf diesem Smartphone kann das öffnen</string>
+    <string name="video_settings">Videoeinstellungen</string>
+    <string name="play_videos_with_sound_subtitle">Videos starten mit Ton, nicht stumm.</string>
+    <string name="loop_videos">Videos wiederholen</string>
+    <string name="loop_videos_subtitle">Ein Video beginnt am Ende wieder von vorn.</string>
+    <string name="playback_speed">Wiedergabegeschwindigkeit</string>
+    <string name="playback_speed_subtitle">Für alle Videos.</string>
+    <string name="video_details">Videodetails</string>
+    <string name="prop_size">Größe</string>
+    <string name="video_codec">Videocodec</string>
+    <string name="audio_codec">Audio</string>
+    <string name="frame_rate">Bildrate</string>
 </resources>

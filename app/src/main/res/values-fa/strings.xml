@@ -1236,4 +1236,15 @@
     <string name="music_in_phone_player">پخش موسیقی در پخش‌کنندهٔ گوشی</string>
     <string name="music_in_phone_player_subtitle">به‌جای پخش‌کنندهٔ موسیقی Comfort.</string>
     <string name="no_app_to_open_this">هیچ برنامه‌ای در این گوشی نمی‌تواند این را باز کند</string>
+    <string name="video_settings">تنظیمات ویدیو</string>
+    <string name="play_videos_with_sound_subtitle">ویدیوها با صدا شروع می‌شوند، نه بی‌صدا.</string>
+    <string name="loop_videos">تکرار ویدیوها</string>
+    <string name="loop_videos_subtitle">ویدیو وقتی تمام شد از اول پخش می‌شود.</string>
+    <string name="playback_speed">سرعت پخش</string>
+    <string name="playback_speed_subtitle">برای همهٔ ویدیوها.</string>
+    <string name="video_details">جزئیات ویدیو</string>
+    <string name="prop_size">اندازه</string>
+    <string name="video_codec">کدک ویدیو</string>
+    <string name="audio_codec">صدا</string>
+    <string name="frame_rate">نرخ فریم</string>
 </resources>

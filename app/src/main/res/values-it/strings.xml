@@ -1239,4 +1239,15 @@
     <string name="music_in_phone_player">Riproduci la musica nel lettore del telefono</string>
     <string name="music_in_phone_player_subtitle">Al posto del lettore musicale di Comfort.</string>
     <string name="no_app_to_open_this">Nessuna app sul telefono può aprirlo</string>
+    <string name="video_settings">Impostazioni video</string>
+    <string name="play_videos_with_sound_subtitle">I video partono con l\'audio, non muti.</string>
+    <string name="loop_videos">Ripeti i video</string>
+    <string name="loop_videos_subtitle">Un video ricomincia dall\'inizio quando finisce.</string>
+    <string name="playback_speed">Velocità di riproduzione</string>
+    <string name="playback_speed_subtitle">Per tutti i video.</string>
+    <string name="video_details">Dettagli video</string>
+    <string name="prop_size">Dimensioni</string>
+    <string name="video_codec">Codec video</string>
+    <string name="audio_codec">Audio</string>
+    <string name="frame_rate">Frequenza fotogrammi</string>
 </resources>

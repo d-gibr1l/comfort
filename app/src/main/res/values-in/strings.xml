@@ -1233,4 +1233,15 @@
     <string name="music_in_phone_player">Putar musik di pemutar ponsel</string>
     <string name="music_in_phone_player_subtitle">Sebagai ganti pemutar musik Comfort.</string>
     <string name="no_app_to_open_this">Tidak ada aplikasi di ponsel ini yang bisa membukanya</string>
+    <string name="video_settings">Setelan video</string>
+    <string name="play_videos_with_sound_subtitle">Video mulai dengan suara, tidak dibisukan.</string>
+    <string name="loop_videos">Ulangi video</string>
+    <string name="loop_videos_subtitle">Video diputar lagi dari awal saat selesai.</string>
+    <string name="playback_speed">Kecepatan putar</string>
+    <string name="playback_speed_subtitle">Untuk semua video.</string>
+    <string name="video_details">Detail video</string>
+    <string name="prop_size">Ukuran</string>
+    <string name="video_codec">Codec video</string>
+    <string name="audio_codec">Audio</string>
+    <string name="frame_rate">Frame rate</string>
 </resources>

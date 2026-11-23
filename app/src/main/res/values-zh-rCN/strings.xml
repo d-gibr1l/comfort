@@ -1202,4 +1202,15 @@
     <string name="music_in_phone_player">用手机的播放器播放音乐</string>
     <string name="music_in_phone_player_subtitle">代替 Comfort 的音乐播放器。</string>
     <string name="no_app_to_open_this">这台手机上没有能打开此内容的应用</string>
+    <string name="video_settings">视频设置</string>
+    <string name="play_videos_with_sound_subtitle">视频开始播放时带声音，不静音。</string>
+    <string name="loop_videos">循环播放视频</string>
+    <string name="loop_videos_subtitle">视频播完后从头再播。</string>
+    <string name="playback_speed">播放速度</string>
+    <string name="playback_speed_subtitle">适用于所有视频。</string>
+    <string name="video_details">视频详情</string>
+    <string name="prop_size">大小</string>
+    <string name="video_codec">视频编码</string>
+    <string name="audio_codec">音频</string>
+    <string name="frame_rate">帧率</string>
 </resources>

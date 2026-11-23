@@ -834,6 +834,11 @@ fun MainScreen(
                     // A video with sound paused the music: it plays on once the viewer is gone.
                     com.comfort.app.music.MusicPlayer.resumeAfterInterruption()
                 },
+                // Re-download: the viewer closes and the link's configure sheet opens.
+                onRedownload = { url ->
+                    mediaViewer = null
+                    router.open(url)
+                },
             )
             }
             }
