@@ -35,7 +35,7 @@
 - [x] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
 - [x] Add an incognito option to the download preview sheet.
 - [x] Fix the visual flicker when an item is moved in the music queue.
-- [ ] There's a flicker when moving an already played item below the currently playing one.t *(Done 2026-11-23, to be tested)*
+- [x] There's a flicker when moving an already played item below the currently playing one.t *(Fixed and confirmed 2026-11-23: after a move the player briefly reported the song that took the old place as playing, so the title and blurred backdrop flicked to it; held for the moment the queue settles)*
 - [x] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players. *(Done 2026-11-23, to be tested: Settings › Look & feel › Players)*
 - [x] Let the apps snackbar for finished or failed downloads show even when im not in the queue page, also prevent snackbars from appearing in the video player. *(Done 2026-11-23, to be tested)*
 - [x] When im playing a video and i leave the app and open a downloaded video from the notification it goes back to playing the video that was playing before i left the app. *(Done 2026-11-23, to be tested)*
