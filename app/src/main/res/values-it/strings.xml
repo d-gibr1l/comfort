@@ -1258,9 +1258,6 @@
     <string name="welcome_next">Avanti</string>
     <string name="welcome_start">Inizia</string>
     <string name="welcome_tagline">Video, immagini e musica da centinaia di siti, salvati sul telefono.</string>
-    <string name="welcome_feature_share">Condividi un link con Comfort da qualsiasi app, o incollalo nella Home.</string>
-    <string name="welcome_feature_library">Tutto ciò che salvi finisce nella tua Libreria.</string>
-    <string name="welcome_feature_music">I brani suonano nel lettore integrato, con i testi.</string>
     <string name="welcome_defaults_title">Le tue impostazioni predefinite</string>
     <string name="welcome_defaults_subtitle">Come vengono salvati i download. Puoi comunque scegliere per ognuno.</string>
     <string name="welcome_video_quality">Qualità video</string>
@@ -1285,4 +1282,10 @@
     <string name="reading_right_to_left">Da destra a sinistra (manga)</string>
     <string name="reading_left_to_right">Da sinistra a destra</string>
     <string name="reading_vertical">Verticale (webtoon)</string>
+    <string name="welcome_share_title">Condividi qualsiasi link</string>
+    <string name="welcome_share_body">Da qualsiasi app, o incollalo in Home</string>
+    <string name="welcome_library_title">Una sola libreria</string>
+    <string name="welcome_library_body">Tutto ciò che salvi, in un posto</string>
+    <string name="welcome_music_title">Un lettore musicale</string>
+    <string name="welcome_music_body">I tuoi brani, con i testi</string>
 </resources>

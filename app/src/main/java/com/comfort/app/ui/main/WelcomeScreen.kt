@@ -182,28 +182,35 @@ private fun IntroPage() {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
-        // One card for the three, plain icons in it, as the Settings pages' rows (the grey
-        // circles each icon sat in looked dropped in).
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-                Feature(Icons.Outlined.Share, R.string.welcome_feature_share)
-                Feature(Icons.Outlined.PhotoLibrary, R.string.welcome_feature_library)
-                Feature(Icons.Outlined.MusicNote, R.string.welcome_feature_music)
-            }
+        // Three cards, each a tinted icon tile, a bold title and a short line.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Feature(Icons.Outlined.Share, R.string.welcome_share_title, R.string.welcome_share_body)
+            Feature(Icons.Outlined.PhotoLibrary, R.string.welcome_library_title, R.string.welcome_library_body)
+            Feature(Icons.Outlined.MusicNote, R.string.welcome_music_title, R.string.welcome_music_body)
         }
     }
 }
 
 @Composable
-private fun Feature(icon: ImageVector, text: Int) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(18.dp))
-        Text(stringResource(text), style = MaterialTheme.typography.bodyLarge)
+private fun Feature(icon: ImageVector, title: Int, body: Int) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(stringResource(title), style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily), fontWeight = FontWeight.SemiBold)
+                Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

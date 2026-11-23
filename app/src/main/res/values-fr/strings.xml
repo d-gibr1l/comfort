@@ -1289,9 +1289,6 @@
     <string name="welcome_next">Suivant</string>
     <string name="welcome_start">Commencer</string>
     <string name="welcome_tagline">Vidéos, images et musique de centaines de sites, enregistrées sur votre téléphone.</string>
-    <string name="welcome_feature_share">Partagez un lien vers Comfort depuis n\'importe quelle app, ou collez-le dans Accueil.</string>
-    <string name="welcome_feature_library">Tout ce que vous enregistrez arrive dans votre Bibliothèque.</string>
-    <string name="welcome_feature_music">Les morceaux se lisent dans le lecteur intégré, avec les paroles.</string>
     <string name="welcome_defaults_title">Vos réglages par défaut</string>
     <string name="welcome_defaults_subtitle">La façon dont les téléchargements sont enregistrés. Vous pouvez quand même choisir pour chacun.</string>
     <string name="welcome_video_quality">Qualité vidéo</string>
@@ -1316,4 +1313,10 @@
     <string name="reading_right_to_left">De droite à gauche (manga)</string>
     <string name="reading_left_to_right">De gauche à droite</string>
     <string name="reading_vertical">Vertical (webtoon)</string>
+    <string name="welcome_share_title">Partagez un lien</string>
+    <string name="welcome_share_body">Depuis n\'importe quelle app, ou collez-le dans Accueil</string>
+    <string name="welcome_library_title">Une seule bibliothèque</string>
+    <string name="welcome_library_body">Tout ce que vous enregistrez, au même endroit</string>
+    <string name="welcome_music_title">Un lecteur de musique</string>
+    <string name="welcome_music_body">Vos morceaux, avec leurs paroles</string>
 </resources>

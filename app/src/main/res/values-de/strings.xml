@@ -1255,9 +1255,6 @@
     <string name="welcome_next">Weiter</string>
     <string name="welcome_start">Los geht\'s</string>
     <string name="welcome_tagline">Videos, Bilder und Musik von Hunderten Websites, auf deinem Smartphone gespeichert.</string>
-    <string name="welcome_feature_share">Teile einen Link aus jeder App mit Comfort oder füge ihn auf der Startseite ein.</string>
-    <string name="welcome_feature_library">Alles, was du speicherst, landet in deiner Mediathek.</string>
-    <string name="welcome_feature_music">Songs laufen im eingebauten Musikplayer, mit Songtexten.</string>
     <string name="welcome_defaults_title">Deine Standards</string>
     <string name="welcome_defaults_subtitle">Wie Downloads gespeichert werden. Du kannst trotzdem für jeden wählen.</string>
     <string name="welcome_video_quality">Videoqualität</string>
@@ -1282,4 +1279,10 @@
     <string name="reading_right_to_left">Rechts nach links (Manga)</string>
     <string name="reading_left_to_right">Links nach rechts</string>
     <string name="reading_vertical">Vertikal (Webtoon)</string>
+    <string name="welcome_share_title">Jeden Link teilen</string>
+    <string name="welcome_share_body">Aus jeder App, oder auf Start einfügen</string>
+    <string name="welcome_library_title">Eine Mediathek</string>
+    <string name="welcome_library_body">Alles Gespeicherte an einem Ort</string>
+    <string name="welcome_music_title">Ein Musikplayer</string>
+    <string name="welcome_music_body">Deine Songs mit ihren Texten</string>
 </resources>

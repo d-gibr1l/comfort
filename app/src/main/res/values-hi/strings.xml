@@ -1255,9 +1255,6 @@
     <string name="welcome_next">आगे</string>
     <string name="welcome_start">शुरू करें</string>
     <string name="welcome_tagline">सैकड़ों साइटों से वीडियो, तस्वीरें और संगीत, आपके फ़ोन में सेव।</string>
-    <string name="welcome_feature_share">किसी भी ऐप से लिंक Comfort पर शेयर करें, या होम पर पेस्ट करें।</string>
-    <string name="welcome_feature_library">जो भी सेव करें, वह आपकी लाइब्रेरी में आता है।</string>
-    <string name="welcome_feature_music">गाने बिल्ट-इन म्यूज़िक प्लेयर में, बोल के साथ चलते हैं।</string>
     <string name="welcome_defaults_title">आपकी डिफ़ॉल्ट सेटिंग</string>
     <string name="welcome_defaults_subtitle">डाउनलोड कैसे सेव हों। हर एक के लिए फिर भी चुन सकते हैं।</string>
     <string name="welcome_video_quality">वीडियो गुणवत्ता</string>
@@ -1282,4 +1279,10 @@
     <string name="reading_right_to_left">दाएँ से बाएँ (मंगा)</string>
     <string name="reading_left_to_right">बाएँ से दाएँ</string>
     <string name="reading_vertical">ऊर्ध्वाधर (वेबटून)</string>
+    <string name="welcome_share_title">कोई भी लिंक शेयर करें</string>
+    <string name="welcome_share_body">किसी भी ऐप से, या होम पर पेस्ट करें</string>
+    <string name="welcome_library_title">एक लाइब्रेरी</string>
+    <string name="welcome_library_body">जो भी सेव करें, एक ही जगह</string>
+    <string name="welcome_music_title">एक म्यूज़िक प्लेयर</string>
+    <string name="welcome_music_body">आपके गाने, बोलों के साथ</string>
 </resources>

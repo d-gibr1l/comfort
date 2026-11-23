@@ -1391,9 +1391,6 @@
     <string name="welcome_next">التالي</string>
     <string name="welcome_start">لنبدأ</string>
     <string name="welcome_tagline">فيديوهات وصور وموسيقى من مئات المواقع، محفوظة على هاتفك.</string>
-    <string name="welcome_feature_share">شارك رابطًا مع Comfort من أي تطبيق، أو الصقه في الرئيسية.</string>
-    <string name="welcome_feature_library">كل ما تحفظه يذهب إلى مكتبتك.</string>
-    <string name="welcome_feature_music">تُشغَّل الأغاني في مشغّل الموسيقى المدمج، مع الكلمات.</string>
     <string name="welcome_defaults_title">إعداداتك الافتراضية</string>
     <string name="welcome_defaults_subtitle">كيف تُحفظ التنزيلات. ويمكنك الاختيار لكل تنزيل أيضًا.</string>
     <string name="welcome_video_quality">جودة الفيديو</string>
@@ -1418,4 +1415,10 @@
     <string name="reading_right_to_left">من اليمين لليسار (مانغا)</string>
     <string name="reading_left_to_right">من اليسار لليمين</string>
     <string name="reading_vertical">عمودي (ويبتون)</string>
+    <string name="welcome_share_title">شارك أي رابط</string>
+    <string name="welcome_share_body">من أي تطبيق، أو الصقه في الرئيسية</string>
+    <string name="welcome_library_title">مكتبة واحدة</string>
+    <string name="welcome_library_body">كل ما تحفظه في مكان واحد</string>
+    <string name="welcome_music_title">مشغّل موسيقى</string>
+    <string name="welcome_music_body">أغانيك مع كلماتها</string>
 </resources>

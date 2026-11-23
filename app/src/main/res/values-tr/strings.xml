@@ -1255,9 +1255,6 @@
     <string name="welcome_next">İleri</string>
     <string name="welcome_start">Başlayalım</string>
     <string name="welcome_tagline">Yüzlerce siteden video, resim ve müzik, telefonunuza kaydedilir.</string>
-    <string name="welcome_feature_share">Herhangi bir uygulamadan Comfort\'a bağlantı paylaşın ya da Ana sayfaya yapıştırın.</string>
-    <string name="welcome_feature_library">Kaydettiğiniz her şey Kitaplığınıza gelir.</string>
-    <string name="welcome_feature_music">Şarkılar yerleşik müzik çalarda, sözleriyle çalar.</string>
     <string name="welcome_defaults_title">Varsayılanlarınız</string>
     <string name="welcome_defaults_subtitle">İndirmelerin nasıl kaydedileceği. Yine de her biri için seçebilirsiniz.</string>
     <string name="welcome_video_quality">Video kalitesi</string>
@@ -1282,4 +1279,10 @@
     <string name="reading_right_to_left">Sağdan sola (manga)</string>
     <string name="reading_left_to_right">Soldan sağa</string>
     <string name="reading_vertical">Dikey (webtoon)</string>
+    <string name="welcome_share_title">Herhangi bir bağlantıyı paylaşın</string>
+    <string name="welcome_share_body">Herhangi bir uygulamadan veya Ana sayfaya yapıştırarak</string>
+    <string name="welcome_library_title">Tek bir Kitaplık</string>
+    <string name="welcome_library_body">Kaydettiğiniz her şey tek yerde</string>
+    <string name="welcome_music_title">Bir müzik çalar</string>
+    <string name="welcome_music_body">Şarkılarınız, sözleriyle</string>
 </resources>

@@ -1221,9 +1221,6 @@
     <string name="welcome_next">次へ</string>
     <string name="welcome_start">はじめる</string>
     <string name="welcome_tagline">何百ものサイトの動画・画像・音楽を、スマートフォンに保存。</string>
-    <string name="welcome_feature_share">どのアプリからでも Comfort にリンクを共有、またはホームに貼り付けます。</string>
-    <string name="welcome_feature_library">保存したものはすべてライブラリに入ります。</string>
-    <string name="welcome_feature_music">曲は内蔵の音楽プレーヤーで歌詞付きで再生されます。</string>
     <string name="welcome_defaults_title">デフォルト設定</string>
     <string name="welcome_defaults_subtitle">ダウンロードの保存方法です。個別に選ぶこともできます。</string>
     <string name="welcome_video_quality">動画の画質</string>
@@ -1248,4 +1245,10 @@
     <string name="reading_right_to_left">右から左（マンガ）</string>
     <string name="reading_left_to_right">左から右</string>
     <string name="reading_vertical">縦スクロール（ウェブトゥーン）</string>
+    <string name="welcome_share_title">どんなリンクも共有</string>
+    <string name="welcome_share_body">どのアプリからでも、またはホームに貼り付け</string>
+    <string name="welcome_library_title">ひとつのライブラリ</string>
+    <string name="welcome_library_body">保存したものがすべて一か所に</string>
+    <string name="welcome_music_title">音楽プレーヤー</string>
+    <string name="welcome_music_body">歌詞つきで曲を再生</string>
 </resources>

@@ -1252,9 +1252,6 @@
     <string name="welcome_next">Berikutnya</string>
     <string name="welcome_start">Mulai</string>
     <string name="welcome_tagline">Video, gambar, dan musik dari ratusan situs, tersimpan di ponsel Anda.</string>
-    <string name="welcome_feature_share">Bagikan link ke Comfort dari aplikasi mana pun, atau tempel di Beranda.</string>
-    <string name="welcome_feature_library">Semua yang Anda simpan masuk ke Pustaka.</string>
-    <string name="welcome_feature_music">Lagu diputar di pemutar musik bawaan, dengan lirik.</string>
     <string name="welcome_defaults_title">Default Anda</string>
     <string name="welcome_defaults_subtitle">Cara unduhan disimpan. Anda tetap bisa memilih untuk tiap unduhan.</string>
     <string name="welcome_video_quality">Kualitas video</string>
@@ -1279,4 +1276,10 @@
     <string name="reading_right_to_left">Kanan ke kiri (manga)</string>
     <string name="reading_left_to_right">Kiri ke kanan</string>
     <string name="reading_vertical">Vertikal (webtoon)</string>
+    <string name="welcome_share_title">Bagikan tautan apa pun</string>
+    <string name="welcome_share_body">Dari aplikasi apa pun, atau tempel di Beranda</string>
+    <string name="welcome_library_title">Satu Pustaka</string>
+    <string name="welcome_library_body">Semua yang disimpan, di satu tempat</string>
+    <string name="welcome_music_title">Pemutar musik</string>
+    <string name="welcome_music_body">Lagu-lagumu, dengan liriknya</string>
 </resources>

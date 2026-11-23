@@ -1255,9 +1255,6 @@
     <string name="welcome_next">بعدی</string>
     <string name="welcome_start">شروع کنیم</string>
     <string name="welcome_tagline">ویدیو، عکس و موسیقی از صدها سایت، ذخیره‌شده در گوشی شما.</string>
-    <string name="welcome_feature_share">از هر برنامه‌ای پیوند را با Comfort هم‌رسانی کنید یا در خانه بچسبانید.</string>
-    <string name="welcome_feature_library">هر چه ذخیره کنید به کتابخانه‌تان می‌رود.</string>
-    <string name="welcome_feature_music">آهنگ‌ها در پخش‌کنندهٔ داخلی، همراه متن ترانه پخش می‌شوند.</string>
     <string name="welcome_defaults_title">پیش‌فرض‌های شما</string>
     <string name="welcome_defaults_subtitle">نحوهٔ ذخیرهٔ دانلودها. باز هم می‌توانید برای هر کدام انتخاب کنید.</string>
     <string name="welcome_video_quality">کیفیت ویدیو</string>
@@ -1282,4 +1279,10 @@
     <string name="reading_right_to_left">راست به چپ (مانگا)</string>
     <string name="reading_left_to_right">چپ به راست</string>
     <string name="reading_vertical">عمودی (وبتون)</string>
+    <string name="welcome_share_title">هر پیوندی را هم‌رسانی کنید</string>
+    <string name="welcome_share_body">از هر برنامه‌ای، یا در خانه بچسبانید</string>
+    <string name="welcome_library_title">یک کتابخانه</string>
+    <string name="welcome_library_body">هرچه ذخیره می‌کنید، در یک جا</string>
+    <string name="welcome_music_title">یک پخش‌کنندهٔ موسیقی</string>
+    <string name="welcome_music_body">آهنگ‌هایتان، با متنشان</string>
 </resources>

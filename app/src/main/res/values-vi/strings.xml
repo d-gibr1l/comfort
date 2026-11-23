@@ -1221,9 +1221,6 @@
     <string name="welcome_next">Tiếp</string>
     <string name="welcome_start">Bắt đầu</string>
     <string name="welcome_tagline">Video, ảnh và nhạc từ hàng trăm trang, lưu trên điện thoại của bạn.</string>
-    <string name="welcome_feature_share">Chia sẻ liên kết tới Comfort từ bất kỳ ứng dụng nào, hoặc dán ở Trang chủ.</string>
-    <string name="welcome_feature_library">Mọi thứ bạn lưu đều vào Thư viện.</string>
-    <string name="welcome_feature_music">Bài hát phát trong trình phát nhạc tích hợp, có lời.</string>
     <string name="welcome_defaults_title">Mặc định của bạn</string>
     <string name="welcome_defaults_subtitle">Cách lưu tải xuống. Bạn vẫn có thể chọn cho từng mục.</string>
     <string name="welcome_video_quality">Chất lượng video</string>
@@ -1248,4 +1245,10 @@
     <string name="reading_right_to_left">Phải sang trái (manga)</string>
     <string name="reading_left_to_right">Trái sang phải</string>
     <string name="reading_vertical">Dọc (webtoon)</string>
+    <string name="welcome_share_title">Chia sẻ mọi liên kết</string>
+    <string name="welcome_share_body">Từ bất kỳ ứng dụng nào, hoặc dán ở Trang chủ</string>
+    <string name="welcome_library_title">Một Thư viện</string>
+    <string name="welcome_library_body">Mọi thứ bạn lưu, ở một nơi</string>
+    <string name="welcome_music_title">Trình phát nhạc</string>
+    <string name="welcome_music_body">Bài hát của bạn, kèm lời</string>
 </resources>

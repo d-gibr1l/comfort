@@ -1289,9 +1289,6 @@
     <string name="welcome_next">הבא</string>
     <string name="welcome_start">בואו נתחיל</string>
     <string name="welcome_tagline">סרטונים, תמונות ומוזיקה ממאות אתרים, שמורים בטלפון שלך.</string>
-    <string name="welcome_feature_share">שתף קישור ל-Comfort מכל אפליקציה, או הדבק אותו בבית.</string>
-    <string name="welcome_feature_library">כל מה שתשמור מגיע לספרייה שלך.</string>
-    <string name="welcome_feature_music">שירים מתנגנים בנגן המובנה, עם מילים.</string>
     <string name="welcome_defaults_title">ברירות המחדל שלך</string>
     <string name="welcome_defaults_subtitle">איך הורדות נשמרות. עדיין אפשר לבחור לכל אחת.</string>
     <string name="welcome_video_quality">איכות וידאו</string>
@@ -1316,4 +1313,10 @@
     <string name="reading_right_to_left">מימין לשמאל (מנגה)</string>
     <string name="reading_left_to_right">משמאל לימין</string>
     <string name="reading_vertical">אנכי (וובטון)</string>
+    <string name="welcome_share_title">שתפו כל קישור</string>
+    <string name="welcome_share_body">מכל אפליקציה, או הדביקו בבית</string>
+    <string name="welcome_library_title">ספרייה אחת</string>
+    <string name="welcome_library_body">כל מה ששמרתם, במקום אחד</string>
+    <string name="welcome_music_title">נגן מוזיקה</string>
+    <string name="welcome_music_body">השירים שלכם, עם המילים</string>
 </resources>

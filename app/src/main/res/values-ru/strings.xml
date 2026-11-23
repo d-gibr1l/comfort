@@ -1323,9 +1323,6 @@
     <string name="welcome_next">Далее</string>
     <string name="welcome_start">Начать</string>
     <string name="welcome_tagline">Видео, картинки и музыка с сотен сайтов — прямо на вашем телефоне.</string>
-    <string name="welcome_feature_share">Поделитесь ссылкой с Comfort из любого приложения или вставьте её на главной.</string>
-    <string name="welcome_feature_library">Всё сохранённое попадает в вашу медиатеку.</string>
-    <string name="welcome_feature_music">Песни играют во встроенном плеере, с текстами.</string>
     <string name="welcome_defaults_title">Ваши настройки по умолчанию</string>
     <string name="welcome_defaults_subtitle">Как сохраняются загрузки. Для каждой можно выбрать отдельно.</string>
     <string name="welcome_video_quality">Качество видео</string>
@@ -1350,4 +1347,10 @@
     <string name="reading_right_to_left">Справа налево (манга)</string>
     <string name="reading_left_to_right">Слева направо</string>
     <string name="reading_vertical">Вертикально (вебтун)</string>
+    <string name="welcome_share_title">Делитесь любой ссылкой</string>
+    <string name="welcome_share_body">Из любого приложения или вставьте на главной</string>
+    <string name="welcome_library_title">Одна медиатека</string>
+    <string name="welcome_library_body">Всё сохранённое в одном месте</string>
+    <string name="welcome_music_title">Музыкальный плеер</string>
+    <string name="welcome_music_body">Ваши песни с текстами</string>
 </resources>

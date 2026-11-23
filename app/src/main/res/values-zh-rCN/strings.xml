@@ -1221,9 +1221,6 @@
     <string name="welcome_next">下一步</string>
     <string name="welcome_start">开始使用</string>
     <string name="welcome_tagline">来自数百个网站的视频、图片和音乐，保存到你的手机。</string>
-    <string name="welcome_feature_share">从任何应用把链接分享给 Comfort，或在主页粘贴。</string>
-    <string name="welcome_feature_library">你保存的一切都会进入资料库。</string>
-    <string name="welcome_feature_music">歌曲在内置音乐播放器中播放，带歌词。</string>
     <string name="welcome_defaults_title">你的默认设置</string>
     <string name="welcome_defaults_subtitle">下载的保存方式。每次下载仍可单独选择。</string>
     <string name="welcome_video_quality">视频画质</string>
@@ -1248,4 +1245,10 @@
     <string name="reading_right_to_left">从右到左（日漫）</string>
     <string name="reading_left_to_right">从左到右</string>
     <string name="reading_vertical">竖向（条漫）</string>
+    <string name="welcome_share_title">分享任意链接</string>
+    <string name="welcome_share_body">从任意应用分享，或在首页粘贴</string>
+    <string name="welcome_library_title">一个媒体库</string>
+    <string name="welcome_library_body">你保存的一切，集中一处</string>
+    <string name="welcome_music_title">音乐播放器</string>
+    <string name="welcome_music_body">你的歌曲，附带歌词</string>
 </resources>
