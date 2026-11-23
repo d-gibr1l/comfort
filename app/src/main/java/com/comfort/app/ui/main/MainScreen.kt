@@ -480,6 +480,13 @@ fun MainScreen(
             label = "miniPlayerInset",
         ).value,
     ) {
+    // "Finished" and "failed" for downloads, on whichever page is open (they were only seen with
+    // the Queue open), but not over the media viewer: held until it closes.
+    run {
+        val eventQueue by viewModel.queueFlow.collectAsStateWithLifecycle()
+        val eventHistory by viewModel.historyFlow.collectAsStateWithLifecycle()
+        DownloadEventSnackbars(historyItems = eventHistory, queueItems = eventQueue, holdWhile = { mediaViewer != null })
+    }
     Box(modifier = Modifier.fillMaxSize()) {
     // No background of its own: MainActivity's Surface paints it, and every page paints its own
     // over that — a third full-screen fill under each frame for nothing.

@@ -94,7 +94,7 @@ fun QueueScreen(
     // The app's one snackbar host (MainScreen's): drawn here while the Queue is open, and under the
     // pages again once it closes, so a delete's Undo carries on there instead of being committed.
     val snackbars = LocalAppSnackbars.current
-    DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems)
+    // (Finished/failed snackbars: MainScreen's, on every page.)
     var helpOpen by remember { mutableStateOf(false) }
     if (helpOpen) QueueHelpSheet(onDismiss = { helpOpen = false })
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —

@@ -1,5 +1,6 @@
 package com.comfort.app.ui.main
 
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.res.stringResource
 import android.icu.util.MeasureUnit
 import com.comfort.app.util.LocalFormat
@@ -318,7 +319,13 @@ val LocalAppSnackbars = androidx.compose.runtime.staticCompositionLocalOf<AppSna
 fun DownloadEventSnackbars(
     historyItems: List<DownloadEntity>,
     queueItems: List<DownloadEntity>,
+    // While true (the media viewer open), they wait, and show once it's false.
+    holdWhile: () -> Boolean = { false },
 ) {
+    val held by androidx.compose.runtime.rememberUpdatedState(holdWhile)
+    suspend fun waitTillShown() {
+        androidx.compose.runtime.snapshotFlow { held() }.first { !it }
+    }
     val eventsContext = androidx.compose.ui.platform.LocalContext.current
     val snackbars = LocalAppSnackbars.current
 
@@ -343,6 +350,7 @@ fun DownloadEventSnackbars(
                 else -> eventsContext.resources.getQuantityString(R.plurals.downloads_finished, finished.size, finished.size)
             }
             if (message != null) snackbars.showEvent("downloads") {
+                waitTillShown()
                 snackbars.host.showSnackbar(DownloadEventVisuals(isSuccess = true, message = message))
             }
         }
@@ -369,6 +377,7 @@ fun DownloadEventSnackbars(
                 else -> eventsContext.resources.getQuantityString(R.plurals.downloads_failed, failed.size, failed.size)
             }
             if (message != null) snackbars.showEvent("downloads") {
+                waitTillShown()
                 snackbars.host.showSnackbar(DownloadEventVisuals(isSuccess = false, message = message))
             }
         }
