@@ -214,8 +214,15 @@ internal fun QueuePanel() {
                 QueueRow(
                     song = song,
                     // Unchanged by a drag (rows stay in their slots): fading them in and out
-                    // as one started and ended flickered.
-                    played = currentPos >= 0 && pos < currentPos,
+                    // as one started and ended flickered. But the dragged one is drawn as it'll
+                    // be where it's held: a played song taken below the one on is unplayed there
+                    // (it stayed faded under the finger, then popped bright on the drop).
+                    played = if (isDragged && currentPos >= 0) {
+                        val newCurrent = currentPos -
+                            (if (dragStart < currentPos && dragTarget >= currentPos) 1 else 0) +
+                            (if (dragStart > currentPos && dragTarget <= currentPos) 1 else 0)
+                        dragTarget < newCurrent
+                    } else currentPos >= 0 && pos < currentPos,
                     current = index == state.index,
                     dragged = isDragged,
                     isPlaying = state.isPlaying,
@@ -339,6 +346,7 @@ private fun QueueRowContent(
     onClick: () -> Unit,
     handle: Modifier?,
 ) {
+    val playedAlpha by androidx.compose.animation.core.animateFloatAsState(if (played) 0.45f else 1f, label = "queuePlayed")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -358,8 +366,8 @@ private fun QueueRowContent(
             .swipeRemoveAction()
             .clickable(onClick = onClick)
             .padding(start = 8.dp, end = 4.dp)
-            // Already played: faded.
-            .graphicsLayer { alpha = if (played) 0.45f else 1f },
+            // Already played: faded (eased, as a dragged song crosses the one on).
+            .graphicsLayer { alpha = playedAlpha },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(50.dp).clip(RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
