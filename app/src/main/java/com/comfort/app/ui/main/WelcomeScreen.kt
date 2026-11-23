@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -123,17 +124,14 @@ fun WelcomeScreen(onDone: () -> Unit) {
                 Spacer(Modifier.weight(1f))
                 if (page < 2) TextButton(onClick = { finish() }) { Text(stringResource(R.string.welcome_skip), style = MaterialTheme.typography.labelLarge.copy(fontFamily = HeaderFontFamily)) }
             }
-            val welcomeShift = with(androidx.compose.ui.platform.LocalDensity.current) { 30.dp.roundToPx() }
             AnimatedContent(
                 targetState = page,
                 transitionSpec = {
-                    // Material's shared axis: the page going fades out first as it moves aside, then
-                    // the next fades in after it, so the two never show over each other.
+                    // The pages slide a quarter of the way and crossfade (the first version's, asked
+                    // back for over a fade-through).
                     val forward = targetState > initialState
-                    val enter = slideInHorizontally(androidx.compose.animation.core.tween(300, delayMillis = 90)) { if (forward) welcomeShift else -welcomeShift } +
-                        fadeIn(androidx.compose.animation.core.tween(210, delayMillis = 90))
-                    val exit = slideOutHorizontally(androidx.compose.animation.core.tween(300)) { if (forward) -welcomeShift else welcomeShift } +
-                        fadeOut(androidx.compose.animation.core.tween(90))
+                    val enter = slideInHorizontally { if (forward) it / 4 else -it / 4 } + fadeIn()
+                    val exit = slideOutHorizontally { if (forward) -it / 4 else it / 4 } + fadeOut()
                     // Not clipped to the page area (a page sliding aside was cut off at its edge).
                     (enter togetherWith exit).using(androidx.compose.animation.SizeTransform(clip = false))
                 },
@@ -148,18 +146,33 @@ fun WelcomeScreen(onDone: () -> Unit) {
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (page > 0) {
-                    OutlinedButton(onClick = { page-- }, modifier = Modifier.weight(1f).height(56.dp)) { Text(stringResource(R.string.action_back), style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily)) }
+            // Leaving the first page, Next narrows into its half as Back grows in beside it (and
+            // the reverse going back); its label crossfades to Get started on the last page.
+            val backShare by androidx.compose.animation.core.animateFloatAsState(
+                if (page > 0) 1f else 0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 380f),
+                label = "welcomeBack",
+            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(vertical = 16.dp)) {
+                if (backShare > 0.01f) {
+                    OutlinedButton(
+                        onClick = { if (page > 0) page-- },
+                        modifier = Modifier.weight(backShare).height(56.dp).graphicsLayer { alpha = backShare.coerceIn(0f, 1f) },
+                        contentPadding = PaddingValues(0.dp),
+                    ) { Text(stringResource(R.string.action_back), style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily), maxLines = 1) }
+                    Spacer(Modifier.width(12.dp * backShare.coerceIn(0f, 1f)))
                 }
                 Button(
                     onClick = { if (page < 2) page++ else finish() },
                     modifier = Modifier.weight(1f).height(56.dp),
                 ) {
-                    Text(
-                        stringResource(if (page < 2) R.string.welcome_next else R.string.welcome_start),
-                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily),
-                    )
+                    androidx.compose.animation.AnimatedContent(targetState = page < 2, label = "welcomeNextLabel") { next ->
+                        Text(
+                            stringResource(if (next) R.string.welcome_next else R.string.welcome_start),
+                            style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily),
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
