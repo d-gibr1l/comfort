@@ -215,6 +215,9 @@ private suspend fun galleryItemsFor(
             // A carousel's file deleted from the phone since: left out.
             if (files.size > 1 && info == null) return@mapIndexedNotNull null
             val mime = info?.mime ?: runCatching { context.contentResolver.getType(uri) }.getOrNull()
+            // A song among a download's files: the music player's, not a page; lyrics and
+            // subtitles aren't pages either.
+            if (files.size > 1 && (mime?.startsWith("audio/") == true || com.comfort.app.data.DeletedFiles.isSidecarName(info?.name))) return@mapIndexedNotNull null
             GalleryItem(
                 id = if (index == 0) download.id else "${download.id}#$index",
                 uri = uri,

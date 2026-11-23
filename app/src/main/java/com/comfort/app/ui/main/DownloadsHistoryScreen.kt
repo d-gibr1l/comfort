@@ -439,6 +439,11 @@ fun DownloadsHistoryScreen(
                 BatchViewRequest.download = null
                 if (batch.isAudio && mime?.startsWith("image/") != true && mime?.startsWith("video/") != true) {
                     openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = listOf(batch), startId = pageId))
+                } else if (batch.isAudio) {
+                    // A picture (or video) saved with a song: the viewer on it alone — the song's
+                    // download isn't among the Library's pictures and videos, which opened on the
+                    // Library's first one. Its song isn't a page (galleryItemsFor).
+                    openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = listOf(batch.copy(isAudio = false)), startId = pageId))
                 } else {
                     val visual = historyItems.filter { !it.isAudio }
                     openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = visual.ifEmpty { listOf(batch) }, startId = pageId))
