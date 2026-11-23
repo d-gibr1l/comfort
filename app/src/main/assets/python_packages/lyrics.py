@@ -10,6 +10,12 @@ players that only read sidecars. title/artist override the tags (the preview she
 the fallbacks and seconds stand in for tags the file doesn't have or can't hold — a .webm song
 (some Spotify tracks), whose lyrics can only go in the .lrc file.
 
+    lyrics.py --fetch <cache.json> <title> <artist> [album]
+
+looks the song up before it has finished downloading (from what the app already knows of it) and
+leaves LRCLIB's answer in cache.json; a later run given that cache (its 9th argument) uses it when
+it fits the downloaded song (its title, and length within 3 s), else looks again.
+
 Prints one JSON line: {"lyrics": "synced" | "plain" | "none" | "instrumental", "lrc": bool}.
 Never fails the download: no network, no match or an unreadable file just prints "none"."""
 
@@ -147,8 +153,46 @@ def _embed(path, text):
         audio.save()
 
 
+def _norm(s):
+    return re.sub(r"[^\w]+", " ", (s or "").lower()).strip()
+
+
+def _cached(cache, title, seconds):
+    """The early lookup's answer, if it's this song: its title in the song's title (or the other
+    way round), and its length within 3 s of the file's."""
+    if not cache or not os.path.isfile(cache):
+        return None
+    try:
+        with open(cache, encoding="utf-8") as f:
+            hit = json.load(f)
+    except Exception:
+        return None
+    if not hit or not (hit.get("syncedLyrics") or hit.get("plainLyrics") or hit.get("instrumental")):
+        return None
+    a, b = _norm(hit.get("trackName")), _norm(title)
+    if not a or not b or (a not in b and b not in a):
+        return None
+    if seconds and hit.get("duration") and abs(hit["duration"] - seconds) > 3:
+        return None
+    return hit
+
+
+def fetch(cache, title, artist, album=None):
+    """The early lookup: LRCLIB's answer for what's known of the song, into [cache]."""
+    hit = None
+    try:
+        hit = _lookup(title, artist, album, None)
+    except Exception:
+        pass
+    try:
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump(hit or {}, f)
+    except Exception:
+        pass
+
+
 def add_lyrics(path, mode="synced", write_lrc=True, title=None, artist=None,
-               fallback_title=None, fallback_artist=None, fallback_seconds=None):
+               fallback_title=None, fallback_artist=None, fallback_seconds=None, cache=None):
     result = {"lyrics": "none", "lrc": False}
     try:
         t, a, album, seconds = _tags(path)
@@ -156,7 +200,7 @@ def add_lyrics(path, mode="synced", write_lrc=True, title=None, artist=None,
         seconds = seconds or fallback_seconds
         if not title or not artist:
             return result
-        hit = _lookup(title, artist, album, seconds)
+        hit = _cached(cache, title, seconds) or _lookup(title, artist, album, seconds)
         if not hit:
             return result
         if hit.get("instrumental") and not hit.get("plainLyrics"):
@@ -188,6 +232,10 @@ def add_lyrics(path, mode="synced", write_lrc=True, title=None, artist=None,
 
 if __name__ == "__main__":
     a = sys.argv[1:]
+    if a and a[0] == "--fetch":
+        if len(a) >= 4:
+            fetch(a[1], a[2], a[3], (a[4] or None) if len(a) > 4 else None)
+        sys.exit(0)
     if not a:
         print("Usage: lyrics.py <path> <synced|plain> <write_lrc 0|1> [title] [artist]", file=sys.stderr)
         sys.exit(2)
@@ -200,4 +248,5 @@ if __name__ == "__main__":
         fallback_title=(a[5] or None) if len(a) > 5 else None,
         fallback_artist=(a[6] or None) if len(a) > 6 else None,
         fallback_seconds=int(a[7]) if len(a) > 7 and a[7].isdigit() else None,
+        cache=(a[8] or None) if len(a) > 8 else None,
     )), flush=True)

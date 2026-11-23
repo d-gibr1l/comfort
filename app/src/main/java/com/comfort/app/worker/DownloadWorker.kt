@@ -176,9 +176,39 @@ class DownloadWorker(
     /** Adds lyrics to a downloaded song (Settings › Processing › Lyrics; lyrics.py looks it up on
      * LRCLIB by its tags and embeds them). Returns the .lrc file it wrote beside [song], if any.
      * Best-effort and capped: a song with no lyrics found, or no network, saves as it is. */
+    // The lyrics looked up while the song downloads (startLyricsPrefetch), and where they're left.
+    private var lyricsPrefetch: kotlinx.coroutines.Deferred<Unit>? = null
+    private var lyricsCache: File? = null
+    private val prefetchScope = kotlinx.coroutines.CoroutineScope(Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+
+    /** A song's lyrics, looked up as its download starts (from its title and artist, already known
+     * from the preview) rather than only once it has finished: addLyrics then finds them waiting. */
+    private suspend fun startLyricsPrefetch(downloadId: String, overrideTitle: String, overrideArtist: String) {
+        if (GalleryDlPreferences.getLyricsMode(applicationContext) == GalleryDlPreferences.LYRICS_OFF) return
+        val entity = runCatching { AppDatabase.getDatabase(applicationContext).downloadDao().getById(downloadId) }.getOrNull() ?: return
+        if (!entity.isAudio) return
+        val artist = overrideArtist.ifBlank { entity.artist.orEmpty() }
+        val title = overrideTitle.ifBlank {
+            entity.track?.takeIf { it.isNotBlank() } ?: entity.title.removePrefix("$artist - ")
+        }
+        if (title.isBlank() || artist.isBlank()) return
+        val cache = File(applicationContext.cacheDir, "lyrics/$downloadId.json").apply { parentFile?.mkdirs(); delete() }
+        lyricsCache = cache
+        lyricsPrefetch = prefetchScope.async {
+            runCatching {
+                kotlinx.coroutines.withTimeoutOrNull(LYRICS_CAP_MS) {
+                    PythonRuntime.run(applicationContext, "lyrics.py", listOf("--fetch", cache.absolutePath, title, artist, entity.album.orEmpty())) { }
+                }
+            }
+            Unit
+        }
+    }
+
     private suspend fun addLyrics(song: File, title: String, artist: String, downloadId: String): File? {
         val mode = GalleryDlPreferences.getLyricsMode(applicationContext)
         if (mode == GalleryDlPreferences.LYRICS_OFF) return null
+        // The early lookup, if it's still going: waited for (it's further along than a new one).
+        lyricsPrefetch?.let { runCatching { kotlinx.coroutines.withTimeoutOrNull(LYRICS_CAP_MS) { it.await() } } }
         val writeLrc = GalleryDlPreferences.isLyricsLrcFile(applicationContext)
         // What the app already knows about the song, for a file whose own tags can't be read
         // (a .webm): the engine's artist and track, or its "Artist - Title" title.
@@ -203,7 +233,7 @@ class DownloadWorker(
                     applicationContext, "lyrics.py",
                     listOf(
                         song.absolutePath, mode, if (writeLrc) "1" else "0", title, artist,
-                        knownTitle, knownArtist, seconds?.toString().orEmpty(),
+                        knownTitle, knownArtist, seconds?.toString().orEmpty(), lyricsCache?.absolutePath.orEmpty(),
                     ),
                 ) { }
             }
@@ -802,6 +832,8 @@ class DownloadWorker(
                 // A manga / comic site's chapter (Settings › Processing › Comics): its pages are held
                 // to the end and saved as one .cbz (packComic), not as loose pictures.
                 val comicMode = engine == DownloadEngine.GALLERY_DL && com.comfort.app.data.ComicSites.packs(applicationContext, url)
+                // A song's lyrics: looked up now, while it downloads (see startLyricsPrefetch).
+                if (engine != DownloadEngine.GALLERY_DL && lyricsPrefetch == null) startLyricsPrefetch(downloadId, overrideTitle, overrideArtist)
 
                 // Last file first: galleries put the newest first, so a carousel's first picture ends
                 // up first in the gallery too. Saved last, the first file still sets the thumbnail.
