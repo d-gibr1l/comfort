@@ -760,8 +760,8 @@ fun MainScreen(
                     SharePickerScreen(
                         url = picker.url,
                         onDismiss = { router.close() },
-                        onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate ->
-                            router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate)
+                        onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate, startAt ->
+                            router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate, scheduledAt = startAt)
                             router.close()
                         },
                         onHeightChange = { sheetHeight = it },

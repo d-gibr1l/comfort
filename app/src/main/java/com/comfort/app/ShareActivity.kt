@@ -587,14 +587,15 @@ private fun LoadingSheet(onDismiss: () -> Unit, isDuplicate: Boolean, onDownload
                     // Detection can take a real few seconds on a slow/rate-limited site — this
                     // skips straight to a plain whole-URL download instead of waiting it out.
                     Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        // The preview sheet's Download button: 56 dp, fully rounded ends.
                         Button(
                             onClick = onDownloadNow,
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(28.dp),
                         ) {
                             Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(if (isDuplicate) stringResource(R.string.redownload) else stringResource(R.string.search_download))
+                            Text(if (isDuplicate) stringResource(R.string.redownload) else stringResource(R.string.download_action))
                         }
                     }
                 }
@@ -674,7 +675,7 @@ private fun SharePickerSheet(
                     modifier = Modifier.navigationBarsPadding(),
                     url = url,
                     onDismiss = { visible = false },
-                    onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate ->
+                    onDownload = { downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate, startAt ->
                         // SharePickerScreen's own "Download N"/"Redownload N" button now checks
                         // duplicate status against the exact (url, itemFilter) pair for the
                         // currently-selected items itself (DownloadDao.findActiveOrFinishedByUrl
@@ -684,7 +685,7 @@ private fun SharePickerSheet(
                         // already-shown confirmation carried through, same reasoning as
                         // DownloadPreviewSheet/LoadingSheet's own Download buttons.
                         val app = context.applicationContext
-                        router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate) {
+                        router.download(downloadUrl, itemFilter, totalItems, videoQuality, forceDuplicate, scheduledAt = startAt) {
                             showShareToast(app, startedMessage(app, it))
                         }
                         visible = false

@@ -56,7 +56,7 @@ import androidx.compose.ui.semantics.semantics
 fun SharePickerScreen(
     url: String,
     onDismiss: () -> Unit,
-    onDownload: (url: String, itemFilter: String?, totalItems: Int, videoQuality: VideoQuality?, forceDuplicate: Boolean) -> Unit,
+    onDownload: (url: String, itemFilter: String?, totalItems: Int, videoQuality: VideoQuality?, forceDuplicate: Boolean, startAt: Long?) -> Unit,
     modifier: Modifier = Modifier,
     onHeightChange: (Dp) -> Unit = {},
     // ShareActivity already runs this exact listing pass once itself, to decide whether this
@@ -160,7 +160,7 @@ fun SharePickerScreen(
             // No picker ever shown for this case (listing genuinely couldn't be previewed) — same
             // "no button, so no confirmation to already have given" reasoning as MultiLinkHandler,
             // not forced: a duplicate here still just folds into the normal skip-and-record.
-            onDownload(url, null, 0, null, false)
+            onDownload(url, null, 0, null, false, null)
         }
     }
 
@@ -218,10 +218,33 @@ fun SharePickerScreen(
         },
         bottomBar = {
             if (state == ListingState.LOADED) {
+                // "Start at…" (StartAtDialog), as the preview sheet's: added now, started then.
+                var startAt by remember { mutableStateOf<Long?>(null) }
+                LaunchedEffect(startAt) {
+                    val at = startAt ?: return@LaunchedEffect
+                    kotlinx.coroutines.delay((at - System.currentTimeMillis()).coerceAtLeast(0L))
+                    startAt = null
+                }
+                var showStartAt by remember { mutableStateOf(false) }
+                if (showStartAt) {
+                    StartAtDialog(
+                        initial = startAt,
+                        onDismiss = { showStartAt = false },
+                        onPicked = { at -> startAt = at; showStartAt = false },
+                        onRemove = if (startAt != null) ({ startAt = null; showStartAt = false }) else null,
+                    )
+                }
+                val startAtLabel = startAt?.let {
+                    stringResource(R.string.starts_at_x, android.text.format.DateFormat.getTimeFormat(androidx.compose.ui.platform.LocalContext.current).format(java.util.Date(it)))
+                }
                 Surface(color = Color.Transparent, tonalElevation = 3.dp) {
                     // 24dp horizontal inset matches MainScreen's own bottom nav pill's margin,
                     // so this button reads the same width as that pill rather than a narrower one.
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
+                        // The preview sheet's split button: Download, and Start at… on its trailing half.
+                        val outer = 28.dp
+                        val inner = 4.dp
+                        Row(modifier = Modifier.fillMaxWidth().height(56.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         Button(
                             onClick = {
                                 // itemFilter (hoisted above, shared with the isDuplicate check)
@@ -231,13 +254,13 @@ fun SharePickerScreen(
                                 // this button already said "Redownload" when isDuplicate was true,
                                 // so tapping it is the confirmation — same reasoning
                                 // DownloadPreviewSheet's own Download button already uses.
-                                onDownload(url, itemFilter, selectedCount, if (hasVideoItems) selectedQuality else null, isDuplicate)
+                                onDownload(url, itemFilter, selectedCount, if (hasVideoItems) selectedQuality else null, isDuplicate, startAt?.takeIf { it > System.currentTimeMillis() })
                             },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
                             enabled = selectedNums.isNotEmpty(),
                         ) {
-                            Icon(Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(if (startAt != null) Icons.Outlined.Schedule else Icons.Outlined.ArrowDownward, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             // The selection's size when every selected item reported one (gallery-dl /
                             // Instaloader listings ask the media server) — never a partial sum.
@@ -245,7 +268,22 @@ fun SharePickerScreen(
                                 .takeIf { picked -> picked.isNotEmpty() && picked.all { it.sizeBytes != null } }
                                 ?.sumOf { it.sizeBytes!! }
                             val sizeSuffix = selectedSize?.let { " · ${formatFilesize(it)}" } ?: ""
-                            Text((if (isDuplicate) stringResource(R.string.redownload_x, selectedCount) else stringResource(R.string.download_x, selectedCount)) + sizeSuffix)
+                            Text(
+                                startAtLabel?.let { "$it · $selectedCount" }
+                                    ?: ((if (isDuplicate) stringResource(R.string.redownload_x, selectedCount) else stringResource(R.string.download_x, selectedCount)) + sizeSuffix),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
+                        Button(
+                            onClick = { showStartAt = true },
+                            enabled = selectedNums.isNotEmpty(),
+                            modifier = Modifier.width(64.dp).fillMaxHeight(),
+                            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.start_at), modifier = Modifier.size(22.dp))
+                        }
                         }
                     }
                 }
@@ -359,7 +397,7 @@ fun SharePickerScreen(
                             // never a real isDuplicate check to have shown the user in the first
                             // place, so this still just folds into the normal skip-and-record
                             // rather than forcing through.
-                            onClick = { onDownload(url, null, 0, null, false) },
+                            onClick = { onDownload(url, null, 0, null, false, null) },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = MaterialTheme.shapes.medium,
                         ) {

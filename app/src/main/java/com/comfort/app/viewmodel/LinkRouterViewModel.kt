@@ -133,9 +133,11 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         totalItems: Int = 0,
         videoQuality: VideoQuality? = null,
         forceDuplicate: Boolean = false,
+        // The picker's "Start at…": added now, started at that time.
+        scheduledAt: Long? = null,
         onDone: (EnqueueResult) -> Unit = {},
     ): Job = enqueue(onDone) {
-        DownloadDispatcher.enqueueDownload(context, url, titleFor(url), itemFilter, totalItems, videoQuality, forceDuplicate = forceDuplicate)
+        DownloadDispatcher.enqueueDownload(context, url, titleFor(url), itemFilter, totalItems, videoQuality, forceDuplicate = forceDuplicate, scheduledAt = scheduledAt)
     }
 
     /** Several shared links at once — each enqueued with the defaults; [onDone] gets how many were
