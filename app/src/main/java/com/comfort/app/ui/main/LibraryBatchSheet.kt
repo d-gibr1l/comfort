@@ -60,6 +60,11 @@ private data class BatchItem(
     val isLyrics get() = ext == "lrc"
     /** A file that goes with another one (lyrics, subtitles), not a picture, video or song. */
     val isSidecar get() = isLyrics || ext in setOf("srt", "vtt", "ass", "ssa")
+    /** The name as the Library shows a download's: without the "[id] [site]" the file name carries,
+     * a " (1)" copy number, or the extension. */
+    val shownName: String get() = name.substringBeforeLast('.')
+        .replace(Regex("""(\s*\[[^\[\]]*])+\s*(\(\d+\))?\s*$"""), "")
+        .trim().ifBlank { name }
 }
 
 private const val PREFS = "library_batch_view"
@@ -219,7 +224,7 @@ private fun GridTile(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit)
                 }
             }
             Column(Modifier.padding(10.dp)) {
-                Text(item.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.shownName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(meta(item), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
@@ -235,7 +240,7 @@ private fun ListRow(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit) 
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("${item.number}. ${item.name}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${item.number}. ${item.shownName}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(meta(item), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
             IconButton(onClick = onDelete) {
