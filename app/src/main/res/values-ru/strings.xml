@@ -1126,6 +1126,12 @@
         <item quantity="many">Не удалось скачать %1$d из %2$d</item>
         <item quantity="other">Не удалось скачать %1$d из %2$d</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">Удалено с телефона: %1$d из %2$d</item>
+        <item quantity="few">Удалено с телефона: %1$d из %2$d</item>
+        <item quantity="many">Удалено с телефона: %1$d из %2$d</item>
+        <item quantity="other">Удалено с телефона: %1$d из %2$d</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d загрузка завершена</item>
         <item quantity="few">%d загрузки завершены</item>

@@ -1095,6 +1095,11 @@
         <item quantity="many">%1$d de %2$d itens não puderam ser baixados</item>
         <item quantity="other">%1$d de %2$d itens não puderam ser baixados</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d de %2$d excluídos do celular</item>
+        <item quantity="many">%1$d de %2$d excluídos do celular</item>
+        <item quantity="other">%1$d de %2$d excluídos do celular</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d download concluído</item>
         <item quantity="many">%d de downloads concluídos</item>

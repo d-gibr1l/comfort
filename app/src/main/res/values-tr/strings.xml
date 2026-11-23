@@ -1176,6 +1176,10 @@
         <item quantity="one">%2$d öğeden %1$d tanesi indirilemedi</item>
         <item quantity="other">%2$d öğeden %1$d tanesi indirilemedi</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%2$d öğeden %1$d tanesi telefondan silindi</item>
+        <item quantity="other">%2$d öğeden %1$d tanesi telefondan silindi</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d indirme bitti</item>
         <item quantity="other">%d indirme bitti</item>

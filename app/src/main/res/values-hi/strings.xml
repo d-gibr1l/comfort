@@ -1176,6 +1176,10 @@
         <item quantity="one">%2$d में से %1$d आइटम डाउनलोड नहीं हो सके</item>
         <item quantity="other">%2$d में से %1$d आइटम डाउनलोड नहीं हो सके</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%2$d में से %1$d फ़ोन से हटाए गए</item>
+        <item quantity="other">%2$d में से %1$d फ़ोन से हटाए गए</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d डाउनलोड पूरा हुआ</item>
         <item quantity="other">%d डाउनलोड पूरे हुए</item>

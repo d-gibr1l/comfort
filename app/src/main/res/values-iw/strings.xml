@@ -1203,6 +1203,11 @@
         <item quantity="two">לא ניתן היה להוריד %1$d מתוך %2$d פריטים</item>
         <item quantity="other">לא ניתן היה להוריד %1$d מתוך %2$d פריטים</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d מתוך %2$d נמחקו מהטלפון</item>
+        <item quantity="two">%1$d מתוך %2$d נמחקו מהטלפון</item>
+        <item quantity="other">%1$d מתוך %2$d נמחקו מהטלפון</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">הורדה אחת הסתיימה</item>
         <item quantity="two">%d הורדות הסתיימו</item>

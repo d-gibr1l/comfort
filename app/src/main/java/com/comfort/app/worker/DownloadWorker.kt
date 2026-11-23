@@ -585,6 +585,9 @@ class DownloadWorker(
                 // save) are filled first, in the engine's order: the retried file goes back where
                 // it was.
                 val usedPositions = dao.savedFilePositions(downloadId).toSet()
+                // A download that finished before (this run fetches its missing items): files are
+                // saved with its time, so they sit with the rest in the gallery, not as today's.
+                val originalSavedAt = entity?.finishedAt
                 val lastUsedPosition = usedPositions.maxOrNull() ?: 0
                 val lastPosition = AtomicInteger(maxOf(lastUsedPosition, savedCount.get()))
                 val emptyPositions = java.util.ArrayDeque((1..lastUsedPosition).filter { it !in usedPositions })
@@ -702,7 +705,7 @@ class DownloadWorker(
                     // a synced .lrc lands beside it and is saved after the song.
                     val lrcFile = if (isAudioFile) addLyrics(candidate, overrideTitle, overrideArtist, downloadId) else null
                     val savedUri = MediaStoreHelper.saveMediaToGallery(
-                        applicationContext, candidate, forceAudioMime = isAudioFile,
+                        applicationContext, candidate, forceAudioMime = isAudioFile, savedAt = originalSavedAt,
                     )
                     if (savedUri != null && lrcFile != null) {
                         // Named after the song as it was saved: a name already taken makes it
@@ -715,12 +718,12 @@ class DownloadWorker(
                         }.getOrNull()
                         val lrc = savedName?.substringBeforeLast('.')?.takeIf { it != candidate.nameWithoutExtension }
                             ?.let { base -> File(lrcFile.parentFile, "$base.lrc").takeIf { lrcFile.renameTo(it) } } ?: lrcFile
-                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrc) }
+                        runCatching { MediaStoreHelper.saveMediaToGallery(applicationContext, lrc, savedAt = originalSavedAt) }
                         lrc.delete()
                     }
                     lrcFile?.delete()
                     // Where it went, in the post's order: what the media viewer pages through.
-                    if (savedUri != null) dao.recordSavedFile(com.comfort.app.data.SavedFile(downloadId, savedUri.toString(), position))
+                    if (savedUri != null) dao.recordSavedFile(com.comfort.app.data.SavedFile(downloadId, savedUri.toString(), position, path = original.name))
                     if (savedUri == null) {
                         // Counted when it arrived; it didn't make it to the gallery (storage full,
                         // the chosen folder's permission gone). Counted as missing, not dropped
@@ -761,7 +764,9 @@ class DownloadWorker(
                             null
                         }
                         val thumbnailUri = artworkUri ?: savedUri
-                        if (singleItemDownload || firstOfDownload) {
+                        // A run fetching a finished download's missing items again: the thumbnail
+                        // stays, unless what came back is the post's first item.
+                        if (singleItemDownload || (firstOfDownload && position <= 1)) {
                             dao.setThumbnail(downloadId, thumbnailUri.toString())
                             if (artworkUri != null) dao.setMediaUri(downloadId, savedUri.toString())
                         } else {

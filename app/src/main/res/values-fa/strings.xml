@@ -1176,6 +1176,10 @@
         <item quantity="one">%1$d از %2$d مورد دانلود نشد</item>
         <item quantity="other">%1$d از %2$d مورد دانلود نشد</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d از %2$d از گوشی حذف شده</item>
+        <item quantity="other">%1$d از %2$d از گوشی حذف شده</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d دانلود تمام شد</item>
         <item quantity="other">%d دانلود تمام شد</item>

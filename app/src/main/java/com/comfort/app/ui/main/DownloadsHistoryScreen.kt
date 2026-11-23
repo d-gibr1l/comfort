@@ -131,6 +131,21 @@ fun DownloadsHistoryScreen(
     // plays in the Settings root header (see SettingsScreen.kt's SettingsRootScreen).
     val libraryTopicIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_gallery_thumbnail)
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
+    // Files deleted from the phone (multi-item downloads): checked as the Library shows, as the
+    // app comes back (they're deleted elsewhere), and as its downloads' counts change.
+    val multiItemKey = remember(historyItems) {
+        historyItems.filter { it.downloadedItems > 1 }.joinToString(",") { "${it.id}:${it.downloadedItems}" }
+    }
+    LaunchedEffect(isVisible, multiItemKey) { if (isVisible) viewModel.refreshDeleted() }
+    val deletedLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val currentlyVisible by androidx.compose.runtime.rememberUpdatedState(isVisible)
+    DisposableEffect(deletedLifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME && currentlyVisible) viewModel.refreshDeleted()
+        }
+        deletedLifecycle.lifecycle.addObserver(observer)
+        onDispose { deletedLifecycle.lifecycle.removeObserver(observer) }
+    }
     val deletedItems by viewModel.deletedFlow.collectAsStateWithLifecycle()
     val hasActiveDownloads by viewModel.hasActiveDownloads.collectAsStateWithLifecycle()
     val activeDownloadsCount by viewModel.activeDownloadsCount.collectAsStateWithLifecycle()
@@ -663,7 +678,7 @@ fun DownloadsHistoryScreen(
                         onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                         onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                         onRedownload = { viewModel.redownloadDeleted(item.id) },
-                        onDownloadMissing = { viewModel.retryDownload(item.id) },
+                        onDownloadMissing = { viewModel.downloadMissing(item.id) },
                         modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = null),
                     )
                 }
@@ -740,7 +755,7 @@ fun DownloadsHistoryScreen(
                             onToggleFavorite = { viewModel.setFavorite(item.id, !item.isFavorite) },
                             onRename = { newTitle -> viewModel.renameDownload(item.id, newTitle) },
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
-                            onDownloadMissing = { viewModel.retryDownload(item.id) },
+                            onDownloadMissing = { viewModel.downloadMissing(item.id) },
                         )
                     }
                     }

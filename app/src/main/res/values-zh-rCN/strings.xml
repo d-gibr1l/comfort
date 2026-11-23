@@ -1149,6 +1149,9 @@
     <plurals name="items_couldnt_be_downloaded">
         <item quantity="other">%2$d 个项目中有 %1$d 个无法下载</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="other">已从手机中删除 %1$d 个（共 %2$d 个）</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="other">%d 个下载已完成</item>
     </plurals>

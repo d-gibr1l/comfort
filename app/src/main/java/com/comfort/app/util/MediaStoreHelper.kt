@@ -217,13 +217,16 @@ object MediaStoreHelper {
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if
      * one is set, otherwise Download/Comfort's subfolder for its type — and returns its
      * content Uri. */
-    fun saveMediaToGallery(context: Context, sourceFile: File, forceAudioMime: Boolean = false): Uri? {
+    /** [savedAt]: the date the file is saved with (its time in the gallery), now when null — a
+     * download's file fetched again ("Download missing items") keeps the download's own. */
+    fun saveMediaToGallery(context: Context, sourceFile: File, forceAudioMime: Boolean = false, savedAt: Long? = null): Uri? {
+        val at = savedAt ?: System.currentTimeMillis()
         // Whatever the engine left as this file's mtime (a server's Last-Modified = upload time,
         // for Redgifs) must not become the saved file's date: copies made by some gallery/profile
         // setups (Secure Folder) keep the source's timestamp rather than stamping a new one.
-        sourceFile.setLastModified(System.currentTimeMillis())
+        sourceFile.setLastModified(at)
         val ext = sourceFile.name.substringAfterLast('.', "").lowercase()
-        if (ext == "mp4" || ext == "m4v" || ext == "mov") rewriteMp4CreationTime(sourceFile, System.currentTimeMillis())
+        if (ext == "mp4" || ext == "m4v" || ext == "mov") rewriteMp4CreationTime(sourceFile, at)
         var mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
             ?: URLConnection.guessContentTypeFromName(sourceFile.name)
             ?: when (ext) {
@@ -486,7 +489,9 @@ object MediaStoreHelper {
         // months back among older items instead of with today's. Stamped after that update, since
         // indexing would overwrite it otherwise.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val takenAt = System.currentTimeMillis()
+            // The time saveMediaToGallery gave the file (now, or the download's own for a file
+            // fetched again).
+            val takenAt = sourceFile.lastModified().takeIf { it > 0 } ?: System.currentTimeMillis()
             stampDateTaken(resolver, uri, takenAt)
             // Indexing after IS_PENDING=0 isn't always finished by the time that returns (seen on
             // device: every download since the first fix had datetaken NULL, i.e. the stamp above

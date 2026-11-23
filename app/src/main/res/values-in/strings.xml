@@ -1050,6 +1050,10 @@
         <item quantity="one">%1$d dari %2$d item tidak bisa diunduh</item>
         <item quantity="other">%1$d dari %2$d item tidak bisa diunduh</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d dari %2$d dihapus dari ponsel</item>
+        <item quantity="other">%1$d dari %2$d dihapus dari ponsel</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d unduhan selesai</item>
         <item quantity="other">%d unduhan selesai</item>

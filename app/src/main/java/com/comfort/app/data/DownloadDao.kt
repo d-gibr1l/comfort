@@ -315,6 +315,13 @@ interface DownloadDao {
     @Query("DELETE FROM saved_files WHERE downloadId = :downloadId")
     suspend fun clearSavedFiles(downloadId: String)
 
+    /** One file of [downloadId], deleted from the phone (see DeletedFiles). */
+    @Query("DELETE FROM saved_files WHERE downloadId = :downloadId AND uri = :uri")
+    suspend fun deleteSavedFile(downloadId: String, uri: String)
+
+    @Query("UPDATE downloads SET downloadedItems = MAX(0, downloadedItems - :count) WHERE id = :id")
+    suspend fun decrementDownloadedItems(id: String, count: Int)
+
 
     @Query("SELECT * FROM downloads")
     suspend fun getAllOnce(): List<DownloadEntity>

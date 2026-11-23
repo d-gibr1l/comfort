@@ -1120,6 +1120,10 @@
         <item quantity="one">%1$d of %2$d items couldn\'t be downloaded</item>
         <item quantity="other">%1$d of %2$d items couldn\'t be downloaded</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d of %2$d deleted from your phone</item>
+        <item quantity="other">%1$d of %2$d deleted from your phone</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d download finished</item>
         <item quantity="other">%d downloads finished</item>

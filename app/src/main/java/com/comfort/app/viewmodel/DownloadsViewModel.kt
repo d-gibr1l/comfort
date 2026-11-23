@@ -349,6 +349,39 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     /** A card's Retry/Continue, or "Download the missing items" on a finished one. */
     fun retryDownload(id: String) = retryDownloads(listOf(id))
 
+    /** How many of each multi-item download's files have been deleted from the phone since they
+     * were saved, by download id (only the ones with any): the Library counts what's left and
+     * offers "Download missing items". See [refreshDeleted]. */
+    private val _deletedCounts = com.comfort.app.data.DeletedFiles.counts
+    private val deletedCheck = kotlinx.coroutines.sync.Mutex()
+
+    /** Checks the Library's multi-item downloads for deleted files: when the Library shows (files
+     * get deleted elsewhere, meanwhile) and when its downloads change. */
+    fun refreshDeleted() {
+        viewModelScope.launch(Dispatchers.IO) {
+            deletedCheck.withLock {
+                val multi = historyFlow.value.filter { it.status == DownloadStatus.FINISHED && it.downloadedItems > 1 }.map { it.id }
+                if (multi.isEmpty()) { _deletedCounts.value = emptyMap(); return@withLock }
+                val files = multi.chunked(500).flatMap { dao.savedFiles(it) }
+                val gone = com.comfort.app.data.DeletedFiles.missing(getApplication(), files)
+                _deletedCounts.value = gone.groupingBy { it.downloadId }.eachCount()
+            }
+        }
+    }
+
+    /** "Download missing items": the files deleted from the phone are fetched again, and only
+     * those (DeletedFiles.prepareRedownload); a download whose items failed runs again as before. */
+    fun downloadMissing(id: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val gone = com.comfort.app.data.DeletedFiles.missing(getApplication(), dao.savedFiles(id))
+                com.comfort.app.data.DeletedFiles.prepareRedownload(getApplication(), id, gone)
+            }
+            _deletedCounts.update { it - id }
+            retryDownloads(listOf(id))
+        }
+    }
+
     /** The selection bar's Retry/Resume: each selected card's own, as one dispatch in the order
      * they're listed. A tap on these cards — starts them even while "Pause All" holds everything
      * else. */

@@ -290,7 +290,10 @@ internal fun HistoryGridItem(
             isVideo -> Icons.Filled.PlayArrow
             else -> null
         }
-        val incomplete = item.missingItems > 0
+        // Files deleted from the phone since: counted out, and it reads as incomplete.
+        val deleted = deletedCount(item)
+        val left = (item.downloadedItems - deleted).coerceAtLeast(0)
+        val incomplete = item.missingItems > 0 || deleted > 0
         if (typeIcon != null || item.downloadedItems > 1 || incomplete) {
             Row(
                 modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
@@ -298,7 +301,7 @@ internal fun HistoryGridItem(
             ) {
                 if (typeIcon != null) MediaBadge(icon = typeIcon, text = null)
                 if (incomplete) {
-                    MediaBadge(icon = Icons.Outlined.Warning, text = "${item.downloadedItems}/${item.totalItems}", tint = Color(0xFFFFB74D))
+                    MediaBadge(icon = Icons.Outlined.Warning, text = "$left/${maxOf(item.totalItems, item.downloadedItems)}", tint = Color(0xFFFFB74D))
                 } else if (item.downloadedItems > 1) {
                     MediaBadge(icon = Icons.Outlined.Layers, text = "${item.downloadedItems}")
                 }
@@ -691,6 +694,16 @@ internal fun HistoryRow(
                 Spacer(Modifier.height(2.dp))
                 MetaRow(icon = Icons.Outlined.Warning, text = item.errorMessage.orEmpty(), color = MaterialTheme.colorScheme.error)
             }
+            // Some of its files deleted from the phone since (DeletedFiles).
+            val deletedFiles = deletedCount(item)
+            if (deletedFiles > 0) {
+                Spacer(Modifier.height(2.dp))
+                MetaRow(
+                    icon = Icons.Outlined.Warning,
+                    text = androidx.compose.ui.res.pluralStringResource(R.plurals.x_of_y_deleted_from_phone, deletedFiles, deletedFiles, item.downloadedItems),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
 
         // Bulk actions in the selection-mode top bar replace the per-item menu while selecting.
@@ -761,8 +774,8 @@ private fun DownloadActionsMenu(
                 onClick = { onDismiss(); onRedownload() },
             )
         } else {
-            // Runs the same download again: its archives skip what's already saved.
-            if (item.missingItems > 0) {
+            // Fetches what failed, or what's been deleted from the phone since (only those).
+            if (item.missingItems > 0 || deletedCount(item) > 0) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.download_missing_items)) },
                     leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
@@ -886,6 +899,11 @@ private fun MetaRow(
 
 /** How many of a finished download's items failed while the rest saved — DownloadWorker keeps the
  * note saying so as a FINISHED row's errorMessage. 0 for a complete download. */
+/** How many of [item]'s files have been deleted from the phone since they were saved. */
+@Composable
+private fun deletedCount(item: DownloadEntity): Int =
+    com.comfort.app.data.DeletedFiles.counts.collectAsState().value[item.id] ?: 0
+
 private val DownloadEntity.missingItems: Int
     get() = if (status == DownloadStatus.FINISHED && !errorMessage.isNullOrBlank()) (totalItems - downloadedItems).coerceAtLeast(0) else 0
 

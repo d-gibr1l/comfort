@@ -1284,6 +1284,14 @@
         <item quantity="many">تعذّر تنزيل %1$d من أصل %2$d عنصر</item>
         <item quantity="other">تعذّر تنزيل %1$d من أصل %2$d عنصر</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="zero">حُذف %1$d من أصل %2$d من هاتفك</item>
+        <item quantity="one">حُذف %1$d من أصل %2$d من هاتفك</item>
+        <item quantity="two">حُذف %1$d من أصل %2$d من هاتفك</item>
+        <item quantity="few">حُذف %1$d من أصل %2$d من هاتفك</item>
+        <item quantity="many">حُذف %1$d من أصل %2$d من هاتفك</item>
+        <item quantity="other">حُذف %1$d من أصل %2$d من هاتفك</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="zero">اكتملت %d تنزيلات</item>
         <item quantity="one">اكتمل تنزيل واحد</item>

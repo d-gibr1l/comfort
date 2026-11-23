@@ -12,8 +12,8 @@ data class SavedFile(
     val uri: String,
     /** 1-based, in the order the engine delivered the files (a carousel's own order). */
     val position: Int,
-    /** Unused. Added (database v30) to find a file again after the gallery restores it from its
-     * recycle bin under a new Uri; dropped, since seeing a restored file needs a media permission
-     * the app doesn't ask for. Kept so installed databases stay at v30 (a downgrade would wipe them). */
+    /** The file's name as the engine saved it (its staging name, as in downloaded_files): which
+     * item it was, for "Download missing items" once it's deleted (see DeletedFiles). Null for a
+     * file saved before this was kept. (Added in database v30 for another use, since dropped.) */
     val path: String? = null,
 )

@@ -1149,6 +1149,9 @@
     <plurals name="items_couldnt_be_downloaded">
         <item quantity="other">%1$d / %2$d mục không tải được</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="other">Đã xóa %1$d/%2$d khỏi điện thoại</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="other">%d lượt tải đã xong</item>
     </plurals>

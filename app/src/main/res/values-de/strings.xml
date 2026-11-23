@@ -1067,6 +1067,10 @@
         <item quantity="one">%1$d von %2$d Elementen konnte nicht geladen werden</item>
         <item quantity="other">%1$d von %2$d Elementen konnten nicht geladen werden</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d von %2$d vom Smartphone gelöscht</item>
+        <item quantity="other">%1$d von %2$d vom Smartphone gelöscht</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d Download fertig</item>
         <item quantity="other">%d Downloads fertig</item>

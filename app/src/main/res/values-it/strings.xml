@@ -1178,6 +1178,10 @@
         <item quantity="one">Impossibile scaricare %1$d elemento su %2$d</item>
         <item quantity="other">Impossibile scaricare %1$d elementi su %2$d</item>
     </plurals>
+    <plurals name="x_of_y_deleted_from_phone">
+        <item quantity="one">%1$d di %2$d eliminati dal telefono</item>
+        <item quantity="other">%1$d di %2$d eliminati dal telefono</item>
+    </plurals>
     <plurals name="downloads_finished">
         <item quantity="one">%d download completato</item>
         <item quantity="other">%d download completati</item>
