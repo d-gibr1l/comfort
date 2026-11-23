@@ -1339,4 +1339,5 @@
     <string name="media_access_title">Show your restored downloads</string>
     <string name="media_access_body">They were saved by an earlier install of Comfort, so Android keeps them closed to this one. Allow access to your photos, videos and music to open them here.</string>
     <string name="media_access_allow">Allow access</string>
+    <string name="comic_converting">Converting to .cbz…</string>
 </resources>

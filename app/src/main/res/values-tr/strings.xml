@@ -1289,4 +1289,5 @@
     <string name="media_access_title">Geri yüklenen indirmeleri göster</string>
     <string name="media_access_body">Bunlar Comfort\'un önceki bir kurulumu tarafından kaydedildi, bu yüzden Android onları bu kuruluma kapalı tutuyor. Burada açmak için fotoğraf, video ve müziğe erişime izin verin.</string>
     <string name="media_access_allow">Erişime izin ver</string>
+    <string name="comic_converting">.cbz\'ye dönüştürülüyor…</string>
 </resources>

@@ -1425,4 +1425,5 @@
     <string name="media_access_title">اعرض تنزيلاتك المستعادة</string>
     <string name="media_access_body">حُفظت بواسطة تثبيت سابق لـ Comfort، لذا يُبقيها Android مغلقة أمام هذا التثبيت. اسمح بالوصول إلى صورك وفيديوهاتك وموسيقاك لفتحها هنا.</string>
     <string name="media_access_allow">السماح بالوصول</string>
+    <string name="comic_converting">جارٍ التحويل إلى ‎.cbz…</string>
 </resources>

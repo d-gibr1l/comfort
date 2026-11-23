@@ -522,7 +522,11 @@ fun QueueItemCard(
                             // A playlist: the song (or video) on its way now, after the word —
                             // ahead of "Extracting audio", which an audio playlist always is.
                             val current = com.comfort.app.data.DownloadNotes.items.collectAsStateWithLifecycle().value[item.id]
-                            if (current != null) {
+                            // What it's doing besides downloading (finding lyrics, packing a comic).
+                            val note = com.comfort.app.data.DownloadNotes.notes.collectAsStateWithLifecycle().value[item.id]
+                            if (note != null) {
+                                note
+                            } else if (current != null) {
                                 stringResource(R.string.downloading_x, current)
                             } else if (item.downloadingAudioTrack) {
                                 // A video+audio merge's own separate audio sub-file looks, from
@@ -892,7 +896,15 @@ fun QueueItemCard(
                                     labelColor = MaterialTheme.colorScheme.error,
                                     leadingIconContentColor = MaterialTheme.colorScheme.error,
                                 ),
-                                leadingIcon = { Icon(Icons.Outlined.CancelPresentation, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                leadingIcon = {
+                                    // A comic packing its pages after a first Cancel: a spinner (Cancel
+                                    // again stops that and keeps the pages as they are).
+                                    if (item.id in com.comfort.app.data.ComicFinish.requested.collectAsStateWithLifecycle().value) {
+                                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.error)
+                                    } else {
+                                        Icon(Icons.Outlined.CancelPresentation, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    }
+                                },
                                 label = { Text(stringResource(R.string.action_cancel), style = MaterialTheme.typography.labelLarge) },
                             )
                             AssistChip(

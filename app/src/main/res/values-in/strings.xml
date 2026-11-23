@@ -1286,4 +1286,5 @@
     <string name="media_access_title">Tampilkan unduhan yang dipulihkan</string>
     <string name="media_access_body">Unduhan ini disimpan oleh instalasi Comfort sebelumnya, jadi Android menutupnya untuk instalasi ini. Izinkan akses ke foto, video, dan musik untuk membukanya di sini.</string>
     <string name="media_access_allow">Izinkan akses</string>
+    <string name="comic_converting">Mengonversi ke .cbz…</string>
 </resources>

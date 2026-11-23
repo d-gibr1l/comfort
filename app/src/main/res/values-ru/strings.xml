@@ -1357,4 +1357,5 @@
     <string name="media_access_title">Показать восстановленные загрузки</string>
     <string name="media_access_body">Их сохранила прежняя установка Comfort, поэтому Android закрывает их для этой. Разрешите доступ к фото, видео и музыке, чтобы открывать их здесь.</string>
     <string name="media_access_allow">Разрешить доступ</string>
+    <string name="comic_converting">Преобразование в .cbz…</string>
 </resources>

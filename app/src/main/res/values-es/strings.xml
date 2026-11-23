@@ -1323,4 +1323,5 @@
     <string name="media_access_title">Muestra tus descargas restauradas</string>
     <string name="media_access_body">Las guardó una instalación anterior de Comfort, así que Android no deja que esta las abra. Permite el acceso a tus fotos, vídeos y música para abrirlas aquí.</string>
     <string name="media_access_allow">Permitir acceso</string>
+    <string name="comic_converting">Convirtiendo a .cbz…</string>
 </resources>

@@ -333,7 +333,19 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
         rows.filter { it.status in PAUSABLE }
             .associate { entity -> entity.id to PendingMove(entity.status) { it.copy(status = DownloadStatus.PAUSED, speedMbs = 0f) } }
 
-    fun cancelDownload(id: String) = cancelDownloads(listOf(id))
+    fun cancelDownload(id: String) {
+        // A comic chapter downloading: the first Cancel stops it and packs the pages already here
+        // into its .cbz (ComicFinish); a second, while that runs, cancels for real.
+        val row = queuedRows(listOf(id)).firstOrNull()
+        if (row != null && row.status == DownloadStatus.RUNNING && !com.comfort.app.data.ComicFinish.isRequested(id) &&
+            com.comfort.app.data.ComicSites.packs(getApplication(), row.url)
+        ) {
+            com.comfort.app.data.ComicFinish.request(id)
+            return
+        }
+        com.comfort.app.data.ComicFinish.clear(id)
+        cancelDownloads(listOf(id))
+    }
 
     /** A card's Cancel, or the selection bar's for every selected download. */
     fun cancelDownloads(ids: Collection<String>) {

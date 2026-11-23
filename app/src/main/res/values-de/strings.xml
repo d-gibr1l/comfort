@@ -1289,4 +1289,5 @@
     <string name="media_access_title">Wiederhergestellte Downloads anzeigen</string>
     <string name="media_access_body">Sie wurden von einer früheren Comfort-Installation gespeichert, daher hält Android sie für diese verschlossen. Erlaube den Zugriff auf Fotos, Videos und Musik, um sie hier zu öffnen.</string>
     <string name="media_access_allow">Zugriff erlauben</string>
+    <string name="comic_converting">Wird in .cbz umgewandelt…</string>
 </resources>

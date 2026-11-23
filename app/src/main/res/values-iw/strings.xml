@@ -1323,4 +1323,5 @@
     <string name="media_access_title">הצגת ההורדות ששוחזרו</string>
     <string name="media_access_body">הן נשמרו בהתקנה קודמת של Comfort, ולכן Android סוגר אותן בפני ההתקנה הזו. אפשרו גישה לתמונות, לסרטונים ולמוזיקה כדי לפתוח אותן כאן.</string>
     <string name="media_access_allow">מתן גישה</string>
+    <string name="comic_converting">ממיר ל-‎.cbz…</string>
 </resources>

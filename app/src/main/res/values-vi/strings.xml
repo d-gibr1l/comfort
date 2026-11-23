@@ -1255,4 +1255,5 @@
     <string name="media_access_title">Hiện các bản tải đã khôi phục</string>
     <string name="media_access_body">Chúng được lưu bởi bản cài Comfort trước đó, nên Android không cho bản này mở. Hãy cho phép truy cập ảnh, video và nhạc để mở chúng tại đây.</string>
     <string name="media_access_allow">Cho phép truy cập</string>
+    <string name="comic_converting">Đang chuyển sang .cbz…</string>
 </resources>

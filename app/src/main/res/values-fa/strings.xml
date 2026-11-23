@@ -1289,4 +1289,5 @@
     <string name="media_access_title">دانلودهای بازیابی‌شده را نشان بده</string>
     <string name="media_access_body">این‌ها را نصب قبلی Comfort ذخیره کرده، برای همین Android آن‌ها را برای این نصب بسته نگه می‌دارد. برای باز کردنشان اینجا، اجازهٔ دسترسی به عکس‌ها، ویدیوها و موسیقی را بدهید.</string>
     <string name="media_access_allow">اجازهٔ دسترسی</string>
+    <string name="comic_converting">در حال تبدیل به ‎.cbz…</string>
 </resources>

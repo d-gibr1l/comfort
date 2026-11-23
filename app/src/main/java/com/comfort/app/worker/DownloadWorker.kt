@@ -879,7 +879,7 @@ class DownloadWorker(
                 /** A comic chapter's held pages, in their order, zipped into "<title>.cbz" (stored, not
                  * compressed: pictures don't shrink, and a reader opens stored entries fastest) and
                  * saved as the download's one file, its first page kept as the Library's cover. */
-                suspend fun packComic() {
+                suspend fun packComicPages() {
                     val held = synchronized(heldFiles) { heldFiles.toList().also { heldFiles.clear() } }
                     val pages = held.filter { (f, isAudio, _) -> !isAudio && f.isFile && f.extension.lowercase() in SWEEP_IMAGE_EXTENSIONS }
                         .sortedWith(compareBy<Triple<File, Boolean, Int>> { it.third }.thenBy { it.first.name })
@@ -932,6 +932,15 @@ class DownloadWorker(
                     if (saved != null) {
                         dao.setMediaUri(downloadId, saved.uri)
                         if (cover.isFile) dao.setThumbnail(downloadId, android.net.Uri.fromFile(cover).toString())
+                    }
+                }
+
+                // The card says it's converting while the pages are packed.
+                suspend fun packComic() {
+                    com.comfort.app.data.DownloadNotes.set(downloadId, applicationContext.getString(R.string.comic_converting))
+                    try { packComicPages() } finally {
+                        com.comfort.app.data.DownloadNotes.clear(downloadId)
+                        com.comfort.app.data.ComicFinish.clear(downloadId)
                     }
                 }
 
@@ -1156,13 +1165,28 @@ class DownloadWorker(
                 val executor = object : EngineExecutor {
                     override suspend fun run(engine: DownloadEngine, excludeVideo: Boolean) {
                         val command = commands.forEngine(engine, excludeVideo)
-                        PythonRuntime.run(applicationContext, command.script, command.args, callbackFor(command.label))
+                        if (!comicMode) {
+                            PythonRuntime.run(applicationContext, command.script, command.args, callbackFor(command.label))
+                            return
+                        }
+                        // A comic: its Cancel stops the engine here, and the pages so far are packed.
+                        kotlinx.coroutines.coroutineScope {
+                            val run = launch { PythonRuntime.run(applicationContext, command.script, command.args, callbackFor(command.label)) }
+                            val watch = launch {
+                                com.comfort.app.data.ComicFinish.requested.first { downloadId in it }
+                                DownloadLog.line(applicationContext, downloadId, "cancelled: packing the pages so far")
+                                run.cancel()
+                            }
+                            run.join()
+                            watch.cancel()
+                        }
                     }
                     // A live, no-network check against the bundled engines (EngineProbe) — only a
                     // gallery-dl-routed plan asks, to skip a gallery-dl attempt that can't work.
                     override suspend fun probe() = EngineProbe.probeBoth(applicationContext, url)
                     override val savedCount: Int get() = savedSoFar.get()
-                    override val isStopped: Boolean get() = this@DownloadWorker.isStopped
+                    // A comic asked to finish early runs no further engine either.
+                    override val isStopped: Boolean get() = this@DownloadWorker.isStopped || com.comfort.app.data.ComicFinish.isRequested(downloadId)
                     override fun fail(message: Int) {
                         val text = applicationContext.getString(message)
                         lastErrorLine.compareAndSet(null, text)
