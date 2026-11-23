@@ -86,7 +86,8 @@ private val ROW_SHAPE = RoundedCornerShape(16.dp)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun QueuePanel() {
+/** [headerScrolls]: "Up next", shuffle and repeat scroll away with the songs (landscape, short on height). */
+internal fun QueuePanel(headerScrolls: Boolean = false) {
     val state by MusicPlayer.state.collectAsState()
     val rowHeightPx = with(LocalDensity.current) { ROW_HEIGHT.toPx() }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -116,9 +117,9 @@ internal fun QueuePanel() {
         (dragStart + kotlin.math.round(dragOffset / rowHeightPx).toInt()).coerceIn(0, rows.lastIndex)
     val reorderable = !state.shuffle
     // Opens on the song on (the played ones above it, a scroll up).
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentPos.coerceAtLeast(0))
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentPos.coerceAtLeast(0) + (if (headerScrolls) 1 else 0))
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val header: @Composable () -> Unit = {
         Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
             Box(Modifier.size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.35f)))
         }
@@ -183,7 +184,9 @@ internal fun QueuePanel() {
                 },
             )
         }
-
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (!headerScrolls) header()
         LazyColumn(
             state = listState,
             // Clears the navigation bar at the end.
@@ -193,6 +196,7 @@ internal fun QueuePanel() {
             // Keyed by the song (and which copy, for one queued twice), not its place in the
             // queue: a reorder renumbers the places, and every row below was rebuilt (its
             // cover reloading: a flicker on drop).
+            if (headerScrolls) item(key = "queue_header") { Column { header() } }
             val keys = run {
                 val seen = HashMap<String, Int>()
                 rows.map { (_, song) -> val n = seen.merge(song.id, 1, Int::plus)!!; "${song.id}#$n" }

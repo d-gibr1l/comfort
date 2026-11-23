@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +58,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -174,6 +177,8 @@ fun NowPlayingScreen(
 
     // A swipe on the cover changes song with its own slide (see SwipeSkipState).
     val coverSkip = rememberSwipeSkipState()
+    // Landscape: the cover on the left, the controls (or the queue, in their place) on the right.
+    val landscapeLayout = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     // Back: the queue first, then the full lyrics, then the player (the last one declared runs first).
     BackHandler(enabled = lyricsShown) { showLyrics = false }
     BackHandler(enabled = showQueue) { showQueue = false }
@@ -241,7 +246,8 @@ fun NowPlayingScreen(
         androidx.compose.animation.SharedTransitionLayout {
             val shared = this
             androidx.compose.animation.AnimatedContent(
-                targetState = showQueue,
+                // In landscape the whole screen stays; only its right side turns into the queue.
+                targetState = showQueue && !landscapeLayout,
                 transitionSpec = {
                     androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) togetherWith
                         androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160))
@@ -259,11 +265,13 @@ fun NowPlayingScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // Auxio's top bar: close, "Now playing" over where in the queue, and the queue.
+                    // Landscape with the queue open: gone, the cover and queue moved up into its room.
+                    androidx.compose.animation.AnimatedVisibility(visible = !(landscapeLayout && showQueue)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.close_player), tint = Color.White, modifier = Modifier.size(30.dp))
                         }
-                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (landscapeLayout) Spacer(Modifier.weight(1f)) else Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold, color = Color.White)
                             Text(
                                 if (state.count > 1) stringResource(R.string.song_x_of_x, state.index + 1, state.count) else stringResource(R.string.your_library),
@@ -315,13 +323,36 @@ fun NowPlayingScreen(
                             Spacer(Modifier.size(48.dp))
                         }
                     }
+                    }
 
+                    // Landscape: the cover on the left, the title, bar and buttons on the right (one
+                    // under the other, they didn't fit the height).
+                    val landscape = landscapeLayout
+                    // Spotify's lyric line under the cover, as two (the line and the next);
+                    // a tap opens the full lyrics. Not while those are up.
+                    val lyricLines: @Composable () -> Unit = {
+                        val previewLyrics = lyrics
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = previewLyrics?.synced == true && !lyricsShown && lyricLine && !linesHidden,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
+                        ) {
+                            if (previewLyrics != null) {
+                                LyricsPreview(
+                                    lyrics = previewLyrics,
+                                    positionMs = shownPosition,
+                                    onClick = { showLyrics = true },
+                                    compact = landscape,
+                                    // Clear of the cover above and the title below.
+                                    modifier = Modifier.fillMaxWidth().padding(top = if (landscape) 10.dp else 4.dp, bottom = if (landscape) 0.dp else 20.dp),
+                                )
+                            }
+                        }
+                    }
+                    PortraitOrSideBySide(landscape, first = {
                     // The cover, as big as fits (a tablet or landscape gets a square, not a stretch);
                     // swipe it sideways to change song.
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).swipeToSkip(coverSkip),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                    val coverContent: @Composable () -> Unit = {
                         androidx.compose.animation.AnimatedContent(
                             targetState = lyricsShown,
                             transitionSpec = {
@@ -362,25 +393,33 @@ fun NowPlayingScreen(
                         }
                         }
                     }
-
-                    Column(modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp)) {
-                        // Spotify's lyric line under the cover, as two (the line and the next);
-                        // a tap opens the full lyrics. Not while those are up.
-                        val previewLyrics = lyrics
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = previewLyrics?.synced == true && !lyricsShown && lyricLine && !linesHidden,
-                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
-                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically(),
-                        ) {
-                            if (previewLyrics != null) {
-                                LyricsPreview(
-                                    lyrics = previewLyrics,
-                                    positionMs = shownPosition,
-                                    onClick = { showLyrics = true },
-                                    // Clear of the cover above and the title below.
-                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
-                                )
+                    if (!landscape) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).swipeToSkip(coverSkip),
+                            contentAlignment = Alignment.Center,
+                        ) { coverContent() }
+                    } else {
+                        // Landscape: the cover as tall as fits, with room under it for the lyric lines.
+                        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxHeight().padding(start = 24.dp, end = 8.dp, top = 4.dp, bottom = 8.dp)) {
+                            val side = (maxHeight - LANDSCAPE_LYRICS_SPACE).coerceAtLeast(120.dp)
+                            Column(Modifier.width(side)) {
+                                Box(Modifier.size(side).swipeToSkip(coverSkip), contentAlignment = Alignment.Center) { coverContent() }
+                                Box(Modifier.fillMaxWidth().height(LANDSCAPE_LYRICS_SPACE), contentAlignment = Alignment.TopCenter) { lyricLines() }
                             }
+                        }
+                    }
+                    }, second = {
+                    val controls: @Composable () -> Unit = {
+                    Column(modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().padding(horizontal = 24.dp)) {
+                        if (!landscape) lyricLines()
+                        // Landscape: what the top bar says in portrait, over the title.
+                        if (landscape) {
+                            Text(
+                                stringResource(R.string.now_playing) + (if (state.count > 1) " · " + stringResource(R.string.song_x_of_x, state.index + 1, state.count) else ""),
+                                style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                                color = Color.White.copy(alpha = 0.7f),
+                            )
+                            Spacer(Modifier.height(6.dp))
                         }
                         // Title and artist, left-aligned (Auxio's), with the song's menu.
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -460,6 +499,36 @@ fun NowPlayingScreen(
                             )
                         }
                     }
+                    }
+                    if (!landscape) controls() else {
+                        // Landscape: the queue takes the controls' place; the cover stays.
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = showQueue,
+                            transitionSpec = {
+                                (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
+                                    androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(260)) { it / 6 }) togetherWith
+                                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160))
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                            label = "landscapeQueue",
+                        ) { inQueue ->
+                            if (inQueue) {
+                                QueueLayout(
+                                    state = state,
+                                    position = shownPosition,
+                                    onCloseQueue = { showQueue = false },
+                                    coverModifier = Modifier,
+                                    titleModifier = Modifier,
+                                    panelModifier = Modifier,
+                                    inPanel = true,
+                                )
+                            } else {
+                                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { controls() }
+                            }
+                        }
+                    }
+                    })
                 }
                     } else {
                         QueueLayout(
@@ -1170,12 +1239,14 @@ private fun QueueLayout(
     coverModifier: Modifier,
     titleModifier: Modifier,
     panelModifier: Modifier,
+    // Landscape's right side, beside the player's cover: no status bar room, no small cover.
+    inPanel: Boolean = false,
 ) {
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top)),
+            .then(if (inPanel) Modifier else Modifier.windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top))),
     ) {
         Row(
             modifier = Modifier
@@ -1186,10 +1257,12 @@ private fun QueueLayout(
         ) {
             // Swipe the song (cover and title) sideways to change it, as on the mini player.
             Row(modifier = Modifier.weight(1f).swipeToSkip(), verticalAlignment = Alignment.CenterVertically) {
-            Box(coverModifier.size(52.dp).clip(RoundedCornerShape(10.dp))) {
-                CoverImage(state.song, blurred = false, modifier = Modifier.fillMaxSize())
+            if (!inPanel) {
+                Box(coverModifier.size(52.dp).clip(RoundedCornerShape(10.dp))) {
+                    CoverImage(state.song, blurred = false, modifier = Modifier.fillMaxSize())
+                }
+                Spacer(Modifier.size(12.dp))
             }
-            Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f).then(titleModifier)) {
                 Text(state.song?.title.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 state.song?.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -1267,7 +1340,7 @@ private fun QueueLayout(
             contentColor = Color.White,
             modifier = panelModifier.fillMaxSize().nestedScroll(pullToClose),
         ) {
-            QueuePanel()
+            QueuePanel(headerScrolls = inPanel)
         }
     }
 }
@@ -1315,3 +1388,29 @@ private object SmallBlur : coil.transform.Transformation {
         }
     }
 }
+
+/** [first] then [second], one under the other in the column; in landscape, side by side ([first]
+ * as wide as it is, [second] the rest, centred on the height). */
+@Composable
+private fun ColumnScope.PortraitOrSideBySide(
+    landscape: Boolean,
+    first: @Composable ColumnScope.() -> Unit,
+    second: @Composable ColumnScope.() -> Unit,
+) {
+    if (!landscape) {
+        first()
+        second()
+    } else {
+        Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) { first() }
+            Column(
+                Modifier.weight(1f).fillMaxHeight(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) { second() }
+        }
+    }
+}
+
+/** Landscape: the room under the cover for the two lyric lines. */
+private val LANDSCAPE_LYRICS_SPACE = 100.dp

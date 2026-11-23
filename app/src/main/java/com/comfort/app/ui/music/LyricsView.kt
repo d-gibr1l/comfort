@@ -169,7 +169,8 @@ private const val FOLLOW_AGAIN_AFTER_MS = 3_000L
  * opens the full lyrics.
  */
 @Composable
-internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit, modifier: Modifier = Modifier) {
+/** [compact]: smaller lines, for the room under the cover in landscape. */
+internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     val lines = lyrics.lines ?: return
     val target = lyrics.lineAt(positionMs)
     // The line shown as being sung; it follows [target], with the roll in between for a step on.
@@ -192,8 +193,8 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
     }
     val p = roll.value
 
-    val nextStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
-    val currentStyle = MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
+    val nextStyle = (if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge).copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
+    val currentStyle = (if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium).copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
     val density = LocalDensity.current
     val gapPx = with(density) { 6.dp.toPx() }
     // Room for the line being sung on two lines and the next on one, whatever they hold: the
