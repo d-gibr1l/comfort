@@ -242,7 +242,20 @@ private fun ListRow(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit) 
 @Composable
 private fun Thumb(item: BatchItem, modifier: Modifier) {
     val audio = item.mime?.startsWith("audio/") == true
-    if (audio || item.isSidecar) {
+    if (audio) {
+        // A song: its own embedded cover (as the music player shows it), a note without one.
+        var failed by remember(item.uri) { mutableStateOf(false) }
+        Box(modifier, contentAlignment = Alignment.Center) {
+            if (failed) Icon(Icons.Outlined.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            else coil.compose.AsyncImage(
+                model = com.comfort.app.util.AudioCover(item.uri.toString(), null),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                onError = { failed = true },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    } else if (item.isSidecar) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Icon(
                 when {
