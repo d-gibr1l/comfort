@@ -1217,4 +1217,22 @@
     <string name="grid_view">グリッド</string>
     <string name="list_view">リスト</string>
     <string name="batch_item_not_deleted">Android が Comfort にこのファイルの削除を許可しませんでした（再インストール前に保存）。ギャラリーで削除してください。</string>
+    <string name="welcome_skip">スキップ</string>
+    <string name="welcome_next">次へ</string>
+    <string name="welcome_start">はじめる</string>
+    <string name="welcome_tagline">何百ものサイトの動画・画像・音楽を、スマートフォンに保存。</string>
+    <string name="welcome_feature_share">どのアプリからでも Comfort にリンクを共有、またはホームに貼り付けます。</string>
+    <string name="welcome_feature_library">保存したものはすべてライブラリに入ります。</string>
+    <string name="welcome_feature_music">曲は内蔵の音楽プレーヤーで歌詞付きで再生されます。</string>
+    <string name="welcome_defaults_title">デフォルト設定</string>
+    <string name="welcome_defaults_subtitle">ダウンロードの保存方法です。個別に選ぶこともできます。</string>
+    <string name="welcome_video_quality">動画の画質</string>
+    <string name="welcome_video_format">動画の形式</string>
+    <string name="welcome_audio_format">音声の形式</string>
+    <string name="welcome_change_later">これらはあとで設定からも変更できます。</string>
+    <string name="welcome_notifications_title">完了がわかる</string>
+    <string name="welcome_notifications_body">Comfort はダウンロードの進行状況を表示し、完了や失敗をお知らせします。</string>
+    <string name="welcome_notifications_allow">通知を許可</string>
+    <string name="welcome_notifications_on">通知はオンです</string>
+    <string name="welcome_battery_body">他のアプリを使っている間もダウンロードが続き、時間どおりに始まるようにします。許可しないと、Android の省電力機能が一時停止することがあります。</string>
 </resources>

@@ -1319,4 +1319,22 @@
     <string name="grid_view">Сетка</string>
     <string name="list_view">Список</string>
     <string name="batch_item_not_deleted">Android не разрешил Comfort удалить этот файл (сохранён до переустановки): удалите его в галерее.</string>
+    <string name="welcome_skip">Пропустить</string>
+    <string name="welcome_next">Далее</string>
+    <string name="welcome_start">Начать</string>
+    <string name="welcome_tagline">Видео, картинки и музыка с сотен сайтов — прямо на вашем телефоне.</string>
+    <string name="welcome_feature_share">Поделитесь ссылкой с Comfort из любого приложения или вставьте её на главной.</string>
+    <string name="welcome_feature_library">Всё сохранённое попадает в вашу медиатеку.</string>
+    <string name="welcome_feature_music">Песни играют во встроенном плеере, с текстами.</string>
+    <string name="welcome_defaults_title">Ваши настройки по умолчанию</string>
+    <string name="welcome_defaults_subtitle">Как сохраняются загрузки. Для каждой можно выбрать отдельно.</string>
+    <string name="welcome_video_quality">Качество видео</string>
+    <string name="welcome_video_format">Формат видео</string>
+    <string name="welcome_audio_format">Формат звука</string>
+    <string name="welcome_change_later">Всё это потом есть в настройках.</string>
+    <string name="welcome_notifications_title">Узнавайте, когда готово</string>
+    <string name="welcome_notifications_body">Comfort показывает ход загрузки и сообщает, когда она завершилась или не удалась.</string>
+    <string name="welcome_notifications_allow">Разрешить уведомления</string>
+    <string name="welcome_notifications_on">Уведомления включены</string>
+    <string name="welcome_battery_body">Чтобы загрузки продолжались, пока вы в других приложениях, и начинались вовремя. Без этого экономия заряда Android может их приостановить.</string>
 </resources>

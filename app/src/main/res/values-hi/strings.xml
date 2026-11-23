@@ -1251,4 +1251,22 @@
     <string name="grid_view">ग्रिड</string>
     <string name="list_view">सूची</string>
     <string name="batch_item_not_deleted">Android ने Comfort को यह फ़ाइल हटाने नहीं दी (दोबारा इंस्टॉल से पहले सेव की गई): इसे अपनी गैलरी में हटाएँ।</string>
+    <string name="welcome_skip">छोड़ें</string>
+    <string name="welcome_next">आगे</string>
+    <string name="welcome_start">शुरू करें</string>
+    <string name="welcome_tagline">सैकड़ों साइटों से वीडियो, तस्वीरें और संगीत, आपके फ़ोन में सेव।</string>
+    <string name="welcome_feature_share">किसी भी ऐप से लिंक Comfort पर शेयर करें, या होम पर पेस्ट करें।</string>
+    <string name="welcome_feature_library">जो भी सेव करें, वह आपकी लाइब्रेरी में आता है।</string>
+    <string name="welcome_feature_music">गाने बिल्ट-इन म्यूज़िक प्लेयर में, बोल के साथ चलते हैं।</string>
+    <string name="welcome_defaults_title">आपकी डिफ़ॉल्ट सेटिंग</string>
+    <string name="welcome_defaults_subtitle">डाउनलोड कैसे सेव हों। हर एक के लिए फिर भी चुन सकते हैं।</string>
+    <string name="welcome_video_quality">वीडियो गुणवत्ता</string>
+    <string name="welcome_video_format">वीडियो फ़ॉर्मैट</string>
+    <string name="welcome_audio_format">ऑडियो फ़ॉर्मैट</string>
+    <string name="welcome_change_later">ये सब बाद में सेटिंग में मिलेंगे।</string>
+    <string name="welcome_notifications_title">जानें कब पूरा हुआ</string>
+    <string name="welcome_notifications_body">Comfort डाउनलोड की प्रगति दिखाता है, और पूरा होने या फ़ेल होने पर बताता है।</string>
+    <string name="welcome_notifications_allow">सूचनाओं की अनुमति दें</string>
+    <string name="welcome_notifications_on">सूचनाएँ चालू हैं</string>
+    <string name="welcome_battery_body">ताकि दूसरे ऐप इस्तेमाल करते समय भी डाउनलोड चलते रहें और समय पर शुरू हों। इसके बिना Android का बैटरी सेवर उन्हें रोक सकता है।</string>
 </resources>

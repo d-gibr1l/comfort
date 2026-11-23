@@ -1387,4 +1387,22 @@
     <string name="grid_view">شبكة</string>
     <string name="list_view">قائمة</string>
     <string name="batch_item_not_deleted">لم يسمح Android لـ Comfort بحذف هذا الملف (حُفظ قبل إعادة التثبيت): احذفه من المعرض.</string>
+    <string name="welcome_skip">تخطٍّ</string>
+    <string name="welcome_next">التالي</string>
+    <string name="welcome_start">لنبدأ</string>
+    <string name="welcome_tagline">فيديوهات وصور وموسيقى من مئات المواقع، محفوظة على هاتفك.</string>
+    <string name="welcome_feature_share">شارك رابطًا مع Comfort من أي تطبيق، أو الصقه في الرئيسية.</string>
+    <string name="welcome_feature_library">كل ما تحفظه يذهب إلى مكتبتك.</string>
+    <string name="welcome_feature_music">تُشغَّل الأغاني في مشغّل الموسيقى المدمج، مع الكلمات.</string>
+    <string name="welcome_defaults_title">إعداداتك الافتراضية</string>
+    <string name="welcome_defaults_subtitle">كيف تُحفظ التنزيلات. ويمكنك الاختيار لكل تنزيل أيضًا.</string>
+    <string name="welcome_video_quality">جودة الفيديو</string>
+    <string name="welcome_video_format">صيغة الفيديو</string>
+    <string name="welcome_audio_format">صيغة الصوت</string>
+    <string name="welcome_change_later">كل هذا موجود في الإعدادات لاحقًا.</string>
+    <string name="welcome_notifications_title">اعرف متى ينتهي</string>
+    <string name="welcome_notifications_body">يعرض Comfort تقدّم التنزيل، ويخبرك عند انتهائه أو فشله.</string>
+    <string name="welcome_notifications_allow">السماح بالإشعارات</string>
+    <string name="welcome_notifications_on">الإشعارات مفعّلة</string>
+    <string name="welcome_battery_body">لتستمر التنزيلات أثناء استخدامك لتطبيقات أخرى وتبدأ في موعدها. دون ذلك قد يوقفها موفّر البطارية في Android.</string>
 </resources>

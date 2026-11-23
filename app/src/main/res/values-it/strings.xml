@@ -1254,4 +1254,22 @@
     <string name="grid_view">Griglia</string>
     <string name="list_view">Elenco</string>
     <string name="batch_item_not_deleted">Android non ha permesso a Comfort di eliminare questo file (salvato prima di una reinstallazione): eliminalo dalla galleria.</string>
+    <string name="welcome_skip">Salta</string>
+    <string name="welcome_next">Avanti</string>
+    <string name="welcome_start">Inizia</string>
+    <string name="welcome_tagline">Video, immagini e musica da centinaia di siti, salvati sul telefono.</string>
+    <string name="welcome_feature_share">Condividi un link con Comfort da qualsiasi app, o incollalo nella Home.</string>
+    <string name="welcome_feature_library">Tutto ciò che salvi finisce nella tua Libreria.</string>
+    <string name="welcome_feature_music">I brani suonano nel lettore integrato, con i testi.</string>
+    <string name="welcome_defaults_title">Le tue impostazioni predefinite</string>
+    <string name="welcome_defaults_subtitle">Come vengono salvati i download. Puoi comunque scegliere per ognuno.</string>
+    <string name="welcome_video_quality">Qualità video</string>
+    <string name="welcome_video_format">Formato video</string>
+    <string name="welcome_audio_format">Formato audio</string>
+    <string name="welcome_change_later">Trovi tutto questo poi nelle Impostazioni.</string>
+    <string name="welcome_notifications_title">Sapere quando ha finito</string>
+    <string name="welcome_notifications_body">Comfort mostra l\'avanzamento di un download e ti avvisa quando è finito o non è riuscito.</string>
+    <string name="welcome_notifications_allow">Consenti notifiche</string>
+    <string name="welcome_notifications_on">Notifiche attive</string>
+    <string name="welcome_battery_body">Così i download continuano mentre usi altre app e partono in orario. Senza, il risparmio energetico di Android può metterli in pausa.</string>
 </resources>

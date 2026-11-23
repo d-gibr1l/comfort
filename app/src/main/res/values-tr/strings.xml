@@ -1251,4 +1251,22 @@
     <string name="grid_view">Izgara</string>
     <string name="list_view">Liste</string>
     <string name="batch_item_not_deleted">Android, Comfort\'un bu dosyayı silmesine izin vermedi (yeniden yüklemeden önce kaydedilmiş): galeriden silin.</string>
+    <string name="welcome_skip">Atla</string>
+    <string name="welcome_next">İleri</string>
+    <string name="welcome_start">Başlayalım</string>
+    <string name="welcome_tagline">Yüzlerce siteden video, resim ve müzik, telefonunuza kaydedilir.</string>
+    <string name="welcome_feature_share">Herhangi bir uygulamadan Comfort\'a bağlantı paylaşın ya da Ana sayfaya yapıştırın.</string>
+    <string name="welcome_feature_library">Kaydettiğiniz her şey Kitaplığınıza gelir.</string>
+    <string name="welcome_feature_music">Şarkılar yerleşik müzik çalarda, sözleriyle çalar.</string>
+    <string name="welcome_defaults_title">Varsayılanlarınız</string>
+    <string name="welcome_defaults_subtitle">İndirmelerin nasıl kaydedileceği. Yine de her biri için seçebilirsiniz.</string>
+    <string name="welcome_video_quality">Video kalitesi</string>
+    <string name="welcome_video_format">Video biçimi</string>
+    <string name="welcome_audio_format">Ses biçimi</string>
+    <string name="welcome_change_later">Bunların hepsi sonra Ayarlar\'da.</string>
+    <string name="welcome_notifications_title">Bittiğini bilin</string>
+    <string name="welcome_notifications_body">Comfort bir indirmenin ilerlemesini gösterir; bittiğinde ya da başarısız olduğunda haber verir.</string>
+    <string name="welcome_notifications_allow">Bildirimlere izin ver</string>
+    <string name="welcome_notifications_on">Bildirimler açık</string>
+    <string name="welcome_battery_body">İndirmeler siz başka uygulamaları kullanırken sürsün ve zamanında başlasın diye. Bu olmadan Android\'in pil tasarrufu onları duraklatabilir.</string>
 </resources>

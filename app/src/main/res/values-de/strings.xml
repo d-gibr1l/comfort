@@ -1251,4 +1251,22 @@
     <string name="grid_view">Raster</string>
     <string name="list_view">Liste</string>
     <string name="batch_item_not_deleted">Android hat Comfort das Löschen dieser Datei nicht erlaubt (vor einer Neuinstallation gespeichert): Lösche sie in deiner Galerie.</string>
+    <string name="welcome_skip">Überspringen</string>
+    <string name="welcome_next">Weiter</string>
+    <string name="welcome_start">Los geht\'s</string>
+    <string name="welcome_tagline">Videos, Bilder und Musik von Hunderten Websites, auf deinem Smartphone gespeichert.</string>
+    <string name="welcome_feature_share">Teile einen Link aus jeder App mit Comfort oder füge ihn auf der Startseite ein.</string>
+    <string name="welcome_feature_library">Alles, was du speicherst, landet in deiner Mediathek.</string>
+    <string name="welcome_feature_music">Songs laufen im eingebauten Musikplayer, mit Songtexten.</string>
+    <string name="welcome_defaults_title">Deine Standards</string>
+    <string name="welcome_defaults_subtitle">Wie Downloads gespeichert werden. Du kannst trotzdem für jeden wählen.</string>
+    <string name="welcome_video_quality">Videoqualität</string>
+    <string name="welcome_video_format">Videoformat</string>
+    <string name="welcome_audio_format">Audioformat</string>
+    <string name="welcome_change_later">All das findest du später in den Einstellungen.</string>
+    <string name="welcome_notifications_title">Wissen, wann es fertig ist</string>
+    <string name="welcome_notifications_body">Comfort zeigt den Fortschritt eines Downloads und sagt dir, wenn er fertig oder fehlgeschlagen ist.</string>
+    <string name="welcome_notifications_allow">Benachrichtigungen erlauben</string>
+    <string name="welcome_notifications_on">Benachrichtigungen sind an</string>
+    <string name="welcome_battery_body">Damit Downloads weiterlaufen, während du andere Apps nutzt, und pünktlich starten. Ohne das kann Androids Energiesparmodus sie anhalten.</string>
 </resources>

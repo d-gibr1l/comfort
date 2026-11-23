@@ -1217,4 +1217,22 @@
     <string name="grid_view">网格</string>
     <string name="list_view">列表</string>
     <string name="batch_item_not_deleted">Android 不允许 Comfort 删除此文件（重新安装前保存的）：请在图库中删除。</string>
+    <string name="welcome_skip">跳过</string>
+    <string name="welcome_next">下一步</string>
+    <string name="welcome_start">开始使用</string>
+    <string name="welcome_tagline">来自数百个网站的视频、图片和音乐，保存到你的手机。</string>
+    <string name="welcome_feature_share">从任何应用把链接分享给 Comfort，或在主页粘贴。</string>
+    <string name="welcome_feature_library">你保存的一切都会进入资料库。</string>
+    <string name="welcome_feature_music">歌曲在内置音乐播放器中播放，带歌词。</string>
+    <string name="welcome_defaults_title">你的默认设置</string>
+    <string name="welcome_defaults_subtitle">下载的保存方式。每次下载仍可单独选择。</string>
+    <string name="welcome_video_quality">视频画质</string>
+    <string name="welcome_video_format">视频格式</string>
+    <string name="welcome_audio_format">音频格式</string>
+    <string name="welcome_change_later">这些之后都可以在设置中修改。</string>
+    <string name="welcome_notifications_title">完成时通知你</string>
+    <string name="welcome_notifications_body">Comfort 会显示下载进度，并在完成或失败时告诉你。</string>
+    <string name="welcome_notifications_allow">允许通知</string>
+    <string name="welcome_notifications_on">通知已开启</string>
+    <string name="welcome_battery_body">让下载在你使用其他应用时继续进行，并按时开始。否则 Android 的省电功能可能会暂停它们。</string>
 </resources>

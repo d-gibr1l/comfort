@@ -1285,4 +1285,22 @@
     <string name="grid_view">Grade</string>
     <string name="list_view">Lista</string>
     <string name="batch_item_not_deleted">O Android não deixou o Comfort excluir este arquivo (salvo antes de reinstalar): exclua pela galeria.</string>
+    <string name="welcome_skip">Pular</string>
+    <string name="welcome_next">Próximo</string>
+    <string name="welcome_start">Começar</string>
+    <string name="welcome_tagline">Vídeos, imagens e músicas de centenas de sites, salvos no seu celular.</string>
+    <string name="welcome_feature_share">Compartilhe um link com o Comfort de qualquer app, ou cole na Início.</string>
+    <string name="welcome_feature_library">Tudo o que você salva vai para a Biblioteca.</string>
+    <string name="welcome_feature_music">As músicas tocam no player integrado, com letras.</string>
+    <string name="welcome_defaults_title">Seus padrões</string>
+    <string name="welcome_defaults_subtitle">Como os downloads são salvos. Você ainda pode escolher para cada um.</string>
+    <string name="welcome_video_quality">Qualidade do vídeo</string>
+    <string name="welcome_video_format">Formato do vídeo</string>
+    <string name="welcome_audio_format">Formato do áudio</string>
+    <string name="welcome_change_later">Tudo isso fica depois nas Configurações.</string>
+    <string name="welcome_notifications_title">Saiba quando terminou</string>
+    <string name="welcome_notifications_body">O Comfort mostra o progresso de cada download e avisa quando terminou ou falhou.</string>
+    <string name="welcome_notifications_allow">Permitir notificações</string>
+    <string name="welcome_notifications_on">Notificações ativadas</string>
+    <string name="welcome_battery_body">Para os downloads continuarem enquanto você usa outros apps e começarem na hora. Sem isso, a economia de bateria do Android pode pausá-los.</string>
 </resources>

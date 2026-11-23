@@ -1285,4 +1285,22 @@
     <string name="grid_view">Grille</string>
     <string name="list_view">Liste</string>
     <string name="batch_item_not_deleted">Android n\'a pas laissé Comfort supprimer ce fichier (enregistré avant une réinstallation) : supprimez-le dans la galerie.</string>
+    <string name="welcome_skip">Passer</string>
+    <string name="welcome_next">Suivant</string>
+    <string name="welcome_start">Commencer</string>
+    <string name="welcome_tagline">Vidéos, images et musique de centaines de sites, enregistrées sur votre téléphone.</string>
+    <string name="welcome_feature_share">Partagez un lien vers Comfort depuis n\'importe quelle app, ou collez-le dans Accueil.</string>
+    <string name="welcome_feature_library">Tout ce que vous enregistrez arrive dans votre Bibliothèque.</string>
+    <string name="welcome_feature_music">Les morceaux se lisent dans le lecteur intégré, avec les paroles.</string>
+    <string name="welcome_defaults_title">Vos réglages par défaut</string>
+    <string name="welcome_defaults_subtitle">La façon dont les téléchargements sont enregistrés. Vous pouvez quand même choisir pour chacun.</string>
+    <string name="welcome_video_quality">Qualité vidéo</string>
+    <string name="welcome_video_format">Format vidéo</string>
+    <string name="welcome_audio_format">Format audio</string>
+    <string name="welcome_change_later">Tout ceci se retrouve ensuite dans les Paramètres.</string>
+    <string name="welcome_notifications_title">Savoir quand c\'est fini</string>
+    <string name="welcome_notifications_body">Comfort affiche la progression d\'un téléchargement et vous prévient quand il est fini ou a échoué.</string>
+    <string name="welcome_notifications_allow">Autoriser les notifications</string>
+    <string name="welcome_notifications_on">Notifications activées</string>
+    <string name="welcome_battery_body">Pour que les téléchargements continuent pendant que vous utilisez d\'autres apps, et démarrent à l\'heure. Sans cela, l\'économiseur de batterie d\'Android peut les mettre en pause.</string>
 </resources>

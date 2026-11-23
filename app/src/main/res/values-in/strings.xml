@@ -1248,4 +1248,22 @@
     <string name="grid_view">Kisi</string>
     <string name="list_view">Daftar</string>
     <string name="batch_item_not_deleted">Android tidak mengizinkan Comfort menghapus file ini (disimpan sebelum instal ulang): hapus di galeri.</string>
+    <string name="welcome_skip">Lewati</string>
+    <string name="welcome_next">Berikutnya</string>
+    <string name="welcome_start">Mulai</string>
+    <string name="welcome_tagline">Video, gambar, dan musik dari ratusan situs, tersimpan di ponsel Anda.</string>
+    <string name="welcome_feature_share">Bagikan link ke Comfort dari aplikasi mana pun, atau tempel di Beranda.</string>
+    <string name="welcome_feature_library">Semua yang Anda simpan masuk ke Pustaka.</string>
+    <string name="welcome_feature_music">Lagu diputar di pemutar musik bawaan, dengan lirik.</string>
+    <string name="welcome_defaults_title">Default Anda</string>
+    <string name="welcome_defaults_subtitle">Cara unduhan disimpan. Anda tetap bisa memilih untuk tiap unduhan.</string>
+    <string name="welcome_video_quality">Kualitas video</string>
+    <string name="welcome_video_format">Format video</string>
+    <string name="welcome_audio_format">Format audio</string>
+    <string name="welcome_change_later">Semua ini ada di Setelan nanti.</string>
+    <string name="welcome_notifications_title">Tahu kapan selesai</string>
+    <string name="welcome_notifications_body">Comfort menampilkan progres unduhan, dan memberi tahu saat selesai atau gagal.</string>
+    <string name="welcome_notifications_allow">Izinkan notifikasi</string>
+    <string name="welcome_notifications_on">Notifikasi aktif</string>
+    <string name="welcome_battery_body">Agar unduhan tetap berjalan saat Anda memakai aplikasi lain, dan mulai tepat waktu. Tanpa ini, penghemat baterai Android bisa menjedanya.</string>
 </resources>

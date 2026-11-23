@@ -1285,4 +1285,22 @@
     <string name="grid_view">Cuadrícula</string>
     <string name="list_view">Lista</string>
     <string name="batch_item_not_deleted">Android no dejó que Comfort borrara este archivo (guardado antes de reinstalar): bórralo desde la galería.</string>
+    <string name="welcome_skip">Omitir</string>
+    <string name="welcome_next">Siguiente</string>
+    <string name="welcome_start">Empezar</string>
+    <string name="welcome_tagline">Vídeos, imágenes y música de cientos de sitios, guardados en tu teléfono.</string>
+    <string name="welcome_feature_share">Comparte un enlace con Comfort desde cualquier app, o pégalo en Inicio.</string>
+    <string name="welcome_feature_library">Todo lo que guardes va a tu Biblioteca.</string>
+    <string name="welcome_feature_music">Las canciones suenan en el reproductor integrado, con letras.</string>
+    <string name="welcome_defaults_title">Tus valores predeterminados</string>
+    <string name="welcome_defaults_subtitle">Cómo se guardan las descargas. Igual puedes elegir para cada una.</string>
+    <string name="welcome_video_quality">Calidad de vídeo</string>
+    <string name="welcome_video_format">Formato de vídeo</string>
+    <string name="welcome_audio_format">Formato de audio</string>
+    <string name="welcome_change_later">Todo esto está luego en Ajustes.</string>
+    <string name="welcome_notifications_title">Sabe cuándo termina</string>
+    <string name="welcome_notifications_body">Comfort muestra el progreso de cada descarga y te avisa cuando termina o falla.</string>
+    <string name="welcome_notifications_allow">Permitir notificaciones</string>
+    <string name="welcome_notifications_on">Notificaciones activadas</string>
+    <string name="welcome_battery_body">Para que las descargas sigan mientras usas otras apps y empiecen a tiempo. Sin esto, el ahorro de batería de Android puede pausarlas.</string>
 </resources>

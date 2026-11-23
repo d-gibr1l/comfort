@@ -1251,4 +1251,22 @@
     <string name="grid_view">شبکه</string>
     <string name="list_view">فهرست</string>
     <string name="batch_item_not_deleted">Android اجازه نداد Comfort این فایل را حذف کند (پیش از نصب دوباره ذخیره شده): آن را از گالری حذف کنید.</string>
+    <string name="welcome_skip">رد شدن</string>
+    <string name="welcome_next">بعدی</string>
+    <string name="welcome_start">شروع کنیم</string>
+    <string name="welcome_tagline">ویدیو، عکس و موسیقی از صدها سایت، ذخیره‌شده در گوشی شما.</string>
+    <string name="welcome_feature_share">از هر برنامه‌ای پیوند را با Comfort هم‌رسانی کنید یا در خانه بچسبانید.</string>
+    <string name="welcome_feature_library">هر چه ذخیره کنید به کتابخانه‌تان می‌رود.</string>
+    <string name="welcome_feature_music">آهنگ‌ها در پخش‌کنندهٔ داخلی، همراه متن ترانه پخش می‌شوند.</string>
+    <string name="welcome_defaults_title">پیش‌فرض‌های شما</string>
+    <string name="welcome_defaults_subtitle">نحوهٔ ذخیرهٔ دانلودها. باز هم می‌توانید برای هر کدام انتخاب کنید.</string>
+    <string name="welcome_video_quality">کیفیت ویدیو</string>
+    <string name="welcome_video_format">قالب ویدیو</string>
+    <string name="welcome_audio_format">قالب صدا</string>
+    <string name="welcome_change_later">همهٔ این‌ها بعداً در تنظیمات هست.</string>
+    <string name="welcome_notifications_title">بدانید کی تمام شد</string>
+    <string name="welcome_notifications_body">Comfort پیشرفت دانلود را نشان می‌دهد و وقتی تمام یا ناموفق شد خبرتان می‌کند.</string>
+    <string name="welcome_notifications_allow">اجازهٔ اعلان‌ها</string>
+    <string name="welcome_notifications_on">اعلان‌ها روشن است</string>
+    <string name="welcome_battery_body">تا دانلودها هنگام استفاده از برنامه‌های دیگر ادامه پیدا کنند و سر وقت شروع شوند. بدون آن، صرفه‌جوی باتری Android ممکن است متوقفشان کند.</string>
 </resources>

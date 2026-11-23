@@ -1301,4 +1301,22 @@
     <string name="grid_view">Grid</string>
     <string name="list_view">List</string>
     <string name="batch_item_not_deleted">Android didn\'t let Comfort delete this file (saved before a reinstall): delete it in your gallery.</string>
+    <string name="welcome_skip">Skip</string>
+    <string name="welcome_next">Next</string>
+    <string name="welcome_start">Get started</string>
+    <string name="welcome_tagline">Videos, pictures and music from hundreds of sites, saved to your phone.</string>
+    <string name="welcome_feature_share">Share a link to Comfort from any app, or paste it on Home.</string>
+    <string name="welcome_feature_library">Everything you save lands in your Library.</string>
+    <string name="welcome_feature_music">Songs play in the built-in music player, with lyrics.</string>
+    <string name="welcome_defaults_title">Your defaults</string>
+    <string name="welcome_defaults_subtitle">How downloads are saved. You can still pick for each one.</string>
+    <string name="welcome_video_quality">Video quality</string>
+    <string name="welcome_video_format">Video format</string>
+    <string name="welcome_audio_format">Audio format</string>
+    <string name="welcome_change_later">All of these are in Settings later.</string>
+    <string name="welcome_notifications_title">Know when it\'s done</string>
+    <string name="welcome_notifications_body">Comfort shows a download\'s progress, and tells you when it\'s finished or failed.</string>
+    <string name="welcome_notifications_allow">Allow notifications</string>
+    <string name="welcome_notifications_on">Notifications are on</string>
+    <string name="welcome_battery_body">So downloads keep going while you use other apps, and start on time. Without it, Android\'s battery saver can pause them.</string>
 </resources>

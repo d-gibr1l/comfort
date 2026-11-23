@@ -198,7 +198,10 @@ class MainActivity : ComponentActivity() {
           onDispose {}
       }
 
-      LaunchedEffect(Unit) {
+      // First run: the welcome (WelcomeScreen) asks for notifications itself, after saying why.
+      var showWelcome by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.comfort.app.ui.main.Welcome.needed(this@MainActivity)) }
+      LaunchedEffect(showWelcome) {
+        if (showWelcome) return@LaunchedEffect
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
           ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -260,6 +263,7 @@ class MainActivity : ComponentActivity() {
             // content is up: one full-screen fill less per frame on every screen.
             androidx.compose.runtime.LaunchedEffect(Unit) { window.setBackgroundDrawable(null) }
             MainNavigation(openQueueSignal = openQueueSignal.intValue, shortcut = shortcut.value, openDownload = openDownloadRequest.value)
+            if (showWelcome) com.comfort.app.ui.main.WelcomeScreen(onDone = { showWelcome = false })
           }
         }
       }

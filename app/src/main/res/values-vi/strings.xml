@@ -1217,4 +1217,22 @@
     <string name="grid_view">Lưới</string>
     <string name="list_view">Danh sách</string>
     <string name="batch_item_not_deleted">Android không cho Comfort xóa tệp này (lưu trước khi cài lại): hãy xóa trong thư viện ảnh.</string>
+    <string name="welcome_skip">Bỏ qua</string>
+    <string name="welcome_next">Tiếp</string>
+    <string name="welcome_start">Bắt đầu</string>
+    <string name="welcome_tagline">Video, ảnh và nhạc từ hàng trăm trang, lưu trên điện thoại của bạn.</string>
+    <string name="welcome_feature_share">Chia sẻ liên kết tới Comfort từ bất kỳ ứng dụng nào, hoặc dán ở Trang chủ.</string>
+    <string name="welcome_feature_library">Mọi thứ bạn lưu đều vào Thư viện.</string>
+    <string name="welcome_feature_music">Bài hát phát trong trình phát nhạc tích hợp, có lời.</string>
+    <string name="welcome_defaults_title">Mặc định của bạn</string>
+    <string name="welcome_defaults_subtitle">Cách lưu tải xuống. Bạn vẫn có thể chọn cho từng mục.</string>
+    <string name="welcome_video_quality">Chất lượng video</string>
+    <string name="welcome_video_format">Định dạng video</string>
+    <string name="welcome_audio_format">Định dạng âm thanh</string>
+    <string name="welcome_change_later">Tất cả đều có trong Cài đặt sau này.</string>
+    <string name="welcome_notifications_title">Biết khi nào xong</string>
+    <string name="welcome_notifications_body">Comfort hiển thị tiến trình tải xuống và báo khi xong hoặc thất bại.</string>
+    <string name="welcome_notifications_allow">Cho phép thông báo</string>
+    <string name="welcome_notifications_on">Đã bật thông báo</string>
+    <string name="welcome_battery_body">Để tải xuống tiếp tục khi bạn dùng ứng dụng khác và bắt đầu đúng giờ. Nếu không, trình tiết kiệm pin của Android có thể tạm dừng chúng.</string>
 </resources>
