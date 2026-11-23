@@ -164,19 +164,27 @@ private fun IntroPage() {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
-        Feature(Icons.Outlined.Share, R.string.welcome_feature_share)
-        Feature(Icons.Outlined.PhotoLibrary, R.string.welcome_feature_library)
-        Feature(Icons.Outlined.MusicNote, R.string.welcome_feature_music)
+        // One card for the three, plain icons in it, as the Settings pages' rows (the grey
+        // circles each icon sat in looked dropped in).
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                Feature(Icons.Outlined.Share, R.string.welcome_feature_share)
+                Feature(Icons.Outlined.PhotoLibrary, R.string.welcome_feature_library)
+                Feature(Icons.Outlined.MusicNote, R.string.welcome_feature_music)
+            }
+        }
     }
 }
 
 @Composable
 private fun Feature(icon: ImageVector, text: Int) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-        }
-        Spacer(Modifier.width(16.dp))
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(18.dp))
         Text(stringResource(text), style = MaterialTheme.typography.bodyLarge)
     }
 }
