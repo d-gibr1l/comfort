@@ -296,7 +296,6 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
 @Composable
 private fun GesturesCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    remember { com.comfort.app.data.GestureSettings.init(context) }
     val swipeRemove by com.comfort.app.data.GestureSettings.swipeToRemove.collectAsState()
     val swipePages by com.comfort.app.data.GestureSettings.swipeBetweenPages.collectAsState()
     Surface(

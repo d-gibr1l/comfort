@@ -38,6 +38,8 @@ class ComfortApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // The swipe switches (Settings › Look & feel › Gestures), read before any screen is built.
+        com.comfort.app.data.GestureSettings.init(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             VideoSiteRouter.loadSiteRules(this@ComfortApp)
             com.comfort.app.theme.ThemePreferences.applyNightMode(this@ComfortApp)

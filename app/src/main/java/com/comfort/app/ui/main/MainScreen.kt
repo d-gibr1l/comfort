@@ -318,7 +318,6 @@ fun MainScreen(
     // Swiping sideways between the pages (PageSwipe.kt). Not while the Queue covers them or a
     // tap's own transition is still running.
     // Settings › Look & feel › Swipe between pages.
-    remember { com.comfort.app.data.GestureSettings.init(context) }
     val swipePages by com.comfort.app.data.GestureSettings.swipeBetweenPages.collectAsState()
     val pageSwipe = rememberPageSwipeState(
         current = selectedTab,
