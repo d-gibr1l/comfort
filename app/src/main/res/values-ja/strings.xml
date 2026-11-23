@@ -1251,4 +1251,5 @@
     <string name="welcome_library_body">保存したものがすべて一か所に</string>
     <string name="welcome_music_title">音楽プレーヤー</string>
     <string name="welcome_music_body">歌詞つきで曲を再生</string>
+    <string name="welcome_allow">許可</string>
 </resources>

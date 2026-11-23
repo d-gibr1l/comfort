@@ -1319,4 +1319,5 @@
     <string name="welcome_library_body">כל מה ששמרתם, במקום אחד</string>
     <string name="welcome_music_title">נגן מוזיקה</string>
     <string name="welcome_music_body">השירים שלכם, עם המילים</string>
+    <string name="welcome_allow">אישור</string>
 </resources>

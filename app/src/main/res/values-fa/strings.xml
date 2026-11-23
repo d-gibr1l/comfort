@@ -1285,4 +1285,5 @@
     <string name="welcome_library_body">هرچه ذخیره می‌کنید، در یک جا</string>
     <string name="welcome_music_title">یک پخش‌کنندهٔ موسیقی</string>
     <string name="welcome_music_body">آهنگ‌هایتان، با متنشان</string>
+    <string name="welcome_allow">اجازه دادن</string>
 </resources>

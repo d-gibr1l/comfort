@@ -1288,4 +1288,5 @@
     <string name="welcome_library_body">Tutto ciò che salvi, in un posto</string>
     <string name="welcome_music_title">Un lettore musicale</string>
     <string name="welcome_music_body">I tuoi brani, con i testi</string>
+    <string name="welcome_allow">Consenti</string>
 </resources>

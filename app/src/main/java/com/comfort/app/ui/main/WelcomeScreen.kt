@@ -94,6 +94,58 @@ fun WelcomeScreen(onDone: () -> Unit) {
     var format by remember { mutableStateOf(GalleryDlPreferences.getOutputFormat(context)) }
     var audio by remember { mutableStateOf(GalleryDlPreferences.getAudioFormat(context)) }
     var share by remember { mutableStateOf(GalleryDlPreferences.getShareMode(context)) }
+    // The two permissions the last page asks for, checked again whenever the app comes back.
+    fun notificationsOn() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    fun batteryOn(): Boolean {
+        val pm = context.getSystemService(android.os.PowerManager::class.java) ?: return true
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+    var notifOn by remember { mutableStateOf(notificationsOn()) }
+    var unrestricted by remember { mutableStateOf(batteryOn()) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) { notifOn = notificationsOn(); unrestricted = batteryOn() }
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    // Allow on the last page: notifications, then unrestricted battery, then on into the app —
+    // each asked once, whatever the answer.
+    var allowing by remember { mutableStateOf(false) }
+    var finishNow by remember { mutableStateOf(false) }
+    val batteryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        unrestricted = batteryOn()
+        if (allowing) { allowing = false; finishNow = true }
+    }
+    fun askBattery() {
+        val intent = android.content.Intent(
+            android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+            android.net.Uri.parse("package:${context.packageName}"),
+        )
+        // Some skins have no screen for this one: the general battery list instead.
+        runCatching { batteryLauncher.launch(intent) }.onFailure {
+            runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+            if (allowing) { allowing = false; finishNow = true }
+        }
+    }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        notifOn = notificationsOn()
+        if (allowing) { if (!unrestricted) askBattery() else { allowing = false; finishNow = true } }
+    }
+    fun askNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+    fun allowAll() {
+        allowing = true
+        when {
+            !notifOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            !unrestricted -> askBattery()
+            else -> { allowing = false; finishNow = true }
+        }
+    }
+
     fun finish() {
         GalleryDlPreferences.setVideoQuality(context, quality)
         GalleryDlPreferences.setOutputFormat(context, format)
@@ -102,6 +154,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
         Welcome.markDone(context)
         onDone()
     }
+    LaunchedEffect(finishNow) { if (finishNow) finish() }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         // The side margins on each part, not the whole column: a page sliding aside is then cut
@@ -142,7 +195,7 @@ fun WelcomeScreen(onDone: () -> Unit) {
                     when (p) {
                         0 -> IntroPage()
                         1 -> DefaultsPage(quality, { quality = it }, format, { format = it }, audio, { audio = it }, share, { share = it })
-                        else -> NotificationsPage()
+                        else -> NotificationsPage(notifOn, unrestricted, onAllowNotifications = { askNotifications() }, onAllowBattery = { askBattery() })
                     }
                 }
             }
@@ -162,13 +215,15 @@ fun WelcomeScreen(onDone: () -> Unit) {
                     ) { Text(stringResource(R.string.action_back), style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily), maxLines = 1) }
                     Spacer(Modifier.width(12.dp * backShare.coerceIn(0f, 1f)))
                 }
+                val needsAllow = page == 2 && !(notifOn && unrestricted)
                 Button(
-                    onClick = { if (page < 2) page++ else finish() },
+                    onClick = { if (page < 2) page++ else if (needsAllow) allowAll() else finish() },
                     modifier = Modifier.weight(1f).height(56.dp),
                 ) {
-                    androidx.compose.animation.AnimatedContent(targetState = page < 2, label = "welcomeNextLabel") { next ->
+                    val label = when { page < 2 -> R.string.welcome_next; needsAllow -> R.string.welcome_allow; else -> R.string.welcome_start }
+                    androidx.compose.animation.AnimatedContent(targetState = label, label = "welcomeNextLabel") { shown ->
                         Text(
-                            stringResource(if (next) R.string.welcome_next else R.string.welcome_start),
+                            stringResource(shown),
                             style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily),
                             maxLines = 1,
                         )
@@ -287,12 +342,7 @@ private fun <T> ChoiceGroup(title: String, options: List<T>, selected: T, label:
 }
 
 @Composable
-private fun NotificationsPage() {
-    val context = LocalContext.current
-    fun granted() = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-    var allowed by remember { mutableStateOf(granted()) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed = granted() }
+private fun NotificationsPage(allowed: Boolean, unrestricted: Boolean, onAllowNotifications: () -> Unit, onAllowBattery: () -> Unit) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(96.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
             Icon(Icons.Outlined.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(44.dp))
@@ -305,33 +355,19 @@ private fun NotificationsPage() {
         if (allowed) {
             AssistChip(onClick = {}, label = { Text(stringResource(R.string.welcome_notifications_on)) }, leadingIcon = { Icon(Icons.Outlined.Check, contentDescription = null) })
         } else {
-            FilledTonalButton(onClick = { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
+            FilledTonalButton(onClick = onAllowNotifications) {
                 Text(stringResource(R.string.welcome_notifications_allow), style = MaterialTheme.typography.labelLarge.copy(fontFamily = HeaderFontFamily))
             }
         }
         Spacer(Modifier.height(24.dp))
-        BatteryCard()
+        BatteryCard(unrestricted, onAllowBattery)
     }
 }
 
 /** Unrestricted battery (as Settings › Downloads offers): without it, Android's battery saver can
  * freeze a download waiting to start while the app is in the background. */
 @Composable
-private fun BatteryCard() {
-    val context = LocalContext.current
-    fun unrestricted(): Boolean {
-        val pm = context.getSystemService(android.os.PowerManager::class.java) ?: return true
-        return pm.isIgnoringBatteryOptimizations(context.packageName)
-    }
-    var on by remember { mutableStateOf(unrestricted()) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { on = unrestricted() }
-    // Back from the system's own screen for it (the result isn't always reported).
-    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycle) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) on = unrestricted() }
-        lifecycle.lifecycle.addObserver(observer)
-        onDispose { lifecycle.lifecycle.removeObserver(observer) }
-    }
+private fun BatteryCard(on: Boolean, onAllow: () -> Unit) {
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -350,15 +386,7 @@ private fun BatteryCard() {
             if (!on) {
                 Spacer(Modifier.height(12.dp))
                 FilledTonalButton(
-                    onClick = {
-                        val intent = android.content.Intent(
-                            android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                            android.net.Uri.parse("package:${context.packageName}"),
-                        )
-                        // Some skins have no screen for this one: the general battery list instead.
-                        runCatching { launcher.launch(intent) }
-                            .onFailure { runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) } }
-                    },
+                    onClick = onAllow,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))

@@ -1285,4 +1285,5 @@
     <string name="welcome_library_body">जो भी सेव करें, एक ही जगह</string>
     <string name="welcome_music_title">एक म्यूज़िक प्लेयर</string>
     <string name="welcome_music_body">आपके गाने, बोलों के साथ</string>
+    <string name="welcome_allow">अनुमति दें</string>
 </resources>

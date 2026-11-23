@@ -1421,4 +1421,5 @@
     <string name="welcome_library_body">كل ما تحفظه في مكان واحد</string>
     <string name="welcome_music_title">مشغّل موسيقى</string>
     <string name="welcome_music_body">أغانيك مع كلماتها</string>
+    <string name="welcome_allow">السماح</string>
 </resources>

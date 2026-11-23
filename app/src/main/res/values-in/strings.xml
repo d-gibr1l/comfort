@@ -1282,4 +1282,5 @@
     <string name="welcome_library_body">Semua yang disimpan, di satu tempat</string>
     <string name="welcome_music_title">Pemutar musik</string>
     <string name="welcome_music_body">Lagu-lagumu, dengan liriknya</string>
+    <string name="welcome_allow">Izinkan</string>
 </resources>

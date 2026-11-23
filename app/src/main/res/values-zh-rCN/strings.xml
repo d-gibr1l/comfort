@@ -1251,4 +1251,5 @@
     <string name="welcome_library_body">你保存的一切，集中一处</string>
     <string name="welcome_music_title">音乐播放器</string>
     <string name="welcome_music_body">你的歌曲，附带歌词</string>
+    <string name="welcome_allow">允许</string>
 </resources>

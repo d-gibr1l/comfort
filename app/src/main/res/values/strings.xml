@@ -1335,4 +1335,5 @@
     <string name="welcome_library_body">Everything you save, in one place</string>
     <string name="welcome_music_title">A music player</string>
     <string name="welcome_music_body">Your songs, with their lyrics</string>
+    <string name="welcome_allow">Allow</string>
 </resources>

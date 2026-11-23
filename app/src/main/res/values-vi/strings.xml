@@ -1251,4 +1251,5 @@
     <string name="welcome_library_body">Mọi thứ bạn lưu, ở một nơi</string>
     <string name="welcome_music_title">Trình phát nhạc</string>
     <string name="welcome_music_body">Bài hát của bạn, kèm lời</string>
+    <string name="welcome_allow">Cho phép</string>
 </resources>

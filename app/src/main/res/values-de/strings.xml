@@ -1285,4 +1285,5 @@
     <string name="welcome_library_body">Alles Gespeicherte an einem Ort</string>
     <string name="welcome_music_title">Ein Musikplayer</string>
     <string name="welcome_music_body">Deine Songs mit ihren Texten</string>
+    <string name="welcome_allow">Erlauben</string>
 </resources>
