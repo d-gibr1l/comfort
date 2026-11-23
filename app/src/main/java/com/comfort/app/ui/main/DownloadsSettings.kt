@@ -779,6 +779,7 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimePickerButton(
     modifier: Modifier = Modifier,
@@ -818,20 +819,32 @@ private fun TimePickerButton(
         // the wheel's own onSnappedTime — re-deriving it from minutesSinceMidnight on every
         // recomposition would fight the wheel's scroll position every time it snaps.
         var pendingMinutes by remember { mutableStateOf(minutesSinceMidnight) }
-        Dialog(onDismissRequest = { showPicker = false }) {
-            Card(shape = MaterialTheme.shapes.extraLarge) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(label, style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    TimeWheel(minutes = pendingMinutes, onChange = { pendingMinutes = it })
-                    Spacer(Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) }
-                        TextButton(onClick = { onPicked(pendingMinutes); showPicker = false }) { Text(stringResource(R.string.done)) }
-                    }
+        // A sheet, as Queue's Start at… (the app's pickers all come up from the bottom).
+        ModalBottomSheet(
+            onDismissRequest = { showPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            // Compact: the title on one line, the wheels, then AM/PM beside Done | ✕.
+            Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimeWheel(minutes = pendingMinutes, onChange = { pendingMinutes = it }, amPm = false)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TimeWheelAmPm(minutes = pendingMinutes, onChange = { pendingMinutes = it })
+                    Spacer(Modifier.weight(1f))
+                    ConfirmCancelSplitButton(
+                        label = stringResource(R.string.done),
+                        icon = Icons.Outlined.Check,
+                        onConfirm = { onPicked(pendingMinutes); showPicker = false },
+                        onCancel = { showPicker = false },
+                        outlinedConfirm = false,
+                    )
                 }
             }
         }

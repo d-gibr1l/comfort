@@ -302,15 +302,25 @@ internal fun StartAtDialog(
     // dialog in the middle of the screen.
     // Open all the way: half open, Done | ✕ sat under the navigation bar.
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 16.dp)) {
-            SheetHeader(
-                icon = Icons.Outlined.Schedule,
-                title = stringResource(R.string.start_at),
-                subtitle = note,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
+        // Compact, as Settings' schedule picker: the title with when it starts under it (Remove
+        // beside them), the quick picks, the wheels, then AM/PM beside Done | ✕.
+        Column(modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.start_at),
+                        style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                    if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (onRemove != null) {
+                    TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_start_time)) }
+                }
+            }
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 quickPicks.forEach { m ->
@@ -322,35 +332,11 @@ internal fun StartAtDialog(
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Column(
-                    modifier = Modifier.padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    TimeWheel(minutes = minutes, onChange = { minutes = it }, modifier = Modifier.padding(horizontal = 16.dp))
-                    Spacer(Modifier.height(8.dp))
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                            Spacer(Modifier.width(6.dp))
-                            Text(summary, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        }
-                    }
-                }
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimeWheel(minutes = minutes, onChange = { minutes = it }, amPm = false)
             }
-            Spacer(Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                if (onRemove != null) {
-                    TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_start_time)) }
-                }
+                TimeWheelAmPm(minutes = minutes, onChange = { minutes = it })
                 Spacer(Modifier.weight(1f))
                 ConfirmCancelSplitButton(
                     label = stringResource(R.string.done),
