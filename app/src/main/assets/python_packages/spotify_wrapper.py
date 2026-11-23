@@ -523,6 +523,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 callback(event("error", message="No tracks found at this Spotify link"))
             return "Error: no tracks found"
 
+        # Several tracks of an album or playlist: the download is named after it, "Artist -
+        # Album" or "Curator - Playlist" (or whichever of the two exists), not after its first
+        # track. Sent first: the first title an engine sends wins.
+        if callback and entity_type != "track" and len(track_ids) > 1:
+            name = (entity.get("name") or "").strip()
+            by = (entity.get("subtitle") or "").strip()
+            label = f"{by} - {name}" if name and by and not name.lower().startswith(by.lower()) else (name or by)
+            if label:
+                callback(event("title", title=label[:200]))
+
         any_success = False
         for track_id in track_ids:
             title, artist, duration, thumbnail_url = _track_metadata(track_id)

@@ -1127,6 +1127,36 @@ def short_id(value):
     return digits[:6]
 
 
+
+# Sites whose multi-video "playlists" are posts (see _playlist_name).
+_POST_EXTRACTORS = {
+    "Instagram", "Twitter", "TikTok", "Reddit", "Facebook", "Threads", "Bluesky", "Tumblr",
+    "Pinterest", "Weibo", "VK",
+}
+
+def _playlist_name(info):
+    """The name of the playlist [info] (one of its entries) came from: "Uploader - Title", the
+    title alone, or the uploader alone, whichever exist; None for a single video (no playlist).
+    The uploader isn't repeated when the title already starts with it (a channel's "Name - Videos")."""
+    if info.get("playlist_index") is None:
+        return None
+    # A post with several videos (a carousel, a thread) also comes as a "playlist", named after
+    # the post: those keep "Poster - caption", like a single one.
+    if (info.get("extractor_key") or "") in _POST_EXTRACTORS:
+        return None
+    title = info.get("playlist_title") or info.get("playlist")
+    if isinstance(title, str):
+        title = title.strip() or None
+    else:
+        title = None
+    # A playlist "titled" by its id is no title (some extractors set playlist to the id).
+    if title and title == info.get("playlist_id"):
+        title = None
+    uploader = (info.get("playlist_uploader") or info.get("playlist_channel") or "").strip() or None
+    if title and uploader and not title.lower().startswith(uploader.lower()):
+        return f"{uploader} - {title}"
+    return title or uploader
+
 def _caption(info):
     """The post's own words for the filename and the queue card: its title (or description when
     it has none), without the poster's name in front, links or extra spaces. X posts need all
@@ -2428,9 +2458,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # derivation from the saved filename), so the queue card shows what's actually
                 # downloading well before the first byte lands, not just a "Downloading from X"
                 # placeholder for the whole transfer.
+                # A playlist (or channel) download is named after the playlist, not its first
+                # item: "Uploader - Playlist title", or whichever of the two exists.
+                playlist_title = _playlist_name(info)
+                if playlist_title:
+                    reported_title[0] = True
+                    callback(event("title", title=playlist_title[:200]))
                 poster = info.get("uploader") or info.get("channel") or info.get("creator")
                 caption = _caption(info)
-                if poster or caption:
+                if not reported_title[0] and (poster or caption):
                     reported_title[0] = True
                     # Same words as the filename: "Poster - caption", or just whichever exists.
                     title = f"{poster} - {caption}" if poster and caption else (caption or poster)
