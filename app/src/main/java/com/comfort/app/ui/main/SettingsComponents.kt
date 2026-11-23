@@ -308,6 +308,8 @@ internal fun SettingsSubPageHeader(
     // like every other Android app's compact app bar — with no separate "collapsed layout" to
     // jump-cut into (that's what caused the double-header ghosting fixed earlier).
     collapseFraction: Float = 0f,
+    // Beside the title, at its end (the Queue's ⓘ).
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val undoIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_undo)
     Column(
@@ -394,6 +396,7 @@ internal fun SettingsSubPageHeader(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
+            trailing?.invoke()
         }
     }
 }

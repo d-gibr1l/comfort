@@ -1250,4 +1250,16 @@
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
     <string name="subscriptions_hours">%1$d h</string>
+    <string name="queue_help_title">Como a fila funciona</string>
+    <string name="queue_help_subtitle">Os botões dela, e o que fazer quando um download falha</string>
+    <string name="queue_help_pause_title">Pausar tudo e Retomar tudo</string>
+    <string name="queue_help_pause_body">Pausar tudo para todos os downloads em andamento e segura os que estão esperando, e os que você adicionar, até você tocar em Retomar tudo. Um download pausado mantém o que salvou e continua dali.</string>
+    <string name="queue_help_start_title">Iniciar agora e Começar às…</string>
+    <string name="queue_help_start_body">Iniciar agora em um card esperando o inicia na hora, mesmo fora do agendamento ou com todos os espaços de download ocupados. Começar às… escolhe um horário para esse download.</string>
+    <string name="queue_help_schedule_title">Agendamento</string>
+    <string name="queue_help_schedule_body">Com Configurações › Downloads › Agendamento ativado, os downloads novos esperam em Agendados até a janela de horário abrir. Um download com horário próprio também espera ali.</string>
+    <string name="queue_help_select_title">Selecionar e trocar de aba</string>
+    <string name="queue_help_select_body">Toque e segure um card para selecioná-lo, e arraste para selecionar mais. Deslize para o lado para trocar de aba.</string>
+    <string name="queue_help_errors_title">Quando um download falha</string>
+    <string name="queue_help_errors_body">Toque em ⓘ no card para ver os detalhes, e em Tentar de novo para tentar de novo.\n• Posts privados, com restrição de idade ou que exigem login: adicione sua conta em Configurações › Cookies e login.\n• Limite de requisições: o site quer uma pausa; o download espera e continua sozinho.\n• Sem conexão: os downloads esperando começam quando você voltar a ficar on-line; um em andamento pode falhar, então toque em Tentar de novo.\n• Link não compatível: abra com Navegar na web em Início para encontrar a mídia na página.</string>
 </resources>

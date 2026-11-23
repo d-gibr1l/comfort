@@ -1216,4 +1216,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">So funktioniert die Warteschlange</string>
+    <string name="queue_help_subtitle">Ihre Schaltflächen und was zu tun ist, wenn ein Download fehlschlägt</string>
+    <string name="queue_help_pause_title">Alle pausieren und Alle fortsetzen</string>
+    <string name="queue_help_pause_body">Alle pausieren stoppt alle laufenden Downloads und hält die wartenden sowie neu hinzugefügte an, bis du Alle fortsetzen tippst. Ein pausierter Download behält, was er gespeichert hat, und macht dort weiter.</string>
+    <string name="queue_help_start_title">Jetzt starten und Starten um…</string>
+    <string name="queue_help_start_body">Jetzt starten auf einer wartenden Karte startet sie sofort, auch außerhalb des Zeitplans oder wenn alle Download-Plätze belegt sind. Starten um… wählt eine Uhrzeit für diesen einen Download.</string>
+    <string name="queue_help_schedule_title">Zeitplan</string>
+    <string name="queue_help_schedule_body">Ist Einstellungen › Downloads › Zeitplan an, warten neue Downloads unter Geplant, bis das Zeitfenster beginnt. Ein Download mit eigener Uhrzeit wartet dort ebenfalls.</string>
+    <string name="queue_help_select_title">Auswählen und Tabs wechseln</string>
+    <string name="queue_help_select_body">Halte eine Karte gedrückt, um sie auszuwählen, und ziehe, um weitere auszuwählen. Wische seitlich, um zwischen den Tabs zu wechseln.</string>
+    <string name="queue_help_errors_title">Wenn ein Download fehlschlägt</string>
+    <string name="queue_help_errors_body">Tippe auf der Karte auf ⓘ für Details und auf Wiederholen, um es erneut zu versuchen.\n• Private, altersbeschränkte oder nur angemeldet sichtbare Beiträge: füge dein Konto unter Einstellungen › Cookies &amp; Anmeldung hinzu.\n• Rate-Limit: Die Seite will eine Pause; der Download wartet und macht von selbst weiter.\n• Keine Verbindung: Wartende Downloads starten, sobald du wieder online bist; ein laufender kann fehlschlagen, dann tippe auf Wiederholen.\n• Link nicht unterstützt: Öffne ihn mit Im Web surfen auf Start, um die Medien auf der Seite zu finden.</string>
 </resources>

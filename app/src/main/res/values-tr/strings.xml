@@ -1216,4 +1216,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">Kuyruk nasıl çalışır</string>
+    <string name="queue_help_subtitle">Düğmeleri ve bir indirme başarısız olunca ne yapılır</string>
+    <string name="queue_help_pause_title">Tümünü duraklat ve Tümünü sürdür</string>
+    <string name="queue_help_pause_body">Tümünü duraklat çalışan tüm indirmeleri durdurur ve bekleyenleri, eklediklerinizle birlikte, Tümünü sürdür düğmesine dokunana kadar bekletir. Duraklatılan indirme kaydettiğini korur ve oradan devam eder.</string>
+    <string name="queue_help_start_title">Şimdi başlat ve Başlangıç saati…</string>
+    <string name="queue_help_start_body">Bekleyen bir kartta Şimdi başlat, zamanlamanın dışında olsa da ya da tüm indirme yerleri dolu olsa da onu hemen başlatır. Başlangıç saati… yalnızca o indirme için bir saat seçer.</string>
+    <string name="queue_help_schedule_title">Zamanlama</string>
+    <string name="queue_help_schedule_body">Ayarlar › İndirmeler › Zamanlama açıkken yeni indirmeler, zaman aralığı başlayana kadar Zamanlanan sekmesinde bekler. Kendi saati verilen bir indirme de orada bekler.</string>
+    <string name="queue_help_select_title">Seçme ve sekme değiştirme</string>
+    <string name="queue_help_select_body">Bir kartı seçmek için uzun basın, daha fazlasını seçmek için sürükleyin. Sekmeler arasında geçmek için yana kaydırın.</string>
+    <string name="queue_help_errors_title">Bir indirme başarısız olursa</string>
+    <string name="queue_help_errors_body">Ayrıntılar için karttaki ⓘ simgesine, yeniden denemek için Tekrar dene düğmesine dokunun.\n• Gizli, yaş sınırlı ya da oturum açmayı gerektiren gönderiler: hesabınızı Ayarlar › Çerezler ve Oturum bölümünden ekleyin.\n• Hız sınırı: site mola istiyor; indirme bekler ve kendiliğinden devam eder.\n• Bağlantı yok: bekleyen indirmeler yeniden çevrimiçi olunca başlar; çalışan bir indirme başarısız olabilir, o zaman Tekrar dene düğmesine dokunun.\n• Desteklenmeyen bağlantı: sayfadaki medyayı bulmak için Ana Sayfa sayfasında Web\'de gezin ile açın.</string>
 </resources>

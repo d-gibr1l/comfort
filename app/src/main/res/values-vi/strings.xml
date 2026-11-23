@@ -1182,4 +1182,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">Hàng đợi hoạt động thế nào</string>
+    <string name="queue_help_subtitle">Các nút của nó, và cần làm gì khi tải xuống thất bại</string>
+    <string name="queue_help_pause_title">Tạm dừng tất cả và Tiếp tục tất cả</string>
+    <string name="queue_help_pause_body">Tạm dừng tất cả dừng mọi tải xuống đang chạy và giữ lại các mục đang chờ, cùng những mục bạn thêm, cho đến khi bạn nhấn Tiếp tục tất cả. Tải xuống bị tạm dừng giữ phần đã lưu và tiếp tục từ đó.</string>
+    <string name="queue_help_start_title">Bắt đầu ngay và Bắt đầu lúc…</string>
+    <string name="queue_help_start_body">Bắt đầu ngay trên thẻ đang chờ sẽ bắt đầu ngay, kể cả ngoài lịch hoặc khi mọi lượt tải đều đang bận. Bắt đầu lúc… chọn giờ cho riêng tải xuống đó.</string>
+    <string name="queue_help_schedule_title">Lịch</string>
+    <string name="queue_help_schedule_body">Khi bật Cài đặt › Tải xuống › Lịch, các tải xuống mới chờ trong Đã hẹn đến khi khung giờ mở. Tải xuống có giờ riêng cũng chờ ở đó.</string>
+    <string name="queue_help_select_title">Chọn và chuyển tab</string>
+    <string name="queue_help_select_body">Nhấn giữ một thẻ để chọn, rồi kéo để chọn thêm. Vuốt ngang để chuyển tab.</string>
+    <string name="queue_help_errors_title">Khi tải xuống thất bại</string>
+    <string name="queue_help_errors_body">Nhấn ⓘ trên thẻ để xem chi tiết, và Thử lại để thử lại.\n• Bài riêng tư, giới hạn độ tuổi hoặc cần đăng nhập: thêm tài khoản của bạn trong Cài đặt › Cookie và đăng nhập.\n• Bị giới hạn tốc độ: trang muốn nghỉ; tải xuống sẽ chờ rồi tự tiếp tục.\n• Không có kết nối: các tải xuống đang chờ bắt đầu khi bạn có mạng lại; tải xuống đang chạy có thể thất bại, khi đó nhấn Thử lại.\n• Liên kết không được hỗ trợ: mở bằng Duyệt web trên Trang chủ để tìm nội dung trên trang.</string>
 </resources>

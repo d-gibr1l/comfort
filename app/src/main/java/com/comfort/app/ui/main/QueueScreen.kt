@@ -95,6 +95,8 @@ fun QueueScreen(
     // pages again once it closes, so a delete's Undo carries on there instead of being committed.
     val snackbars = LocalAppSnackbars.current
     DownloadEventSnackbars(historyItems = historyItems, queueItems = queueItems)
+    var helpOpen by remember { mutableStateOf(false) }
+    if (helpOpen) QueueHelpSheet(onDismiss = { helpOpen = false })
     // Every delete on this screen (bulk, one item's "Remove", swipe-to-dismiss) is undoable —
     // see rememberUndoableDelete.
     val requestDelete = rememberUndoableDelete(viewModel)
@@ -424,6 +426,12 @@ fun QueueScreen(
                         bottomPadding = headerState.bottomPadding,
                         collapseFraction = headerState.collapseFraction,
                         includeHorizontalPadding = true,
+                        // What the Queue's controls do and what its errors mean (QueueHelpSheet).
+                        trailing = {
+                            IconButton(onClick = { helpOpen = true }) {
+                                Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.queue_help_title), modifier = Modifier.size(26.dp))
+                            }
+                        },
                         // Collapsed while selecting: no space left between the bar and the chips.
                         modifier = Modifier.hiddenWhile(selecting, collapse = true),
                     )

@@ -1219,4 +1219,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">Come funziona la coda</string>
+    <string name="queue_help_subtitle">I suoi pulsanti, e cosa fare quando un download non riesce</string>
+    <string name="queue_help_pause_title">Metti tutti in pausa e Riprendi tutti</string>
+    <string name="queue_help_pause_body">Metti tutti in pausa ferma tutti i download in corso e trattiene quelli in attesa, e quelli che aggiungi, finché non tocchi Riprendi tutti. Un download in pausa conserva ciò che ha salvato e riprende da lì.</string>
+    <string name="queue_help_start_title">Avvia ora e Avvia alle…</string>
+    <string name="queue_help_start_body">Avvia ora su una scheda in attesa la avvia subito, anche fuori dalla programmazione o con tutti gli slot di download occupati. Avvia alle… sceglie un orario per quel singolo download.</string>
+    <string name="queue_help_schedule_title">Pianificazione</string>
+    <string name="queue_help_schedule_body">Con Impostazioni › Download › Pianificazione attivo, i nuovi download aspettano in Pianificati finché non si apre la fascia oraria. Anche un download con un orario suo aspetta lì.</string>
+    <string name="queue_help_select_title">Selezionare e cambiare scheda</string>
+    <string name="queue_help_select_body">Tieni premuta una scheda per selezionarla e trascina per selezionarne altre. Scorri di lato per passare da una scheda all\'altra.</string>
+    <string name="queue_help_errors_title">Quando un download non riesce</string>
+    <string name="queue_help_errors_body">Tocca ⓘ sulla scheda per i dettagli e Riprova per riprovare.\n• Post privati, con limiti di età o visibili solo con accesso: aggiungi il tuo account in Impostazioni › Cookie e accesso.\n• Limite di richieste: il sito vuole una pausa; il download aspetta e riprende da solo.\n• Nessuna connessione: i download in attesa partono quando torni online; uno in corso può non riuscire, quindi tocca Riprova.\n• Link non supportato: aprilo con Naviga sul web in Home per trovare i contenuti nella pagina.</string>
 </resources>

@@ -1250,4 +1250,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">איך התור עובד</string>
+    <string name="queue_help_subtitle">הכפתורים שלו, ומה לעשות כשהורדה נכשלת</string>
+    <string name="queue_help_pause_title">השהה הכול והמשך הכול</string>
+    <string name="queue_help_pause_body">השהה הכול עוצר כל הורדה פעילה ומחזיק את הממתינות, וכל הורדה שתוסיף, עד שתקיש המשך הכול. הורדה מושהית שומרת את מה שנשמר וממשיכה משם.</string>
+    <string name="queue_help_start_title">התחל עכשיו והתחלה ב…</string>
+    <string name="queue_help_start_body">התחל עכשיו בכרטיס ממתין מתחיל אותו מיד, גם מחוץ לתזמון או כשכל מקומות ההורדה תפוסים. התחלה ב… בוחר שעה להורדה הזו בלבד.</string>
+    <string name="queue_help_schedule_title">תזמון</string>
+    <string name="queue_help_schedule_body">כשהגדרות › הורדות › תזמון פעיל, הורדות חדשות ממתינות במתוזמנות עד שחלון הזמן נפתח. גם הורדה עם שעה משלה ממתינה שם.</string>
+    <string name="queue_help_select_title">בחירה ומעבר בין כרטיסיות</string>
+    <string name="queue_help_select_body">לחיצה ארוכה על כרטיס בוחרת אותו, וגרירה בוחרת עוד. החלקה הצידה עוברת בין הכרטיסיות.</string>
+    <string name="queue_help_errors_title">כשהורדה נכשלת</string>
+    <string name="queue_help_errors_body">הקש על ⓘ בכרטיס לפרטים, ועל נסה שוב כדי לנסות שוב.\n• פוסטים פרטיים, מוגבלי גיל או שדורשים התחברות: הוסף את החשבון שלך בהגדרות › עוגיות והתחברות.\n• הגבלת קצב: האתר מבקש הפסקה; ההורדה ממתינה וממשיכה לבד.\n• אין חיבור: הורדות ממתינות יתחילו כשתחזור לרשת; הורדה פעילה עלולה להיכשל, אז הקש נסה שוב.\n• קישור לא נתמך: פתח אותו עם גלישה באינטרנט בבית כדי למצוא את המדיה בדף.</string>
 </resources>

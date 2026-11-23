@@ -1213,4 +1213,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">Cara kerja Antrean</string>
+    <string name="queue_help_subtitle">Tombolnya, dan yang harus dilakukan saat unduhan gagal</string>
+    <string name="queue_help_pause_title">Jeda Semua dan Lanjutkan Semua</string>
+    <string name="queue_help_pause_body">Jeda Semua menghentikan semua unduhan yang berjalan dan menahan yang menunggu, serta yang Anda tambahkan, sampai Anda mengetuk Lanjutkan Semua. Unduhan yang dijeda menyimpan yang sudah tersimpan dan berlanjut dari situ.</string>
+    <string name="queue_help_start_title">Mulai sekarang dan Mulai pada…</string>
+    <string name="queue_help_start_body">Mulai sekarang pada kartu yang menunggu langsung memulainya, bahkan di luar jadwal atau saat semua slot unduhan penuh. Mulai pada… memilih waktu untuk unduhan itu saja.</string>
+    <string name="queue_help_schedule_title">Jadwal</string>
+    <string name="queue_help_schedule_body">Dengan Setelan › Unduhan › Jadwal aktif, unduhan baru menunggu di Terjadwal sampai rentang waktunya dimulai. Unduhan dengan waktunya sendiri juga menunggu di sana.</string>
+    <string name="queue_help_select_title">Memilih dan berpindah tab</string>
+    <string name="queue_help_select_body">Tekan lama kartu untuk memilihnya, lalu seret untuk memilih lebih banyak. Geser ke samping untuk berpindah tab.</string>
+    <string name="queue_help_errors_title">Saat unduhan gagal</string>
+    <string name="queue_help_errors_body">Ketuk ⓘ di kartu untuk detailnya, dan Coba lagi untuk mencoba lagi.\n• Postingan privat, berbatas usia, atau perlu masuk: tambahkan akun Anda di Setelan › Cookie &amp; Login.\n• Dibatasi: situs minta jeda; unduhan menunggu dan berlanjut sendiri.\n• Tanpa koneksi: unduhan yang menunggu mulai saat Anda kembali online; yang berjalan bisa gagal, jadi ketuk Coba lagi.\n• Link tidak didukung: buka dengan Jelajahi web di Beranda untuk menemukan media di halaman.</string>
 </resources>

@@ -1182,4 +1182,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">キューの使い方</string>
+    <string name="queue_help_subtitle">ボタンの働きと、ダウンロードが失敗したときの対処</string>
+    <string name="queue_help_pause_title">すべて一時停止 と すべて再開</string>
+    <string name="queue_help_pause_body">すべて一時停止 は実行中のダウンロードをすべて止め、待機中と新しく追加したものを すべて再開 をタップするまで保留します。一時停止したダウンロードは保存済みの分を残し、そこから再開します。</string>
+    <string name="queue_help_start_title">今すぐ開始 と 開始時刻を設定…</string>
+    <string name="queue_help_start_body">待機中のカードの 今すぐ開始 は、スケジュール外でも、ダウンロード枠がすべて使用中でも、すぐに開始します。開始時刻を設定… はそのダウンロードだけの時刻を選びます。</string>
+    <string name="queue_help_schedule_title">スケジュール</string>
+    <string name="queue_help_schedule_body">設定 › ダウンロード › スケジュール がオンのとき、新しいダウンロードは時間帯が始まるまで 予約済み で待ちます。個別に時刻を指定したダウンロードもそこで待ちます。</string>
+    <string name="queue_help_select_title">選択とタブの切り替え</string>
+    <string name="queue_help_select_body">カードを長押しすると選択し、ドラッグするとさらに選択します。横にスワイプするとタブを切り替えます。</string>
+    <string name="queue_help_errors_title">ダウンロードが失敗したとき</string>
+    <string name="queue_help_errors_body">カードの ⓘ で詳細を、再試行 でもう一度試せます。\n• 非公開・年齢制限・ログインが必要な投稿：設定 › Cookie とログイン でアカウントを追加してください。\n• レート制限：サイトが休憩を求めています。ダウンロードは待ってから自動で続きます。\n• 接続なし：待機中のダウンロードはオンラインに戻ると始まります。実行中のものは失敗することがあるので 再試行 をタップしてください。\n• 対応していないリンク：ホーム の ウェブを閲覧 で開き、ページ内のメディアを探してください。</string>
 </resources>

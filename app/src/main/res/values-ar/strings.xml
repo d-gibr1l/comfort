@@ -1352,4 +1352,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">كيف تعمل قائمة الانتظار</string>
+    <string name="queue_help_subtitle">أزرارها، وماذا تفعل عند فشل التنزيل</string>
+    <string name="queue_help_pause_title">إيقاف الكل مؤقتًا واستئناف الكل</string>
+    <string name="queue_help_pause_body">إيقاف الكل مؤقتًا يوقف كل تنزيل جارٍ ويُبقي المنتظرة، وأي تنزيل تضيفه، حتى تضغط استئناف الكل. التنزيل الموقوف يحتفظ بما حفظه ويكمل من حيث توقف.</string>
+    <string name="queue_help_start_title">ابدأ الآن والبدء في…</string>
+    <string name="queue_help_start_body">ابدأ الآن على بطاقة منتظرة يبدؤها فورًا، حتى خارج الجدول أو مع انشغال كل خانات التنزيل. البدء في… يختار وقتًا لهذا التنزيل وحده.</string>
+    <string name="queue_help_schedule_title">الجدولة</string>
+    <string name="queue_help_schedule_body">عند تفعيل الإعدادات › التنزيلات › الجدولة، تنتظر التنزيلات الجديدة في مجدول حتى تبدأ الفترة الزمنية. والتنزيل الذي حُدّد له وقت خاص ينتظر هناك أيضًا.</string>
+    <string name="queue_help_select_title">التحديد والتنقل بين التبويبات</string>
+    <string name="queue_help_select_body">اضغط مطولًا على بطاقة لتحديدها، واسحب لتحديد المزيد. اسحب جانبيًا للتنقل بين التبويبات.</string>
+    <string name="queue_help_errors_title">عند فشل التنزيل</string>
+    <string name="queue_help_errors_body">اضغط ⓘ على البطاقة للتفاصيل، وإعادة المحاولة للمحاولة مجددًا.\n• منشورات خاصة أو مقيدة بالعمر أو تتطلب تسجيل الدخول: أضف حسابك في الإعدادات › ملفات تعريف الارتباط وتسجيل الدخول.\n• تقييد المعدل: يريد الموقع استراحة؛ ينتظر التنزيل ويكمل وحده.\n• لا اتصال: تبدأ التنزيلات المنتظرة عند عودتك للاتصال؛ وقد يفشل الجاري، فاضغط إعادة المحاولة.\n• رابط غير مدعوم: افتحه عبر تصفح الويب في الرئيسية للعثور على الوسائط في الصفحة.</string>
 </resources>

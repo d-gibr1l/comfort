@@ -1182,4 +1182,16 @@
     <string name="percent_and_status">%1$d%% · %2$s</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">队列如何运作</string>
+    <string name="queue_help_subtitle">它的按钮，以及下载失败时该怎么办</string>
+    <string name="queue_help_pause_title">全部暂停和全部继续</string>
+    <string name="queue_help_pause_body">全部暂停会停止所有正在进行的下载，并暂缓等待中的以及你新添加的下载，直到你点按全部继续。暂停的下载会保留已保存的内容，并从那里继续。</string>
+    <string name="queue_help_start_title">立即开始和定时开始…</string>
+    <string name="queue_help_start_body">在等待中的卡片上点按立即开始会立即开始下载，即使不在计划时间内或所有下载位都被占用。定时开始…为这一项下载选择时间。</string>
+    <string name="queue_help_schedule_title">定时</string>
+    <string name="queue_help_schedule_body">开启设置 › 下载 › 定时后，新下载会在“已定时”中等待，直到时间段开始。设了自己时间的下载也在那里等待。</string>
+    <string name="queue_help_select_title">选择与切换标签页</string>
+    <string name="queue_help_select_body">长按卡片可选中它，拖动可选中更多。左右滑动可切换标签页。</string>
+    <string name="queue_help_errors_title">下载失败时</string>
+    <string name="queue_help_errors_body">点按卡片上的 ⓘ 查看详情，点按重试再试一次。\n• 私密、有年龄限制或需要登录的帖子：在设置 › Cookie 和登录中添加你的账号。\n• 请求受限：网站需要歇一下；下载会等待并自行继续。\n• 没有网络：等待中的下载会在你重新联网后开始；正在进行的可能失败，请点按重试。\n• 不支持的链接：在首页用浏览网页打开它，以找到页面上的媒体。</string>
 </resources>

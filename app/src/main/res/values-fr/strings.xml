@@ -1250,4 +1250,16 @@
     <string name="stable">Stable</string>
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
+    <string name="queue_help_title">Comment marche la file d\'attente</string>
+    <string name="queue_help_subtitle">Ses boutons, et que faire quand un téléchargement échoue</string>
+    <string name="queue_help_pause_title">Tout mettre en pause et Tout reprendre</string>
+    <string name="queue_help_pause_body">Tout mettre en pause arrête tous les téléchargements en cours et retient ceux en attente, ainsi que ceux que vous ajoutez, jusqu\'à ce que vous touchiez Tout reprendre. Un téléchargement en pause garde ce qu\'il a enregistré et reprend de là.</string>
+    <string name="queue_help_start_title">Démarrer maintenant et Démarrer à…</string>
+    <string name="queue_help_start_body">Démarrer maintenant sur une carte en attente la lance tout de suite, même hors de la plage horaire ou quand tous les emplacements sont occupés. Démarrer à… choisit une heure pour ce seul téléchargement.</string>
+    <string name="queue_help_schedule_title">Planification</string>
+    <string name="queue_help_schedule_body">Avec Paramètres › Téléchargements › Planification activé, les nouveaux téléchargements attendent dans Planifiés jusqu\'à l\'ouverture de la plage horaire. Un téléchargement avec sa propre heure y attend aussi.</string>
+    <string name="queue_help_select_title">Sélectionner et changer d\'onglet</string>
+    <string name="queue_help_select_body">Appuyez longuement sur une carte pour la sélectionner, et faites glisser pour en sélectionner d\'autres. Balayez sur le côté pour changer d\'onglet.</string>
+    <string name="queue_help_errors_title">Quand un téléchargement échoue</string>
+    <string name="queue_help_errors_body">Touchez ⓘ sur la carte pour les détails, et Réessayer pour réessayer.\n• Publications privées, avec restriction d\'âge ou réservées aux comptes connectés : ajoutez votre compte dans Paramètres › Cookies et connexion.\n• Limite de requêtes : le site demande une pause ; le téléchargement attend et reprend tout seul.\n• Pas de connexion : les téléchargements en attente démarrent une fois de nouveau en ligne ; un téléchargement en cours peut échouer, touchez alors Réessayer.\n• Lien non pris en charge : ouvrez-le avec Naviguer sur le web sur Accueil pour trouver les médias de la page.</string>
 </resources>

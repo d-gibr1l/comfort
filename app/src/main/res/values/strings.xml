@@ -1266,4 +1266,16 @@
     <string name="audio_language">Audio language</string>
     <string name="audio_language_app_x">App\'s language (%1$s)</string>
     <string name="audio_language_subtitle">For videos with dubbed audio, like many on YouTube. Ones without this language download in their original. Songs always keep theirs.</string>
+    <string name="queue_help_title">How the Queue works</string>
+    <string name="queue_help_subtitle">Its buttons, and what to do when a download fails</string>
+    <string name="queue_help_pause_title">Pause All and Resume All</string>
+    <string name="queue_help_pause_body">Pause All stops every running download and holds the waiting ones, and any you add, until you tap Resume All. A paused download keeps what it saved and carries on from there.</string>
+    <string name="queue_help_start_title">Start now and Start at…</string>
+    <string name="queue_help_start_body">Start now on a waiting card starts it right away, even outside the schedule or with every download slot busy. Start at… picks a time for that one download.</string>
+    <string name="queue_help_schedule_title">Schedule</string>
+    <string name="queue_help_schedule_body">With Settings › Downloads › Schedule on, new downloads wait in Scheduled until the time window opens. A download given its own time waits there too.</string>
+    <string name="queue_help_select_title">Selecting and switching tabs</string>
+    <string name="queue_help_select_body">Long-press a card to select it, and drag to select more. Swipe sideways to move between the tabs.</string>
+    <string name="queue_help_errors_title">When a download fails</string>
+    <string name="queue_help_errors_body">Tap ⓘ on the card for the details, and Retry to try again.\n• Private, age-restricted or sign-in-only posts: add your account in Settings › Cookies &amp; Login.\n• Rate-limited: the site wants a break; the download waits and carries on by itself.\n• No connection: waiting downloads start once you\'re back online; a running one may fail, so tap Retry.\n• Link not supported: open it with Browse the web on Home to find the media on the page.</string>
 </resources>

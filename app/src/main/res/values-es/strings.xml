@@ -1250,4 +1250,16 @@
     <string name="yang">Yang</string>
     <string name="yin">Yin</string>
     <string name="subscriptions_hours">%1$d h</string>
+    <string name="queue_help_title">Cómo funciona la cola</string>
+    <string name="queue_help_subtitle">Sus botones y qué hacer cuando falla una descarga</string>
+    <string name="queue_help_pause_title">Pausar todo y Reanudar todo</string>
+    <string name="queue_help_pause_body">Pausar todo detiene todas las descargas en curso y retiene las que esperan, y las que añadas, hasta que toques Reanudar todo. Una descarga en pausa conserva lo guardado y sigue desde ahí.</string>
+    <string name="queue_help_start_title">Iniciar ahora y Empezar a las…</string>
+    <string name="queue_help_start_body">Iniciar ahora en una tarjeta en espera la inicia al momento, incluso fuera del horario o con todas las descargas ocupadas. Empezar a las… elige una hora para esa descarga.</string>
+    <string name="queue_help_schedule_title">Horario</string>
+    <string name="queue_help_schedule_body">Con Ajustes › Descargas › Horario activado, las descargas nuevas esperan en Programadas hasta que se abre la franja horaria. Una descarga con su propia hora también espera ahí.</string>
+    <string name="queue_help_select_title">Seleccionar y cambiar de pestaña</string>
+    <string name="queue_help_select_body">Mantén pulsada una tarjeta para seleccionarla y arrastra para seleccionar más. Desliza de lado para cambiar de pestaña.</string>
+    <string name="queue_help_errors_title">Cuando falla una descarga</string>
+    <string name="queue_help_errors_body">Toca ⓘ en la tarjeta para ver los detalles y Reintentar para volver a intentarlo.\n• Publicaciones privadas, con restricción de edad o que requieren iniciar sesión: añade tu cuenta en Ajustes › Cookies e inicio de sesión.\n• Límite de solicitudes: el sitio pide una pausa; la descarga espera y sigue sola.\n• Sin conexión: las descargas en espera empiezan cuando vuelvas a estar en línea; una en curso puede fallar, así que toca Reintentar.\n• Enlace no compatible: ábrelo con Navegar por la web en Inicio para encontrar el contenido de la página.</string>
 </resources>

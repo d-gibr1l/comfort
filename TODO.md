@@ -23,15 +23,15 @@
 - [x] Add an option in Music settings to toggle the music player's adaptive background.
 - [x] Add settings to toggle swipe gestures in the Library and Queue.
 - [x] Add a custom duration option to the music player sleep timer.
-- [ ] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
+- [x] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
 - [ ] Prevent yt-dlp and gallery-dl from running instagram links when instaloader is on.
 - [ ] Add an option to view logs for each download in library.
 - [ ] I deleted the item thats the thumbnail in the library of comfort and when i tapped on it, it opened the first item in the library instead of opening the items left of that download.
 - [x] Prevent scrolling inside the "Current Command" code box from passing through to the mini header or outer page on the Advanced screen, and prevent downward scrolling on it from pulling down or dismissing the preview bottom sheet (isolate command box scrolling).
 - [x] Prevent continuous downward scrolling on content inside a bottom modal sheet from pulling the sheet down to dismiss it.
 - [x] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
-- [ ] Redesign the new template popup into a bottom modal sheet.
-- [ ] Redesign the audio language picker into a bottom modal sheet.
+- [x] Redesign the new template popup into a bottom modal sheet.
+- [x] Redesign the audio language picker into a bottom modal sheet.
 - [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings.
 - [x] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
 - [x] Add an incognito option to the download preview sheet.
