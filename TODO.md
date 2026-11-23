@@ -32,7 +32,7 @@
 - [x] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
 - [x] Redesign the new template popup into a bottom modal sheet.
 - [x] Redesign the audio language picker into a bottom modal sheet.
-- [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings.
+- [ ] Convert the video player's More Options menu into a bottom modal sheet, and include a re-download action (opening the configure sheet) as well as video player settings, and a video details section there showing genuinely useful information (resolution, codec, frame rate, bitrate, duration, size) in place of the deep EXIF view's (moved from its own line).
 - [x] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
 - [x] Add an incognito option to the download preview sheet.
 - [x] Fix the visual flicker when an item is moved in the music queue.
@@ -45,7 +45,6 @@
 - [x] Make video scrubbing land on the exact timestamp being scrubbed rather than snapping away.
 - [x] Apply a horizontal slide-in transition across all applicable navigation routes so that the moment you tap, the new screen immediately slides in from the right while pushing the current screen out to the left along a smooth, fast-to-slow curve with zero delay.
 - [x] Make lyrics and the progress bar progress smoothly to their current playback position instead of snapping when the app was playing in the background before opening.
-- [ ] Update the deep EXIF metadata view to display genuinely useful information on videos.
 - [ ] Redesign the time wheel for scheduling.
 - [x] Fix the brief pause or stutter in the currently playing song right as the next song begins playing when crossfade is enabled.
 - [x] Update the item count for multi-item downloads so it automatically decreases when individual files are deleted from the device.
