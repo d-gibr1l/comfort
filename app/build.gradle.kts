@@ -79,6 +79,14 @@ android {
             versionNameSuffix = "-perf"
             matchingFallbacks += listOf("release")
         }
+        // The debug build beside the everyday one (own package name, fresh data): first-run and
+        // backup-restore checks without clearing the everyday install.
+        create("debugSideBySide") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".sxs"
+            versionNameSuffix = "-sxs"
+            matchingFallbacks += listOf("debug")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
