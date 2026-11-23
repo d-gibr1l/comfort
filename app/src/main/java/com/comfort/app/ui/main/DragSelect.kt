@@ -112,6 +112,10 @@ fun Modifier.dragToSelect(
     val armPx = with(density) { 24.dp.toPx() }
 
     fun update() {
+        // Not until the finger has moved: the list can move under a finger held still (the
+        // Library's header shrinking as selecting starts), and the card that slid under it got
+        // picked too (reported).
+        if (!state.scrollArmed) return
         val y = state.pointer.y.coerceIn(topPx, (height[0] - bottomPx - 1f).coerceAtLeast(topPx))
         val id = latestItemAt(Offset(state.pointer.x, y)) ?: return
         if (id == state.current) return
@@ -159,6 +163,7 @@ fun Modifier.dragToSelect(
                         if (!change.pressed) break
                         state.pointer = change.position
                         if (state.active) {
+                            if (!state.scrollArmed && (state.pointer - state.startPointer).getDistance() > armPx) state.scrollArmed = true
                             if (change.positionChange() != Offset.Zero) change.consume()
                             update()
                         }

@@ -1,5 +1,6 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import com.comfort.app.R
@@ -480,7 +481,26 @@ fun DownloadsHistoryScreen(
         // it's skipped entirely (TopAppBar takes over up top instead, see the bottom of this
         // function) rather than kept as a list item nobody can see space for correctly.
         val fullHeaderContent = @Composable {
-            if (!selectionMode) {
+            // Selecting: the header shrinks to the selection bar's height and fades, over 300 ms,
+            // the cards gliding up after it (taken out at once, they jumped; kept full size, a gap
+            // was left under the bar). Back the same way. Hidden, it takes no touches.
+            val collapse by androidx.compose.animation.core.animateFloatAsState(
+                if (selectionMode) 1f else 0f,
+                androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                label = "headerCollapse",
+            )
+            val barPx = selectionBarHeightPx
+            Column(
+                modifier = Modifier
+                    .clipToBounds()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val h = (placeable.height + (barPx - placeable.height) * collapse).toInt().coerceAtLeast(0)
+                        layout(placeable.width, h) { placeable.place(0, 0) }
+                    }
+                    .graphicsLayer { alpha = 1f - collapse }
+                    .then(if (selectionMode) Modifier.blockTouches() else Modifier),
+            ) {
                 LibraryHeader(
                     libraryTopicIcon = libraryTopicIcon,
                     searchExpanded = searchExpanded,
@@ -553,9 +573,12 @@ fun DownloadsHistoryScreen(
                 }
             }
         }
-        val topPaddingWhileSelecting = with(LocalDensity.current) {
+        // Where the selection bar ends, for the drag-select's top zone; the list itself keeps its
+        // padding (the bar covers the hidden header, or the cards scrolled under it).
+        val selectionBarInset = with(LocalDensity.current) {
             if (selectionMode) selectionBarHeightPx.toDp() else 0.dp
         }
+        val topPaddingWhileSelecting = 0.dp
         val visibleIds = remember(visibleItems) { visibleItems.map { it.id } }
         if (showDuplicatesOnly) {
             if (duplicateAttempts.isEmpty()) {
@@ -634,7 +657,7 @@ fun DownloadsHistoryScreen(
                     itemAt = { gridState.idAt(it) },
                     scrollBy = { gridState.scrollBy(it) },
                     onSelectionChange = { selectedIds = it },
-                    topInset = topPaddingWhileSelecting,
+                    topInset = selectionBarInset,
                     bottomInset = navBarClearance(),
                 ).pinchSteps(onStep = { step ->
                     val next = (gridSize + step).coerceIn(0, LIBRARY_GRID_SIZES.lastIndex)
@@ -695,7 +718,7 @@ fun DownloadsHistoryScreen(
                     itemAt = { listState.idAt(it) },
                     scrollBy = { listState.scrollBy(it) },
                     onSelectionChange = { selectedIds = it },
-                    topInset = topPaddingWhileSelecting,
+                    topInset = selectionBarInset,
                     bottomInset = navBarClearance(),
                 ),
             ) {
@@ -1090,5 +1113,14 @@ private suspend fun androidx.compose.foundation.lazy.grid.LazyGridState.fastSmoo
 
     if (firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset in 1..2) {
         scrollToItem(0, 0)
+    }
+}
+
+/** Takes every touch on it, so nothing under it (a hidden header's buttons) gets one. */
+private fun Modifier.blockTouches(): Modifier = this.pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial).changes.forEach { it.consume() }
+        }
     }
 }
