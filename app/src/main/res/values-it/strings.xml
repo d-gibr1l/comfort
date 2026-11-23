@@ -615,6 +615,7 @@
     <string name="link_copied">Link copiato</string>
     <string name="extracting_audio">Estrazione dell\'audio</string>
     <string name="downloading">Download in corso</string>
+    <string name="downloading_x">Download in corso · %1$s</string>
     <string name="fetching_info">Recupero informazioni...</string>
     <string name="no_internet_connection">Nessuna connessione a Internet</string>
     <string name="speed_x">Velocità: %1$s</string>

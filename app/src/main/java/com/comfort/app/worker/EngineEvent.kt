@@ -26,6 +26,8 @@ sealed interface EngineEvent {
     data class Artist(val artist: String) : EngineEvent
     data class Album(val album: String) : EngineEvent
     data class Track(val track: String) : EngineEvent
+    /** The playlist entry downloading now ("Artist - Song"), for the queue card. */
+    data class Item(val title: String) : EngineEvent
     /** A real error announcement worth showing the user (never a traceback continuation line). */
     data class Error(val message: String) : EngineEvent
     /** gallery-dl's "No results for ..." — an empty-handed outcome it logs at info level, not as an error. */
@@ -88,6 +90,7 @@ object EngineEventParser {
             "artist" -> str("artist")?.let { EngineEvent.Artist(it) }
             "album" -> str("album")?.let { EngineEvent.Album(it) }
             "track" -> str("track")?.let { EngineEvent.Track(it) }
+            "item" -> str("title")?.takeIf { it.isNotBlank() }?.let { EngineEvent.Item(it) }
             // A wrapper's own error is always a deliberate announcement. One relayed from
             // yt-dlp's logger can carry its whole traceback, so only its headline is kept.
             // yt-dlp's logger also relays the traceback that follows an error as an error of its

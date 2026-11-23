@@ -18,4 +18,14 @@ object DownloadNotes {
     fun clear(downloadId: String) {
         if (downloadId in _notes.value) _notes.update { it - downloadId }
     }
+
+    /** The item a multi-item download is on now ("Artist - Song" of a playlist), for its card. */
+    private val _items = MutableStateFlow<Map<String, String>>(emptyMap())
+    val items: StateFlow<Map<String, String>> = _items.asStateFlow()
+
+    fun setItem(downloadId: String, title: String) = _items.update { it + (downloadId to title) }
+
+    fun clearItem(downloadId: String) {
+        if (downloadId in _items.value) _items.update { it - downloadId }
+    }
 }

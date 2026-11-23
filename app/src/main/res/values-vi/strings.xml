@@ -615,6 +615,7 @@
     <string name="link_copied">Đã sao chép liên kết</string>
     <string name="extracting_audio">Đang tách âm thanh</string>
     <string name="downloading">Đang tải xuống</string>
+    <string name="downloading_x">Đang tải xuống · %1$s</string>
     <string name="fetching_info">Đang lấy thông tin...</string>
     <string name="no_internet_connection">Không có kết nối internet</string>
     <string name="speed_x">Tốc độ: %1$s</string>

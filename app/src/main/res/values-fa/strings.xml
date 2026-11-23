@@ -615,6 +615,7 @@
     <string name="link_copied">پیوند کپی شد</string>
     <string name="extracting_audio">در حال استخراج صدا</string>
     <string name="downloading">در حال دانلود</string>
+    <string name="downloading_x">در حال دانلود · %1$s</string>
     <string name="fetching_info">در حال دریافت اطلاعات...</string>
     <string name="no_internet_connection">اتصال اینترنت وجود ندارد</string>
     <string name="speed_x">سرعت: %1$s</string>

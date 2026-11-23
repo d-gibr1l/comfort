@@ -519,7 +519,12 @@ fun QueueItemCard(
                     )
                     val statusText = when (item.status) {
                         DownloadStatus.RUNNING -> {
-                            if (item.downloadingAudioTrack) {
+                            // A playlist: the song (or video) on its way now, after the word —
+                            // ahead of "Extracting audio", which an audio playlist always is.
+                            val current = com.comfort.app.data.DownloadNotes.items.collectAsStateWithLifecycle().value[item.id]
+                            if (current != null) {
+                                stringResource(R.string.downloading_x, current)
+                            } else if (item.downloadingAudioTrack) {
                                 // A video+audio merge's own separate audio sub-file looks, from
                                 // the queue card alone, like a second download starting out of
                                 // nowhere with a much smaller size — this is what actually
@@ -543,6 +548,8 @@ fun QueueItemCard(
                     }
                     Text(
                         text = statusText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall,
                         color = when (item.status) {
                             DownloadStatus.ERRORED -> MaterialTheme.colorScheme.error
@@ -586,11 +593,18 @@ fun QueueItemCard(
                 // gallery's own completed items aren't reflected in a byte count that only ever
                 // tracked the one file. Byte-accurate progress is reserved for genuinely
                 // single-item downloads, which is what it's normally available for anyway.
-                val itemProgress = if (item.totalItems > 1) {
+                // A playlist (its song downloading now is known): the bar is that song's own
+                // progress, filling once per song — "4 of 47" beside it says how far the whole
+                // run is. Asked for: the run's bar barely moved, 47 songs long.
+                val currentSong = com.comfort.app.data.DownloadNotes.items.collectAsStateWithLifecycle().value[item.id]
+                val songProgress = currentSong != null && item.expectedBytes > 0
+                val itemProgress = if (item.totalItems > 1 && !songProgress) {
                     (item.downloadedItems.toFloat() / item.totalItems).coerceIn(0f, 1f)
                 } else null
                 val byteProgress = if (itemProgress == null && item.expectedBytes > 0) {
-                    ((item.totalBytes + item.liveBytes).toFloat() / item.expectedBytes).coerceIn(0f, 1f)
+                    // The song's own bytes only: the ones saved before it are other songs'.
+                    val bytes = if (songProgress) item.liveBytes else item.totalBytes + item.liveBytes
+                    (bytes.toFloat() / item.expectedBytes).coerceIn(0f, 1f)
                 } else null
                 val rawProgress = itemProgress ?: byteProgress
 

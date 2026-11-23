@@ -615,6 +615,7 @@
     <string name="link_copied">הקישור הועתק</string>
     <string name="extracting_audio">מחלץ שמע</string>
     <string name="downloading">מוריד</string>
+    <string name="downloading_x">מוריד · %1$s</string>
     <string name="fetching_info">מאחזר מידע...</string>
     <string name="no_internet_connection">אין חיבור לאינטרנט</string>
     <string name="speed_x">מהירות: %1$s</string>

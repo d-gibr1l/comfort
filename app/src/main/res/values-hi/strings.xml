@@ -615,6 +615,7 @@
     <string name="link_copied">लिंक कॉपी किया गया</string>
     <string name="extracting_audio">ऑडियो निकाला जा रहा है</string>
     <string name="downloading">डाउनलोड हो रहा है</string>
+    <string name="downloading_x">डाउनलोड हो रहा है · %1$s</string>
     <string name="fetching_info">जानकारी लाई जा रही है...</string>
     <string name="no_internet_connection">इंटरनेट कनेक्शन नहीं है</string>
     <string name="speed_x">गति: %1$s</string>

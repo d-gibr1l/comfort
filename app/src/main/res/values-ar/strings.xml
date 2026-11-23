@@ -615,6 +615,7 @@
     <string name="link_copied">تم نسخ الرابط</string>
     <string name="extracting_audio">جارٍ استخراج الصوت</string>
     <string name="downloading">جارٍ التنزيل</string>
+    <string name="downloading_x">جارٍ التنزيل · %1$s</string>
     <string name="fetching_info">جارٍ جلب المعلومات...</string>
     <string name="no_internet_connection">لا يوجد اتصال بالإنترنت</string>
     <string name="speed_x">السرعة: %1$s</string>

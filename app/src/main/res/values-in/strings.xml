@@ -653,6 +653,7 @@
     <string name="link_copied">Tautan disalin</string>
     <string name="extracting_audio">Mengekstrak audio</string>
     <string name="downloading">Mengunduh</string>
+    <string name="downloading_x">Mengunduh · %1$s</string>
     <string name="fetching_info">Mengambil info...</string>
     <string name="no_internet_connection">Tidak ada koneksi internet</string>
     <string name="speed_x">Kecepatan: %1$s</string>

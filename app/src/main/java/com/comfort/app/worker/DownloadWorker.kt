@@ -932,6 +932,7 @@ class DownloadWorker(
                         is EngineEvent.Artist -> dao.setArtistIfAbsent(downloadId, event.artist)
                         is EngineEvent.Album -> dao.setAlbumIfAbsent(downloadId, event.album)
                         is EngineEvent.Track -> dao.setTrackIfAbsent(downloadId, event.track)
+                        is EngineEvent.Item -> DownloadNotes.setItem(downloadId, event.title)
                         // First error wins, unless it's unusable garbage — or only an engine saying
                         // the post isn't its kind (isNotItsKind), which a later engine's real error
                         // replaces. When gallery-dl and a
@@ -1441,6 +1442,7 @@ class DownloadWorker(
         }
         } finally {
             com.comfort.app.data.LiveProgress.end(liveRun)
+            com.comfort.app.data.DownloadNotes.clearItem(downloadId)
             DownloadNotifications.markForegroundStopped(applicationContext)
             // Matches the temp file created above for the cookies-normalization fix — cleaned up
             // unconditionally here (success, failure, or cancellation) rather than only on the

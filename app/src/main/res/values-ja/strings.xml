@@ -615,6 +615,7 @@
     <string name="link_copied">リンクをコピーしました</string>
     <string name="extracting_audio">音声を抽出中</string>
     <string name="downloading">ダウンロード中</string>
+    <string name="downloading_x">ダウンロード中 · %1$s</string>
     <string name="fetching_info">情報を取得中...</string>
     <string name="no_internet_connection">インターネットに接続されていません</string>
     <string name="speed_x">速度: %1$s</string>

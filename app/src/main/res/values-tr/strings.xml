@@ -615,6 +615,7 @@
     <string name="link_copied">Bağlantı kopyalandı</string>
     <string name="extracting_audio">Ses çıkarılıyor</string>
     <string name="downloading">İndiriliyor</string>
+    <string name="downloading_x">İndiriliyor · %1$s</string>
     <string name="fetching_info">Bilgi alınıyor...</string>
     <string name="no_internet_connection">İnternet bağlantısı yok</string>
     <string name="speed_x">Hız: %1$s</string>

@@ -2260,6 +2260,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     last_reported_total = [None]
     reported_title = [False]
     reported_thumbnail = [False]
+    # The playlist entry last announced as downloading (its id), for the "item" event.
+    reported_item = [None]
     last_filename = [None]
 
     # Every one of these postprocessors further transforms the file yt-dlp just finished
@@ -2451,6 +2453,15 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                         tags.append(ext.upper())
                 if tags:
                     callback(event("format", tags="|".join(tags)))
+            # Each playlist entry as it starts: the card shows the song (or video) downloading
+            # now under the playlist's name — "Artist - Song", or "Poster - caption".
+            if info.get("id") and info.get("id") != reported_item[0] and _playlist_name(info):
+                reported_item[0] = info.get("id")
+                who = info.get("artist") or info.get("uploader") or info.get("channel") or info.get("creator")
+                what = info.get("track") or _caption(info)
+                name = f"{who} - {what}" if who and what else (what or who)
+                if name:
+                    callback(event("item", title=str(name)[:200]))
             if not reported_title[0]:
                 # Extraction has already happened by the time any "downloading" event fires, so
                 # the real poster/caption are available immediately — sent once, this early,
@@ -2461,6 +2472,10 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
                 # A playlist (or channel) download is named after the playlist, not its first
                 # item: "Uploader - Playlist title", or whichever of the two exists.
                 playlist_title = _playlist_name(info)
+                # How many items this run downloads (the picked ones, if picked): the card's
+                # "4 of 12" — without it a playlist only counted up, with no total.
+                if playlist_title and isinstance(info.get("n_entries"), int) and info["n_entries"] > 1:
+                    callback(event("total", count=info["n_entries"]))
                 if playlist_title:
                     reported_title[0] = True
                     callback(event("title", title=playlist_title[:200]))
