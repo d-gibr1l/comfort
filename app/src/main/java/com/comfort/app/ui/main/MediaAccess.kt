@@ -97,6 +97,19 @@ object MediaAccess {
             if (lockedOut(context, new)) continue
             moves[old] = new.toString()
         }
+        // Files restored from another phone (copied over, so under new ids there) or moved by an
+        // app that copied them: their old links lead nowhere; found again by their saved name now
+        // that the phone's media can be seen (BackupRestore.relinkByName).
+        db.query("SELECT uri, path FROM saved_files WHERE path IS NOT NULL").use { c ->
+            while (c.moveToNext()) {
+                val old = c.getString(0) ?: continue
+                if (old in moves) continue
+                val uri = runCatching { Uri.parse(old) }.getOrNull() ?: continue
+                if (uri.authority != MediaStore.AUTHORITY || !com.comfort.app.util.MediaStoreHelper.reallyGone(context, uri)) continue
+                val name = c.getString(1).substringAfterLast('/').takeIf { it.isNotBlank() } ?: continue
+                com.comfort.app.data.BackupRestore.relinkByName(context, old, name)?.takeIf { it != old }?.let { moves[old] = it }
+            }
+        }
         // In Room's own transaction, so the Library's lists see the change at once (written
         // straight to the database, they kept the old links until the app restarted).
         if (moves.isNotEmpty()) room.runInTransaction {
@@ -119,6 +132,9 @@ object MediaAccess {
     } catch (_: Exception) {
         false
     }
+
+    /** Whether this launch has looked for moved files yet (see MediaAccessCard). */
+    @Volatile var relinkedThisRun = false
 
     /** Whether any of [downloads]' files is on the phone but closed to this app (a few checked). */
     suspend fun anyLockedOut(context: Context, downloads: List<DownloadEntity>): Boolean = withContext(Dispatchers.IO) {
@@ -157,7 +173,10 @@ internal fun MediaAccessCard(downloads: List<DownloadEntity>, modifier: Modifier
     }
     LaunchedEffect(downloads.size, granted) {
         val closed = MediaAccess.anyLockedOut(context, downloads)
-        if (closed && granted) {
+        // Allowed: once a launch, links that lead nowhere looked for by name too (a restore from
+        // another phone, whose files came over under new ids), not only the closed ones.
+        if (granted && (closed || !MediaAccess.relinkedThisRun)) {
+            MediaAccess.relinkedThisRun = true
             // Allowed (here or in Android's settings) but still on links that stay closed: moved
             // over, and every picture and player built while they were closed built again.
             if (MediaAccess.rehome(context) > 0) (context as? android.app.Activity)?.recreate()

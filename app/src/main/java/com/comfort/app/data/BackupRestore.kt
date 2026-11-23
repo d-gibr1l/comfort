@@ -256,12 +256,34 @@ object BackupRestore {
             val (thumb, media) = db.query("SELECT thumbnailPath, mediaUri FROM downloads WHERE id = ?", arrayOf(id)).use { c ->
                 if (c.moveToFirst()) c.getString(0) to c.getString(1) else null to null
             }
-            val files = db.query("SELECT uri FROM saved_files WHERE downloadId = ?", arrayOf(id)).use { c ->
-                buildList { while (c.moveToNext()) add(c.getString(0)) }
+            val named = db.query("SELECT uri, path FROM saved_files WHERE downloadId = ?", arrayOf(id)).use { c ->
+                buildList { while (c.moveToNext()) add(c.getString(0) to c.getString(1)) }
             }
-            val foreign = (listOfNotNull(thumb, media) + files).toSet()
+            var files = named.map { it.first }
+            var foreign = (listOfNotNull(thumb, media) + files).toSet()
                 .filterTo(mutableSetOf()) { !com.comfort.app.util.MediaStoreHelper.isComfortMediaFile(context, it) }
             if (foreign.isEmpty()) continue
+            // Before giving a file up: the file it names, found by its saved name — moved to another
+            // folder (its link still good, or a new one where an app copied it), or copied to this
+            // phone. Re-linked when exactly one file has that name.
+            val relinked = HashMap<String, String>()
+            for ((uri, path) in named) {
+                if (uri !in foreign) continue
+                val name = path?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: continue
+                relinkByName(context, uri, name)?.let { relinked[uri] = it }
+            }
+            if (relinked.isNotEmpty()) {
+                room.runInTransaction {
+                    for ((old, new) in relinked) {
+                        db.execSQL("UPDATE saved_files SET uri = ? WHERE downloadId = ? AND uri = ?", arrayOf(new, id, old))
+                        db.execSQL("UPDATE downloads SET thumbnailPath = ? WHERE id = ? AND thumbnailPath = ?", arrayOf(new, id, old))
+                        db.execSQL("UPDATE downloads SET mediaUri = ? WHERE id = ? AND mediaUri = ?", arrayOf(new, id, old))
+                    }
+                }
+                files = files.map { relinked[it] ?: it }
+                foreign = foreign.filterTo(mutableSetOf()) { it !in relinked }
+                if (foreign.isEmpty()) continue
+            }
             room.runInTransaction {
                 for (uri in foreign) db.delete("saved_files", "downloadId = ? AND uri = ?", arrayOf(id, uri))
                 if (thumb in foreign) db.execSQL("UPDATE downloads SET thumbnailPath = NULL WHERE id = ?", arrayOf(id))
@@ -274,6 +296,39 @@ object BackupRestore {
                 if (!keptFiles && !keptThumb && !keptMedia) db.execSQL("UPDATE downloads SET status = 'DELETED' WHERE id = ?", arrayOf(id))
             }
         }
+    }
+
+    /** The phone's file named [name] for a restored link [uri] that isn't one of this app's files
+     * here: the same file moved out of Comfort's folders (the link itself still names it), else the
+     * only file on the phone with that name (copied over, or copied by an app on a move). Null when
+     * none, or more than one, has it. */
+    internal fun relinkByName(context: Context, uri: String, name: String): String? {
+        val resolver = context.contentResolver
+        val parsed = runCatching { Uri.parse(uri) }.getOrNull() ?: return null
+        if (parsed.authority == android.provider.MediaStore.AUTHORITY) {
+            val here = runCatching {
+                resolver.query(parsed, arrayOf(android.provider.MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            }.getOrNull()
+            if (here == name) return uri
+        }
+        return runCatching {
+            resolver.query(
+                android.provider.MediaStore.Files.getContentUri("external"),
+                arrayOf(android.provider.MediaStore.MediaColumns._ID, android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE),
+                "${android.provider.MediaStore.MediaColumns.DISPLAY_NAME} = ?", arrayOf(name), null,
+            )?.use { c ->
+                if (c.count != 1 || !c.moveToFirst()) return@use null
+                val rowId = c.getLong(0)
+                val collection = when (c.getInt(1)) {
+                    android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE -> android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                    android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                    android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO -> android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                    else -> android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                }
+                android.content.ContentUris.withAppendedId(collection, rowId).toString()
+            }
+        }.getOrNull()
     }
 
     /** Inserts [rows] into [table], only the columns it has; a row already there is kept. The ids
