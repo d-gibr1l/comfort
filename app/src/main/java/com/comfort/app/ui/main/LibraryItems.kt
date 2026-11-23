@@ -601,32 +601,38 @@ internal fun HistoryRow(
                         }
                     }
                 }
-                // How many items, on the thumbnail itself, as in the grid: bottom-right, opposite the
-                // length. The row's text beside it has only the date then.
-                if (item.downloadedItems > 1) {
+                // How many items, top-right (asked for there, clear of the length): what's left
+                // when files were deleted or failed, amber with a warning then, as in the grid.
+                val deletedHere = deletedCount(item)
+                val incompleteHere = item.missingItems > 0 || deletedHere > 0
+                if (item.downloadedItems > 1 || incompleteHere) {
+                    val countTint = if (incompleteHere) Color(0xFFFFB74D) else Color.White
                     Row(
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.45f))
-                            .padding(start = 3.dp, end = 5.dp, top = 1.dp, bottom = 1.dp),
+                            .align(Alignment.TopEnd)
+                            // Out at the corner, a little past the thumbnail's edge.
+                            .offset(x = 6.dp, y = 4.dp)
+                            // The nav bar's continuous capsule: its ends flow into the sides.
+                            .background(Color.Black.copy(alpha = 0.55f), com.comfort.app.theme.ContinuousCapsuleShape)
+                            .padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Outlined.Layers, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Icon(if (incompleteHere) Icons.Outlined.Warning else Icons.Outlined.Layers, contentDescription = null, tint = countTint, modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(2.dp))
+                        val left = (item.downloadedItems - deletedHere).coerceAtLeast(0)
                         Text(
-                            "${item.downloadedItems}",
-                            color = Color.White,
+                            if (incompleteHere) "$left/${maxOf(item.totalItems, item.downloadedItems)}" else "${item.downloadedItems}",
+                            color = countTint,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
+                // Top-left: the count has the top-right.
                 if (item.isFavorite) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(Alignment.TopStart)
                             .padding(5.dp)
                             .size(18.dp)
                             .clip(CircleShape)
