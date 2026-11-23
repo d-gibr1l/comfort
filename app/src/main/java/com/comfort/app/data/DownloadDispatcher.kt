@@ -36,6 +36,8 @@ sealed class EnqueueResult(val id: String) {
     class Duplicate(id: String) : EnqueueResult(id)
     /** Couldn't be queued (the database or WorkManager threw): nothing was started. */
     class Failed(val error: Throwable) : EnqueueResult("")
+    /** [site] is blocked (Settings › Sites, a site's ⋮ › Block): nothing was started. */
+    class Blocked(val site: String) : EnqueueResult("")
 }
 
 /** Enqueue logic shared between the in-app ViewModel and the instant-share path (which runs
@@ -256,6 +258,7 @@ object DownloadDispatcher {
         forceDuplicate: Boolean = false,
     ): EnqueueResult {
         val trimmedUrl = url.trim()
+        VideoSiteRouter.blockedSite(trimmedUrl)?.let { return EnqueueResult.Blocked(it) }
         val sanitizedTitle = title.trim().ifBlank { trimmedUrl }
         val safeTotalItems = totalItems.coerceAtLeast(0)
         val dao = AppDatabase.getDatabase(context).downloadDao()

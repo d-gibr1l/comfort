@@ -495,6 +495,10 @@
     <string name="search_sites">جستجوی سایت‌ها</string>
     <string name="clear_search">پاک کردن جستجو</string>
     <string name="changed_by_you">تغییر داده‌شده توسط شما</string>
+    <string name="block">مسدود کردن</string>
+    <string name="unblock">رفع مسدودیت</string>
+    <string name="blocked_nothing_downloaded">مسدود: چیزی از آن دانلود نمی‌شود</string>
+    <string name="site_x_is_blocked">%1$s مسدود است. در تنظیمات › به‌روزرسانی‌ها و موتورها › سایت‌ها رفع مسدودیت کنید.</string>
     <string name="posts_and_reels_go_to_instaloader">پست‌ها و ریلزها اول به Instaloader می‌روند</string>
     <string name="move_x">انتقال %1$s</string>
     <string name="move_to_x">انتقال به %1$s</string>

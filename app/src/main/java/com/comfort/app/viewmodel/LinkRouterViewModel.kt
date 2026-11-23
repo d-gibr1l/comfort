@@ -30,6 +30,8 @@ sealed interface LinkRoute {
     data class Preview(override val url: String, val preloaded: PreviewInfo? = null) : LinkRoute
     data class Picker(override val url: String, val listing: ListingResult) : LinkRoute
     data class Browse(override val url: String) : LinkRoute
+    /** [site] is blocked: nothing is looked up or downloaded (MainScreen and the share sheet say so). */
+    data class Blocked(override val url: String, val site: String) : LinkRoute
 }
 
 /** Opening a link and starting its download — shared by Home's paste flow (one per activity) and
@@ -56,6 +58,10 @@ class LinkRouterViewModel(application: Application) : AndroidViewModel(applicati
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return
         listing?.cancel()
+        com.comfort.app.data.VideoSiteRouter.blockedSite(trimmed)?.let { site ->
+            _route.value = LinkRoute.Blocked(trimmed, site)
+            return
+        }
         _route.value = LinkRoute.Listing(trimmed)
         _isDuplicate.value = false
         listing = viewModelScope.launch {
@@ -211,6 +217,7 @@ fun startedMessage(context: android.content.Context, result: EnqueueResult): Str
             return context.getString(com.comfort.app.R.string.download_starts_at_x, android.text.format.DateUtils.formatDateTime(context, at, flags))
         }
     }
+    if (result is EnqueueResult.Blocked) return context.getString(com.comfort.app.R.string.site_x_is_blocked, result.site)
     return context.getString(startedMessageRes(result))
 }
 

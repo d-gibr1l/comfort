@@ -269,6 +269,10 @@ private fun SitesSection() {
                 com.comfort.app.data.VideoSiteRouter.deleteSites(context, hosts)
                 revision++
             },
+            onBlock = { hosts, block ->
+                com.comfort.app.data.VideoSiteRouter.setBlocked(context, hosts, block)
+                revision++
+            },
             onDismiss = { browsing = null },
         )
     }
@@ -490,9 +494,14 @@ private fun SiteListSheet(
     sites: List<String>,
     onMove: (Set<String>, com.comfort.app.data.VideoSiteRouter.SiteRoute?) -> Unit,
     onDelete: (Set<String>) -> Unit,
+    onBlock: (Set<String>, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    // Which of them are blocked: re-read whenever a block changes.
+    var blockRevision by remember { mutableStateOf(0) }
+    val blockedSites = remember(sites, blockRevision) { sites.filter { com.comfort.app.data.VideoSiteRouter.isBlocked(it) }.toSet() }
+    val block: (Set<String>, Boolean) -> Unit = { hosts, on -> onBlock(hosts, on); blockRevision++ }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     val selecting = selected.isNotEmpty()
     // Sites moved or deleted leave the list: they leave the selection too.
@@ -603,6 +612,17 @@ private fun SiteListSheet(
                                         },
                                     )
                                 }
+                                // All of them blocked: Unblock; otherwise Block (the rest too).
+                                val allBlocked = selected.all { it in blockedSites }
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(if (allBlocked) R.string.unblock else R.string.block)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Block, contentDescription = null) },
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        batchMenu = false
+                                        block(selected, !allBlocked)
+                                    },
+                                )
                             }
                         }
                     }
@@ -696,6 +716,7 @@ private fun SiteListSheet(
                 items(shown.size, key = { shown.getOrNull(it) ?: it }) { i ->
                     val site = shown.getOrNull(i) ?: return@items
                     val changed = com.comfort.app.data.VideoSiteRouter.siteOverride(site) != null
+                    val isBlocked = site in blockedSites
                     val isSelected = site in selected
                     var menu by remember { mutableStateOf(false) }
                     Row(
@@ -734,6 +755,7 @@ private fun SiteListSheet(
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(site, style = MaterialTheme.typography.bodyLarge)
+                            if (isBlocked) Text(stringResource(R.string.blocked_nothing_downloaded), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                             if (changed) Text(stringResource(R.string.changed_by_you), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             if (instaloaderOn && site == "instagram.com") Text(stringResource(R.string.posts_and_reels_go_to_instaloader), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -765,6 +787,16 @@ private fun SiteListSheet(
                                         },
                                     )
                                 }
+                                // Its links refused before any preview or download.
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(stringResource(if (isBlocked) R.string.unblock else R.string.block)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Block, contentDescription = null) },
+                                    onClick = {
+                                        haptics.performHapticFeedback(HapticFeedbackType.ContextClick)
+                                        menu = false
+                                        block(setOf(site), !isBlocked)
+                                    },
+                                )
                                 // Off every list; its links then go as a site on no list does.
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },

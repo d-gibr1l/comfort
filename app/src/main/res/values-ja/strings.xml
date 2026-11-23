@@ -495,6 +495,10 @@
     <string name="search_sites">サイトを検索</string>
     <string name="clear_search">検索をクリア</string>
     <string name="changed_by_you">自分で変更</string>
+    <string name="block">ブロック</string>
+    <string name="unblock">ブロックを解除</string>
+    <string name="blocked_nothing_downloaded">ブロック中: ここからは何もダウンロードされません</string>
+    <string name="site_x_is_blocked">%1$s はブロックされています。設定 › アップデートとエンジン › サイト で解除できます。</string>
     <string name="posts_and_reels_go_to_instaloader">投稿とリールはまず Instaloader へ</string>
     <string name="move_x">%1$s を移動</string>
     <string name="move_to_x">%1$s に移動</string>

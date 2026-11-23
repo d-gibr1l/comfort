@@ -495,6 +495,10 @@
     <string name="search_sites">Tìm trang</string>
     <string name="clear_search">Xóa tìm kiếm</string>
     <string name="changed_by_you">Do bạn thay đổi</string>
+    <string name="block">Chặn</string>
+    <string name="unblock">Bỏ chặn</string>
+    <string name="blocked_nothing_downloaded">Đã chặn: không tải gì từ trang này</string>
+    <string name="site_x_is_blocked">%1$s đã bị chặn. Bỏ chặn trong Cài đặt › Cập nhật và công cụ › Trang web.</string>
     <string name="posts_and_reels_go_to_instaloader">Bài đăng và reel được gửi tới Instaloader trước</string>
     <string name="move_x">Chuyển %1$s</string>
     <string name="move_to_x">Chuyển sang %1$s</string>

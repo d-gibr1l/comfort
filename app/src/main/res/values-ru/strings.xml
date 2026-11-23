@@ -543,6 +543,10 @@
     <string name="search_sites">Поиск сайтов</string>
     <string name="clear_search">Очистить поиск</string>
     <string name="changed_by_you">Изменено вами</string>
+    <string name="block">Заблокировать</string>
+    <string name="unblock">Разблокировать</string>
+    <string name="blocked_nothing_downloaded">Заблокирован: с него ничего не скачивается</string>
+    <string name="site_x_is_blocked">%1$s заблокирован. Разблокируйте его в разделе «Настройки › Обновления и движки › Сайты».</string>
     <string name="posts_and_reels_go_to_instaloader">Посты и рилсы сначала идут в Instaloader</string>
     <string name="move_x">Переместить %1$s</string>
     <string name="move_to_x">Переместить в «%1$s»</string>

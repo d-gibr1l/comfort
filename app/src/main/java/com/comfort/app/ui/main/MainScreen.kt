@@ -723,6 +723,17 @@ fun MainScreen(
             }
         }
 
+        // A blocked site's link: said so, and nothing opens.
+        (route as? LinkRoute.Blocked)?.let { blocked ->
+            val message = stringResource(R.string.site_x_is_blocked, blocked.site)
+            LaunchedEffect(blocked) {
+                router.close()
+                appSnackbars.showEvent("blocked") {
+                    librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = false, message = message))
+                }
+            }
+        }
+
         // Neither engine knows the site: the in-app browser, to find the media on the page.
         (route as? LinkRoute.Browse)?.let { browse ->
             WebBrowser(startUrl = browse.url, onDismiss = { router.close() })

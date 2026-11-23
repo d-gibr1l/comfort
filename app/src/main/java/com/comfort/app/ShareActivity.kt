@@ -202,29 +202,37 @@ class ShareActivity : ComponentActivity() {
                         val router: LinkRouterViewModel = viewModel(viewModelStoreOwner = routerOwner)
                         // Read once per share, not in every branch on every recomposition.
                         val shareMode = remember { GalleryDlPreferences.getShareMode(context) }
+                        // Links from a blocked site (Settings › Sites) are dropped before anything
+                        // asks or starts; if that's all of them, the share just says so and closes.
+                        val openUrls = remember(urls) { urls.filter { com.comfort.app.data.VideoSiteRouter.blockedSite(it) == null } }
+                        val blockedSite = remember(urls) { urls.firstNotNullOfOrNull { com.comfort.app.data.VideoSiteRouter.blockedSite(it) } }
                         when {
+                            openUrls.isEmpty() -> LaunchedEffect(Unit) {
+                                showShareToast(context.applicationContext, context.getString(R.string.site_x_is_blocked, blockedSite.orEmpty()))
+                                finish()
+                            }
                             // Multiple links: the picker/preview sheets below are built around
                             // reviewing/filtering exactly one link's own gallery, and stacking one
                             // per link would be terrible UX — so this bypasses them (and the
                             // Sharing mode setting, which only ever gated whether *one* link's
                             // sheet appears) and just enqueues every link found.
-                            urls.size > 1 -> MultiLinkShare(
-                                urls = urls,
+                            openUrls.size > 1 -> MultiLinkShare(
+                                urls = openUrls,
                                 router = router,
                                 ask = shareMode != ShareMode.INSTANT,
                                 onFinished = { finishAfterEnqueues(router) },
                             )
                             shareMode == ShareMode.INSTANT -> InstantShareHandler(
-                                url = urls[0],
+                                url = openUrls[0],
                                 router = router,
                                 onFinished = { finishAfterEnqueues(router) },
                             )
                             shareMode == ShareMode.ALWAYS_ASK -> AskShareModeHandler(
-                                url = urls[0],
+                                url = openUrls[0],
                                 router = router,
                                 onFinished = { finishAfterEnqueues(router) },
                             )
-                            else -> ShareRouter(url = urls[0], router = router, onFinished = { finishAfterEnqueues(router) })
+                            else -> ShareRouter(url = openUrls[0], router = router, onFinished = { finishAfterEnqueues(router) })
                         }
                     }
                 }
@@ -508,6 +516,11 @@ private fun ShareRouter(url: String, router: LinkRouterViewModel, onFinished: ()
         is LinkRoute.Picker -> SharePickerSheet(url = url, preloadedResult = current.listing, router = router, onFinished = onFinished)
         // Neither engine knows the site: the in-app browser, to find the media on the page.
         is LinkRoute.Browse -> com.comfort.app.ui.main.WebBrowser(startUrl = url, onDismiss = onFinished)
+        // A blocked site: said so, and the share closes.
+        is LinkRoute.Blocked -> LaunchedEffect(current) {
+            showShareToast(context.applicationContext, context.getString(R.string.site_x_is_blocked, current.site))
+            onFinished()
+        }
     }
 }
 

@@ -535,6 +535,10 @@
     <string name="search_sites">Rechercher un site</string>
     <string name="clear_search">Effacer la recherche</string>
     <string name="changed_by_you">Modifié par toi</string>
+    <string name="block">Bloquer</string>
+    <string name="unblock">Débloquer</string>
+    <string name="blocked_nothing_downloaded">Bloqué : rien n\'est téléchargé depuis ce site</string>
+    <string name="site_x_is_blocked">%1$s est bloqué. Débloquez-le dans Paramètres › Mises à jour et moteurs › Sites.</string>
     <string name="posts_and_reels_go_to_instaloader">Les publications et reels passent d’abord par Instaloader</string>
     <string name="move_x">Déplacer %1$s</string>
     <string name="move_to_x">Déplacer vers %1$s</string>

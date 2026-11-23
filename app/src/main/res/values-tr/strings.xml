@@ -495,6 +495,10 @@
     <string name="search_sites">Sitelerde ara</string>
     <string name="clear_search">Aramayı temizle</string>
     <string name="changed_by_you">Senin değiştirdiğin</string>
+    <string name="block">Engelle</string>
+    <string name="unblock">Engeli kaldır</string>
+    <string name="blocked_nothing_downloaded">Engelli: buradan hiçbir şey indirilmez</string>
+    <string name="site_x_is_blocked">%1$s engelli. Engeli Ayarlar › Güncellemeler ve motorlar › Siteler bölümünden kaldırabilirsiniz.</string>
     <string name="posts_and_reels_go_to_instaloader">Gönderiler ve reels önce Instaloader’a gider</string>
     <string name="move_x">%1$s taşı</string>
     <string name="move_to_x">%1$s listesine taşı</string>

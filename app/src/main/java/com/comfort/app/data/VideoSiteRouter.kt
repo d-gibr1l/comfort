@@ -60,6 +60,9 @@ object VideoSiteRouter {
     @Volatile private var removedYtDlp: Set<String> = emptySet()
     // Sites the user deleted from the lists: shown on none, and routed like a site on no list.
     @Volatile private var deleted: Set<String> = emptySet()
+    // Sites the user blocked (a site's ⋮ › Block): nothing is downloaded from them. Kept apart
+    // from the lists above — a blocked site stays on its list, so it can be unblocked there.
+    @Volatile private var blocked: Set<String> = emptySet()
 
     /** Where a site's links go, as the Sites lists name it: one engine only, or both (gallery-dl
      * first, yt-dlp for its videos — the route a site takes unless something says otherwise). */
@@ -81,7 +84,25 @@ object VideoSiteRouter {
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_YT_DLP_REMOVED),
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_BOTH),
         GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_DELETED),
-    )
+    ).also { blocked = GalleryDlPreferences.getSiteHosts(context, GalleryDlPreferences.KEY_SITES_BLOCKED) }
+
+    /** The blocked site [url] is on (its host, or a parent domain of it, blocked), or null. */
+    fun blockedSite(url: String): String? {
+        if (blocked.isEmpty()) return null
+        val host = normalizedHost(url) ?: return null
+        return blocked.firstOrNull { host == it || host.endsWith(".$it") }
+    }
+
+    /** Whether [host] itself is blocked (for the Sites lists). */
+    fun isBlocked(host: String): Boolean = host in blocked
+
+    /** Blocks (or, with [block] false, unblocks) [hosts]: links from a blocked site are refused
+     * before any preview or download. */
+    fun setBlocked(context: Context, hosts: Set<String>, block: Boolean) {
+        val now = if (block) blocked + hosts else blocked - hosts
+        GalleryDlPreferences.setSiteHosts(context, GalleryDlPreferences.KEY_SITES_BLOCKED, now)
+        blocked = now
+    }
 
     /** Sites whose links go to yt-dlp alone: the built-in video sites still on it, plus any added. */
     fun ytDlpSites(): List<String> = ((videoOnlyHosts - removedYtDlp) + addedYtDlp - addedGalleryDl - addedBoth).sorted()
@@ -143,6 +164,8 @@ object VideoSiteRouter {
 
     /** [deleteSite] for many at once, saved once. */
     fun deleteSites(context: Context, hosts: Set<String>) {
+        // Off every list, there'd be nowhere left to unblock it: it isn't kept blocked.
+        if (hosts.any { it in blocked }) setBlocked(context, hosts, block = false)
         val builtIn = hosts intersect videoOnlyHosts
         saveSiteRules(
             context, addedYtDlp - hosts, addedGalleryDl - hosts,

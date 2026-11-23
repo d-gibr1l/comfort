@@ -495,6 +495,10 @@
     <string name="search_sites">Cerca siti</string>
     <string name="clear_search">Cancella ricerca</string>
     <string name="changed_by_you">Modificato da te</string>
+    <string name="block">Blocca</string>
+    <string name="unblock">Sblocca</string>
+    <string name="blocked_nothing_downloaded">Bloccato: non viene scaricato nulla</string>
+    <string name="site_x_is_blocked">%1$s è bloccato. Sbloccalo in Impostazioni › Aggiornamenti e motori › Siti.</string>
     <string name="posts_and_reels_go_to_instaloader">Post e reel passano prima da Instaloader</string>
     <string name="move_x">Sposta %1$s</string>
     <string name="move_to_x">Sposta in %1$s</string>
