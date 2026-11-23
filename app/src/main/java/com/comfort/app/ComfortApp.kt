@@ -41,6 +41,14 @@ class ComfortApp : Application() {
         // The swipe switches (Settings › Look & feel › Gestures), read before any screen is built.
         com.comfort.app.data.GestureSettings.init(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            // Once: cards that showed a later file than their first (see pointThumbnailsAtFirstItem).
+            val prefs = getSharedPreferences("app_repairs", MODE_PRIVATE)
+            if (!prefs.getBoolean("thumbnails_first_item", false)) {
+                runCatching { com.comfort.app.data.AppDatabase.getDatabase(this@ComfortApp).downloadDao().pointThumbnailsAtFirstItem() }
+                    .onSuccess { prefs.edit().putBoolean("thumbnails_first_item", true).apply() }
+            }
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             VideoSiteRouter.loadSiteRules(this@ComfortApp)
             com.comfort.app.theme.ThemePreferences.applyNightMode(this@ComfortApp)
         }

@@ -764,9 +764,12 @@ class DownloadWorker(
                             null
                         }
                         val thumbnailUri = artworkUri ?: savedUri
-                        // A run fetching a finished download's missing items again: the thumbnail
-                        // stays, unless what came back is the post's first item.
-                        if (singleItemDownload || (firstOfDownload && position <= 1)) {
+                        // The download's first item is its card's picture, and only that one: a
+                        // video saved with its thumbnail counts as a single item, and each of its
+                        // files set the picture in turn, the thumbnail (saved last) winning, so the
+                        // card showed it while a tap played the video (reported). A run fetching
+                        // missing items again leaves it too, unless the first item is what came back.
+                        if (position <= 1 && (singleItemDownload || firstOfDownload)) {
                             dao.setThumbnail(downloadId, thumbnailUri.toString())
                             if (artworkUri != null) dao.setMediaUri(downloadId, savedUri.toString())
                         } else {

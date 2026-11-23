@@ -315,6 +315,14 @@ interface DownloadDao {
     @Query("DELETE FROM saved_files WHERE downloadId = :downloadId")
     suspend fun clearSavedFiles(downloadId: String)
 
+    /** Downloads whose card picture was a later file than their first (a video saved with its
+     * thumbnail showed the thumbnail): back to the first. Not songs, whose picture is their cover. */
+    @Query("""UPDATE downloads SET thumbnailPath = (SELECT s.uri FROM saved_files s WHERE s.downloadId = downloads.id AND s.position = 1)
+        WHERE mediaUri IS NULL
+        AND thumbnailPath IN (SELECT s2.uri FROM saved_files s2 WHERE s2.downloadId = downloads.id AND s2.position > 1)
+        AND EXISTS (SELECT 1 FROM saved_files s3 WHERE s3.downloadId = downloads.id AND s3.position = 1)""")
+    suspend fun pointThumbnailsAtFirstItem(): Int
+
     /** One file of [downloadId], deleted from the phone (see DeletedFiles). */
     @Query("DELETE FROM saved_files WHERE downloadId = :downloadId AND uri = :uri")
     suspend fun deleteSavedFile(downloadId: String, uri: String)
