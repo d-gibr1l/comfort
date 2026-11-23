@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -65,6 +66,8 @@ class BackRevealState internal constructor(
     internal val behindX = Animatable(-BEHIND_OFFSET)
     internal val behindAlpha = Animatable(0f)
     internal val shadow = Animatable(0f)
+    // The page behind darkened as the one in front slides over it (the parallax push).
+    internal val behindDim = Animatable(0f)
     // The one transition in progress (open, back, a gesture's finish/cancel). Starting another
     // cancels it first, and every transition ends in a consistent state (fully open, fully back or
     // at rest) — so the newest action always wins. This replaced a "finishing" flag: a back
@@ -92,7 +95,7 @@ class BackRevealState internal constructor(
     /** An on-screen back button: the same transition as releasing a back swipe, from the start.
      * [slide] false: a plain crossfade, no sideways movement (switching tabs). */
     fun animateBack(slide: Boolean = true) {
-        startExclusive { commit(slide) }
+        startExclusive { if (slide) slideBack() else commit(slide = false) }
     }
 
     /** Opens the page in front — J2K's push, the mirror of its back: the new page comes in from
@@ -105,19 +108,36 @@ class BackRevealState internal constructor(
     fun animateEnter(behindVisible: Boolean = true, slide: Boolean = true, onFinished: () -> Unit = {}, change: () -> Unit) {
         startExclusive {
             try {
-                frontX.snapTo(if (slide) ENTER_FROM_X else 0f)
-                frontAlpha.snapTo(0f)
+                frontX.snapTo(if (slide) 1f else 0f)
+                frontAlpha.snapTo(if (slide) 1f else 0f)
                 behindX.snapTo(0f)
                 behindAlpha.snapTo(if (behindVisible) 1f else 0f)
                 shadow.snapTo(0f)
                 change()
                 withFrameNanos { }
-                val spec = tween<Float>(ENTER_MS, easing = DECELERATE)
-                coroutineScope {
-                    if (slide) launch { frontX.animateTo(0f, spec) }
-                    launch { frontAlpha.animateTo(1f, spec) }
-                    if (slide && behindVisible) launch { behindX.animateTo(-BEHIND_OFFSET, spec) }
-                    launch { behindAlpha.animateTo(0f, spec) }
+                if (slide) {
+                    // The parallax push: the new page in over the whole width from the right; the
+                    // one behind drifts a third of the way left and darkens. No shadow on the
+                    // page's edge: it read as a thick border between the two (reported).
+                    val spec = tween<Float>(SLIDE_MS, easing = SLIDE_EASING)
+                    coroutineScope {
+                        launch { frontX.animateTo(0f, spec) }
+                        if (behindVisible) {
+                            launch { behindX.animateTo(-PARALLAX_X, spec) }
+                            launch { behindDim.animateTo(PARALLAX_DIM, spec) }
+                        }
+                    }
+                    // At rest behind the page, hidden, where the back gesture expects it.
+                    behindAlpha.snapTo(0f)
+                    behindDim.snapTo(0f)
+                    shadow.snapTo(0f)
+                    behindX.snapTo(-BEHIND_OFFSET)
+                } else {
+                    val spec = tween<Float>(ENTER_MS, easing = DECELERATE)
+                    coroutineScope {
+                        launch { frontAlpha.animateTo(1f, spec) }
+                        launch { behindAlpha.animateTo(0f, spec) }
+                    }
                 }
             } finally {
                 onFinished()
@@ -159,6 +179,28 @@ class BackRevealState internal constructor(
         }
     }
 
+    /** A back button: [animateEnter]'s parallax push in reverse — the page off to the right,
+     * the one behind coming back from a third of the way left and brightening. */
+    private suspend fun slideBack() {
+        frontAlpha.snapTo(1f)
+        behindX.snapTo(-PARALLAX_X)
+        behindAlpha.snapTo(1f)
+        behindDim.snapTo(PARALLAX_DIM)
+        shadow.snapTo(0f)
+        val spec = tween<Float>(SLIDE_MS, easing = SLIDE_EASING)
+        coroutineScope {
+            launch { frontX.animateTo(1f, spec) }
+            launch { behindX.animateTo(0f, spec) }
+            launch { behindDim.animateTo(0f, spec) }
+        }
+        onBack.value()
+        frontX.snapTo(0f)
+        frontAlpha.snapTo(1f)
+        behindX.snapTo(-BEHIND_OFFSET)
+        behindAlpha.snapTo(0f)
+        behindDim.snapTo(0f)
+    }
+
     private suspend fun commit(slide: Boolean = true) {
         // Time scales with the distance still to cover, like CrossFadeChangeHandler's pop.
         val remaining = if (slide) ((EXIT_X - frontX.value) / EXIT_X).coerceIn(0f, 1f) else 1f
@@ -192,6 +234,14 @@ class BackRevealState internal constructor(
         // (AccelerateDecelerate, approximated as a cubic).
         const val ENTER_FROM_X = 0.2f
         const val ENTER_MS = 200
+        // The full-width slide (opening a page, a back button): Material's standard curve. The
+        // emphasized one did most of the distance in the first few frames: it read as a snap.
+        const val SLIDE_MS = 400
+        val SLIDE_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+        // How far the page behind drifts, and how dark it gets, as one slides over it.
+        const val PARALLAX_X = 0.3f
+        // Light: darker, it read as a heavy grey over a light theme.
+        const val PARALLAX_DIM = 0.2f
         val ACCELERATE_DECELERATE = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
     }
 }
@@ -253,5 +303,9 @@ fun Modifier.predictiveBackBehind(state: BackRevealState, active: Boolean): Modi
         this.graphicsLayer {
             translationX = state.behindX.value * size.width * state.dir
             alpha = state.behindAlpha.value
+        }.drawWithContent {
+            drawContent()
+            val dim = state.behindDim.value
+            if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
         }
     }
