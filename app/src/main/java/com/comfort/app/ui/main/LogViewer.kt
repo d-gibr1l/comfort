@@ -129,6 +129,8 @@ internal fun LogViewer(onDismiss: () -> Unit, downloadId: String? = null, title:
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        // Edge to edge: the log runs on under the navigation bar (its last line padded clear of it).
+        contentWindowInsets = { WindowInsets(0) },
     ) {
         // Tall, but a sheet: the page it opened from still shows above it.
         val height = (LocalConfiguration.current.screenHeightDp * 0.85f).dp
@@ -158,7 +160,7 @@ internal fun LogViewer(onDismiss: () -> Unit, downloadId: String? = null, title:
                 }
                 else -> LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
                     modifier = Modifier.fillMaxSize().pinchToZoomText(zoom),
                 ) {
                     itemsIndexed(shown) { index, line ->
