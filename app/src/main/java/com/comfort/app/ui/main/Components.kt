@@ -133,13 +133,14 @@ fun StatusBarScrim(alpha: () -> Float, modifier: Modifier = Modifier) {
 data class DownloadEventVisuals(
     val isSuccess: Boolean,
     override val message: String,
-    /** Something still going on (an engine updating): a small spinner, shown until replaced. */
+    /** Something still going on (an engine updating): a small spinner, shown for a few seconds
+     * (kept up until it ended, it sat on screen through a long update); the result follows. */
     val inProgress: Boolean = false,
 ) : SnackbarVisuals {
     override val actionLabel: String? = null
     override val withDismissAction: Boolean = true
     override val duration: SnackbarDuration = when {
-        inProgress -> SnackbarDuration.Indefinite
+        inProgress -> SnackbarDuration.Short
         isSuccess -> SnackbarDuration.Short
         else -> SnackbarDuration.Long
     }
