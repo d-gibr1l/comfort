@@ -616,7 +616,8 @@ internal fun SettingsListRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
+                    // titleMedium (16sp): titleSmall's 14sp read as small next to the 28dp icons.
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                     color = onContainerColor,
                     fontWeight = FontWeight.SemiBold,
                 )
