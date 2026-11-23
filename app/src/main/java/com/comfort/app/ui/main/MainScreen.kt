@@ -816,6 +816,10 @@ fun MainScreen(
         val viewerBottomBar = remember { mutableStateOf(0.dp) }
         Box(Modifier.fillMaxSize()) {
             CompositionLocalProvider(com.comfort.app.ui.viewer.LocalViewerBottomBarHeight provides viewerBottomBar) {
+            // A new request (a download's notification tapped while the viewer was already up)
+            // builds it afresh: kept, its pager stayed on the item it had, and the video playing
+            // before went on playing (reported).
+            androidx.compose.runtime.key(request) {
             com.comfort.app.ui.viewer.MediaViewerHost(
                 request, viewModel,
                 requestDelete = viewerDelete,
@@ -826,6 +830,7 @@ fun MainScreen(
                     com.comfort.app.music.MusicPlayer.resumeAfterInterruption()
                 },
             )
+            }
             }
             // The app's snackbars over the viewer, just above its bottom controls (the viewer
             // measures them: the toolbar, plus the filmstrip when it shows). The host under the pages
