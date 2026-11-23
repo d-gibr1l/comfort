@@ -10,6 +10,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
+import androidx.compose.foundation.background
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -770,34 +771,17 @@ private fun AudioLanguageSetting() {
     if (picking) {
         val options = listOf(com.comfort.app.data.AudioLanguage.ORIGINAL, com.comfort.app.data.AudioLanguage.APP) +
             com.comfort.app.data.AudioLanguage.COMMON
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { picking = false },
-            title = { Text(title) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    options.forEach { value ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .rowTapTarget {
-                                    picking = false
-                                    current = value
-                                    GalleryDlPreferences.setAudioLanguage(context, value)
-                                }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            androidx.compose.material3.RadioButton(selected = value == current, onClick = null)
-                            Spacer(Modifier.width(12.dp))
-                            Text(label(value), style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                }
+        ChoiceSheet(
+            title = title,
+            icon = Icons.Outlined.RecordVoiceOver,
+            choices = options.map { it to label(it) },
+            selected = current,
+            onPick = { value ->
+                picking = false
+                current = value
+                GalleryDlPreferences.setAudioLanguage(context, value)
             },
-            confirmButton = {},
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { picking = false }) { Text(stringResource(R.string.action_cancel)) }
-            },
+            onDismiss = { picking = false },
         )
     }
 }
@@ -868,33 +852,76 @@ private fun SubtitleLanguagesSetting(current: String?, customLabel: String?, onP
             com.comfort.app.data.SubtitleLanguage.ORIGINAL,
             null,
         )
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { picking = false },
-            title = { Text(title) },
-            text = {
-                Column {
-                    options.forEach { value ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .rowTapTarget {
-                                    picking = false
-                                    onPick(value)
-                                }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            androidx.compose.material3.RadioButton(selected = value == current, onClick = null)
-                            Spacer(Modifier.width(12.dp))
-                            Text(if (value == null) stringResource(R.string.subtitle_langs_custom) else label(value), style = MaterialTheme.typography.bodyLarge)
-                        }
+        val customLabel = stringResource(R.string.subtitle_langs_custom)
+        val labels = options.map { value -> value to (if (value == null) customLabel else label(value)) }
+        ChoiceSheet(
+            title = title,
+            icon = Icons.Outlined.Subtitles,
+            choices = labels,
+            selected = current,
+            onPick = { value ->
+                picking = false
+                onPick(value)
+            },
+            onDismiss = { picking = false },
+        )
+    }
+}
+
+/** A setting's choices, one to pick, as a bottom sheet (they were popup dialogs): the setting's
+ * name, then a row per choice, the one in use highlighted and ticked. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> ChoiceSheet(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    choices: List<Pair<T, String>>,
+    selected: T,
+    onPick: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberSturdySheetState(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        // Edge to edge: the list runs under the navigation bar instead of stopping above it.
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        // At most most of the screen: a long list (Audio language's) took it all, up under the
+        // status bar; it scrolls inside instead.
+        val maxHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.85f).dp
+        Column(Modifier.heightIn(max = maxHeight).padding(horizontal = 16.dp)) {
+            SheetHeader(icon = icon, title = title, subtitle = null, modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 12.dp))
+            Column(
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                choices.forEach { (value, label) ->
+                    val isSelected = value == selected
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // The nav bar's continuous capsule: its ends flow into the sides.
+                            .clip(com.comfort.app.theme.ContinuousCapsuleShape)
+                            .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                            .clickable { onPick(value) }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = isSelected, onClick = null)
+                        Spacer(Modifier.width(14.dp))
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { picking = false }) { Text(stringResource(R.string.action_cancel)) }
-            },
-        )
+                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            }
+        }
     }
 }
