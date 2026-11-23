@@ -779,7 +779,8 @@ fun MainScreen(
         // enough on a slow/rate-limited site that a bare frozen Download button would otherwise
         // look broken with no feedback at all.
         if (route is LinkRoute.Listing) {
-            ModalBottomSheet(onDismissRequest = { router.close() }) {
+            // As sturdy as the download sheet: a short or slow pull springs back.
+            ModalBottomSheet(onDismissRequest = { router.close() }, sheetState = rememberSturdySheetState()) {
                 Column(
                     modifier = Modifier.fillMaxWidth().height(220.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -805,6 +806,8 @@ fun MainScreen(
             val animatedHeight by androidx.compose.animation.core.animateDpAsState(targetValue = sheetHeight, label = "sharePickerSheetHeight")
             ModalBottomSheet(
                 onDismissRequest = { router.close() },
+                // As hard to swipe away as the download sheet (the default closed on a short pull).
+                sheetState = rememberSturdySheetState(),
                 dragHandle = null,
             ) {
                 Box(modifier = Modifier.fillMaxWidth().height(animatedHeight)) {
