@@ -1096,7 +1096,15 @@ fun MediaViewerScreen(
                                                     androidx.compose.material.icons.Icons.Outlined.Subtitles,
                                                     stringResource(R.string.subtitles),
                                                     value = tracks.subtitles.firstOrNull { it.selected }?.label ?: stringResource(R.string.subtitles_off_short),
-                                                    onClick = { trackPicker = androidx.media3.common.C.TRACK_TYPE_TEXT },
+                                                    // One language: a tap turns it on or off (a picker with a
+                                                    // single choice in it was a step for nothing).
+                                                    onClick = {
+                                                        if (tracks.subtitles.size == 1) {
+                                                            tracks.selectSubtitles(if (tracks.subtitlesOff) tracks.subtitles.first() else null)
+                                                        } else {
+                                                            trackPicker = androidx.media3.common.C.TRACK_TYPE_TEXT
+                                                        }
+                                                    },
                                                 )
                                             }
                                             if (tracks.audio.size > 1) {
