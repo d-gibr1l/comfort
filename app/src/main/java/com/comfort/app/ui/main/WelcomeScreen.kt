@@ -96,33 +96,44 @@ fun WelcomeScreen(onDone: () -> Unit) {
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 24.dp)) {
+        // The side margins on each part, not the whole column: a page sliding aside is then cut
+        // off at the screen's edge, not 24dp in (its scroll area clips).
+        Column(Modifier.fillMaxSize().systemBarsPadding()) {
             // Where you are, and Skip (the defaults stay as they are).
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // A fixed height: on the last page Skip goes, and the dots moved up with it.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 8.dp).height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                 repeat(3) { i ->
+                    val dotWidth by androidx.compose.animation.core.animateDpAsState(if (i == page) 28.dp else 6.dp, label = "welcomeDot")
                     Box(
                         Modifier
                             .padding(end = 6.dp)
                             .height(6.dp)
-                            .width(if (i == page) 28.dp else 6.dp)
+                            .width(dotWidth)
                             .clip(CircleShape)
                             .background(if (i <= page) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest),
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                if (page < 2) TextButton(onClick = { finish() }) { Text(stringResource(R.string.welcome_skip)) }
+                if (page < 2) TextButton(onClick = { finish() }) { Text(stringResource(R.string.welcome_skip), style = MaterialTheme.typography.labelLarge.copy(fontFamily = HeaderFontFamily)) }
             }
+            val welcomeShift = with(androidx.compose.ui.platform.LocalDensity.current) { 30.dp.roundToPx() }
             AnimatedContent(
                 targetState = page,
                 transitionSpec = {
+                    // Material's shared axis: the page going fades out first as it moves aside, then
+                    // the next fades in after it, so the two never show over each other.
                     val forward = targetState > initialState
-                    (slideInHorizontally { if (forward) it / 4 else -it / 4 } + fadeIn()) togetherWith
-                        (slideOutHorizontally { if (forward) -it / 4 else it / 4 } + fadeOut())
+                    val enter = slideInHorizontally(androidx.compose.animation.core.tween(300, delayMillis = 90)) { if (forward) welcomeShift else -welcomeShift } +
+                        fadeIn(androidx.compose.animation.core.tween(210, delayMillis = 90))
+                    val exit = slideOutHorizontally(androidx.compose.animation.core.tween(300)) { if (forward) -welcomeShift else welcomeShift } +
+                        fadeOut(androidx.compose.animation.core.tween(90))
+                    // Not clipped to the page area (a page sliding aside was cut off at its edge).
+                    (enter togetherWith exit).using(androidx.compose.animation.SizeTransform(clip = false))
                 },
                 modifier = Modifier.weight(1f),
                 label = "welcomePage",
             ) { p ->
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.Center) {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.Center) {
                     when (p) {
                         0 -> IntroPage()
                         1 -> DefaultsPage(quality, { quality = it }, format, { format = it }, audio, { audio = it }, share, { share = it })
@@ -130,9 +141,9 @@ fun WelcomeScreen(onDone: () -> Unit) {
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (page > 0) {
-                    OutlinedButton(onClick = { page-- }, modifier = Modifier.weight(1f).height(56.dp)) { Text(stringResource(R.string.action_back)) }
+                    OutlinedButton(onClick = { page-- }, modifier = Modifier.weight(1f).height(56.dp)) { Text(stringResource(R.string.action_back), style = MaterialTheme.typography.titleMedium.copy(fontFamily = HeaderFontFamily)) }
                 }
                 Button(
                     onClick = { if (page < 2) page++ else finish() },
@@ -202,7 +213,7 @@ private fun DefaultsPage(
         Spacer(Modifier.height(4.dp))
         Text(stringResource(R.string.welcome_defaults_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(20.dp))
-        ChoiceGroup(stringResource(R.string.welcome_video_quality), listOf(VideoQuality.BEST, VideoQuality.P1080, VideoQuality.P720, VideoQuality.P480, VideoQuality.AUDIO_ONLY), quality, { qualityLabel(it) }, onQuality)
+        ChoiceGroup(stringResource(R.string.welcome_video_quality), listOf(VideoQuality.BEST, VideoQuality.P2160, VideoQuality.P1440, VideoQuality.P1080, VideoQuality.P720, VideoQuality.P480), quality, { qualityLabel(it) }, onQuality)
         ChoiceGroup(stringResource(R.string.welcome_video_format), OutputFormat.entries, format, { it.label }, onFormat)
         ChoiceGroup(stringResource(R.string.welcome_audio_format), AudioFormat.entries, audio, { if (it == AudioFormat.ORIGINAL) stringResource(R.string.audio_track_original) else it.label }, onAudio)
         ChoiceGroup(stringResource(R.string.sharing_mode), ShareMode.entries, share, { shareLabel(it) }, onShare)
@@ -231,11 +242,17 @@ private fun <T> ChoiceGroup(title: String, options: List<T>, selected: T, label:
     Spacer(Modifier.height(8.dp))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { option ->
+            // Picked, the chip's corners round out into a continuous capsule (the nav bar's).
+            val round by androidx.compose.animation.core.animateFloatAsState(
+                if (option == selected) 1f else 0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 500f),
+                label = "chipRound",
+            )
             FilterChip(
                 selected = option == selected,
                 onClick = { onPick(option) },
                 label = { Text(label(option)) },
-                shape = RoundedCornerShape(12.dp),
+                shape = remember(round) { com.comfort.app.theme.CapsuleMorphShape(round, 12.dp) },
             )
         }
     }
@@ -262,7 +279,7 @@ private fun NotificationsPage() {
             AssistChip(onClick = {}, label = { Text(stringResource(R.string.welcome_notifications_on)) }, leadingIcon = { Icon(Icons.Outlined.Check, contentDescription = null) })
         } else {
             FilledTonalButton(onClick = { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
-                Text(stringResource(R.string.welcome_notifications_allow))
+                Text(stringResource(R.string.welcome_notifications_allow), style = MaterialTheme.typography.labelLarge.copy(fontFamily = HeaderFontFamily))
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -319,7 +336,7 @@ private fun BatteryCard() {
                 ) {
                     Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.allow_unrestricted_background_activity))
+                    Text(stringResource(R.string.allow_unrestricted_background_activity), style = MaterialTheme.typography.labelLarge.copy(fontFamily = HeaderFontFamily))
                 }
             }
         }

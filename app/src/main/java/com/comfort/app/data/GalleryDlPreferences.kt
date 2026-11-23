@@ -550,11 +550,13 @@ object GalleryDlPreferences {
     }
 
     /** Falls back to the old KEY_INSTANT_SHARE boolean (pre-dating this 3-way setting) on an
-     * upgrade so an existing install's choice carries over unchanged instead of silently
-     * resetting to CONFIGURE. */
+     * upgrade so an existing install's choice carries over unchanged; never chosen at all,
+     * ALWAYS_ASK. */
     fun getShareMode(context: Context): ShareMode {
         val stored = prefs(context).getString(KEY_SHARE_MODE, null)
-        if (stored != null) return runCatching { ShareMode.valueOf(stored) }.getOrDefault(ShareMode.CONFIGURE)
+        if (stored != null) return runCatching { ShareMode.valueOf(stored) }.getOrDefault(ShareMode.ALWAYS_ASK)
+        // Never chosen: Always ask (a share asks Configure or Instant each time).
+        if (!prefs(context).contains(KEY_INSTANT_SHARE)) return ShareMode.ALWAYS_ASK
         return if (prefs(context).getBoolean(KEY_INSTANT_SHARE, false)) ShareMode.INSTANT else ShareMode.CONFIGURE
     }
 

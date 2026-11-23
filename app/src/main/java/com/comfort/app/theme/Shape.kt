@@ -85,3 +85,21 @@ object ContinuousCapsuleShape : androidx.compose.ui.graphics.Shape {
         return androidx.compose.ui.graphics.Outline.Generic(path)
     }
 }
+
+/** A rounded rectangle ([from] corners) turning into [ContinuousCapsuleShape] as [progress] goes
+ * 0 → 1: a selected chip's shape, animated. In between, its corners grow toward half the height. */
+class CapsuleMorphShape(private val progress: Float, private val from: androidx.compose.ui.unit.Dp) : androidx.compose.ui.graphics.Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        density: androidx.compose.ui.unit.Density,
+    ): androidx.compose.ui.graphics.Outline {
+        if (progress >= 0.999f) return ContinuousCapsuleShape.createOutline(size, layoutDirection, density)
+        val start = with(density) { from.toPx() }
+        val end = size.minDimension / 2f
+        val r = start + (end - start) * progress.coerceIn(0f, 1f)
+        return androidx.compose.ui.graphics.Outline.Rounded(
+            androidx.compose.ui.geometry.RoundRect(0f, 0f, size.width, size.height, androidx.compose.ui.geometry.CornerRadius(r))
+        )
+    }
+}
