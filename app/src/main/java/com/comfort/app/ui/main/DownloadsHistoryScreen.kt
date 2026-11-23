@@ -577,6 +577,8 @@ fun DownloadsHistoryScreen(
                     },
                     modifier = Modifier,
                 )
+                // Restored downloads saved by another install: closed to this app until allowed.
+                MediaAccessCard(historyItems)
                 // The Audio filter's songs, played in the music player: all in order, or shuffled.
                 val songs = remember(visibleItems) { visibleItems.filter { it.isAudio && it.status != DownloadStatus.DELETED } }
                 if (audioOnly && songs.isNotEmpty()) {

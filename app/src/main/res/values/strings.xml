@@ -1336,4 +1336,7 @@
     <string name="welcome_music_title">A music player</string>
     <string name="welcome_music_body">Your songs, with their lyrics</string>
     <string name="welcome_allow">Allow</string>
+    <string name="media_access_title">Show your restored downloads</string>
+    <string name="media_access_body">They were saved by an earlier install of Comfort, so Android keeps them closed to this one. Allow access to your photos, videos and music to open them here.</string>
+    <string name="media_access_allow">Allow access</string>
 </resources>

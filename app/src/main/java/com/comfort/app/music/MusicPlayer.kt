@@ -311,6 +311,23 @@ object MusicPlayer {
         if (from != to) controller?.moveMediaItem(from, to)
     }
 
+    /** Songs queued under links that were moved ([moves]: old link → new, MediaAccess.rehome after
+     * a restore): their queue entries swapped for the new links (the old ones won't open). */
+    fun relink(moves: Map<String, String>) {
+        if (moves.isEmpty()) return
+        playScope.launch {
+            val c = controller ?: return@launch
+            for (i in 0 until c.mediaItemCount) {
+                val item = c.getMediaItemAt(i)
+                val song = songs[item.mediaId] ?: continue
+                val new = moves[song.uri.toString()] ?: continue
+                val moved = song.copy(uri = Uri.parse(new))
+                songs[moved.id] = moved
+                c.replaceMediaItem(i, moved.toMediaItem())
+            }
+        }
+    }
+
     /** Takes the queue's song at [index] out (a swipe in the queue). */
     fun removeAt(index: Int) {
         controller?.let { if (index in 0 until it.mediaItemCount) it.removeMediaItem(index) }

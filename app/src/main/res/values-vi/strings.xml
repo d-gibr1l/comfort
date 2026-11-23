@@ -1252,4 +1252,7 @@
     <string name="welcome_music_title">Trình phát nhạc</string>
     <string name="welcome_music_body">Bài hát của bạn, kèm lời</string>
     <string name="welcome_allow">Cho phép</string>
+    <string name="media_access_title">Hiện các bản tải đã khôi phục</string>
+    <string name="media_access_body">Chúng được lưu bởi bản cài Comfort trước đó, nên Android không cho bản này mở. Hãy cho phép truy cập ảnh, video và nhạc để mở chúng tại đây.</string>
+    <string name="media_access_allow">Cho phép truy cập</string>
 </resources>

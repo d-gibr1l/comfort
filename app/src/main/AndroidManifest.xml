@@ -2,6 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Reading media saved by another install (a restore after a reinstall or on another phone):
+         asked for only then, from the Library (ui/main/MediaAccess.kt). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Reading current network capabilities (validated/metered/...) for the Queue's "waiting for
          network" indicator on a stuck download — a normal permission, granted automatically. -->

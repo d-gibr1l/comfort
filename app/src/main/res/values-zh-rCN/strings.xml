@@ -1252,4 +1252,7 @@
     <string name="welcome_music_title">音乐播放器</string>
     <string name="welcome_music_body">你的歌曲，附带歌词</string>
     <string name="welcome_allow">允许</string>
+    <string name="media_access_title">显示恢复的下载</string>
+    <string name="media_access_body">这些文件由之前安装的 Comfort 保存，因此 Android 不允许当前安装打开它们。允许访问照片、视频和音乐即可在这里打开。</string>
+    <string name="media_access_allow">允许访问</string>
 </resources>

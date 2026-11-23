@@ -1252,4 +1252,7 @@
     <string name="welcome_music_title">音楽プレーヤー</string>
     <string name="welcome_music_body">歌詞つきで曲を再生</string>
     <string name="welcome_allow">許可</string>
+    <string name="media_access_title">復元したダウンロードを表示</string>
+    <string name="media_access_body">以前にインストールした Comfort が保存したため、Android はこのアプリから開けないようにしています。ここで開くには、写真・動画・音楽へのアクセスを許可してください。</string>
+    <string name="media_access_allow">アクセスを許可</string>
 </resources>

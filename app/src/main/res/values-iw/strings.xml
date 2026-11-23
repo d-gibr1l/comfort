@@ -1320,4 +1320,7 @@
     <string name="welcome_music_title">נגן מוזיקה</string>
     <string name="welcome_music_body">השירים שלכם, עם המילים</string>
     <string name="welcome_allow">אישור</string>
+    <string name="media_access_title">הצגת ההורדות ששוחזרו</string>
+    <string name="media_access_body">הן נשמרו בהתקנה קודמת של Comfort, ולכן Android סוגר אותן בפני ההתקנה הזו. אפשרו גישה לתמונות, לסרטונים ולמוזיקה כדי לפתוח אותן כאן.</string>
+    <string name="media_access_allow">מתן גישה</string>
 </resources>

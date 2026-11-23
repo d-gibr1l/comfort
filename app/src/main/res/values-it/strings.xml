@@ -1289,4 +1289,7 @@
     <string name="welcome_music_title">Un lettore musicale</string>
     <string name="welcome_music_body">I tuoi brani, con i testi</string>
     <string name="welcome_allow">Consenti</string>
+    <string name="media_access_title">Mostra i download ripristinati</string>
+    <string name="media_access_body">Sono stati salvati da un\'installazione precedente di Comfort, quindi Android non li apre a questa. Consenti l\'accesso a foto, video e musica per aprirli qui.</string>
+    <string name="media_access_allow">Consenti l\'accesso</string>
 </resources>
