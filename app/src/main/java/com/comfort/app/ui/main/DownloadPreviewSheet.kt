@@ -1510,10 +1510,11 @@ private fun MainPreviewScreen(
                             label = stringResource(R.string.filename_templates),
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
-                            shape = MIDDLE_CHIP_SHAPE,
+                            shape = LAST_CHIP_SHAPE,
                             onClick = onOpenTemplates,
                         )
-                        IncognitoChip(incognito, onToggleIncognito)
+                        // (Incognito is in the row above: a video's sheet has two rows, and it
+                        // showed in both.)
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                 } else {
