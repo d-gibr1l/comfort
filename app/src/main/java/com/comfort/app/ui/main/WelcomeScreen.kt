@@ -52,9 +52,15 @@ object Welcome {
     private const val PREFS = "welcome"
     private const val KEY_DONE = "done"
 
+    // Set once a launch has found a first run: the welcome then shows on every launch until it's
+    // finished or skipped. Without it, the settings the app writes on its first start (more than 3)
+    // made the next launch take it for an install from before the welcome (reported).
+    private const val KEY_PENDING = "pending"
+
     fun needed(context: Context): Boolean {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (p.getBoolean(KEY_DONE, false)) return false
+        if (p.getBoolean(KEY_PENDING, false)) return true
         // Settings already there (checked on the main thread at launch, so not the database): an
         // install from before the welcome. A first run has written next to none yet.
         val settings = context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, Context.MODE_PRIVATE).all.size
@@ -63,6 +69,7 @@ object Welcome {
             markDone(context)
             return false
         }
+        p.edit().putBoolean(KEY_PENDING, true).apply()
         return true
     }
 
