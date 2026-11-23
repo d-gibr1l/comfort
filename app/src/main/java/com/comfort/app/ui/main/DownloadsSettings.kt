@@ -818,24 +818,15 @@ private fun TimePickerButton(
         // the wheel's own onSnappedTime — re-deriving it from minutesSinceMidnight on every
         // recomposition would fight the wheel's scroll position every time it snaps.
         var pendingMinutes by remember { mutableStateOf(minutesSinceMidnight) }
-        val initialTime = remember { LocalTime(hour = hour, minute = minute) }
         Dialog(onDismissRequest = { showPicker = false }) {
-            Card(shape = MaterialTheme.shapes.large) {
+            Card(shape = MaterialTheme.shapes.extraLarge) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(label, style = MaterialTheme.typography.titleMedium)
+                    Text(label, style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(16.dp))
-                    WheelTimePicker(
-                        modifier = Modifier.size(280.dp, 160.dp),
-                        startTime = initialTime,
-                        timeFormatter = timeFormatter(timeFormat = TimeFormat.AM_PM),
-                        textStyle = MaterialTheme.typography.headlineSmall,
-                        selectedTextStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        onSnappedTime = { snapped -> pendingMinutes = snapped.hour * 60 + snapped.minute },
-                    )
+                    TimeWheel(minutes = pendingMinutes, onChange = { pendingMinutes = it })
                     Spacer(Modifier.height(16.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) }

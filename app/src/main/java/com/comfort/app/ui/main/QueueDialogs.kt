@@ -290,8 +290,6 @@ internal fun StartAtDialog(
         val nextHour = ((nowMin / 60 + 1) % 24) * 60
         listOf(nextHour, (nextHour + 120) % 1440, 23 * 60, 8 * 60).distinct()
     }
-    // Picking a chip turns the wheel to it: the wheel only takes a start time, so it's rebuilt.
-    var wheelSeed by remember { mutableStateOf(startMinutes) }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     val timeFormat = remember { android.text.format.DateFormat.getTimeFormat(context) }
     fun label(m: Int): String {
@@ -318,7 +316,7 @@ internal fun StartAtDialog(
                 quickPicks.forEach { m ->
                     FilterChip(
                         selected = minutes == m,
-                        onClick = { minutes = m; wheelSeed = m },
+                        onClick = { minutes = m },
                         label = { Text(label(m)) },
                         shape = RoundedCornerShape(12.dp),
                     )
@@ -334,26 +332,7 @@ internal fun StartAtDialog(
                     modifier = Modifier.padding(vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    key(wheelSeed) {
-                        dev.darkokoa.datetimewheelpicker.WheelTimePicker(
-                            modifier = Modifier.size(280.dp, 140.dp),
-                            startTime = kotlinx.datetime.LocalTime(hour = wheelSeed / 60, minute = wheelSeed % 60),
-                            // The phone's own 12/24-hour setting.
-                            timeFormatter = dev.darkokoa.datetimewheelpicker.core.format.timeFormatter(
-                                timeFormat = if (android.text.format.DateFormat.is24HourFormat(context)) {
-                                    dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.HOUR_24
-                                } else {
-                                    dev.darkokoa.datetimewheelpicker.core.format.TimeFormat.AM_PM
-                                },
-                            ),
-                            textStyle = MaterialTheme.typography.headlineSmall,
-                            selectedTextStyle = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            // A tick as each hour or minute passes the middle, like a clock app's wheel.
-                            onSnappedTimeChanged = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.SegmentFrequentTick) },
-                            onSnappedTime = { snapped -> minutes = snapped.hour * 60 + snapped.minute },
-                        )
-                    }
+                    TimeWheel(minutes = minutes, onChange = { minutes = it }, modifier = Modifier.padding(horizontal = 16.dp))
                     Spacer(Modifier.height(8.dp))
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                         Row(
