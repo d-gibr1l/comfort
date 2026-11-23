@@ -823,7 +823,8 @@ fun DownloadsHistoryScreen(
                         }
                     }
                 },
-                shape = com.comfort.app.theme.ContinuousCapsuleShape,
+                // The arch, as the Library's thumbnails are.
+                shape = thumbnailShape(),
             ) {
                 Icon(Icons.Outlined.ArrowUpward, contentDescription = stringResource(R.string.scroll_to_top))
             }
