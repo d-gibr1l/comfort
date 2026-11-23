@@ -205,6 +205,9 @@ fun MainScreen(
     // and rebuilt on every Settings-tab revisit, so anything that needs to survive that has to live
     // up here instead.
     var settingsHighlightKey by remember { mutableStateOf<String?>(null) }
+    // Bumped by tapping the Settings tab on a sub-page: MoreScreen plays its back animation to
+    // the main list (the same as the page's back button) rather than jumping there.
+    var settingsBackSignal by remember { mutableIntStateOf(0) }
     // Same RUNNING+QUEUED count already shown inside the Library screen's own queue-icon badge
     // (DownloadsHistoryScreen) — kept consistent with that existing definition of "active" rather
     // than introducing a second, differently-scoped count just for this badge.
@@ -345,7 +348,7 @@ fun MainScreen(
             // selectedTab is already 2 here, so a bare `selectedTab = index` wouldn't have
             // changed anything.
             index == 2 && selectedTab == 2 -> {
-                settingsRoute = SettingsRoute.ROOT
+                if (settingsRoute != SettingsRoute.ROOT) settingsBackSignal++
                 settingsHighlightKey = null
             }
             index == selectedTab -> Unit
@@ -597,6 +600,7 @@ fun MainScreen(
                         highlightKey = settingsHighlightKey,
                         onNavigate = onNavigateSettings,
                         isVisible = selectedTab == 2,
+                        backSignal = settingsBackSignal,
                     )
                     } }
                 }

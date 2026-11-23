@@ -192,6 +192,8 @@ fun MoreScreen(
     // False while MainScreen keeps this composed but hidden (see its keptTabs): the back gesture
     // must then belong to whatever is on screen, not a sub-page nobody can see.
     isVisible: Boolean = true,
+    // Changed by tapping the Settings tab on a sub-page: back to the main list, animated.
+    backSignal: Int = 0,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // The one and only root settings list, always composed underneath: it's what a
@@ -215,6 +217,13 @@ fun MoreScreen(
         }
         // Each sub-page's own back button plays the same peel-away as the gesture, then returns.
         val onBack = { back.animateBack() }
+        // The Settings tab tapped on a sub-page: the same, rather than a jump to the list.
+        var handledBackSignal by remember { androidx.compose.runtime.mutableIntStateOf(backSignal) }
+        LaunchedEffect(backSignal) {
+            if (backSignal == handledBackSignal) return@LaunchedEffect
+            handledBackSignal = backSignal
+            if (route != SettingsRoute.ROOT) onBack()
+        }
         if (route != SettingsRoute.ROOT) Box(modifier = Modifier.fillMaxSize().predictiveBackReveal(back)) {
             when (route) {
                 SettingsRoute.ROOT -> Unit
