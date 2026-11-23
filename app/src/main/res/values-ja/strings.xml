@@ -273,6 +273,8 @@
     <string name="view_logs">ログを表示</string>
     <string name="logs_title">ログ</string>
     <string name="logs_empty">まだダウンロードの記録はありません。</string>
+    <string name="view_log">ログを表示</string>
+    <string name="log_empty_for_download">このダウンロードのログはありません（ログは最近のダウンロードの分だけ残ります）。</string>
     <string name="clear_logs">クリア</string>
     <string name="clear_logs_question">ログを消去しますか?</string>
     <string name="clear_logs_description">これまでの記録を削除します。ダウンロードとライブラリには影響しません。</string>

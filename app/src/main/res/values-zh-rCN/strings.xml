@@ -273,6 +273,8 @@
     <string name="view_logs">查看日志</string>
     <string name="logs_title">日志</string>
     <string name="logs_empty">还没有下载记录。</string>
+    <string name="view_log">查看日志</string>
+    <string name="log_empty_for_download">此下载没有日志（只保留最近下载的日志）。</string>
     <string name="clear_logs">清除</string>
     <string name="clear_logs_question">清除日志？</string>
     <string name="clear_logs_description">删除目前为止的记录。下载和媒体库不受影响。</string>

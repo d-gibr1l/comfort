@@ -302,6 +302,8 @@
     <string name="view_logs">View logs</string>
     <string name="logs_title">Logs</string>
     <string name="logs_empty">No downloads logged yet.</string>
+    <string name="view_log">View log</string>
+    <string name="log_empty_for_download">Nothing was logged for this download (logs are kept for the latest downloads only).</string>
     <string name="clear_logs">Clear</string>
     <string name="clear_logs_question">Clear the logs?</string>
     <string name="clear_logs_description">Deletes what\'s been logged so far. Downloads and the Library aren\'t affected.</string>

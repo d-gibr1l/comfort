@@ -273,6 +273,8 @@
     <string name="view_logs">مشاهده گزارش‌ها</string>
     <string name="logs_title">گزارش‌ها</string>
     <string name="logs_empty">هنوز دانلودی ثبت نشده.</string>
+    <string name="view_log">مشاهدهٔ گزارش</string>
+    <string name="log_empty_for_download">چیزی برای این دانلود ثبت نشده است (گزارش‌ها فقط برای جدیدترین دانلودها نگه داشته می‌شوند).</string>
     <string name="clear_logs">پاک کردن</string>
     <string name="clear_logs_question">گزارش‌ها پاک شوند؟</string>
     <string name="clear_logs_description">آنچه تاکنون ثبت شده را حذف می‌کند. دانلودها و کتابخانه تغییری نمی‌کنند.</string>

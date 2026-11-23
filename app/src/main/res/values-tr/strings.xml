@@ -273,6 +273,8 @@
     <string name="view_logs">Günlükleri görüntüle</string>
     <string name="logs_title">Günlükler</string>
     <string name="logs_empty">Henüz günlüğe kaydedilmiş indirme yok.</string>
+    <string name="view_log">Günlüğü görüntüle</string>
+    <string name="log_empty_for_download">Bu indirme için kayıt yok (günlükler yalnızca son indirmeler için tutulur).</string>
     <string name="clear_logs">Temizle</string>
     <string name="clear_logs_question">Günlükler temizlensin mi?</string>
     <string name="clear_logs_description">Şimdiye kadar kaydedileni siler. İndirmeler ve Kitaplık etkilenmez.</string>

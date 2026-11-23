@@ -290,6 +290,8 @@
     <string name="view_logs">Ver registros</string>
     <string name="logs_title">Registros</string>
     <string name="logs_empty">Aún no hay descargas registradas.</string>
+    <string name="view_log">Ver registro</string>
+    <string name="log_empty_for_download">No hay nada registrado de esta descarga (los registros se guardan solo de las descargas más recientes).</string>
     <string name="clear_logs">Borrar</string>
     <string name="clear_logs_question">¿Borrar los registros?</string>
     <string name="clear_logs_description">Elimina lo registrado hasta ahora. Las descargas y la Biblioteca no se ven afectadas.</string>

@@ -285,6 +285,8 @@
     <string name="view_logs">Lihat log</string>
     <string name="logs_title">Log</string>
     <string name="logs_empty">Belum ada unduhan yang tercatat.</string>
+    <string name="view_log">Lihat log</string>
+    <string name="log_empty_for_download">Tidak ada log untuk unduhan ini (log hanya disimpan untuk unduhan terbaru).</string>
     <string name="clear_logs">Hapus</string>
     <string name="clear_logs_question">Hapus log?</string>
     <string name="clear_logs_description">Menghapus semua yang sudah tercatat. Unduhan dan Pustaka tidak terpengaruh.</string>

@@ -273,6 +273,8 @@
     <string name="view_logs">Visualizza log</string>
     <string name="logs_title">Log</string>
     <string name="logs_empty">Ancora nessun download registrato.</string>
+    <string name="view_log">Visualizza registro</string>
+    <string name="log_empty_for_download">Nessun registro per questo download (i registri restano solo per i download più recenti).</string>
     <string name="clear_logs">Cancella</string>
     <string name="clear_logs_question">Cancellare i log?</string>
     <string name="clear_logs_description">Elimina quanto registrato finora. Download e Libreria non sono toccati.</string>

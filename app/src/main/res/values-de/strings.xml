@@ -286,6 +286,8 @@
     <string name="view_logs">Logs ansehen</string>
     <string name="logs_title">Logs</string>
     <string name="logs_empty">Noch keine Downloads protokolliert.</string>
+    <string name="view_log">Protokoll ansehen</string>
+    <string name="log_empty_for_download">Für diesen Download wurde nichts protokolliert (Protokolle gibt es nur für die neuesten Downloads).</string>
     <string name="clear_logs">Leeren</string>
     <string name="clear_logs_question">Logs leeren?</string>
     <string name="clear_logs_description">Löscht alles bisher Protokollierte. Downloads und die Mediathek bleiben unberührt.</string>

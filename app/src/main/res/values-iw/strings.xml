@@ -273,6 +273,8 @@
     <string name="view_logs">הצגת יומנים</string>
     <string name="logs_title">יומנים</string>
     <string name="logs_empty">עדיין לא נרשמו הורדות.</string>
+    <string name="view_log">הצגת יומן</string>
+    <string name="log_empty_for_download">לא נרשם דבר עבור ההורדה הזו (היומנים נשמרים רק להורדות האחרונות).</string>
     <string name="clear_logs">ניקוי</string>
     <string name="clear_logs_question">לנקות את היומנים?</string>
     <string name="clear_logs_description">מוחק את מה שנרשם עד עכשיו. ההורדות והספרייה לא מושפעות.</string>

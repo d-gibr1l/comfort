@@ -297,6 +297,8 @@
     <string name="view_logs">Открыть журнал</string>
     <string name="logs_title">Журнал</string>
     <string name="logs_empty">Загрузок в журнале пока нет.</string>
+    <string name="view_log">Показать журнал</string>
+    <string name="log_empty_for_download">Для этой загрузки ничего не записано (журнал хранится только для последних загрузок).</string>
     <string name="clear_logs">Очистить</string>
     <string name="clear_logs_question">Очистить журнал?</string>
     <string name="clear_logs_description">Удаляет всё, что записано до сих пор. Загрузки и медиатека не затрагиваются.</string>

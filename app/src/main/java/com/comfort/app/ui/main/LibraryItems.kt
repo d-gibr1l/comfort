@@ -821,6 +821,15 @@ private fun DownloadActionsMenu(
                 )
             }
         }
+        // What the engines said while it downloaded (its lines of the downloads' log).
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.view_log)) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Article, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                DownloadLogRequest.download = item
+            },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.view_original_source)) },
             leadingIcon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) },

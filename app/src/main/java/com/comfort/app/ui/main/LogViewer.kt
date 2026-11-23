@@ -91,9 +91,17 @@ private fun latestDownloadFirst(lines: List<LogLine>): List<LogLine> {
 /** Settings > Advanced > View logs: the downloads' log in a sheet, the latest download first
  * (where it opens), each from its bold "start <link>" line; errors are red, warnings tinted. A long
  * entry (a stack trace) shows its first lines until tapped. Pinch to zoom the text. */
+/** The download whose log a Library card's "View log" asked for; DownloadsHistoryScreen shows it.
+ * (The card's menu closes as the log opens, so it can't hold the sheet itself.) */
+internal object DownloadLogRequest {
+    var download by mutableStateOf<com.comfort.app.data.DownloadEntity?>(null)
+}
+
+/** [downloadId]: only that download's lines, oldest first, under its [title] (a Library card's
+ * "View log"); null for every download's (Settings › Advanced). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LogViewer(onDismiss: () -> Unit) {
+internal fun LogViewer(onDismiss: () -> Unit, downloadId: String? = null, title: String? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var lines by remember { mutableStateOf<List<LogLine>?>(null) }
@@ -101,7 +109,11 @@ internal fun LogViewer(onDismiss: () -> Unit) {
     val expanded = remember { mutableStateMapOf<Int, Boolean>() }
     val zoom = rememberTextZoom("log_viewer", "zoom", min = 0.6f, max = 2f)
     LaunchedEffect(Unit) {
-        lines = withContext(Dispatchers.IO) { latestDownloadFirst(DownloadLog.read(context).map(::parse)) }
+        lines = withContext(Dispatchers.IO) {
+            val all = DownloadLog.read(context).map(::parse)
+            // The log names a download by its id's first 8 characters (DownloadLog.line).
+            if (downloadId != null) all.filter { it.id == downloadId.take(8) } else latestDownloadFirst(all)
+        }
     }
     val listState = rememberLazyListState()
 
@@ -124,11 +136,14 @@ internal fun LogViewer(onDismiss: () -> Unit) {
             SheetHeader(
                 icon = Icons.AutoMirrored.Outlined.Article,
                 title = stringResource(R.string.logs_title),
-                subtitle = stringResource(R.string.logs_subtitle),
+                subtitle = title ?: stringResource(R.string.logs_subtitle),
                 modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
             ) {
-                IconButton(onClick = { confirmClear = true }, enabled = !lines.isNullOrEmpty()) {
-                    Icon(Icons.Outlined.DeleteSweep, contentDescription = stringResource(R.string.clear_logs))
+                // Clearing is every download's log at once: only from Settings' full view.
+                if (downloadId == null) {
+                    IconButton(onClick = { confirmClear = true }, enabled = !lines.isNullOrEmpty()) {
+                        Icon(Icons.Outlined.DeleteSweep, contentDescription = stringResource(R.string.clear_logs))
+                    }
                 }
             }
             val shown = lines
@@ -136,7 +151,7 @@ internal fun LogViewer(onDismiss: () -> Unit) {
                 shown == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 shown.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        stringResource(R.string.logs_empty),
+                        stringResource(if (downloadId != null) R.string.log_empty_for_download else R.string.logs_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

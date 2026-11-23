@@ -273,6 +273,8 @@
     <string name="view_logs">लॉग देखें</string>
     <string name="logs_title">लॉग</string>
     <string name="logs_empty">अभी कोई डाउनलोड लॉग नहीं हुआ।</string>
+    <string name="view_log">लॉग देखें</string>
+    <string name="log_empty_for_download">इस डाउनलोड के लिए कुछ लॉग नहीं हुआ (लॉग सिर्फ़ हाल के डाउनलोड के रखे जाते हैं)।</string>
     <string name="clear_logs">साफ़ करें</string>
     <string name="clear_logs_question">लॉग साफ़ करें?</string>
     <string name="clear_logs_description">अब तक लॉग हुई जानकारी मिटा देता है। डाउनलोड और लाइब्रेरी पर कोई असर नहीं पड़ता।</string>

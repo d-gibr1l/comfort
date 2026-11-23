@@ -293,6 +293,8 @@
     <string name="view_logs">Voir les journaux</string>
     <string name="logs_title">Journaux</string>
     <string name="logs_empty">Aucun téléchargement enregistré pour l\'instant.</string>
+    <string name="view_log">Voir le journal</string>
+    <string name="log_empty_for_download">Rien n\'a été journalisé pour ce téléchargement (les journaux ne gardent que les téléchargements récents).</string>
     <string name="clear_logs">Effacer</string>
     <string name="clear_logs_question">Effacer les journaux\u00A0?</string>
     <string name="clear_logs_description">Supprime ce qui a été enregistré jusqu\'ici. Les téléchargements et la Bibliothèque ne sont pas touchés.</string>

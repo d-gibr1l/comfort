@@ -132,6 +132,14 @@ fun DownloadsHistoryScreen(
     // plays in the Settings root header (see SettingsScreen.kt's SettingsRootScreen).
     val libraryTopicIcon = ImageVector.vectorResource(id = com.comfort.app.R.drawable.ic_gallery_thumbnail)
     val historyItems by viewModel.historyFlow.collectAsStateWithLifecycle()
+    // A card's "View log" (DownloadLogRequest).
+    DownloadLogRequest.download?.let { download ->
+        LogViewer(
+            onDismiss = { DownloadLogRequest.download = null },
+            downloadId = download.id,
+            title = download.title.ifBlank { download.url },
+        )
+    }
     // Files deleted from the phone (multi-item downloads): checked as the Library shows, as the
     // app comes back (they're deleted elsewhere), and as its downloads' counts change.
     val multiItemKey = remember(historyItems) {

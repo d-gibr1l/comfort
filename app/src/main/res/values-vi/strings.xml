@@ -273,6 +273,8 @@
     <string name="view_logs">Xem nhật ký</string>
     <string name="logs_title">Nhật ký</string>
     <string name="logs_empty">Chưa có lượt tải nào được ghi lại.</string>
+    <string name="view_log">Xem nhật ký</string>
+    <string name="log_empty_for_download">Không có nhật ký cho tải xuống này (chỉ giữ nhật ký của các tải xuống gần đây).</string>
     <string name="clear_logs">Xóa</string>
     <string name="clear_logs_question">Xóa nhật ký?</string>
     <string name="clear_logs_description">Xóa những gì đã ghi lại. Các lượt tải và Thư viện không bị ảnh hưởng.</string>

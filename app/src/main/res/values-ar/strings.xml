@@ -273,6 +273,8 @@
     <string name="view_logs">عرض السجلات</string>
     <string name="logs_title">السجلات</string>
     <string name="logs_empty">لم تُسجَّل أي تنزيلات بعد.</string>
+    <string name="view_log">عرض السجل</string>
+    <string name="log_empty_for_download">لم يُسجَّل شيء لهذا التنزيل (تُحفظ السجلات لأحدث التنزيلات فقط).</string>
     <string name="clear_logs">مسح</string>
     <string name="clear_logs_question">مسح السجلات؟</string>
     <string name="clear_logs_description">يحذف ما سُجِّل حتى الآن. لا تتأثر التنزيلات والمكتبة.</string>
