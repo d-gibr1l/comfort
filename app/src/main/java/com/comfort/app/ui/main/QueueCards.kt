@@ -388,7 +388,7 @@ internal fun StoppedRow(
                             // Or later, at a time picked for it (StartAtDialog).
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.start_at)) },
-                                leadingIcon = { Icon(Icons.Outlined.Schedule, contentDescription = null) },
+                                leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_timer_arrow_down), contentDescription = null) },
                                 onClick = { menuExpanded = false; onStartAt() },
                             )
                         }
@@ -871,7 +871,7 @@ fun QueueItemCard(
                         DownloadStatus.RUNNING -> {
                             // Stop now and continue at a picked time (StartAtDialog).
                             IconButton(onClick = onStartAt) {
-                                Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.start_at))
+                                Icon(ImageVector.vectorResource(R.drawable.ic_ms_timer_arrow_down), contentDescription = stringResource(R.string.start_at))
                             }
                             // Real AssistChips (8dp corners, 32dp tall — M3's own chip spec) with
                             // the connected-group shape treatment: fully rounded on the pair's own
@@ -947,7 +947,7 @@ fun QueueItemCard(
                             }
                             // Set or change when it starts (StartAtDialog).
                             IconButton(onClick = onStartAt) {
-                                Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.start_at))
+                                Icon(ImageVector.vectorResource(R.drawable.ic_ms_timer_arrow_down), contentDescription = stringResource(R.string.start_at))
                             }
                             ConfirmCancelSplitButton(
                                 label = stringResource(R.string.up_next),
