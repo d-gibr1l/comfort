@@ -1074,7 +1074,8 @@ class DownloadWorker(
                                     // saveHeldFiles), so a carousel lands in the gallery all at once.
                                     // Counted now, so progress still moves file by file.
                                     lastDataAt.set(System.currentTimeMillis())
-                                    val count = savedCount.incrementAndGet()
+                                    // Lyrics and subtitles are saved but aren't items of their own.
+                                    val count = if (com.comfort.app.data.DeletedFiles.isSidecarName(candidate.name)) savedCount.get() else savedCount.incrementAndGet()
                                     heldFiles += Triple(candidate, isAudioFile, nextPosition())
                                     dao.setDownloadedItems(downloadId, count)
                                     com.comfort.app.data.LiveProgress.speed(liveRun, measuredSpeedMbs.get())
@@ -1295,7 +1296,7 @@ class DownloadWorker(
                         val ext = f.extension.lowercase()
                         val isAudio = ext in AUDIO_EXTENSIONS || engine == DownloadEngine.SPOTIFY ||
                             (ext in AUDIO_OR_VIDEO_EXTENSIONS && isAudioOnlyContainer(f))
-                        savedCount.incrementAndGet()
+                        if (!com.comfort.app.data.DeletedFiles.isSidecarName(f.name)) savedCount.incrementAndGet()
                         heldFiles += Triple(f, isAudio, saveFailures[f.name] ?: nextPosition())
                         swept++
                     }

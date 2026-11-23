@@ -60,6 +60,9 @@ object DeletedFiles {
     private val PICTURE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
     private val SIDECAR_EXT = setOf("lrc", "srt", "vtt", "ass", "ssa")
 
+    /** Lyrics or subtitles: saved with a download, but not one of its items (not counted). */
+    fun isSidecarName(name: String?): Boolean = name?.substringAfterLast('.', "")?.lowercase() in SIDECAR_EXT
+
     /** Whether [file] only goes with another file of its download: a video's or song's saved
      * thumbnail (a picture of the same name, Settings' "Save thumbnail"), or lyrics / subtitles.
      * Deleting one isn't a missing item: the card doesn't warn about it or offer it again. */

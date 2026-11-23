@@ -368,8 +368,16 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                     com.comfort.app.data.DeletedFiles.fillNames(getApplication(), files)
                     files = multi.chunked(500).flatMap { dao.savedFiles(it) }
                 }
-                val gone = com.comfort.app.data.DeletedFiles.missing(getApplication(), files)
                 val byDownload = files.groupBy { it.downloadId }
+                // Lyrics and subtitles counted as items by older saves: taken off the count (only
+                // where the count is still every saved file, so it's done once).
+                for ((id, saved) in byDownload) {
+                    val sidecars = saved.count { com.comfort.app.data.DeletedFiles.isSidecarName(it.path) }
+                    if (sidecars == 0) continue
+                    val entity = historyFlow.value.firstOrNull { it.id == id } ?: continue
+                    if (entity.downloadedItems == saved.size) dao.setDownloadedItems(id, saved.size - sidecars)
+                }
+                val gone = com.comfort.app.data.DeletedFiles.missing(getApplication(), files)
                 // A video's saved thumbnail, lyrics or subtitles deleted: not a missing item.
                 _deletedCounts.value = gone
                     .filterNot { com.comfort.app.data.DeletedFiles.isCompanion(it, byDownload[it.downloadId].orEmpty()) }

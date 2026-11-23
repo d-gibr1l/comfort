@@ -92,7 +92,8 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
     suspend fun forget(item: BatchItem) = withContext(Dispatchers.IO) {
         val dao = AppDatabase.getDatabase(context).downloadDao()
         dao.deleteSavedFile(download.id, item.uri.toString())
-        dao.decrementDownloadedItems(download.id, 1)
+        // Lyrics and subtitles aren't counted as items.
+        if (!item.isSidecar) dao.decrementDownloadedItems(download.id, 1)
         if (item.sizeBytes > 0) dao.addBytes(download.id, -item.sizeBytes)
     }
     // A file Android only deletes with the user's OK (its own dialog).
@@ -148,8 +149,10 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                     val shown = items
                     if (shown != null) {
                         val total = shown.sumOf { it.sizeBytes }
+                        // Lyrics and subtitles are listed but aren't items of their own.
+                        val count = shown.count { !it.isSidecar }
                         Text(
-                            pluralStringResource(R.plurals.item_count, shown.size, shown.size) +
+                            pluralStringResource(R.plurals.item_count, count, count) +
                                 (if (total > 0) " · " + android.text.format.Formatter.formatShortFileSize(context, total) else ""),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
