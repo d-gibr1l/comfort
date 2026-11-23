@@ -223,7 +223,12 @@ object MediaStoreHelper {
         for (uri in uris) {
             try {
                 if (uri.authority == MediaStore.AUTHORITY) {
-                    context.contentResolver.delete(uri, null, null)
+                    val rows = context.contentResolver.delete(uri, null, null)
+                    // Nothing deleted, no error, the file still there: one MediaStore won't let this
+                    // app delete quietly (not its own to it). The user's OK is asked for, as on Android
+                    // 11+'s SecurityException.
+                    if (rows == 0 && !reallyGone(context, uri)) needConsent += uri
+                    android.util.Log.i("MediaStoreHelper", "delete $uri: $rows row(s)")
                 } else if (android.provider.DocumentsContract.isDocumentUri(context, uri)) {
                     android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri)
                 }

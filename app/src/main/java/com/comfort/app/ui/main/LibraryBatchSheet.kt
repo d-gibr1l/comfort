@@ -88,22 +88,33 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity) = Velocity(0f, available.y)
         }
     }
+    // The file is gone: its record and the download's count and size follow.
+    suspend fun forget(item: BatchItem) = withContext(Dispatchers.IO) {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        dao.deleteSavedFile(download.id, item.uri.toString())
+        dao.decrementDownloadedItems(download.id, 1)
+        if (item.sizeBytes > 0) dao.addBytes(download.id, -item.sizeBytes)
+    }
+    // A file Android only deletes with the user's OK (its own dialog).
+    var awaitingOk by remember { mutableStateOf<BatchItem?>(null) }
+    val consent = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val item = awaitingOk ?: return@rememberLauncherForActivityResult
+        awaitingOk = null
+        if (result.resultCode == android.app.Activity.RESULT_OK) scope.launch { forget(item); revision++ }
+    }
     fun delete(item: BatchItem) {
         scope.launch {
-            val refused = withContext(Dispatchers.IO) {
-                val needsOk = com.comfort.app.util.MediaStoreHelper.deleteSavedFiles(context, listOf(item.uri))
-                if (needsOk.isEmpty()) {
-                    val dao = AppDatabase.getDatabase(context).downloadDao()
-                    dao.deleteSavedFile(download.id, item.uri.toString())
-                    dao.decrementDownloadedItems(download.id, 1)
-                    if (item.sizeBytes > 0) dao.addBytes(download.id, -item.sizeBytes)
-                }
-                needsOk.isNotEmpty()
+            android.util.Log.i("LibraryBatchSheet", "delete #${item.number} ${item.uri} (${item.mime})")
+            val needsOk = withContext(Dispatchers.IO) {
+                com.comfort.app.util.MediaStoreHelper.deleteSavedFiles(context, listOf(item.uri)).also { if (it.isEmpty()) forget(item) }
             }
-            if (refused) {
-                android.widget.Toast.makeText(context, R.string.batch_item_not_deleted, android.widget.Toast.LENGTH_LONG).show()
+            if (needsOk.isEmpty()) { revision++; return@launch }
+            val request = runCatching { MediaStore.createDeleteRequest(context.contentResolver, needsOk) }.getOrNull()
+            if (request != null) {
+                awaitingOk = item
+                consent.launch(androidx.activity.result.IntentSenderRequest.Builder(request.intentSender).build())
             } else {
-                revision++
+                android.widget.Toast.makeText(context, R.string.batch_item_not_deleted, android.widget.Toast.LENGTH_LONG).show()
             }
         }
     }
