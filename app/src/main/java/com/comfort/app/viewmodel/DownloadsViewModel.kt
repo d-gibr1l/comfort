@@ -362,13 +362,21 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
             deletedCheck.withLock {
                 val multi = historyFlow.value.filter { it.status == DownloadStatus.FINISHED && it.downloadedItems > 1 }.map { it.id }
                 if (multi.isEmpty()) { _deletedCounts.value = emptyMap(); return@withLock }
-                val files = multi.chunked(500).flatMap { dao.savedFiles(it) }
+                var files = multi.chunked(500).flatMap { dao.savedFiles(it) }
+                // Names for older saves first (once each), so a thumbnail deleted later is known.
+                if (files.any { it.path == null }) {
+                    com.comfort.app.data.DeletedFiles.fillNames(getApplication(), files)
+                    files = multi.chunked(500).flatMap { dao.savedFiles(it) }
+                }
                 val gone = com.comfort.app.data.DeletedFiles.missing(getApplication(), files)
-                _deletedCounts.value = gone.groupingBy { it.downloadId }.eachCount()
+                val byDownload = files.groupBy { it.downloadId }
+                // A video's saved thumbnail, lyrics or subtitles deleted: not a missing item.
+                _deletedCounts.value = gone
+                    .filterNot { com.comfort.app.data.DeletedFiles.isCompanion(it, byDownload[it.downloadId].orEmpty()) }
+                    .groupingBy { it.downloadId }.eachCount()
                 // A card whose picture was a deleted file shows the first of its files that's
                 // left (it went blank, and opened on the Library's first item).
                 val goneUris = gone.map { it.uri }.toSet()
-                val byDownload = files.groupBy { it.downloadId }
                 for (entity in historyFlow.value) {
                     val thumb = entity.thumbnailPath ?: continue
                     if (entity.isAudio || thumb !in goneUris) continue

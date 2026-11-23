@@ -56,6 +56,40 @@ object DeletedFiles {
         return gone
     }
 
+    private val MEDIA_EXT = setOf("mp4", "mkv", "webm", "mov", "m4v", "avi", "mp3", "m4a", "opus", "ogg", "flac", "wav", "aac")
+    private val PICTURE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "avif")
+    private val SIDECAR_EXT = setOf("lrc", "srt", "vtt", "ass", "ssa")
+
+    /** Whether [file] only goes with another file of its download: a video's or song's saved
+     * thumbnail (a picture of the same name, Settings' "Save thumbnail"), or lyrics / subtitles.
+     * Deleting one isn't a missing item: the card doesn't warn about it or offer it again. */
+    fun isCompanion(file: SavedFile, all: List<SavedFile>): Boolean {
+        val name = file.path ?: return false
+        val ext = name.substringAfterLast('.', "").lowercase()
+        if (ext in SIDECAR_EXT) return true
+        if (ext !in PICTURE_EXT) return false
+        val base = name.substringBeforeLast('.')
+        return all.any { other ->
+            val n = other.path ?: return@any false
+            other.uri != file.uri && n.substringBeforeLast('.') == base && n.substringAfterLast('.', "").lowercase() in MEDIA_EXT
+        }
+    }
+
+    /** Fills in the names of [files] recorded without one (older saves) that are still on the
+     * phone, from MediaStore, so [isCompanion] knows them once they're deleted. */
+    suspend fun fillNames(context: Context, files: List<SavedFile>) {
+        val unnamed = files.filter { it.path == null }
+        if (unnamed.isEmpty()) return
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        for (file in unnamed) {
+            val name = runCatching {
+                context.contentResolver.query(Uri.parse(file.uri), arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            }.getOrNull() ?: continue
+            dao.setSavedFilePath(file.downloadId, file.uri, name)
+        }
+    }
+
     /** A file outside MediaStore (a folder chosen in Settings, through the storage picker). */
     private fun exists(context: Context, uri: Uri): Boolean = try {
         context.contentResolver.query(uri, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)

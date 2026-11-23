@@ -323,6 +323,10 @@ interface DownloadDao {
         AND EXISTS (SELECT 1 FROM saved_files s3 WHERE s3.downloadId = downloads.id AND s3.position = 1)""")
     suspend fun pointThumbnailsAtFirstItem(): Int
 
+    /** A saved file's name, for one recorded without it (see DeletedFiles.fillNames). */
+    @Query("UPDATE saved_files SET path = :path WHERE downloadId = :downloadId AND uri = :uri")
+    suspend fun setSavedFilePath(downloadId: String, uri: String, path: String)
+
     /** One file of [downloadId], deleted from the phone (see DeletedFiles). */
     @Query("DELETE FROM saved_files WHERE downloadId = :downloadId AND uri = :uri")
     suspend fun deleteSavedFile(downloadId: String, uri: String)
