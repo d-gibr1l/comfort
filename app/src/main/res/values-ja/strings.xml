@@ -1213,4 +1213,8 @@
     <string name="video_codec">動画コーデック</string>
     <string name="audio_codec">音声</string>
     <string name="frame_rate">フレームレート</string>
+    <string name="view_items">項目を表示</string>
+    <string name="grid_view">グリッド</string>
+    <string name="list_view">リスト</string>
+    <string name="batch_item_not_deleted">Android が Comfort にこのファイルの削除を許可しませんでした（再インストール前に保存）。ギャラリーで削除してください。</string>
 </resources>

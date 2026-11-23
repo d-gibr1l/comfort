@@ -1281,4 +1281,8 @@
     <string name="video_codec">Códec de vídeo</string>
     <string name="audio_codec">Audio</string>
     <string name="frame_rate">Fotogramas por segundo</string>
+    <string name="view_items">Ver elementos</string>
+    <string name="grid_view">Cuadrícula</string>
+    <string name="list_view">Lista</string>
+    <string name="batch_item_not_deleted">Android no dejó que Comfort borrara este archivo (guardado antes de reinstalar): bórralo desde la galería.</string>
 </resources>

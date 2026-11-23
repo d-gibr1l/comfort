@@ -1281,4 +1281,8 @@
     <string name="video_codec">Codec de vídeo</string>
     <string name="audio_codec">Áudio</string>
     <string name="frame_rate">Taxa de quadros</string>
+    <string name="view_items">Ver itens</string>
+    <string name="grid_view">Grade</string>
+    <string name="list_view">Lista</string>
+    <string name="batch_item_not_deleted">O Android não deixou o Comfort excluir este arquivo (salvo antes de reinstalar): exclua pela galeria.</string>
 </resources>

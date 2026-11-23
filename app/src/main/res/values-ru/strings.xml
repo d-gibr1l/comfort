@@ -1315,4 +1315,8 @@
     <string name="video_codec">Видеокодек</string>
     <string name="audio_codec">Звук</string>
     <string name="frame_rate">Частота кадров</string>
+    <string name="view_items">Показать элементы</string>
+    <string name="grid_view">Сетка</string>
+    <string name="list_view">Список</string>
+    <string name="batch_item_not_deleted">Android не разрешил Comfort удалить этот файл (сохранён до переустановки): удалите его в галерее.</string>
 </resources>

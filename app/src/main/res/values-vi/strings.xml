@@ -1213,4 +1213,8 @@
     <string name="video_codec">Codec video</string>
     <string name="audio_codec">Âm thanh</string>
     <string name="frame_rate">Tốc độ khung hình</string>
+    <string name="view_items">Xem các mục</string>
+    <string name="grid_view">Lưới</string>
+    <string name="list_view">Danh sách</string>
+    <string name="batch_item_not_deleted">Android không cho Comfort xóa tệp này (lưu trước khi cài lại): hãy xóa trong thư viện ảnh.</string>
 </resources>

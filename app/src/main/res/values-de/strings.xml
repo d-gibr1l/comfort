@@ -1247,4 +1247,8 @@
     <string name="video_codec">Videocodec</string>
     <string name="audio_codec">Audio</string>
     <string name="frame_rate">Bildrate</string>
+    <string name="view_items">Elemente ansehen</string>
+    <string name="grid_view">Raster</string>
+    <string name="list_view">Liste</string>
+    <string name="batch_item_not_deleted">Android hat Comfort das Löschen dieser Datei nicht erlaubt (vor einer Neuinstallation gespeichert): Lösche sie in deiner Galerie.</string>
 </resources>

@@ -1297,4 +1297,8 @@
     <string name="video_codec">Video codec</string>
     <string name="audio_codec">Audio</string>
     <string name="frame_rate">Frame rate</string>
+    <string name="view_items">View items</string>
+    <string name="grid_view">Grid</string>
+    <string name="list_view">List</string>
+    <string name="batch_item_not_deleted">Android didn\'t let Comfort delete this file (saved before a reinstall): delete it in your gallery.</string>
 </resources>

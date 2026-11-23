@@ -1247,4 +1247,8 @@
     <string name="video_codec">Video codec</string>
     <string name="audio_codec">Ses</string>
     <string name="frame_rate">Kare hızı</string>
+    <string name="view_items">Öğeleri göster</string>
+    <string name="grid_view">Izgara</string>
+    <string name="list_view">Liste</string>
+    <string name="batch_item_not_deleted">Android, Comfort\'un bu dosyayı silmesine izin vermedi (yeniden yüklemeden önce kaydedilmiş): galeriden silin.</string>
 </resources>

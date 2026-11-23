@@ -1247,4 +1247,8 @@
     <string name="video_codec">کدک ویدیو</string>
     <string name="audio_codec">صدا</string>
     <string name="frame_rate">نرخ فریم</string>
+    <string name="view_items">دیدن موارد</string>
+    <string name="grid_view">شبکه</string>
+    <string name="list_view">فهرست</string>
+    <string name="batch_item_not_deleted">Android اجازه نداد Comfort این فایل را حذف کند (پیش از نصب دوباره ذخیره شده): آن را از گالری حذف کنید.</string>
 </resources>

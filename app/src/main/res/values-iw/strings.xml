@@ -1281,4 +1281,8 @@
     <string name="video_codec">קודק וידאו</string>
     <string name="audio_codec">אודיו</string>
     <string name="frame_rate">קצב פריימים</string>
+    <string name="view_items">הצגת הפריטים</string>
+    <string name="grid_view">רשת</string>
+    <string name="list_view">רשימה</string>
+    <string name="batch_item_not_deleted">Android לא איפשר ל-Comfort למחוק את הקובץ (נשמר לפני התקנה מחדש): מחק אותו בגלריה.</string>
 </resources>

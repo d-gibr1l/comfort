@@ -1244,4 +1244,8 @@
     <string name="video_codec">Codec video</string>
     <string name="audio_codec">Audio</string>
     <string name="frame_rate">Frame rate</string>
+    <string name="view_items">Lihat item</string>
+    <string name="grid_view">Kisi</string>
+    <string name="list_view">Daftar</string>
+    <string name="batch_item_not_deleted">Android tidak mengizinkan Comfort menghapus file ini (disimpan sebelum instal ulang): hapus di galeri.</string>
 </resources>

@@ -1383,4 +1383,8 @@
     <string name="video_codec">ترميز الفيديو</string>
     <string name="audio_codec">الصوت</string>
     <string name="frame_rate">معدل الإطارات</string>
+    <string name="view_items">عرض العناصر</string>
+    <string name="grid_view">شبكة</string>
+    <string name="list_view">قائمة</string>
+    <string name="batch_item_not_deleted">لم يسمح Android لـ Comfort بحذف هذا الملف (حُفظ قبل إعادة التثبيت): احذفه من المعرض.</string>
 </resources>

@@ -712,6 +712,12 @@ internal fun HistoryRow(
             }
         }
 
+        // A multi-item download's items, beside its ⋮ (LibraryBatchSheet).
+        if (!selectionMode && item.downloadedItems > 1) {
+            IconButton(onClick = { BatchViewRequest.download = item }) {
+                Icon(Icons.Outlined.Layers, contentDescription = stringResource(R.string.view_items))
+            }
+        }
         // Bulk actions in the selection-mode top bar replace the per-item menu while selecting.
         if (!selectionMode) Box {
             IconButton(onClick = { menuExpanded = true }, colors = menuButtonColors(menuExpanded)) {
@@ -820,6 +826,13 @@ private fun DownloadActionsMenu(
                     onClick = { onDismiss(); compressOpen = true },
                 )
             }
+        }
+        if (item.downloadedItems > 1) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.view_items)) },
+                leadingIcon = { Icon(Icons.Outlined.Layers, contentDescription = null) },
+                onClick = { onDismiss(); BatchViewRequest.download = item },
+            )
         }
         // What the engines said while it downloaded (its lines of the downloads' log).
         DropdownMenuItem(

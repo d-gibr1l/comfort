@@ -1250,4 +1250,8 @@
     <string name="video_codec">Codec video</string>
     <string name="audio_codec">Audio</string>
     <string name="frame_rate">Frequenza fotogrammi</string>
+    <string name="view_items">Mostra elementi</string>
+    <string name="grid_view">Griglia</string>
+    <string name="list_view">Elenco</string>
+    <string name="batch_item_not_deleted">Android non ha permesso a Comfort di eliminare questo file (salvato prima di una reinstallazione): eliminalo dalla galleria.</string>
 </resources>
