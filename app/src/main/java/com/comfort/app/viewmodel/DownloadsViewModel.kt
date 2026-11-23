@@ -365,6 +365,17 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                 val files = multi.chunked(500).flatMap { dao.savedFiles(it) }
                 val gone = com.comfort.app.data.DeletedFiles.missing(getApplication(), files)
                 _deletedCounts.value = gone.groupingBy { it.downloadId }.eachCount()
+                // A card whose picture was a deleted file shows the first of its files that's
+                // left (it went blank, and opened on the Library's first item).
+                val goneUris = gone.map { it.uri }.toSet()
+                val byDownload = files.groupBy { it.downloadId }
+                for (entity in historyFlow.value) {
+                    val thumb = entity.thumbnailPath ?: continue
+                    if (entity.isAudio || thumb !in goneUris) continue
+                    val left = byDownload[entity.id].orEmpty().sortedBy { it.position }.firstOrNull { it.uri !in goneUris } ?: continue
+                    dao.setThumbnail(entity.id, left.uri)
+                    if (entity.mediaUri == thumb) dao.setMediaUri(entity.id, left.uri)
+                }
             }
         }
     }

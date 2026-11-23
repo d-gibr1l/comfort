@@ -221,7 +221,11 @@ fun MediaViewerScreen(
     }
 
     val initialPage = remember(mediaId) {
+        // Its first file, or (that one deleted from the phone) the first of its files that's
+        // left: a carousel's pages are "id", "id#1", "id#2"…, and with the first gone it opened
+        // on the Library's first item instead (reported).
         val index = galleryItems.indexOfFirst { it.id == mediaId }
+            .takeIf { it >= 0 } ?: galleryItems.indexOfFirst { it.id.startsWith("$mediaId#") }
         if (index >= 0) index else 0
     }
 
