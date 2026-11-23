@@ -16,6 +16,35 @@ from yt_dlp.postprocessor.modify_chapters import ModifyChaptersPP
 import net_resilience
 import custom_names
 from comfort_events import event, parse
+
+
+def _cache_preprocessed_player():
+    """Keeps YouTube's player script, as the JS challenge solver preprocesses it, between songs.
+    yt-dlp has the cache but leaves it off ("files are large and we do not support rotation"), so
+    QuickJS rebuilt the whole player for every song: measured on the phone, a song took 7-10 s to
+    look up, 5 s with the player cached (the first one 2.5 s more, to save it). The rotation is done
+    here: only the newest few cached players are kept (YouTube changes the player every few days)."""
+    try:
+        from yt_dlp.extractor.youtube.jsc._builtin import ejs
+        for cls in vars(ejs).values():
+            if isinstance(cls, type) and hasattr(cls, "_ENABLE_PREPROCESSED_PLAYER_CACHE"):
+                cls._ENABLE_PREPROCESSED_PLAYER_CACHE = True
+        base = os.environ.get("XDG_CACHE_HOME")
+        folder = os.path.join(base, "yt-dlp", "challenge-solver") if base else None
+        if folder and os.path.isdir(folder):
+            players = sorted(
+                (os.path.join(folder, f) for f in os.listdir(folder) if f.startswith("player")),
+                key=os.path.getmtime, reverse=True)
+            for old in players[3:]:
+                try:
+                    os.remove(old)
+                except OSError:
+                    pass
+    except Exception:
+        pass
+
+
+_cache_preprocessed_player()
 net_resilience.install()  # stalled connects retry on a fresh connection; see its docstring
 
 # curl_cffi is the only impersonate backend this bundled yt-dlp ships with (see
