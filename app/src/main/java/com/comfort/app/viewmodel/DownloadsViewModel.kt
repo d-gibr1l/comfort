@@ -597,6 +597,18 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * mediaUri when there is one: a song's thumbnailPath is a copy of its cover art, which
      * outlives the song (and can be cleared while the song is still there). A Deleted download
      * whose file is back (restored from the gallery's trash) returns to the Library. */
+    /** The first of [downloadId]'s saved files still on the phone (in its order), if any.
+     * [visibleOnly]: one this app can see; otherwise one merely hidden from it counts too. */
+    private suspend fun firstFileLeft(context: android.content.Context, downloadId: String, visibleOnly: Boolean): String? =
+        dao.savedFiles(downloadId).sortedBy { it.position }.firstOrNull { file ->
+            val uri = runCatching { Uri.parse(file.uri) }.getOrNull() ?: return@firstOrNull false
+            if (uri.authority != MediaStore.AUTHORITY) return@firstOrNull MediaStoreHelper.exists(context, file.uri, failOpen = false)
+            val seen = runCatching {
+                context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)?.use { it.moveToFirst() } == true
+            }.getOrDefault(false)
+            seen || (!visibleOnly && !MediaStoreHelper.reallyGone(context, uri))
+        }?.uri
+
     fun scanForDeletedMedia() {
         if (!isScanning.compareAndSet(false, true)) return
         viewModelScope.launch {
@@ -640,7 +652,17 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                             MediaStoreHelper.exists(context, uriStr)
                         }
                         if (!exists) {
-                            dao.updateStatus(entity.id, DownloadStatus.DELETED)
+                            // A multi-item download whose card picture went but whose other files
+                            // are still there isn't deleted: its card shows the first one left
+                            // (marked deleted, it sat under Deleted with its files still on the
+                            // phone, and its items sheet still showed them — reported).
+                            val left = firstFileLeft(context, entity.id, visibleOnly = false)
+                            if (left != null) {
+                                dao.setThumbnail(entity.id, left)
+                                if (entity.mediaUri == uriStr) dao.setMediaUri(entity.id, left)
+                            } else {
+                                dao.updateStatus(entity.id, DownloadStatus.DELETED)
+                            }
                         }
                     }
                     deleted.forEach { entity ->
@@ -654,6 +676,15 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                         }
                         if (exists) {
                             dao.updateStatus(entity.id, DownloadStatus.FINISHED)
+                        } else {
+                            // Its card picture gone, but other files of it still on the phone: back
+                            // in the Library, the card on the first of them.
+                            val left = firstFileLeft(context, entity.id, visibleOnly = true)
+                            if (left != null) {
+                                dao.setThumbnail(entity.id, left)
+                                if (entity.mediaUri == uriStr) dao.setMediaUri(entity.id, left)
+                                dao.updateStatus(entity.id, DownloadStatus.FINISHED)
+                            }
                         }
                     }
                 }

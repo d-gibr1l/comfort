@@ -294,7 +294,7 @@ internal fun HistoryGridItem(
         val deleted = deletedCount(item)
         val left = (item.downloadedItems - deleted).coerceAtLeast(0)
         val incomplete = item.missingItems > 0 || deleted > 0
-        if (typeIcon != null || item.downloadedItems > 1 || incomplete) {
+        if (item.status != DownloadStatus.DELETED && (typeIcon != null || item.downloadedItems > 1 || incomplete)) {
             Row(
                 modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -605,7 +605,8 @@ internal fun HistoryRow(
                 // when files were deleted or failed, amber with a warning then, as in the grid.
                 val deletedHere = deletedCount(item)
                 val incompleteHere = item.missingItems > 0 || deletedHere > 0
-                if (item.downloadedItems > 1 || incompleteHere) {
+                // A deleted download (none of its files left): no count, nothing to view.
+                if (item.status != DownloadStatus.DELETED && (item.downloadedItems > 1 || incompleteHere)) {
                     val countTint = if (incompleteHere) Color(0xFFFFB74D) else Color.White
                     Row(
                         modifier = Modifier
@@ -713,7 +714,7 @@ internal fun HistoryRow(
         }
 
         // A multi-item download's items, beside its ⋮ (LibraryBatchSheet).
-        if (!selectionMode && item.downloadedItems > 1) {
+        if (!selectionMode && item.downloadedItems > 1 && item.status != DownloadStatus.DELETED) {
             IconButton(onClick = { BatchViewRequest.download = item }) {
                 Icon(Icons.Outlined.Layers, contentDescription = stringResource(R.string.view_items))
             }
@@ -827,7 +828,7 @@ private fun DownloadActionsMenu(
                 )
             }
         }
-        if (item.downloadedItems > 1) {
+        if (item.downloadedItems > 1 && item.status != DownloadStatus.DELETED) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.view_items)) },
                 leadingIcon = { Icon(Icons.Outlined.Layers, contentDescription = null) },
