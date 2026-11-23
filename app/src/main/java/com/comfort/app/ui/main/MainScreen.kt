@@ -461,7 +461,9 @@ fun MainScreen(
         // A song plays in the music player (its neighbours in the list as the queue); anything
         // else opens the media viewer, which pages through the pictures and videos only.
         com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { request ->
+            // startId can be one file of a download ("id#2", from its items sheet): that download.
             val tapped = request.downloads.firstOrNull { it.id == request.startId }
+                ?: request.downloads.firstOrNull { request.startId.startsWith(it.id + "#") }
             // A comic (a chapter saved as .cbz): the comic reader.
             val comicUri = tapped?.mediaUri?.let(android.net.Uri::parse)?.takeIf { uri ->
                 com.comfort.app.data.ComicSites.isComicFile(uri.lastPathSegment, runCatching { context.contentResolver.getType(uri) }.getOrNull())
@@ -473,7 +475,8 @@ fun MainScreen(
             } else if (tapped?.isAudio == true) {
                 // Music settings: Play only the tapped song.
                 val queue = if (com.comfort.app.music.MusicSettings.playTappedOnly.current) listOf(tapped) else request.downloads
-                com.comfort.app.music.MusicPlayer.play(context, queue, tapped.id)
+                // From the song's own id when it's one song of a playlist (MusicPlayer's songsFor).
+                com.comfort.app.music.MusicPlayer.play(context, queue, request.startId)
                 showNowPlaying = true
             } else {
                 mediaViewer = request.copy(downloads = request.downloads.filter { !it.isAudio })

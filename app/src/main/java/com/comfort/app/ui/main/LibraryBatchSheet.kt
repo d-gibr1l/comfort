@@ -55,7 +55,12 @@ private data class BatchItem(
     val mime: String?,
     val sizeBytes: Long,
     val durationMs: Long?,
-)
+) {
+    val ext get() = name.substringAfterLast('.', "").lowercase()
+    val isLyrics get() = ext == "lrc"
+    /** A file that goes with another one (lyrics, subtitles), not a picture, video or song. */
+    val isSidecar get() = isLyrics || ext in setOf("srt", "vtt", "ass", "ssa")
+}
 
 private const val PREFS = "library_batch_view"
 
@@ -101,6 +106,15 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                 revision++
             }
         }
+    }
+
+    // A song's lyrics (or a video's subtitles) open the file they go with: the one of the same name.
+    fun open(item: BatchItem) {
+        val target = if (item.isSidecar) {
+            items.orEmpty().firstOrNull { !it.isSidecar && it.name.substringBeforeLast('.') == item.name.substringBeforeLast('.') }
+                ?: items.orEmpty().firstOrNull { !it.isSidecar }
+        } else item
+        target?.let { onOpen(it.pageId, it.uri, it.mime) }
     }
 
     ModalBottomSheet(
@@ -157,14 +171,14 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    items(shown, key = { it.uri.toString() }) { item -> GridTile(item, onClick = { onOpen(item.pageId, item.uri, item.mime) }, onDelete = { delete(item) }) }
+                    items(shown, key = { it.uri.toString() }) { item -> GridTile(item, onClick = { open(item) }, onDelete = { delete(item) }) }
                 }
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false).nestedScroll(keepSheet),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    items(shown, key = { it.uri.toString() }) { item -> ListRow(item, onClick = { onOpen(item.pageId, item.uri, item.mime) }, onDelete = { delete(item) }) }
+                    items(shown, key = { it.uri.toString() }) { item -> ListRow(item, onClick = { open(item) }, onDelete = { delete(item) }) }
                 }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
@@ -217,9 +231,17 @@ private fun ListRow(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit) 
 @Composable
 private fun Thumb(item: BatchItem, modifier: Modifier) {
     val audio = item.mime?.startsWith("audio/") == true
-    if (audio) {
+    if (audio || item.isSidecar) {
         Box(modifier, contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                when {
+                    item.isLyrics -> Icons.Outlined.Lyrics
+                    item.isSidecar -> Icons.Outlined.Subtitles
+                    else -> Icons.Outlined.MusicNote
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     } else {
         Box(modifier) {
@@ -235,6 +257,8 @@ private fun Thumb(item: BatchItem, modifier: Modifier) {
 private fun meta(item: BatchItem): String {
     val context = LocalContext.current
     val kind = when {
+        item.isLyrics -> stringResource(R.string.lyrics)
+        item.isSidecar -> stringResource(R.string.subtitles)
         item.mime?.startsWith("video/") == true -> stringResource(R.string.video)
         item.mime?.startsWith("audio/") == true -> stringResource(R.string.song)
         else -> stringResource(R.string.picture)

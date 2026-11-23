@@ -429,23 +429,16 @@ fun DownloadsHistoryScreen(
 
     val openViewer = com.comfort.app.ui.viewer.LocalOpenMediaViewer.current
     // A multi-item card's stack button: its items (LibraryBatchSheet). A picture or video opens
-    // on its page in the viewer; a song in the phone's player (it's one file of the download).
+    // on its page in the viewer; a song in the music player, the playlist's songs as the queue
+    // (a song's lyrics file plays its song).
     BatchViewRequest.download?.let { batch ->
-        val batchContext = androidx.compose.ui.platform.LocalContext.current
         LibraryBatchSheet(
             download = batch,
             onDismiss = { BatchViewRequest.download = null },
-            onOpen = { pageId, uri, mime ->
+            onOpen = { pageId, _, mime ->
                 BatchViewRequest.download = null
-                if (mime?.startsWith("audio/") == true) {
-                    // A playlist's song: one file of the download, with no Library entry of its own
-                    // for the music player; the phone's player plays it.
-                    val play = android.content.Intent(android.content.Intent.ACTION_VIEW)
-                        .setDataAndType(uri, mime)
-                        .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    runCatching { batchContext.startActivity(play) }.onFailure {
-                        android.widget.Toast.makeText(batchContext, R.string.no_app_to_open_this, android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                if (batch.isAudio && mime?.startsWith("image/") != true && mime?.startsWith("video/") != true) {
+                    openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = listOf(batch), startId = pageId))
                 } else {
                     val visual = historyItems.filter { !it.isAudio }
                     openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = visual.ifEmpty { listOf(batch) }, startId = pageId))
