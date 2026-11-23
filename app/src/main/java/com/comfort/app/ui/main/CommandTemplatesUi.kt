@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -150,6 +151,7 @@ private fun CurrentSettingsCommand() {
 
 /** Names and edits a template: its name and its arguments. [initial] with a blank name is a new
  * one (its arguments may already be filled in, from a download's Commands screen). */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CommandTemplateDialog(
     initial: CommandTemplate,
@@ -160,38 +162,68 @@ internal fun CommandTemplateDialog(
     var args by remember { mutableStateOf(initial.args) }
     val unclosedQuotes = hasUnmatchedQuotes(args)
     val valid = name.isNotBlank() && args.isNotBlank() && !unclosedQuotes
-    AlertDialog(
+    // A bottom sheet, like the app's other forms (it was a popup dialog).
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (initial.name.isEmpty()) R.string.command_template_new else R.string.command_template_edit)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.replace("\n", "") },
-                    label = { Text(stringResource(R.string.command_template_name)) },
-                    placeholder = { Text(stringResource(R.string.command_template_name_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                )
-                OutlinedTextField(
-                    value = args,
-                    onValueChange = { args = it },
-                    label = { Text(stringResource(R.string.command_template_args)) },
-                    placeholder = { Text(stringResource(R.string.command_template_args_hint)) },
-                    isError = unclosedQuotes,
-                    supportingText = {
-                        if (unclosedQuotes) Text(stringResource(R.string.command_template_unclosed_quotes), color = MaterialTheme.colorScheme.error)
-                        else Text(stringResource(R.string.command_template_args_help))
-                    },
-                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
-                )
+        sheetState = rememberSturdySheetState(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        // Edge to edge: the content runs under the navigation bar instead of stopping above it.
+        contentWindowInsets = { WindowInsets(0) },
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .imePadding()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SheetHeader(
+                icon = Icons.Outlined.Terminal,
+                title = stringResource(if (initial.name.isEmpty()) R.string.command_template_new else R.string.command_template_edit),
+                subtitle = null,
+                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+            )
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.replace("\n", "") },
+                label = { Text(stringResource(R.string.command_template_name)) },
+                placeholder = { Text(stringResource(R.string.command_template_name_hint)) },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            )
+            OutlinedTextField(
+                value = args,
+                onValueChange = { args = it },
+                label = { Text(stringResource(R.string.command_template_args)) },
+                placeholder = { Text(stringResource(R.string.command_template_args_hint)) },
+                isError = unclosedQuotes,
+                supportingText = {
+                    if (unclosedQuotes) Text(stringResource(R.string.command_template_unclosed_quotes), color = MaterialTheme.colorScheme.error)
+                    else Text(stringResource(R.string.command_template_args_help))
+                },
+                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(52.dp)) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+                Button(
+                    enabled = valid,
+                    onClick = { onSave(CommandTemplate(name.trim(), args.trim())) },
+                    modifier = Modifier.weight(1f).height(52.dp),
+                ) {
+                    Text(stringResource(R.string.action_save))
+                }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = valid, onClick = { onSave(CommandTemplate(name.trim(), args.trim())) }) { Text(stringResource(R.string.action_save)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
+            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        }
+    }
 }
