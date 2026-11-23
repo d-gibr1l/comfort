@@ -1324,4 +1324,27 @@
     <string name="media_access_body">הן נשמרו בהתקנה קודמת של Comfort, ולכן Android סוגר אותן בפני ההתקנה הזו. אפשרו גישה לתמונות, לסרטונים ולמוזיקה כדי לפתוח אותן כאן.</string>
     <string name="media_access_allow">מתן גישה</string>
     <string name="comic_converting">ממיר ל-‎.cbz…</string>
+    <string name="reader_settings">הגדרות הקורא</string>
+    <string name="page_scale">קנה מידה של עמוד</string>
+    <string name="scale_fit">התאמה למסך</string>
+    <string name="scale_fit_width">התאמה לרוחב</string>
+    <string name="scale_fit_height">התאמה לגובה</string>
+    <string name="scale_original">גודל מקורי</string>
+    <string name="tap_to_turn_pages">הקשה להפיכת עמודים</string>
+    <string name="tap_to_turn_pages_subtitle">הקישו בצד שמאל או ימין של העמוד; האמצע מציג את הפקדים</string>
+    <string name="invert_taps">היפוך הקשות</string>
+    <string name="animate_page_turns">אנימציה בהפיכת עמוד</string>
+    <string name="side_padding">שוליים בצדדים</string>
+    <string name="reader_background">רקע</string>
+    <string name="reader_bg_black">שחור</string>
+    <string name="reader_bg_gray">אפור</string>
+    <string name="reader_bg_white">לבן</string>
+    <string name="reader_orientation">כיוון</string>
+    <string name="orientation_free">חופשי</string>
+    <string name="orientation_portrait">לאורך</string>
+    <string name="orientation_landscape">לרוחב</string>
+    <string name="volume_keys_turn_pages">מקשי עוצמת הקול הופכים עמודים</string>
+    <string name="reader_keep_screen_on">השארת המסך דלוק</string>
+    <string name="show_page_number">הצגת מספר עמוד</string>
+    <string name="reader_fullscreen">מסך מלא</string>
 </resources>

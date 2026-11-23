@@ -1287,4 +1287,27 @@
     <string name="media_access_body">Unduhan ini disimpan oleh instalasi Comfort sebelumnya, jadi Android menutupnya untuk instalasi ini. Izinkan akses ke foto, video, dan musik untuk membukanya di sini.</string>
     <string name="media_access_allow">Izinkan akses</string>
     <string name="comic_converting">Mengonversi ke .cbz…</string>
+    <string name="reader_settings">Setelan pembaca</string>
+    <string name="page_scale">Skala halaman</string>
+    <string name="scale_fit">Sesuaikan layar</string>
+    <string name="scale_fit_width">Sesuaikan lebar</string>
+    <string name="scale_fit_height">Sesuaikan tinggi</string>
+    <string name="scale_original">Ukuran asli</string>
+    <string name="tap_to_turn_pages">Ketuk untuk membalik halaman</string>
+    <string name="tap_to_turn_pages_subtitle">Ketuk sisi kiri atau kanan; bagian tengah menampilkan kontrol</string>
+    <string name="invert_taps">Balik arah ketuk</string>
+    <string name="animate_page_turns">Animasikan balik halaman</string>
+    <string name="side_padding">Margin samping</string>
+    <string name="reader_background">Latar belakang</string>
+    <string name="reader_bg_black">Hitam</string>
+    <string name="reader_bg_gray">Abu-abu</string>
+    <string name="reader_bg_white">Putih</string>
+    <string name="reader_orientation">Orientasi</string>
+    <string name="orientation_free">Bebas</string>
+    <string name="orientation_portrait">Potret</string>
+    <string name="orientation_landscape">Lanskap</string>
+    <string name="volume_keys_turn_pages">Tombol volume membalik halaman</string>
+    <string name="reader_keep_screen_on">Biarkan layar menyala</string>
+    <string name="show_page_number">Tampilkan nomor halaman</string>
+    <string name="reader_fullscreen">Layar penuh</string>
 </resources>

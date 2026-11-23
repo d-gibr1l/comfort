@@ -1290,4 +1290,27 @@
     <string name="media_access_body">Bunlar Comfort\'un önceki bir kurulumu tarafından kaydedildi, bu yüzden Android onları bu kuruluma kapalı tutuyor. Burada açmak için fotoğraf, video ve müziğe erişime izin verin.</string>
     <string name="media_access_allow">Erişime izin ver</string>
     <string name="comic_converting">.cbz\'ye dönüştürülüyor…</string>
+    <string name="reader_settings">Okuyucu ayarları</string>
+    <string name="page_scale">Sayfa ölçeği</string>
+    <string name="scale_fit">Ekrana sığdır</string>
+    <string name="scale_fit_width">Genişliğe sığdır</string>
+    <string name="scale_fit_height">Yüksekliğe sığdır</string>
+    <string name="scale_original">Orijinal boyut</string>
+    <string name="tap_to_turn_pages">Sayfa çevirmek için dokun</string>
+    <string name="tap_to_turn_pages_subtitle">Sayfanın soluna veya sağına dokunun; orta kısım kontrolleri gösterir</string>
+    <string name="invert_taps">Dokunmaları ters çevir</string>
+    <string name="animate_page_turns">Sayfa çevirmeyi canlandır</string>
+    <string name="side_padding">Yan kenar boşlukları</string>
+    <string name="reader_background">Arka plan</string>
+    <string name="reader_bg_black">Siyah</string>
+    <string name="reader_bg_gray">Gri</string>
+    <string name="reader_bg_white">Beyaz</string>
+    <string name="reader_orientation">Yön</string>
+    <string name="orientation_free">Serbest</string>
+    <string name="orientation_portrait">Dikey</string>
+    <string name="orientation_landscape">Yatay</string>
+    <string name="volume_keys_turn_pages">Ses tuşları sayfa çevirir</string>
+    <string name="reader_keep_screen_on">Ekranı açık tut</string>
+    <string name="show_page_number">Sayfa numarasını göster</string>
+    <string name="reader_fullscreen">Tam ekran</string>
 </resources>

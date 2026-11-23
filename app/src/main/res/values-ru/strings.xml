@@ -1358,4 +1358,27 @@
     <string name="media_access_body">Их сохранила прежняя установка Comfort, поэтому Android закрывает их для этой. Разрешите доступ к фото, видео и музыке, чтобы открывать их здесь.</string>
     <string name="media_access_allow">Разрешить доступ</string>
     <string name="comic_converting">Преобразование в .cbz…</string>
+    <string name="reader_settings">Настройки читалки</string>
+    <string name="page_scale">Масштаб страницы</string>
+    <string name="scale_fit">По размеру экрана</string>
+    <string name="scale_fit_width">По ширине</string>
+    <string name="scale_fit_height">По высоте</string>
+    <string name="scale_original">Исходный размер</string>
+    <string name="tap_to_turn_pages">Листать касанием</string>
+    <string name="tap_to_turn_pages_subtitle">Коснитесь левого или правого края; середина показывает управление</string>
+    <string name="invert_taps">Инвертировать касания</string>
+    <string name="animate_page_turns">Анимация перелистывания</string>
+    <string name="side_padding">Поля по бокам</string>
+    <string name="reader_background">Фон</string>
+    <string name="reader_bg_black">Чёрный</string>
+    <string name="reader_bg_gray">Серый</string>
+    <string name="reader_bg_white">Белый</string>
+    <string name="reader_orientation">Ориентация</string>
+    <string name="orientation_free">Свободная</string>
+    <string name="orientation_portrait">Книжная</string>
+    <string name="orientation_landscape">Альбомная</string>
+    <string name="volume_keys_turn_pages">Листать кнопками громкости</string>
+    <string name="reader_keep_screen_on">Не выключать экран</string>
+    <string name="show_page_number">Показывать номер страницы</string>
+    <string name="reader_fullscreen">Полный экран</string>
 </resources>

@@ -1290,4 +1290,27 @@
     <string name="media_access_body">این‌ها را نصب قبلی Comfort ذخیره کرده، برای همین Android آن‌ها را برای این نصب بسته نگه می‌دارد. برای باز کردنشان اینجا، اجازهٔ دسترسی به عکس‌ها، ویدیوها و موسیقی را بدهید.</string>
     <string name="media_access_allow">اجازهٔ دسترسی</string>
     <string name="comic_converting">در حال تبدیل به ‎.cbz…</string>
+    <string name="reader_settings">تنظیمات خواننده</string>
+    <string name="page_scale">اندازهٔ صفحه</string>
+    <string name="scale_fit">متناسب با صفحه‌نمایش</string>
+    <string name="scale_fit_width">متناسب با عرض</string>
+    <string name="scale_fit_height">متناسب با ارتفاع</string>
+    <string name="scale_original">اندازهٔ اصلی</string>
+    <string name="tap_to_turn_pages">ضربه برای ورق زدن</string>
+    <string name="tap_to_turn_pages_subtitle">روی چپ یا راست صفحه ضربه بزنید؛ وسط کنترل‌ها را نشان می‌دهد</string>
+    <string name="invert_taps">وارونه کردن ضربه‌ها</string>
+    <string name="animate_page_turns">پویانمایی ورق زدن</string>
+    <string name="side_padding">حاشیه‌های کناری</string>
+    <string name="reader_background">پس‌زمینه</string>
+    <string name="reader_bg_black">سیاه</string>
+    <string name="reader_bg_gray">خاکستری</string>
+    <string name="reader_bg_white">سفید</string>
+    <string name="reader_orientation">جهت</string>
+    <string name="orientation_free">آزاد</string>
+    <string name="orientation_portrait">عمودی</string>
+    <string name="orientation_landscape">افقی</string>
+    <string name="volume_keys_turn_pages">دکمه‌های صدا صفحه را ورق می‌زنند</string>
+    <string name="reader_keep_screen_on">روشن نگه داشتن صفحه</string>
+    <string name="show_page_number">نمایش شمارهٔ صفحه</string>
+    <string name="reader_fullscreen">تمام‌صفحه</string>
 </resources>

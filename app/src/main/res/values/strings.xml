@@ -1340,4 +1340,27 @@
     <string name="media_access_body">They were saved by an earlier install of Comfort, so Android keeps them closed to this one. Allow access to your photos, videos and music to open them here.</string>
     <string name="media_access_allow">Allow access</string>
     <string name="comic_converting">Converting to .cbz…</string>
+    <string name="reader_settings">Reader settings</string>
+    <string name="page_scale">Page scale</string>
+    <string name="scale_fit">Fit screen</string>
+    <string name="scale_fit_width">Fit width</string>
+    <string name="scale_fit_height">Fit height</string>
+    <string name="scale_original">Original size</string>
+    <string name="tap_to_turn_pages">Tap to turn pages</string>
+    <string name="tap_to_turn_pages_subtitle">Tap a page\'s left or right side; the middle shows the controls</string>
+    <string name="invert_taps">Invert taps</string>
+    <string name="animate_page_turns">Animate page turns</string>
+    <string name="side_padding">Side margins</string>
+    <string name="reader_background">Background</string>
+    <string name="reader_bg_black">Black</string>
+    <string name="reader_bg_gray">Gray</string>
+    <string name="reader_bg_white">White</string>
+    <string name="reader_orientation">Orientation</string>
+    <string name="orientation_free">Free</string>
+    <string name="orientation_portrait">Portrait</string>
+    <string name="orientation_landscape">Landscape</string>
+    <string name="volume_keys_turn_pages">Volume keys turn pages</string>
+    <string name="reader_keep_screen_on">Keep screen on</string>
+    <string name="show_page_number">Show page number</string>
+    <string name="reader_fullscreen">Full screen</string>
 </resources>

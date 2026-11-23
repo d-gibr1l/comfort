@@ -1426,4 +1426,27 @@
     <string name="media_access_body">حُفظت بواسطة تثبيت سابق لـ Comfort، لذا يُبقيها Android مغلقة أمام هذا التثبيت. اسمح بالوصول إلى صورك وفيديوهاتك وموسيقاك لفتحها هنا.</string>
     <string name="media_access_allow">السماح بالوصول</string>
     <string name="comic_converting">جارٍ التحويل إلى ‎.cbz…</string>
+    <string name="reader_settings">إعدادات القارئ</string>
+    <string name="page_scale">حجم الصفحة</string>
+    <string name="scale_fit">ملاءمة الشاشة</string>
+    <string name="scale_fit_width">ملاءمة العرض</string>
+    <string name="scale_fit_height">ملاءمة الارتفاع</string>
+    <string name="scale_original">الحجم الأصلي</string>
+    <string name="tap_to_turn_pages">انقر لقلب الصفحات</string>
+    <string name="tap_to_turn_pages_subtitle">انقر على يسار الصفحة أو يمينها؛ الوسط يُظهر عناصر التحكم</string>
+    <string name="invert_taps">عكس النقرات</string>
+    <string name="animate_page_turns">تحريك قلب الصفحات</string>
+    <string name="side_padding">الهوامش الجانبية</string>
+    <string name="reader_background">الخلفية</string>
+    <string name="reader_bg_black">أسود</string>
+    <string name="reader_bg_gray">رمادي</string>
+    <string name="reader_bg_white">أبيض</string>
+    <string name="reader_orientation">الاتجاه</string>
+    <string name="orientation_free">حر</string>
+    <string name="orientation_portrait">عمودي</string>
+    <string name="orientation_landscape">أفقي</string>
+    <string name="volume_keys_turn_pages">أزرار الصوت تقلب الصفحات</string>
+    <string name="reader_keep_screen_on">إبقاء الشاشة قيد التشغيل</string>
+    <string name="show_page_number">إظهار رقم الصفحة</string>
+    <string name="reader_fullscreen">ملء الشاشة</string>
 </resources>

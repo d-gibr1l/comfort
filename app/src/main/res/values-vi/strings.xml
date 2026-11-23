@@ -1256,4 +1256,27 @@
     <string name="media_access_body">Chúng được lưu bởi bản cài Comfort trước đó, nên Android không cho bản này mở. Hãy cho phép truy cập ảnh, video và nhạc để mở chúng tại đây.</string>
     <string name="media_access_allow">Cho phép truy cập</string>
     <string name="comic_converting">Đang chuyển sang .cbz…</string>
+    <string name="reader_settings">Cài đặt trình đọc</string>
+    <string name="page_scale">Tỷ lệ trang</string>
+    <string name="scale_fit">Vừa màn hình</string>
+    <string name="scale_fit_width">Vừa chiều rộng</string>
+    <string name="scale_fit_height">Vừa chiều cao</string>
+    <string name="scale_original">Kích thước gốc</string>
+    <string name="tap_to_turn_pages">Chạm để lật trang</string>
+    <string name="tap_to_turn_pages_subtitle">Chạm bên trái hoặc phải trang; giữa trang hiện điều khiển</string>
+    <string name="invert_taps">Đảo chiều chạm</string>
+    <string name="animate_page_turns">Hiệu ứng lật trang</string>
+    <string name="side_padding">Lề hai bên</string>
+    <string name="reader_background">Nền</string>
+    <string name="reader_bg_black">Đen</string>
+    <string name="reader_bg_gray">Xám</string>
+    <string name="reader_bg_white">Trắng</string>
+    <string name="reader_orientation">Hướng màn hình</string>
+    <string name="orientation_free">Tự do</string>
+    <string name="orientation_portrait">Dọc</string>
+    <string name="orientation_landscape">Ngang</string>
+    <string name="volume_keys_turn_pages">Phím âm lượng lật trang</string>
+    <string name="reader_keep_screen_on">Giữ màn hình luôn bật</string>
+    <string name="show_page_number">Hiện số trang</string>
+    <string name="reader_fullscreen">Toàn màn hình</string>
 </resources>

@@ -13,6 +13,12 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.LocalLayoutDirection
 import android.content.Context
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -154,8 +160,13 @@ private object NaturalOrder : Comparator<String> {
 fun ComicReader(request: ComicRequest, onClose: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
-    var mode by remember { mutableStateOf(runCatching { ReadingMode.valueOf(prefs.getString("mode", null) ?: "") }.getOrDefault(ReadingMode.RIGHT_TO_LEFT)) }
+    // The reader's settings (ComicReaderSettings), changed from its sheet and kept.
+    var settings by remember { mutableStateOf(ReaderSettings.load(context)) }
+    fun update(new: ReaderSettings) { settings = new; new.save(context) }
+    val mode = settings.mode
+    var settingsOpen by remember { mutableStateOf(false) }
     var bars by remember { mutableStateOf(true) }
+    ReaderWindow(settings, bars)
     var failed by remember { mutableStateOf(false) }
     val comic by produceState<Pair<File, List<String>>?>(null, request.uri) {
         value = runCatching { openComic(context, request.uri) }.onFailure { failed = true }.getOrNull()
@@ -163,7 +174,24 @@ fun ComicReader(request: ComicRequest, onClose: () -> Unit) {
     val progressKey = "page:${request.uri}"
     BackHandler(onBack = onClose)
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // Volume keys turn pages (when on): handled by whichever mode is showing.
+    var volumeStep by remember { mutableStateOf<((Int) -> Unit)?>(null) }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    Box(
+        Modifier.fillMaxSize().background(settings.background.color)
+            .focusRequester(focus).focusable()
+            .onPreviewKeyEvent { e ->
+                if (!settings.volumeKeys) return@onPreviewKeyEvent false
+                val step = when (e.nativeKeyEvent.keyCode) {
+                    android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> 1
+                    android.view.KeyEvent.KEYCODE_VOLUME_UP -> -1
+                    else -> return@onPreviewKeyEvent false
+                }
+                if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) volumeStep?.invoke(step)
+                true
+            },
+    ) {
         val loaded = comic
         when {
             failed -> Text(stringResource(R.string.comic_cant_open), color = Color.White, modifier = Modifier.align(Alignment.Center).padding(24.dp))
@@ -180,8 +208,12 @@ fun ComicReader(request: ComicRequest, onClose: () -> Unit) {
                     LaunchedEffect(listState) {
                         snapshotFlow { listState.firstVisibleItemIndex }.collect { current = it }
                     }
+                    volumeStep = { step -> scope.launch { listState.animateScrollBy(step * listState.layoutInfo.viewportSize.height * 0.85f) } }
+                    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+                    val margin = maxWidth * (settings.sidePadding / 100f)
                     LazyColumn(
                         state = listState,
+                        contentPadding = PaddingValues(horizontal = margin),
                         modifier = Modifier.fillMaxSize().webtoonZoom(listState, onTap = { bars = !bars }),
                     ) {
                         items(pages.size) { i ->
@@ -193,27 +225,59 @@ fun ComicReader(request: ComicRequest, onClose: () -> Unit) {
                             )
                         }
                     }
-                    BottomBar(current, pages.size, rtl = false, visible = bars, mode = mode, onMode = { mode = it; prefs.edit().putString("mode", it.name).apply() }) { scope.launch { listState.scrollToItem(it) } }
+                    }
+                    BottomBar(current, pages.size, rtl = false, visible = bars, mode = mode, onSettings = { settingsOpen = true }) { scope.launch { listState.scrollToItem(it) } }
                 } else {
                     val rtl = mode == ReadingMode.RIGHT_TO_LEFT
                     val pager = rememberPagerState(initialPage = start) { pages.size }
                     LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { current = it } }
+                    // To the next (+1) or previous (-1) page in reading order, animated or not.
+                    fun turn(step: Int) {
+                        val target = (pager.currentPage + step).coerceIn(0, pages.lastIndex)
+                        scope.launch { if (settings.animatePages) pager.animateScrollToPage(target) else pager.scrollToPage(target) }
+                    }
+                    volumeStep = { turn(it) }
                     HorizontalPager(
                         state = pager,
                         reverseLayout = rtl,
                         beyondViewportPageCount = 1,
                         modifier = Modifier.fillMaxSize(),
                     ) { i ->
-                        ZoomablePage(ComicPage(file, pages[i]), onTap = { bars = !bars })
+                        ZoomablePage(ComicPage(file, pages[i]), settings.scale.contentScale, onTap = { x, width ->
+                            // Tap zones: a page's left or right third turns it (on screen, which way
+                            // is "next" follows the reading direction, flipped with Invert taps).
+                            val third = when {
+                                !settings.tapZones -> 0
+                                x < width / 3f -> -1
+                                x > width * 2f / 3f -> 1
+                                else -> 0
+                            }
+                            if (third == 0) bars = !bars else {
+                                val forwardOnRight = !rtl != settings.invertTaps
+                                turn(if ((third == 1) == forwardOnRight) 1 else -1)
+                            }
+                        })
                     }
-                    BottomBar(current, pages.size, rtl = rtl, visible = bars, mode = mode, onMode = { mode = it; prefs.edit().putString("mode", it.name).apply() }) { scope.launch { pager.scrollToPage(it) } }
+                    BottomBar(current, pages.size, rtl = rtl, visible = bars, mode = mode, onSettings = { settingsOpen = true }) { scope.launch { pager.scrollToPage(it) } }
                 }
                 // Page count, top.
                 AnimatedVisibility(bars, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter)) {
                     TopBar(request.title, "${current + 1} / ${pages.size}", onClose = onClose)
                 }
+                // Bars hidden: the page number, small, at the bottom (Show page number).
+                AnimatedVisibility(!bars && settings.showPageNumber, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+                    Text(
+                        "${current + 1} / ${pages.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.navigationBarsPadding().padding(bottom = 8.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), com.comfort.app.theme.ContinuousCapsuleShape)
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
             }
         }
+        if (settingsOpen) ReaderSettingsSheet(settings, onChange = { update(it) }, onDismiss = { settingsOpen = false })
         if (comic == null || failed) {
             IconButton(onClick = onClose, modifier = Modifier.statusBarsPadding().padding(8.dp)) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = Color.White)
@@ -236,42 +300,35 @@ private fun TopBar(title: String, pageText: String, onClose: () -> Unit) {
     }
 }
 
-/** The reading mode button and its menu (bottom right, beside the slider). */
+/** The reader's window while it's open: kept awake, turned as set, and full screen with the bars
+ * hidden (each as Reader settings says), all put back on leaving. */
 @Composable
-private fun ModeButton(mode: ReadingMode, onMode: (ReadingMode) -> Unit) {
-    var menu by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { menu = true }) {
-            Icon(
-                when (mode) {
-                    ReadingMode.RIGHT_TO_LEFT -> Icons.Outlined.FormatTextdirectionRToL
-                    ReadingMode.LEFT_TO_RIGHT -> Icons.Outlined.FormatTextdirectionLToR
-                    ReadingMode.VERTICAL -> Icons.Outlined.SwapVert
-                },
-                contentDescription = stringResource(R.string.reading_mode),
-                tint = Color.White,
-            )
-        }
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            listOf(
-                ReadingMode.RIGHT_TO_LEFT to R.string.reading_right_to_left,
-                ReadingMode.LEFT_TO_RIGHT to R.string.reading_left_to_right,
-                ReadingMode.VERTICAL to R.string.reading_vertical,
-            ).forEach { (m, label) ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
-                    trailingIcon = { if (m == mode) Icon(Icons.Outlined.Check, contentDescription = null) },
-                    onClick = { menu = false; onMode(m) },
-                )
-            }
-        }
+private fun ReaderWindow(settings: ReaderSettings, bars: Boolean) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    val activity = LocalContext.current as? android.app.Activity
+    DisposableEffect(settings.keepScreenOn) {
+        view.keepScreenOn = settings.keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
+    DisposableEffect(settings.orientation) {
+        val was = activity?.requestedOrientation
+        activity?.requestedOrientation = settings.orientation.android
+        onDispose { if (was != null) activity.requestedOrientation = was }
+    }
+    val window = activity?.window
+    DisposableEffect(settings.fullscreen, bars) {
+        val controller = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
+        controller?.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (settings.fullscreen && !bars) controller?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        else controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        onDispose { controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
     }
 }
 
 /** The bottom bar, over the page with nothing behind it: the page slider, which runs the way the
  * pages do (right to left for manga), and the reading mode button at its right. */
 @Composable
-private fun BoxScope.BottomBar(current: Int, count: Int, rtl: Boolean, visible: Boolean, mode: ReadingMode, onMode: (ReadingMode) -> Unit, onJump: (Int) -> Unit) {
+private fun BoxScope.BottomBar(current: Int, count: Int, rtl: Boolean, visible: Boolean, mode: ReadingMode, onSettings: () -> Unit, onJump: (Int) -> Unit) {
     AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
         var dragging by remember { mutableStateOf<Float?>(null) }
         Row(
@@ -292,7 +349,14 @@ private fun BoxScope.BottomBar(current: Int, count: Int, rtl: Boolean, visible: 
                 }
             }
             Spacer(Modifier.width(8.dp))
-            ModeButton(mode, onMode)
+            // Reader settings, with the nav bar's Settings icon.
+            IconButton(onClick = onSettings) {
+                Icon(
+                    androidx.compose.ui.graphics.vector.ImageVector.vectorResource(R.drawable.ic_nav_settings_heart),
+                    contentDescription = stringResource(R.string.reader_settings),
+                    tint = Color.White,
+                )
+            }
         }
     }
 }
@@ -300,7 +364,7 @@ private fun BoxScope.BottomBar(current: Int, count: Int, rtl: Boolean, visible: 
 /** One page, fitted to the screen: pinch to zoom, drag to move while zoomed (the pager swipes at
  * normal size), double-tap to zoom in where tapped and back out. */
 @Composable
-private fun ZoomablePage(page: ComicPage, onTap: () -> Unit) {
+private fun ZoomablePage(page: ComicPage, contentScale: ContentScale, onTap: (x: Float, width: Float) -> Unit) {
     val zoomScope = rememberCoroutineScope()
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -313,7 +377,7 @@ private fun ZoomablePage(page: ComicPage, onTap: () -> Unit) {
             .fillMaxSize()
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = { onTap() },
+                    onTap = { at -> onTap(at.x, size.width.toFloat()) },
                     onDoubleTap = { at ->
                         // Eased in (or out) toward where it was tapped, not snapped there.
                         val s0 = scale; val o0 = offset
@@ -334,7 +398,7 @@ private fun ZoomablePage(page: ComicPage, onTap: () -> Unit) {
         coil.compose.AsyncImage(
             model = page,
             contentDescription = null,
-            contentScale = ContentScale.Fit,
+            contentScale = contentScale,
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 scaleX = scale; scaleY = scale
                 translationX = offset.x; translationY = offset.y

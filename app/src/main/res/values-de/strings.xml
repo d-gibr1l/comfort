@@ -1290,4 +1290,27 @@
     <string name="media_access_body">Sie wurden von einer früheren Comfort-Installation gespeichert, daher hält Android sie für diese verschlossen. Erlaube den Zugriff auf Fotos, Videos und Musik, um sie hier zu öffnen.</string>
     <string name="media_access_allow">Zugriff erlauben</string>
     <string name="comic_converting">Wird in .cbz umgewandelt…</string>
+    <string name="reader_settings">Leser-Einstellungen</string>
+    <string name="page_scale">Seitengröße</string>
+    <string name="scale_fit">An Bildschirm anpassen</string>
+    <string name="scale_fit_width">An Breite anpassen</string>
+    <string name="scale_fit_height">An Höhe anpassen</string>
+    <string name="scale_original">Originalgröße</string>
+    <string name="tap_to_turn_pages">Tippen zum Umblättern</string>
+    <string name="tap_to_turn_pages_subtitle">Links oder rechts auf die Seite tippen; die Mitte zeigt die Steuerung</string>
+    <string name="invert_taps">Tippen umkehren</string>
+    <string name="animate_page_turns">Umblättern animieren</string>
+    <string name="side_padding">Seitenränder</string>
+    <string name="reader_background">Hintergrund</string>
+    <string name="reader_bg_black">Schwarz</string>
+    <string name="reader_bg_gray">Grau</string>
+    <string name="reader_bg_white">Weiß</string>
+    <string name="reader_orientation">Ausrichtung</string>
+    <string name="orientation_free">Frei</string>
+    <string name="orientation_portrait">Hochformat</string>
+    <string name="orientation_landscape">Querformat</string>
+    <string name="volume_keys_turn_pages">Lautstärketasten blättern um</string>
+    <string name="reader_keep_screen_on">Bildschirm anlassen</string>
+    <string name="show_page_number">Seitenzahl anzeigen</string>
+    <string name="reader_fullscreen">Vollbild</string>
 </resources>

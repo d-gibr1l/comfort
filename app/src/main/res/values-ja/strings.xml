@@ -1256,4 +1256,27 @@
     <string name="media_access_body">以前にインストールした Comfort が保存したため、Android はこのアプリから開けないようにしています。ここで開くには、写真・動画・音楽へのアクセスを許可してください。</string>
     <string name="media_access_allow">アクセスを許可</string>
     <string name="comic_converting">.cbz に変換中…</string>
+    <string name="reader_settings">リーダー設定</string>
+    <string name="page_scale">ページの表示サイズ</string>
+    <string name="scale_fit">画面に合わせる</string>
+    <string name="scale_fit_width">幅に合わせる</string>
+    <string name="scale_fit_height">高さに合わせる</string>
+    <string name="scale_original">原寸</string>
+    <string name="tap_to_turn_pages">タップでページ送り</string>
+    <string name="tap_to_turn_pages_subtitle">ページの左右をタップ。中央でコントロールを表示</string>
+    <string name="invert_taps">タップ方向を反転</string>
+    <string name="animate_page_turns">ページ送りをアニメーション</string>
+    <string name="side_padding">左右の余白</string>
+    <string name="reader_background">背景</string>
+    <string name="reader_bg_black">黒</string>
+    <string name="reader_bg_gray">グレー</string>
+    <string name="reader_bg_white">白</string>
+    <string name="reader_orientation">画面の向き</string>
+    <string name="orientation_free">自由</string>
+    <string name="orientation_portrait">縦</string>
+    <string name="orientation_landscape">横</string>
+    <string name="volume_keys_turn_pages">音量キーでページ送り</string>
+    <string name="reader_keep_screen_on">画面をオンのままにする</string>
+    <string name="show_page_number">ページ番号を表示</string>
+    <string name="reader_fullscreen">全画面</string>
 </resources>

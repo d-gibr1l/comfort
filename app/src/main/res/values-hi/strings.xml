@@ -1290,4 +1290,27 @@
     <string name="media_access_body">इन्हें Comfort के पिछले इंस्टॉल ने सेव किया था, इसलिए Android इन्हें इस इंस्टॉल के लिए बंद रखता है। इन्हें यहाँ खोलने के लिए अपनी फ़ोटो, वीडियो और संगीत तक पहुँच की अनुमति दें।</string>
     <string name="media_access_allow">पहुँच की अनुमति दें</string>
     <string name="comic_converting">.cbz में बदला जा रहा है…</string>
+    <string name="reader_settings">रीडर सेटिंग्स</string>
+    <string name="page_scale">पेज का आकार</string>
+    <string name="scale_fit">स्क्रीन में फ़िट</string>
+    <string name="scale_fit_width">चौड़ाई में फ़िट</string>
+    <string name="scale_fit_height">ऊँचाई में फ़िट</string>
+    <string name="scale_original">मूल आकार</string>
+    <string name="tap_to_turn_pages">पेज पलटने के लिए टैप करें</string>
+    <string name="tap_to_turn_pages_subtitle">पेज के बाएँ या दाएँ टैप करें; बीच में नियंत्रण दिखते हैं</string>
+    <string name="invert_taps">टैप उलटें</string>
+    <string name="animate_page_turns">पेज पलटना ऐनिमेट करें</string>
+    <string name="side_padding">किनारे का हाशिया</string>
+    <string name="reader_background">पृष्ठभूमि</string>
+    <string name="reader_bg_black">काला</string>
+    <string name="reader_bg_gray">स्लेटी</string>
+    <string name="reader_bg_white">सफ़ेद</string>
+    <string name="reader_orientation">ओरिएंटेशन</string>
+    <string name="orientation_free">मुक्त</string>
+    <string name="orientation_portrait">पोर्ट्रेट</string>
+    <string name="orientation_landscape">लैंडस्केप</string>
+    <string name="volume_keys_turn_pages">वॉल्यूम बटन से पेज पलटें</string>
+    <string name="reader_keep_screen_on">स्क्रीन चालू रखें</string>
+    <string name="show_page_number">पेज नंबर दिखाएँ</string>
+    <string name="reader_fullscreen">फ़ुल स्क्रीन</string>
 </resources>

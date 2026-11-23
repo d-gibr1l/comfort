@@ -1256,4 +1256,27 @@
     <string name="media_access_body">这些文件由之前安装的 Comfort 保存，因此 Android 不允许当前安装打开它们。允许访问照片、视频和音乐即可在这里打开。</string>
     <string name="media_access_allow">允许访问</string>
     <string name="comic_converting">正在转换为 .cbz…</string>
+    <string name="reader_settings">阅读器设置</string>
+    <string name="page_scale">页面缩放</string>
+    <string name="scale_fit">适应屏幕</string>
+    <string name="scale_fit_width">适应宽度</string>
+    <string name="scale_fit_height">适应高度</string>
+    <string name="scale_original">原始大小</string>
+    <string name="tap_to_turn_pages">点按翻页</string>
+    <string name="tap_to_turn_pages_subtitle">点按页面左侧或右侧翻页；点按中间显示控件</string>
+    <string name="invert_taps">反转点按方向</string>
+    <string name="animate_page_turns">翻页动画</string>
+    <string name="side_padding">两侧边距</string>
+    <string name="reader_background">背景</string>
+    <string name="reader_bg_black">黑色</string>
+    <string name="reader_bg_gray">灰色</string>
+    <string name="reader_bg_white">白色</string>
+    <string name="reader_orientation">屏幕方向</string>
+    <string name="orientation_free">自由</string>
+    <string name="orientation_portrait">竖屏</string>
+    <string name="orientation_landscape">横屏</string>
+    <string name="volume_keys_turn_pages">音量键翻页</string>
+    <string name="reader_keep_screen_on">保持屏幕常亮</string>
+    <string name="show_page_number">显示页码</string>
+    <string name="reader_fullscreen">全屏</string>
 </resources>

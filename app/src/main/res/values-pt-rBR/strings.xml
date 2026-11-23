@@ -1324,4 +1324,27 @@
     <string name="media_access_body">Eles foram salvos por uma instalação anterior do Comfort, então o Android não deixa esta abri-los. Permita o acesso a fotos, vídeos e músicas para abri-los aqui.</string>
     <string name="media_access_allow">Permitir acesso</string>
     <string name="comic_converting">Convertendo para .cbz…</string>
+    <string name="reader_settings">Configurações do leitor</string>
+    <string name="page_scale">Escala da página</string>
+    <string name="scale_fit">Ajustar à tela</string>
+    <string name="scale_fit_width">Ajustar à largura</string>
+    <string name="scale_fit_height">Ajustar à altura</string>
+    <string name="scale_original">Tamanho original</string>
+    <string name="tap_to_turn_pages">Tocar para virar a página</string>
+    <string name="tap_to_turn_pages_subtitle">Toque no lado esquerdo ou direito; o centro mostra os controles</string>
+    <string name="invert_taps">Inverter toques</string>
+    <string name="animate_page_turns">Animar a virada de página</string>
+    <string name="side_padding">Margens laterais</string>
+    <string name="reader_background">Fundo</string>
+    <string name="reader_bg_black">Preto</string>
+    <string name="reader_bg_gray">Cinza</string>
+    <string name="reader_bg_white">Branco</string>
+    <string name="reader_orientation">Orientação</string>
+    <string name="orientation_free">Livre</string>
+    <string name="orientation_portrait">Retrato</string>
+    <string name="orientation_landscape">Paisagem</string>
+    <string name="volume_keys_turn_pages">Teclas de volume viram a página</string>
+    <string name="reader_keep_screen_on">Manter a tela ligada</string>
+    <string name="show_page_number">Mostrar número da página</string>
+    <string name="reader_fullscreen">Tela cheia</string>
 </resources>
