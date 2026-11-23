@@ -268,7 +268,10 @@ object BackupRestore {
                 if (media in foreign) db.execSQL("UPDATE downloads SET mediaUri = NULL WHERE id = ?", arrayOf(id))
                 val keptFiles = files.any { it !in foreign }
                 val keptThumb = thumb != null && thumb !in foreign
-                if (!keptFiles && !keptThumb) db.execSQL("UPDATE downloads SET status = 'DELETED' WHERE id = ?", arrayOf(id))
+                // A song's file is its mediaUri (its thumbnail is a copy of its cover): kept, it
+                // isn't deleted.
+                val keptMedia = media != null && media !in foreign
+                if (!keptFiles && !keptThumb && !keptMedia) db.execSQL("UPDATE downloads SET status = 'DELETED' WHERE id = ?", arrayOf(id))
             }
         }
     }

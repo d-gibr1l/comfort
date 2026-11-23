@@ -58,7 +58,12 @@ object MediaStoreHelper {
                     ?.use { if (it.moveToFirst()) it.getString(0) else null }
                     ?.substringAfter("/0/", "")
             }
-        }.getOrNull() ?: return false
+        }.getOrNull()
+            // Unreadable: one of this app's own files from before a reinstall, hidden from it
+            // without media permission (then it's there, but not readable), is kept; only a file
+            // that isn't there at all counts as not the app's. Unlinking the hidden ones lost a
+            // restored Library's songs and pictures (reported).
+            ?: return !reallyGone(context, uri)
         val folder = path.trimStart('/')
         return folder.startsWith("$RELATIVE_DIR/") || OLD_RELATIVE_DIRS.any { folder.startsWith(it) }
     }
@@ -179,6 +184,22 @@ object MediaStoreHelper {
      * deleted it from their gallery (or the SAF folder) outside the app. Errors fail open (return
      * true) since wrongly flagging a still-live file as deleted is worse than occasionally missing
      * a real deletion. [failOpen] false reverses that, for confirming a file is really back. */
+    /** Whether a gallery file the app can't see ([uri] missing from its MediaStore queries) is
+     * really gone, or only hidden from the app: after a reinstall it no longer owns the files it
+     * saved before, and without media permission Android leaves them out of its queries. Opening
+     * it tells them apart: a file that's gone can't be found; a hidden one is there but refused.
+     * True for "gone". */
+    fun reallyGone(context: Context, uri: Uri): Boolean = try {
+        context.contentResolver.openFileDescriptor(uri, "r")?.close()
+        false
+    } catch (_: java.io.FileNotFoundException) {
+        true
+    } catch (_: SecurityException) {
+        false
+    } catch (_: Exception) {
+        false
+    }
+
     fun exists(context: Context, uriString: String, failOpen: Boolean = true): Boolean {
         val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return failOpen
         return runCatching {

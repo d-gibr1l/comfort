@@ -48,7 +48,10 @@ object DeletedFiles {
                 }.getOrNull()
                 if (rows != true) { readable = false; break }
             }
-            if (readable) entries.filter { it.second !in present }.forEach { gone += it.first }
+            // Not in the query: gone, or hidden from the app (see MediaStoreHelper.reallyGone).
+            if (readable) entries.filter { it.second !in present }
+                .filter { com.comfort.app.util.MediaStoreHelper.reallyGone(context, Uri.parse(it.first.uri)) }
+                .forEach { gone += it.first }
         }
         return gone
     }

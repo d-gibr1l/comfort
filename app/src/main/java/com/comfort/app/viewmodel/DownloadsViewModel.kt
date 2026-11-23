@@ -602,7 +602,9 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                         val uri = runCatching { Uri.parse(uriStr) }.getOrNull()
                         val exists = if (uri?.authority == MediaStore.AUTHORITY) {
                             val id = uri.lastPathSegment?.toLongOrNull()
-                            id != null && id in existingIds
+                            // Not in the query: gone, or only hidden from the app (its own files
+                            // from before a reinstall, without media permission) — those stay.
+                            (id != null && id in existingIds) || !MediaStoreHelper.reallyGone(context, uri)
                         } else {
                             MediaStoreHelper.exists(context, uriStr)
                         }
