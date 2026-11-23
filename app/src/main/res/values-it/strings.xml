@@ -997,6 +997,9 @@
     <string name="downloading_from_x">Download da %1$s</string>
     <string name="couldn_t_update_engine">Impossibile aggiornare %1$s: %2$s</string>
     <string name="engine_updated_to">%1$s aggiornato alla %2$s</string>
+    <string name="updating_engines_x">Aggiornamento di %1$s…</string>
+    <string name="engines_updated_x">%1$s aggiornato</string>
+    <string name="couldn_t_update_engines_x">Impossibile aggiornare %1$s</string>
     <string name="listing_couldnt_check">Impossibile controllare questo link — il download potrebbe comunque funzionare, ma non è stato possibile mostrarne l\'anteprima.</string>
     <string name="listing_couldnt_check_spotify">Impossibile controllare questo link di Spotify — il download potrebbe comunque funzionare, ma non è stato possibile mostrarne l\'anteprima.</string>
     <string name="couldnt_download_update">Impossibile scaricare l\'aggiornamento: %1$s</string>

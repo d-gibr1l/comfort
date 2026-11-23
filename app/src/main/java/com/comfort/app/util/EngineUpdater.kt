@@ -365,10 +365,21 @@ object EngineUpdater {
     private val installMutex = Mutex()
 
     /** [onUpdated] hears about each engine it installs a new version of (name, new version). */
-    suspend fun checkAndAutoUpdate(context: Context, onUpdated: (VersionStatus, String) -> Unit = { _, _ -> }): List<VersionStatus> =
-        autoUpdateMutex.withLock { checkAndAutoUpdateLocked(context, onUpdated) }
+    /** [onStarting] as an engine's install begins, then [onUpdated] or [onFailed] as it ends. */
+    suspend fun checkAndAutoUpdate(
+        context: Context,
+        onUpdated: (VersionStatus, String) -> Unit = { _, _ -> },
+        onStarting: (VersionStatus) -> Unit = {},
+        onFailed: (VersionStatus) -> Unit = {},
+    ): List<VersionStatus> =
+        autoUpdateMutex.withLock { checkAndAutoUpdateLocked(context, onUpdated, onStarting, onFailed) }
 
-    private suspend fun checkAndAutoUpdateLocked(context: Context, onUpdated: (VersionStatus, String) -> Unit): List<VersionStatus> = withContext(Dispatchers.IO) {
+    private suspend fun checkAndAutoUpdateLocked(
+        context: Context,
+        onUpdated: (VersionStatus, String) -> Unit,
+        onStarting: (VersionStatus) -> Unit,
+        onFailed: (VersionStatus) -> Unit,
+    ): List<VersionStatus> = withContext(Dispatchers.IO) {
         PythonRuntime.ensureProvisioned(context)
         var statuses = checkAll(context)
         var deferredDueToRunning = false
@@ -380,6 +391,7 @@ object EngineUpdater {
                         deferredDueToRunning = true
                         status
                     } else {
+                        onStarting(status)
                         val res = update(context, status)
                         res.getOrNull()?.let { newVersion ->
                             onUpdated(status, newVersion)
@@ -387,6 +399,10 @@ object EngineUpdater {
                         } ?: run {
                             if (res.exceptionOrNull()?.message?.contains("download running", ignoreCase = true) == true) {
                                 deferredDueToRunning = true
+                                // Not a failure: it waits for the download to end.
+                                onUpdated(status, "")
+                            } else {
+                                onFailed(status)
                             }
                             status
                         }

@@ -60,14 +60,54 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
     val anyUpdateAvailable: StateFlow<Boolean> = combine(engineUpdateAvailable, appUpdateAvailable) { e, a -> e || a }
         .stateIn(viewModelScope, SharingStarted.Eagerly, engineUpdateAvailable.value || appUpdateAvailable.value)
 
-    /** "yt-dlp updated to 2026.10.31", once each engine update finishes — tapped or automatic.
-     * MainScreen shows it as a snackbar, on whichever tab is open. */
-    private val _engineUpdated = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
-    val engineUpdated: kotlinx.coroutines.flow.SharedFlow<String> = _engineUpdated
+    /** How the engine updates that just ran went, once the last of them has ended (several at
+     * once, as auto-update does, give one summary, not a message each). MainScreen shows it as a
+     * snackbar on whichever tab is open, replacing its "Updating …" one. */
+    data class EngineUpdateSummary(val updated: List<Pair<String, String>>, val failed: List<String>)
+    private val _engineUpdated = kotlinx.coroutines.flow.MutableSharedFlow<EngineUpdateSummary>(extraBufferCapacity = 4)
+    val engineUpdated: kotlinx.coroutines.flow.SharedFlow<EngineUpdateSummary> = _engineUpdated
+    // The updates of the run still going: name and new version, or the names that failed.
+    private val runUpdated = mutableListOf<Pair<String, String>>()
+    private val runFailed = mutableListOf<String>()
 
     private fun announceUpdate(status: EngineUpdater.VersionStatus, newVersion: String) {
-        _engineUpdated.tryEmit(context.getString(com.comfort.app.R.string.engine_updated_to, status.engine.displayName, newVersion))
+        synchronized(runUpdated) { if (newVersion.isNotEmpty()) runUpdated += status.engine.displayName to newVersion }
     }
+
+    private fun announceFailure(status: EngineUpdater.VersionStatus) {
+        synchronized(runUpdated) { runFailed += status.engine.displayName }
+    }
+
+    /** The summary of the run, once nothing is updating any more. */
+    private fun summarizeIfDone() {
+        if (_updatingEngines.value.isNotEmpty() || _updatingEngineNames.value.isNotEmpty()) return
+        val summary = synchronized(runUpdated) {
+            EngineUpdateSummary(runUpdated.toList(), runFailed.toList()).also { runUpdated.clear(); runFailed.clear() }
+        }
+        if (summary.updated.isNotEmpty() || summary.failed.isNotEmpty()) _engineUpdated.tryEmit(summary)
+    }
+
+    /** An automatic update (EngineUpdater.checkAndAutoUpdate), reported as a tapped one is. */
+    private suspend fun checkAndAutoUpdate(): List<EngineUpdater.VersionStatus> {
+        val statuses = EngineUpdater.checkAndAutoUpdate(
+            context,
+            onUpdated = { status, version ->
+                announceUpdate(status, version)
+                _updatingEngineNames.update { it - status.engine.displayName }
+            },
+            onStarting = { status -> _updatingEngineNames.update { it + status.engine.displayName } },
+            onFailed = { status ->
+                announceFailure(status)
+                _updatingEngineNames.update { it - status.engine.displayName }
+            },
+        )
+        summarizeIfDone()
+        return statuses
+    }
+
+    /** The engines updating now, by name (for "Updating yt-dlp and gallery-dl…"). */
+    val updatingEngineNames: StateFlow<List<String>> get() = _updatingEngineNames
+    private val _updatingEngineNames = MutableStateFlow<List<String>>(emptyList())
 
     /** What the launch check found, to show as a popup (MainScreen): a new Comfort, or engine
      * updates waiting because auto-update is off. Each shown once per version, so "Later" isn't
@@ -130,7 +170,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             withContext(Dispatchers.IO) { PythonRuntime.ensureProvisioned(context) }
             val lastEngineCheck = GalleryDlPreferences.getEngineUpdateLastCheckMs(context)
             if (System.currentTimeMillis() - lastEngineCheck >= GalleryDlPreferences.ENGINE_UPDATE_CHECK_INTERVAL_MS) {
-                val statuses = EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate)
+                val statuses = checkAndAutoUpdate()
                 publishEngines(statuses)
                 offerEngines(statuses)
             }
@@ -155,7 +195,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
             try {
                 do {
                     recheckEngines = false
-                    val statuses = EngineUpdater.checkAndAutoUpdate(context, ::announceUpdate)
+                    val statuses = checkAndAutoUpdate()
                     publishEngines(statuses)
                     if (offer) offerEngines(statuses)
                 } while (recheckEngines)
@@ -180,6 +220,7 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
         val key = status.engine.packageDirName
         if (key in _updatingEngines.value) return
         _updatingEngines.update { it + key }
+        _updatingEngineNames.update { it + status.engine.displayName }
         _engineError.value = null
         viewModelScope.launch {
             try {
@@ -193,13 +234,18 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
                     publishEngines(updated)
                 }
                 result.onFailure { e ->
+                    announceFailure(status)
                     _engineError.value = getApplication<Application>().getString(com.comfort.app.R.string.couldn_t_update_engine, status.engine.displayName, e.message ?: getApplication<Application>().getString(com.comfort.app.R.string.unknown_error))
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
+                announceFailure(status)
                 _engineError.value = getApplication<Application>().getString(com.comfort.app.R.string.couldn_t_update_engine, status.engine.displayName, e.message ?: getApplication<Application>().getString(com.comfort.app.R.string.unknown_error))
             } finally {
                 _updatingEngines.update { it - key }
+                _updatingEngineNames.update { it - status.engine.displayName }
+                // The last one of the run: one summary for all of them.
+                summarizeIfDone()
             }
         }
     }

@@ -1177,6 +1177,9 @@
     <string name="downloading_from_x">Downloading from %1$s</string>
     <string name="couldn_t_update_engine">Couldn\'t update %1$s: %2$s</string>
     <string name="engine_updated_to">%1$s updated to %2$s</string>
+    <string name="updating_engines_x">Updating %1$s…</string>
+    <string name="engines_updated_x">%1$s updated</string>
+    <string name="couldn_t_update_engines_x">Couldn\'t update %1$s</string>
     <string name="listing_couldnt_check">Couldn\'t check this link — the download may still work, but its content couldn\'t be previewed.</string>
     <string name="listing_couldnt_check_spotify">Couldn\'t check this Spotify link — the download may still work, but its content couldn\'t be previewed.</string>
     <string name="couldnt_download_update">Couldn\'t download update: %1$s</string>

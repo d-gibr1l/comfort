@@ -996,6 +996,9 @@
     <string name="downloading_from_x">%1$s से डाउनलोड हो रहा है</string>
     <string name="couldn_t_update_engine">%1$s अपडेट नहीं हो सका: %2$s</string>
     <string name="engine_updated_to">%1$s को %2$s में अपडेट किया गया</string>
+    <string name="updating_engines_x">%1$s अपडेट हो रहा है…</string>
+    <string name="engines_updated_x">%1$s अपडेट हो गया</string>
+    <string name="couldn_t_update_engines_x">%1$s अपडेट नहीं हो सका</string>
     <string name="listing_couldnt_check">यह लिंक जाँचा नहीं जा सका — डाउनलोड फिर भी चल सकता है, पर इसकी सामग्री का प्रीव्यू नहीं हो सका।</string>
     <string name="listing_couldnt_check_spotify">यह Spotify लिंक जाँचा नहीं जा सका — डाउनलोड फिर भी चल सकता है, पर इसकी सामग्री का प्रीव्यू नहीं हो सका।</string>
     <string name="couldnt_download_update">अपडेट डाउनलोड नहीं हो सका: %1$s</string>

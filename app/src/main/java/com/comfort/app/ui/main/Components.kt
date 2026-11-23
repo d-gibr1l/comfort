@@ -132,10 +132,16 @@ fun StatusBarScrim(alpha: () -> Float, modifier: Modifier = Modifier) {
 data class DownloadEventVisuals(
     val isSuccess: Boolean,
     override val message: String,
+    /** Something still going on (an engine updating): a small spinner, shown until replaced. */
+    val inProgress: Boolean = false,
 ) : SnackbarVisuals {
     override val actionLabel: String? = null
     override val withDismissAction: Boolean = true
-    override val duration: SnackbarDuration = if (isSuccess) SnackbarDuration.Short else SnackbarDuration.Long
+    override val duration: SnackbarDuration = when {
+        inProgress -> SnackbarDuration.Indefinite
+        isSuccess -> SnackbarDuration.Short
+        else -> SnackbarDuration.Long
+    }
 }
 
 /** Every snackbar in the app (Library, the Download Queue, the media viewer): Material 3's
@@ -198,7 +204,14 @@ fun DownloadEventSnackbarHost(hostState: SnackbarHostState, modifier: Modifier =
                     .padding(start = if (kind != null) 12.dp else 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (kind != null) {
+                if ((visuals as? DownloadEventVisuals)?.inProgress == true) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = content,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                } else if (kind != null) {
                     Icon(
                         if (kind) Icons.Outlined.CheckCircle else Icons.Outlined.Warning,
                         contentDescription = null,

@@ -997,6 +997,9 @@
     <string name="downloading_from_x">מוריד מ-%1$s</string>
     <string name="couldn_t_update_engine">עדכון %1$s נכשל: %2$s</string>
     <string name="engine_updated_to">%1$s עודכן לגרסה %2$s</string>
+    <string name="updating_engines_x">מעדכן את %1$s…</string>
+    <string name="engines_updated_x">%1$s עודכן</string>
+    <string name="couldn_t_update_engines_x">לא ניתן לעדכן את %1$s</string>
     <string name="listing_couldnt_check">לא ניתן לבדוק את הקישור הזה — ייתכן שההורדה עדיין תעבוד, אבל לא ניתן היה להציג את התוכן שלו.</string>
     <string name="listing_couldnt_check_spotify">לא ניתן לבדוק את קישור ה-Spotify הזה — ייתכן שההורדה עדיין תעבוד, אבל לא ניתן היה להציג את התוכן שלו.</string>
     <string name="couldnt_download_update">הורדת העדכון נכשלה: %1$s</string>

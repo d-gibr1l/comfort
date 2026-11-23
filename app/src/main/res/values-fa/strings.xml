@@ -996,6 +996,9 @@
     <string name="downloading_from_x">در حال دانلود از %1$s</string>
     <string name="couldn_t_update_engine">به‌روزرسانی %1$s ممکن نشد: %2$s</string>
     <string name="engine_updated_to">%1$s به %2$s به‌روز شد</string>
+    <string name="updating_engines_x">در حال به‌روزرسانی %1$s…</string>
+    <string name="engines_updated_x">%1$s به‌روز شد</string>
+    <string name="couldn_t_update_engines_x">به‌روزرسانی %1$s ممکن نشد</string>
     <string name="listing_couldnt_check">بررسی این پیوند ممکن نشد — ممکن است دانلود همچنان کار کند، اما پیش‌نمایش محتوایش ممکن نبود.</string>
     <string name="listing_couldnt_check_spotify">بررسی این پیوند Spotify ممکن نشد — ممکن است دانلود همچنان کار کند، اما پیش‌نمایش محتوایش ممکن نبود.</string>
     <string name="couldnt_download_update">دانلود به‌روزرسانی ممکن نشد: %1$s</string>

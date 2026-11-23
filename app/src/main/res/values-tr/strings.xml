@@ -996,6 +996,9 @@
     <string name="downloading_from_x">%1$s kaynağından indiriliyor</string>
     <string name="couldn_t_update_engine">%1$s güncellenemedi: %2$s</string>
     <string name="engine_updated_to">%1$s, %2$s sürümüne güncellendi</string>
+    <string name="updating_engines_x">%1$s güncelleniyor…</string>
+    <string name="engines_updated_x">%1$s güncellendi</string>
+    <string name="couldn_t_update_engines_x">%1$s güncellenemedi</string>
     <string name="listing_couldnt_check">Bu bağlantı denetlenemedi — indirme yine de çalışabilir, ama içeriğinin önizlemesi yapılamadı.</string>
     <string name="listing_couldnt_check_spotify">Bu Spotify bağlantısı denetlenemedi — indirme yine de çalışabilir, ama içeriğinin önizlemesi yapılamadı.</string>
     <string name="couldnt_download_update">Güncelleme indirilemedi: %1$s</string>

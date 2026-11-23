@@ -1155,6 +1155,9 @@
     <string name="downloading_from_x">Téléchargement depuis %1$s</string>
     <string name="couldn_t_update_engine">Impossible de mettre à jour %1$s\u00A0: %2$s</string>
     <string name="engine_updated_to">%1$s mis à jour vers %2$s</string>
+    <string name="updating_engines_x">Mise à jour de %1$s…</string>
+    <string name="engines_updated_x">%1$s mis à jour</string>
+    <string name="couldn_t_update_engines_x">Impossible de mettre à jour %1$s</string>
     <string name="listing_couldnt_check">Impossible de vérifier ce lien — le téléchargement peut quand même marcher, mais son contenu n\'a pas pu être prévisualisé.</string>
     <string name="listing_couldnt_check_spotify">Impossible de vérifier ce lien Spotify — le téléchargement peut quand même marcher, mais son contenu n\'a pas pu être prévisualisé.</string>
     <string name="couldnt_download_update">Impossible de télécharger la mise à jour\u00A0: %1$s</string>

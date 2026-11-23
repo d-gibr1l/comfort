@@ -678,17 +678,33 @@ fun MainScreen(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance()),
             )
         }
-        // An engine update finishing (tapped in Settings, or automatic at launch), on any tab. Each
-        // one is kept until a snackbar actually shows it: several close together (an auto-update
-        // of two engines) read as one message, none overwritten by the next.
-        var engineMessages by remember { mutableStateOf<List<String>>(emptyList()) }
-        LaunchedEffect(updates) { updates.engineUpdated.collect { engineMessages = engineMessages + it } }
-        LaunchedEffect(engineMessages) {
-            val batch = engineMessages
-            if (batch.isEmpty()) return@LaunchedEffect
+        // Engine updates (tapped in Settings, or automatic at launch), on any tab: "Updating yt-dlp
+        // and gallery-dl…" while they run, then one summary in its place once the last has ended —
+        // two engines updating at once gave two messages, one replacing the other.
+        val updatingNames by updates.updatingEngineNames.collectAsState()
+        val updatingText = if (updatingNames.isEmpty()) null else stringResource(R.string.updating_engines_x, joinNames(updatingNames))
+        LaunchedEffect(updatingText) {
+            val text = updatingText ?: return@LaunchedEffect
             appSnackbars.showEvent("engines") {
-                engineMessages = engineMessages - batch.toSet()
-                librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = batch.joinToString("\n")))
+                librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = true, message = text, inProgress = true))
+            }
+        }
+        val engineUpdatedOne = stringResource(R.string.engine_updated_to)
+        val enginesUpdatedMany = stringResource(R.string.engines_updated_x)
+        val enginesFailed = stringResource(R.string.couldn_t_update_engines_x)
+        LaunchedEffect(updates) {
+            updates.engineUpdated.collect { summary ->
+                val lines = buildList {
+                    when (summary.updated.size) {
+                        0 -> {}
+                        1 -> add(engineUpdatedOne.format(summary.updated[0].first, summary.updated[0].second))
+                        else -> add(enginesUpdatedMany.format(joinNames(summary.updated.map { it.first })))
+                    }
+                    if (summary.failed.isNotEmpty()) add(enginesFailed.format(joinNames(summary.failed)))
+                }
+                appSnackbars.showEvent("engines") {
+                    librarySnackbarHostState.showSnackbar(DownloadEventVisuals(isSuccess = summary.failed.isEmpty(), message = lines.joinToString("\n")))
+                }
             }
         }
 
@@ -1916,3 +1932,9 @@ private fun looksLikeLink(text: String): Boolean {
  * draw phase, so the modifier chain stays the same (nothing recomposes) as it turns on and off. */
 private fun Modifier.pageBackground(color: Color, needed: () -> Boolean): Modifier =
     drawBehind { if (needed()) drawRect(color) }
+
+/** "yt-dlp", "yt-dlp and gallery-dl", "yt-dlp, gallery-dl and Instaloader", in the phone's
+ * language where Android can say it (8.0+). */
+internal fun joinNames(names: List<String>): String =
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) android.icu.text.ListFormatter.getInstance().format(names)
+    else names.joinToString(", ")

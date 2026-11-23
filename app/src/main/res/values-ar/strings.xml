@@ -1000,6 +1000,9 @@
     <string name="downloading_from_x">جارٍ التنزيل من %1$s</string>
     <string name="couldn_t_update_engine">تعذّر تحديث %1$s: %2$s</string>
     <string name="engine_updated_to">تم تحديث %1$s إلى %2$s</string>
+    <string name="updating_engines_x">جارٍ تحديث %1$s…</string>
+    <string name="engines_updated_x">تم تحديث %1$s</string>
+    <string name="couldn_t_update_engines_x">تعذّر تحديث %1$s</string>
     <string name="listing_couldnt_check">تعذّر فحص هذا الرابط — قد يظل التنزيل يعمل، لكن تعذّرت معاينة محتواه.</string>
     <string name="listing_couldnt_check_spotify">تعذّر فحص رابط Spotify هذا — قد يظل التنزيل يعمل، لكن تعذّرت معاينة محتواه.</string>
     <string name="couldnt_download_update">تعذّر تنزيل التحديث: %1$s</string>

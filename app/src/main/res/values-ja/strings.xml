@@ -995,6 +995,9 @@
     <string name="downloading_from_x">%1$s からダウンロード中</string>
     <string name="couldn_t_update_engine">%1$s を更新できませんでした: %2$s</string>
     <string name="engine_updated_to">%1$s を %2$s に更新しました</string>
+    <string name="updating_engines_x">%1$s を更新中…</string>
+    <string name="engines_updated_x">%1$s を更新しました</string>
+    <string name="couldn_t_update_engines_x">%1$s を更新できませんでした</string>
     <string name="listing_couldnt_check">このリンクを確認できませんでした。ダウンロードはできるかもしれませんが、内容をプレビューできませんでした。</string>
     <string name="listing_couldnt_check_spotify">この Spotify のリンクを確認できませんでした。ダウンロードはできるかもしれませんが、内容をプレビューできませんでした。</string>
     <string name="couldnt_download_update">アップデートをダウンロードできませんでした: %1$s</string>

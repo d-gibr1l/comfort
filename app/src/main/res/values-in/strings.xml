@@ -1100,6 +1100,9 @@
     <string name="downloading_from_x">Mengunduh dari %1$s</string>
     <string name="couldn_t_update_engine">Tidak bisa memperbarui %1$s: %2$s</string>
     <string name="engine_updated_to">%1$s diperbarui ke %2$s</string>
+    <string name="updating_engines_x">Memperbarui %1$s…</string>
+    <string name="engines_updated_x">%1$s diperbarui</string>
+    <string name="couldn_t_update_engines_x">Tidak dapat memperbarui %1$s</string>
     <string name="listing_couldnt_check">Tidak bisa memeriksa tautan ini — unduhan mungkin tetap berhasil, tapi isinya tidak bisa dipratinjau.</string>
     <string name="listing_couldnt_check_spotify">Tidak bisa memeriksa tautan Spotify ini — unduhan mungkin tetap berhasil, tapi isinya tidak bisa dipratinjau.</string>
     <string name="couldnt_download_update">Tidak bisa mengunduh pembaruan: %1$s</string>

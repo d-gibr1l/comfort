@@ -1118,6 +1118,9 @@
     <string name="downloading_from_x">Lädt von %1$s</string>
     <string name="couldn_t_update_engine">%1$s konnte nicht aktualisiert werden: %2$s</string>
     <string name="engine_updated_to">%1$s auf %2$s aktualisiert</string>
+    <string name="updating_engines_x">%1$s wird aktualisiert…</string>
+    <string name="engines_updated_x">%1$s aktualisiert</string>
+    <string name="couldn_t_update_engines_x">%1$s konnte nicht aktualisiert werden</string>
     <string name="listing_couldnt_check">Dieser Link konnte nicht geprüft werden – der Download klappt evtl. trotzdem, aber der Inhalt ließ sich nicht in der Vorschau zeigen.</string>
     <string name="listing_couldnt_check_spotify">Dieser Spotify-Link konnte nicht geprüft werden – der Download klappt evtl. trotzdem, aber der Inhalt ließ sich nicht in der Vorschau zeigen.</string>
     <string name="couldnt_download_update">Update konnte nicht geladen werden: %1$s</string>

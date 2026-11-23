@@ -995,6 +995,9 @@
     <string name="downloading_from_x">Đang tải từ %1$s</string>
     <string name="couldn_t_update_engine">Không thể cập nhật %1$s: %2$s</string>
     <string name="engine_updated_to">Đã cập nhật %1$s lên %2$s</string>
+    <string name="updating_engines_x">Đang cập nhật %1$s…</string>
+    <string name="engines_updated_x">Đã cập nhật %1$s</string>
+    <string name="couldn_t_update_engines_x">Không thể cập nhật %1$s</string>
     <string name="listing_couldnt_check">Không thể kiểm tra liên kết này — lượt tải có thể vẫn chạy được, nhưng không xem trước được nội dung.</string>
     <string name="listing_couldnt_check_spotify">Không thể kiểm tra liên kết Spotify này — lượt tải có thể vẫn chạy được, nhưng không xem trước được nội dung.</string>
     <string name="couldnt_download_update">Không thể tải bản cập nhật: %1$s</string>
