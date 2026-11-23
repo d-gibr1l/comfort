@@ -15,6 +15,8 @@
 - [x] Make the audio format picker scrollable when there is not enough space so parts of long format names are not cut off.
 - [x] Fix the awkward text wrapping and oversized button on the "Updates available" engine card when an engine is on a commit or branch version (e.g. gallery-dl on Master): don't prepend "v" to non-numeric versions (avoids "vmaster-..."), shorten commit hashes or compact the button text so it doesn't squish the left column, and prevent the installed version text from breaking onto a second line ("08").
 - [x] Add tactile vibrations to buttons and sliders in music settings, as well as to the lyrics icon on the main settings page.
+- [ ] Turn the FAB on the library page back to the arch shape.
+- [ ] There are two incognito buttons on the download sheet, remove all.
 - [x] Update the lyrics icon on the Now Playing sheet so that when "lyrics line" is off in settings, tapping it opens the full lyrics view, and when "lyrics line" is on, tapping it acts as a toggle.
 - [x] Add a snackbar notification when an engine is updating.
 - [x] Combine or aggregate update notifications so updating two or more engines at once shows a single consolidated snackbar instead of conflicting messages.
@@ -22,6 +24,9 @@
 - [x] Add settings to toggle swipe gestures in the Library and Queue.
 - [x] Add a custom duration option to the music player sleep timer.
 - [ ] Add an info icon in the top-right corner of the Queue that opens a bottom modal sheet explaining features like "Pause All" and "Resume All," scheduling, and common download errors.
+- [ ] Prevent yt-dlp and gallery-dl from running instagram links when instaloader is on.
+- [ ] Add an option to view logs for each download in library.
+- [ ] I deleted the item thats the thumbnail in the library of comfort and when i tapped on it, it opened the first item in the library instead of opening the items left of that download.
 - [x] Prevent scrolling inside the "Current Command" code box from passing through to the mini header or outer page on the Advanced screen, and prevent downward scrolling on it from pulling down or dismissing the preview bottom sheet (isolate command box scrolling).
 - [x] Prevent continuous downward scrolling on content inside a bottom modal sheet from pulling the sheet down to dismiss it.
 - [x] Fix the drag/dismiss behavior of the "View logs" and "Use extra argument" bottom sheets on the Advanced page so they feel smooth and reliable like the download preview sheet.
@@ -31,7 +36,10 @@
 - [x] Add an animation for navigating back to the main Settings page when pressing the Settings navigation tab from a sub-settings page.
 - [x] Add an incognito option to the download preview sheet.
 - [x] Fix the visual flicker when an item is moved in the music queue.
+- [ ] There's a flicker when moving an already played item below the currently playing one.t
 - [ ] Add options allowing users to choose whether to use the app's built-in video and music players or the phone's external players.
+- [ ] Let the apps snackbar for finished or failed downloads show even when im not in the queue page, also prevent snackbars from appearing in the video player.
+- [ ] When im playing a video and i leave the app and open a downloaded video from the notification it goes back to playing the video that was playing before i left the app.
 - [x] Add a "Block" option to the More Options menu in the supported sites sheet so the app refuses to download from blocked sites.
 - [x] Prevent thumbnails from showing before the video starts playing in the video viewer.
 - [x] Make video scrubbing land on the exact timestamp being scrubbed rather than snapping away.
@@ -54,7 +62,7 @@
 - [ ] Add a setting in Settings (e.g. Processing / Downloads) to package chapters into `.cbz` archives using `ZipOutputStream` instead of leaving loose image files in the gallery, pre-configured with known manga sites (MangaDex, MangaFire, etc.) and allowing sites to be added and removed (similar to "Which engine each site uses").
 - [ ] Add native support for reading `.cbz` files with a built-in comic/manga viewer (supporting right-to-left manga paging, webtoon vertical scrolling, and cover thumbnails in the Library).
 - [x] Change the loading indicator on the "Looking at what's there…" preview sheet to the Material 3 Expressive loading indicator that morphs and cycles through shapes.
-- [ ] Fix long-press selecting in the Library on a card near the bottom (under the nav bar): pressing it starts the drag-select's auto-scroll at once, so the list scrolls down and selects every item below. The bottom edge zone that scrolls should start above the nav bar, not include it (seen on the Library list, 2026-11-23).
+- [x] Fix long-press selecting in the Library on a card near the bottom (under the nav bar): pressing it starts the drag-select's auto-scroll at once, so the list scrolls down and selects every item below. The bottom edge zone that scrolls should start above the nav bar, not include it (seen on the Library list, 2026-11-23).
 
 ## Technical Debt & Refactoring
 - [x] **Componentize Monoliths:** *(done in e5a97ec — MoreScreen.kt split into SettingsScreen, SettingsComponents and one file per Settings page)* Break up massive files, specifically MoreScreen.kt (4,350+ lines) into separate feature screens (e.g., SettingsScreen.kt, AboutScreen.kt, EnginesScreen.kt) and move reusable UI components into Components.kt.

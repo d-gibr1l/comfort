@@ -43,6 +43,9 @@ class DragSelectState internal constructor() {
     internal var current: String? = null
     internal var base: Set<String> = emptySet()
     internal var adds = true
+    // Where the finger was when the long press started the drag; see [dragToSelect]'s scrolling.
+    internal var startPointer = Offset.Zero
+    internal var scrollArmed = false
 
     /** An item's long press: [id] is picked, or unpicked if [selection] has it, and while the
      * finger stays down a drag goes on doing the same to the items it passes. Returns the new
@@ -52,6 +55,8 @@ class DragSelectState internal constructor() {
         adds = id !in selection
         anchor = id
         current = id
+        startPointer = pointer
+        scrollArmed = false
         if (pointerDown) active = true
         return if (adds) selection + id else selection - id
     }
@@ -104,6 +109,7 @@ fun Modifier.dragToSelect(
     val bottomPx = with(density) { bottomInset.toPx() }
     val edgePx = with(density) { 64.dp.toPx() }
     val maxSpeedPx = with(density) { 20.dp.toPx() } // a frame, deep in a zone
+    val armPx = with(density) { 24.dp.toPx() }
 
     fun update() {
         val y = state.pointer.y.coerceIn(topPx, (height[0] - bottomPx - 1f).coerceAtLeast(topPx))
@@ -124,7 +130,11 @@ fun Modifier.dragToSelect(
             val bottom = height[0] - bottomPx
             val up = ((topPx + edgePx - state.pointer.y) / edgePx).coerceIn(0f, 1f)
             val down = ((state.pointer.y - (bottom - edgePx)) / edgePx).coerceIn(0f, 1f)
-            val speed = (down - up) * maxSpeedPx
+            // Not until the finger has moved from where it pressed: an item near the bottom (or the
+            // top) is already in a scroll zone, and pressing it scrolled the list at once,
+            // selecting everything below (reported). Once it's moved, the zones work as before.
+            if (!state.scrollArmed && (state.pointer - state.startPointer).getDistance() > armPx) state.scrollArmed = true
+            val speed = if (state.scrollArmed) (down - up) * maxSpeedPx else 0f
             if (speed != 0f) {
                 scrollBy(speed)
                 update()
