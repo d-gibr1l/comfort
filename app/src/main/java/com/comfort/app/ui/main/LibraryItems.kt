@@ -42,7 +42,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -322,7 +322,7 @@ internal fun HistoryGridItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (item.isFavorite) {
-                MediaBadge(icon = Icons.Filled.Star, text = null, tint = Color(0xFFFFD54F), modifier = Modifier.padding(top = 4.dp))
+                MediaBadge(icon = Icons.Filled.Favorite, text = null, tint = Color(0xFFFF6B81), modifier = Modifier.padding(top = 4.dp))
             }
             if (!selectionMode) Box {
                 IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(36.dp)) {
@@ -639,7 +639,7 @@ internal fun HistoryRow(
                             .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.Star, contentDescription = stringResource(R.string.favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
+                        Icon(ImageVector.vectorResource(R.drawable.ic_ms_favorite), contentDescription = stringResource(R.string.favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(11.dp))
                     }
                 }
             }
@@ -796,7 +796,7 @@ private fun DownloadActionsMenu(
             }
             DropdownMenuItem(
                 text = { Text(if (item.isFavorite) stringResource(R.string.remove_from_favorites) else stringResource(R.string.add_to_favorites)) },
-                leadingIcon = { Icon(Icons.Outlined.Star, contentDescription = null) },
+                leadingIcon = { Icon(ImageVector.vectorResource(R.drawable.ic_ms_favorite), contentDescription = null) },
                 onClick = { onDismiss(); onToggleFavorite() },
             )
             DropdownMenuItem(

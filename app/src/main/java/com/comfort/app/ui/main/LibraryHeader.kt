@@ -520,12 +520,17 @@ private fun LibraryHeaderActions(
     activeDownloadsCount: Int,
     onOpenQueue: () -> Unit,
 ) {
-    IconToggleButton(checked = favoritesOnly, onCheckedChange = onFavoritesOnlyChange) {
-        Icon(
-            Icons.Outlined.Star,
-            contentDescription = stringResource(R.string.favorites_only),
-            tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    // On: a round highlight behind the heart, as the ⋮ buttons have while their menu is open.
+    IconToggleButton(
+        checked = favoritesOnly,
+        onCheckedChange = onFavoritesOnlyChange,
+        colors = IconButtonDefaults.iconToggleButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Icon(ImageVector.vectorResource(R.drawable.ic_ms_favorite), contentDescription = stringResource(R.string.favorites_only))
     }
     IconButton(onClick = onToggleGridView) {
         Icon(

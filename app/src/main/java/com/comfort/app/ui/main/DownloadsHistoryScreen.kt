@@ -640,7 +640,7 @@ fun DownloadsHistoryScreen(
             Column(modifier = Modifier.fillMaxSize().padding(top = topPaddingWhileSelecting)) {
                 fullHeaderContent()
                 EmptyState(
-                    icon = if (searching) Icons.Outlined.Search else if (showDeletedOnly) Icons.Outlined.Delete else if (favoritesOnly) Icons.Outlined.Star else Icons.Outlined.Image,
+                    icon = if (searching) Icons.Outlined.Search else if (showDeletedOnly) Icons.Outlined.Delete else if (favoritesOnly) ImageVector.vectorResource(R.drawable.ic_ms_favorite) else Icons.Outlined.Image,
                     title = if (searching) stringResource(R.string.no_matches) else if (showDeletedOnly) stringResource(R.string.nothing_deleted) else if (favoritesOnly) stringResource(R.string.no_favorites_yet) else stringResource(R.string.nothing_here_yet),
                     subtitle = if (searching) stringResource(R.string.try_a_different_search) else if (showDeletedOnly) stringResource(R.string.pictures_you_remove_from_your_device) else if (favoritesOnly) stringResource(R.string.star_a_download_to_pin_it) else stringResource(R.string.downloaded_pictures_will_show_up_in),
                     modifier = Modifier.padding(bottom = navBarClearance()),
@@ -924,7 +924,7 @@ fun DownloadsHistoryScreen(
                         selectedIds.forEach { viewModel.setFavorite(it, true) }
                         selectedIds = emptySet()
                     }) {
-                        Icon(Icons.Outlined.Star, contentDescription = stringResource(R.string.add_selected_to_favorites))
+                        Icon(ImageVector.vectorResource(R.drawable.ic_ms_favorite), contentDescription = stringResource(R.string.add_selected_to_favorites))
                     }
                     IconButton(onClick = {
                         requestDelete(selectedIds)
