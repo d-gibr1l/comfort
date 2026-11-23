@@ -324,6 +324,13 @@ class MusicService : MediaSessionService() {
     // When the tail started playing (silent, a moment ahead of the crossfade) and when the
     // crossfade itself began; 0 before.
     private var tailRollingAt = 0L
+    // Lining the silent tail up with the main player: when it was last moved, and how many times.
+    private var tailAlignedAt = 0L
+    private var tailAligns = 0
+    private var tailLastLag = Long.MIN_VALUE
+    // How far ahead of the main player the last seek put the tail, and what a seek costs (learnt).
+    private var tailSeekAhead = Long.MIN_VALUE
+    private var tailSeekCost = 160L
     private var tailStartedAt = 0L
     private var crossfadeSkip = false
     private var crossfade: android.animation.ValueAnimator? = null
@@ -427,8 +434,11 @@ class MusicService : MediaSessionService() {
                         // Readied a few seconds ahead, paused a moment before the crossfade point;
                         // played from there, silent, so it's already sounding when the crossfade
                         // starts (an audio track takes a moment to start: started at the crossfade
-                        // itself, the old song went quiet for it).
-                        val preroll = 400L
+                        // itself, the old song went quiet for it). Starting, it falls ~90-160 ms
+                        // behind the main player (measured on a Galaxy S24), and at the switch that
+                        // stretch played twice: a stutter. While it's still silent, it's moved on by
+                        // what it lags, until it's within ~25 ms (at most three tries).
+                        val preroll = 1500L
                         if (pos >= crossAt - 4000 && pos < crossAt - preroll && tailFor != id) readyTail(player, crossAt - preroll)
                         val t = tail
                         if (t != null && tailFor == id) {
@@ -436,6 +446,30 @@ class MusicService : MediaSessionService() {
                                 t.volume = 0f
                                 t.play()
                                 tailRollingAt = android.os.SystemClock.elapsedRealtime()
+                                tailAlignedAt = tailRollingAt
+                                tailAligns = 0
+                                tailLastLag = Long.MIN_VALUE
+                                tailSeekAhead = Long.MIN_VALUE
+                                tailSeekCost = 160L
+                            }
+                            val lag = pos - t.currentPosition
+                            val nowMs = android.os.SystemClock.elapsedRealtime()
+                            // Only once the lag has settled (it reads off for ~200 ms after a start or a
+                            // seek), and moved past it by what a seek costs: playing again after one, the
+                            // tail falls back by about that much (~160 ms measured), each time.
+                            val settled = tailLastLag != Long.MIN_VALUE && kotlin.math.abs(lag - tailLastLag) <= 10
+                            tailLastLag = lag
+                            if (tailRollingAt != 0L && t.isPlaying && settled && nowMs - tailAlignedAt >= 200 && tailAligns < 3 &&
+                                kotlin.math.abs(lag) > 20 && pos < crossAt - 400
+                            ) {
+                                // What the last seek cost, now it has settled: what it was moved ahead
+                                // of the main player by, plus the lag left.
+                                if (tailSeekAhead != Long.MIN_VALUE) tailSeekCost = tailSeekAhead + lag
+                                tailSeekAhead = tailSeekCost
+                                t.seekTo(t.currentPosition + lag + tailSeekCost)
+                                tailAligns++
+                                tailAlignedAt = nowMs
+                                tailLastLag = Long.MIN_VALUE
                             }
                             if (tailRollingAt != 0L && pos >= crossAt && t.isPlaying) {
                                 tailStartedAt = android.os.SystemClock.elapsedRealtime()
