@@ -45,6 +45,35 @@ internal object BatchViewRequest {
     var download by mutableStateOf<DownloadEntity?>(null)
 }
 
+/** The items sheet for whichever card's stack button was tapped (BatchViewRequest), in the
+ * Library or the Queue. A picture or video opens on its page in the viewer (with [libraryItems],
+ * the Library's pictures and videos, around it); a song in the music player, the playlist's songs as
+ * the queue (a song's lyrics file plays its song). */
+@Composable
+internal fun BatchViewHost(libraryItems: List<DownloadEntity>) {
+    val openViewer = com.comfort.app.ui.viewer.LocalOpenMediaViewer.current
+    BatchViewRequest.download?.let { batch ->
+        LibraryBatchSheet(
+            download = batch,
+            onDismiss = { BatchViewRequest.download = null },
+            onOpen = { pageId, _, mime ->
+                BatchViewRequest.download = null
+                if (batch.isAudio && mime?.startsWith("image/") != true && mime?.startsWith("video/") != true) {
+                    openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = listOf(batch), startId = pageId))
+                } else if (batch.isAudio) {
+                    // A picture (or video) saved with a song: the viewer on it alone — the song's
+                    // download isn't among the Library's pictures and videos, which opened on the
+                    // Library's first one. Its song isn't a page (galleryItemsFor).
+                    openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = listOf(batch.copy(isAudio = false)), startId = pageId))
+                } else {
+                    val visual = libraryItems.filter { !it.isAudio && it.id != batch.id } + batch
+                    openViewer(com.comfort.app.ui.viewer.MediaViewerRequest(downloads = visual, startId = pageId))
+                }
+            },
+        )
+    }
+}
+
 /** One file of a multi-item download, as the batch sheet lists it. [pageId] is the media viewer's
  * page for it (the download's id for its first file, "id#n" after). */
 private data class BatchItem(
@@ -83,6 +112,19 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var grid by remember { mutableStateOf(prefs.getBoolean("grid", true)) }
     var revision by remember { mutableIntStateOf(0) }
+    // Still downloading (opened from the Queue): the download as it is now, and its items looked
+    // at again every few seconds as more are saved.
+    val live by produceState(download, download.id) {
+        val dao = AppDatabase.getDatabase(context).downloadDao()
+        while (true) {
+            value = withContext(Dispatchers.IO) { dao.getById(download.id) } ?: value
+            if (value.status != com.comfort.app.data.DownloadStatus.RUNNING && value.status != com.comfort.app.data.DownloadStatus.QUEUED) break
+            kotlinx.coroutines.delay(2_000)
+            revision++
+        }
+    }
+    val downloading = live.status == com.comfort.app.data.DownloadStatus.RUNNING || live.status == com.comfort.app.data.DownloadStatus.QUEUED
+    val currentItem = com.comfort.app.data.DownloadNotes.items.collectAsState().value[download.id]
     val items by produceState<List<BatchItem>?>(null, download.id, revision) {
         value = withContext(Dispatchers.IO) { loadItems(context, download) }
     }
@@ -165,6 +207,22 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    // Still downloading: what it's on, and how far the whole run is.
+                    if (downloading) {
+                        Text(
+                            stringResource(R.string.downloading_x, currentItem ?: "${live.downloadedItems} / ${maxOf(live.totalItems, live.downloadedItems)}"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (live.totalItems > 0) {
+                            LinearProgressIndicator(
+                                progress = { (live.downloadedItems.toFloat() / live.totalItems).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.width(8.dp))

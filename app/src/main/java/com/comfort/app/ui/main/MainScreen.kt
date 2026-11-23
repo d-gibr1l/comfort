@@ -747,6 +747,9 @@ fun MainScreen(
             }
         }
 
+        // A multi-item card's items (its stack button, in the Library or the Queue), over both.
+        BatchViewHost(viewModel.historyFlow.collectAsStateWithLifecycle().value)
+
         // A blocked site's link: said so, and nothing opens.
         (route as? LinkRoute.Blocked)?.let { blocked ->
             val message = stringResource(R.string.site_x_is_blocked, blocked.site)
