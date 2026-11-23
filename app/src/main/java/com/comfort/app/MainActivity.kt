@@ -159,10 +159,23 @@ class MainActivity : ComponentActivity() {
         // longer than the whole animation whatever the numbers say.
         val now = if (animationEnd > 1_000_000_000_000L) System.currentTimeMillis() else android.os.SystemClock.uptimeMillis()
         val remaining = (animationEnd - now).coerceIn(0L, 700L)
+        // Eased out, not a quick linear fade: the logo grows a little as it goes and the splash
+        // fades a beat after it, so the app comes up from behind it (the 200 ms fade read as a cut).
+        val ease = android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f)
+        runCatching {
+          provider.iconView.animate()
+            .scaleX(1.12f).scaleY(1.12f)
+            .alpha(0f)
+            .setStartDelay(remaining)
+            .setDuration(320L)
+            .setInterpolator(ease)
+            .start()
+        }
         provider.view.animate()
           .alpha(0f)
-          .setStartDelay(remaining)
-          .setDuration(200L)
+          .setStartDelay(remaining + 60L)
+          .setDuration(340L)
+          .setInterpolator(ease)
           .withEndAction {
             provider.remove()
             applySystemBarStyle?.invoke()
