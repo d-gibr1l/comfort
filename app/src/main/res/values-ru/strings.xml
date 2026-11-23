@@ -463,6 +463,7 @@
     <string name="adds_a_delay_between_a_finished">Добавляет паузу между окончанием одной загрузки и началом следующей в очереди.</string>
     <string name="seconds">Секунды</string>
     <string name="incognito_by_default">Инкогнито по умолчанию</string>
+    <string name="incognito">Инкогнито</string>
     <string name="downloads_are_still_saved_to_your">Загрузки по-прежнему сохраняются на устройство, но не появляются в истории и медиатеке приложения.</string>
     <string name="prevent_duplicate_downloads">Не скачивать дубликаты</string>
     <string name="skips_downloading_a_link_if_it">Пропускает ссылку, если она уже в очереди, загружается или скачана.</string>

@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">Biten bir indirme ile kuyruktaki sonraki arasına gecikme ekler.</string>
     <string name="seconds">Saniye</string>
     <string name="incognito_by_default">Varsayılan olarak gizli</string>
+    <string name="incognito">Gizli</string>
     <string name="downloads_are_still_saved_to_your">İndirmeler yine cihazına kaydedilir, ama uygulamanın Geçmiş\'inde veya Kitaplık\'ında görünmez.</string>
     <string name="prevent_duplicate_downloads">Yinelenen indirmeleri engelle</string>
     <string name="skips_downloading_a_link_if_it">Bir bağlantı zaten kuyruktaysa, çalışıyorsa veya bittiyse indirmeyi atlar.</string>

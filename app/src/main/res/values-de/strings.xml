@@ -452,6 +452,7 @@
     <string name="adds_a_delay_between_a_finished">Fügt eine Pause zwischen einem fertigen Download und dem nächsten in der Warteschlange ein.</string>
     <string name="seconds">Sekunden</string>
     <string name="incognito_by_default">Standardmäßig inkognito</string>
+    <string name="incognito">Inkognito</string>
     <string name="downloads_are_still_saved_to_your">Downloads werden weiter auf deinem Gerät gespeichert, erscheinen aber nicht im Verlauf oder in der Mediathek der App.</string>
     <string name="prevent_duplicate_downloads">Doppelte Downloads verhindern</string>
     <string name="skips_downloading_a_link_if_it">Überspringt einen Link, wenn er schon wartet, läuft oder fertig ist.</string>

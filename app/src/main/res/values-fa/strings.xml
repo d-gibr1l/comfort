@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">بین یک دانلود تمام‌شده و بعدی در صف تأخیر اضافه می‌کند.</string>
     <string name="seconds">ثانیه</string>
     <string name="incognito_by_default">ناشناس به‌طور پیش‌فرض</string>
+    <string name="incognito">ناشناس</string>
     <string name="downloads_are_still_saved_to_your">دانلودها همچنان روی دستگاه ذخیره می‌شوند، اما در تاریخچه یا کتابخانه برنامه نمایش داده نمی‌شوند.</string>
     <string name="prevent_duplicate_downloads">جلوگیری از دانلود تکراری</string>
     <string name="skips_downloading_a_link_if_it">اگر پیوندی از قبل در صف، در حال اجرا یا تمام‌شده باشد، دانلودش را رد می‌کند.</string>

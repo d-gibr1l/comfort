@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">完了したダウンロードとキュー内の次のダウンロードの間に待機を入れます。</string>
     <string name="seconds">秒</string>
     <string name="incognito_by_default">既定でシークレット</string>
+    <string name="incognito">シークレット</string>
     <string name="downloads_are_still_saved_to_your">ダウンロードは端末に保存されますが、アプリの履歴やライブラリには表示されません。</string>
     <string name="prevent_duplicate_downloads">重複ダウンロードを防ぐ</string>
     <string name="skips_downloading_a_link_if_it">リンクがすでにキューにある、実行中、または完了している場合はダウンロードをスキップします。</string>

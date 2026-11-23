@@ -449,6 +449,7 @@
     <string name="adds_a_delay_between_a_finished">Menambahkan jeda antara unduhan yang selesai dan unduhan berikutnya di antrean.</string>
     <string name="seconds">Detik</string>
     <string name="incognito_by_default">Samaran secara bawaan</string>
+    <string name="incognito">Penyamaran</string>
     <string name="downloads_are_still_saved_to_your">Unduhan tetap disimpan di perangkat, tapi tidak muncul di Riwayat atau Pustaka aplikasi.</string>
     <string name="prevent_duplicate_downloads">Cegah unduhan ganda</string>
     <string name="skips_downloading_a_link_if_it">Melewati tautan yang sudah ada di antrean, sedang berjalan, atau sudah selesai.</string>

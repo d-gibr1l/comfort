@@ -251,6 +251,8 @@ object DownloadDispatcher {
         // startNow()'s own "the user explicitly asked to skip past the usual rule" precedent.
         // The preview sheet's "Start at…" — see DownloadEntity.scheduledAt.
         scheduledAt: Long? = null,
+        // The preview sheet's Incognito chip; null follows "Incognito by default".
+        incognito: Boolean? = null,
         forceDuplicate: Boolean = false,
     ): EnqueueResult {
         val trimmedUrl = url.trim()
@@ -321,7 +323,7 @@ object DownloadDispatcher {
                 // Global default only (see GalleryDlPreferences.isIncognitoDefault's own doc
                 // comment) — no per-download override UI yet, same scope YTDLnis itself exposes
                 // this as (a plain Settings switch, not a per-download picker).
-                incognito = GalleryDlPreferences.isIncognitoDefault(context),
+                incognito = incognito ?: GalleryDlPreferences.isIncognitoDefault(context),
             )
         )
         // While globally paused, new downloads sit undispatched — resumeAll() picks up anything

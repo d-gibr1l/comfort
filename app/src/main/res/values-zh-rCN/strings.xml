@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">在完成的下载和队列中的下一个下载之间添加延迟。</string>
     <string name="seconds">秒</string>
     <string name="incognito_by_default">默认无痕</string>
+    <string name="incognito">无痕</string>
     <string name="downloads_are_still_saved_to_your">下载仍会保存到设备，但不会出现在应用的历史记录或媒体库中。</string>
     <string name="prevent_duplicate_downloads">防止重复下载</string>
     <string name="skips_downloading_a_link_if_it">如果链接已在队列中、正在运行或已完成，则跳过下载。</string>

@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">Thêm thời gian chờ giữa một lượt tải xong và lượt tiếp theo trong hàng đợi.</string>
     <string name="seconds">Giây</string>
     <string name="incognito_by_default">Ẩn danh theo mặc định</string>
+    <string name="incognito">Ẩn danh</string>
     <string name="downloads_are_still_saved_to_your">Tệp vẫn được lưu vào thiết bị, nhưng không hiện trong Lịch sử hay Thư viện của ứng dụng.</string>
     <string name="prevent_duplicate_downloads">Ngăn tải trùng</string>
     <string name="skips_downloading_a_link_if_it">Bỏ qua liên kết nếu nó đã ở trong hàng đợi, đang chạy hoặc đã xong.</string>

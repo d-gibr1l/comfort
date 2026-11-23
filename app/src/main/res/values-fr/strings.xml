@@ -459,6 +459,7 @@
     <string name="adds_a_delay_between_a_finished">Ajoute un délai entre la fin d\'un téléchargement et le suivant dans la file.</string>
     <string name="seconds">Secondes</string>
     <string name="incognito_by_default">Navigation privée par défaut</string>
+    <string name="incognito">Navigation privée</string>
     <string name="downloads_are_still_saved_to_your">Les téléchargements sont toujours enregistrés sur ton appareil, mais n\'apparaissent pas dans l\'Historique ni la Bibliothèque de l\'appli.</string>
     <string name="prevent_duplicate_downloads">Éviter les doublons</string>
     <string name="skips_downloading_a_link_if_it">Ne télécharge pas un lien s\'il est déjà en file, en cours ou terminé.</string>

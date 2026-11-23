@@ -459,6 +459,7 @@
     <string name="adds_a_delay_between_a_finished">Adiciona uma espera entre um download concluído e o próximo da fila.</string>
     <string name="seconds">Segundos</string>
     <string name="incognito_by_default">Anônimo por padrão</string>
+    <string name="incognito">Anônimo</string>
     <string name="downloads_are_still_saved_to_your">Os downloads continuam sendo salvos no seu aparelho, mas não aparecem no Histórico nem na Biblioteca do app.</string>
     <string name="prevent_duplicate_downloads">Evitar downloads duplicados</string>
     <string name="skips_downloading_a_link_if_it">Não baixa um link se ele já estiver na fila, em andamento ou concluído.</string>

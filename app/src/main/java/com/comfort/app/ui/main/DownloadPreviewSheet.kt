@@ -37,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
@@ -234,6 +235,9 @@ data class DownloadOptions(
      * when the download started, and a video uploaded in between moved every pick onto the next
      * video. Null for anything else. */
     val itemUrls: List<String>? = null,
+    /** This download only leaves no Library entry or history (the sheet's Incognito chip); null
+     * follows Settings › Downloads' "Incognito by default". */
+    val incognito: Boolean? = null,
 )
 
 /** The engines the Configure sheet offers for [url]: only links more than one engine can download
@@ -347,6 +351,10 @@ fun DownloadPreviewSheet(
     // The sheet's own subtitle pick ("" none); null until changed, following Settings.
     var subtitleLanguages by remember { mutableStateOf<String?>(null) }
     var saveThumbnail by remember { mutableStateOf(false) }
+    // This download only: no Library entry or history once it's saved (Settings › Downloads'
+    // "Incognito by default" is the starting point).
+    val incognitoContext = androidx.compose.ui.platform.LocalContext.current
+    var incognito by remember { mutableStateOf(GalleryDlPreferences.isIncognitoDefault(incognitoContext)) }
     // Per-download engine (null = Auto) and the engines the link can use.
     var engineOverride by remember { mutableStateOf<com.comfort.app.data.DownloadEngine?>(null) }
     val engineOptions = remember(url) { sheetEngineOptions(context, url) }
@@ -698,6 +706,8 @@ fun DownloadPreviewSheet(
             onSubtitlesChange = { picked -> subtitleLanguages = picked.joinToString(",") { it.code } },
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = { saveThumbnail = !saveThumbnail },
+            incognito = incognito,
+            onToggleIncognito = { incognito = !incognito },
             engineOptions = engineOptions,
             engineOverride = engineOverride,
             onEngineChange = { engineOverride = it },
@@ -760,6 +770,8 @@ private fun PreviewSheetOverlayHost(
     onSubtitlesChange: (List<com.comfort.app.data.SubtitleTrack>) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
+    incognito: Boolean,
+    onToggleIncognito: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
     engineOverride: com.comfort.app.data.DownloadEngine?,
     onEngineChange: (com.comfort.app.data.DownloadEngine?) -> Unit,
@@ -859,6 +871,7 @@ private fun PreviewSheetOverlayHost(
         quality = if (!song.showQualityRow) VideoQuality.AUDIO_ONLY else quality,
         outputFormat = outputFormat,
         saveThumbnail = saveThumbnail,
+        incognito = incognito,
         extraCommands = commands.joinToString(" ").takeIf { it.isNotBlank() },
         clipRange = if (segmentsEdited) segments.toClipRange(previewDurationMs) else null,
         filenameTemplate = filenameTemplate?.takeIf { it.isNotBlank() },
@@ -903,6 +916,8 @@ private fun PreviewSheetOverlayHost(
             onSubtitlesChange = onSubtitlesChange,
             saveThumbnail = saveThumbnail,
             onToggleSaveThumbnail = onToggleSaveThumbnail,
+            incognito = incognito,
+            onToggleIncognito = onToggleIncognito,
             engineOptions = engineOptions,
             engine = engineOverride,
             onEngineChange = onEngineChange,
@@ -1203,6 +1218,8 @@ private fun MainPreviewScreen(
     onSubtitlesChange: (List<com.comfort.app.data.SubtitleTrack>) -> Unit,
     saveThumbnail: Boolean,
     onToggleSaveThumbnail: () -> Unit,
+    incognito: Boolean,
+    onToggleIncognito: () -> Unit,
     engineOptions: List<com.comfort.app.data.DownloadEngine>,
     engine: com.comfort.app.data.DownloadEngine?,
     onEngineChange: (com.comfort.app.data.DownloadEngine?) -> Unit,
@@ -1439,9 +1456,10 @@ private fun MainPreviewScreen(
                             label = if (commandCount > 0) stringResource(R.string.commands_x, commandCount) else stringResource(R.string.add_extra_commands),
                             selected = commandCount > 0,
                             icon = Icons.Outlined.Terminal,
-                            shape = LAST_CHIP_SHAPE,
+                            shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenCommands,
                         )
+                        IncognitoChip(incognito, onToggleIncognito)
                         Spacer(modifier = Modifier.width(12.dp))
                     }
 
@@ -1492,9 +1510,10 @@ private fun MainPreviewScreen(
                             label = stringResource(R.string.filename_templates),
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
-                            shape = LAST_CHIP_SHAPE,
+                            shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenTemplates,
                         )
+                        IncognitoChip(incognito, onToggleIncognito)
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                 } else {
@@ -1529,9 +1548,10 @@ private fun MainPreviewScreen(
                             label = stringResource(R.string.filename_templates),
                             selected = filenameTemplate != null,
                             icon = Icons.Outlined.Tag,
-                            shape = LAST_CHIP_SHAPE,
+                            shape = MIDDLE_CHIP_SHAPE,
                             onClick = onOpenTemplates,
                         )
+                        IncognitoChip(incognito, onToggleIncognito)
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                 }
@@ -1618,4 +1638,16 @@ private fun MainPreviewScreen(
             }
         }
     }
+}
+
+/** The preview sheet's Incognito chip: this download leaves no Library entry or history. */
+@Composable
+private fun IncognitoChip(on: Boolean, onToggle: () -> Unit) {
+    PreviewChip(
+        label = stringResource(R.string.incognito),
+        selected = on,
+        icon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = R.drawable.ic_domino_mask),
+        shape = LAST_CHIP_SHAPE,
+        onClick = onToggle,
+    )
 }

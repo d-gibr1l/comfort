@@ -454,6 +454,7 @@
     <string name="adds_a_delay_between_a_finished">Añade una espera entre una descarga terminada y la siguiente de la cola.</string>
     <string name="seconds">Segundos</string>
     <string name="incognito_by_default">Incógnito por defecto</string>
+    <string name="incognito">Incógnito</string>
     <string name="downloads_are_still_saved_to_your">Las descargas se siguen guardando en tu dispositivo, pero no aparecen en el Historial ni en la Biblioteca de la app.</string>
     <string name="prevent_duplicate_downloads">Evitar descargas duplicadas</string>
     <string name="skips_downloading_a_link_if_it">No descarga un enlace si ya está en cola, en curso o terminado.</string>

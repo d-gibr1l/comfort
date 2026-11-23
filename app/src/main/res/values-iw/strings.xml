@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">מוסיף השהיה בין הורדה שהסתיימה להורדה הבאה בתור.</string>
     <string name="seconds">שניות</string>
     <string name="incognito_by_default">גלישה בסתר כברירת מחדל</string>
+    <string name="incognito">גלישה בסתר</string>
     <string name="downloads_are_still_saved_to_your">ההורדות עדיין נשמרות במכשיר, אבל לא יופיעו בהיסטוריה או בספרייה של האפליקציה.</string>
     <string name="prevent_duplicate_downloads">מניעת הורדות כפולות</string>
     <string name="skips_downloading_a_link_if_it">מדלג על הורדת קישור אם הוא כבר בתור, רץ או הסתיים.</string>

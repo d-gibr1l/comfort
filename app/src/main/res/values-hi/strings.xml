@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">एक पूरे हुए डाउनलोड और कतार के अगले डाउनलोड के बीच देरी जोड़ता है।</string>
     <string name="seconds">सेकंड</string>
     <string name="incognito_by_default">डिफ़ॉल्ट रूप से गुप्त</string>
+    <string name="incognito">गुप्त</string>
     <string name="downloads_are_still_saved_to_your">डाउनलोड फिर भी आपके डिवाइस पर सहेजे जाते हैं, पर ऐप के इतिहास या लाइब्रेरी में नहीं दिखते।</string>
     <string name="prevent_duplicate_downloads">दोहरे डाउनलोड रोकें</string>
     <string name="skips_downloading_a_link_if_it">अगर लिंक पहले से कतार में, चल रहा या पूरा हो चुका है तो उसे डाउनलोड करना छोड़ देता है।</string>

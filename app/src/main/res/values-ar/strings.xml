@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">يضيف تأخيرًا بين التنزيل المكتمل والتالي في القائمة.</string>
     <string name="seconds">ثوانٍ</string>
     <string name="incognito_by_default">التصفح المتخفي افتراضيًا</string>
+    <string name="incognito">وضع التخفي</string>
     <string name="downloads_are_still_saved_to_your">تبقى التنزيلات محفوظة على جهازك، لكنها لن تظهر في سجل التطبيق أو مكتبته.</string>
     <string name="prevent_duplicate_downloads">منع التنزيلات المكررة</string>
     <string name="skips_downloading_a_link_if_it">يتخطى تنزيل الرابط إذا كان في القائمة أو قيد التنزيل أو مكتملًا.</string>

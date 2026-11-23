@@ -473,6 +473,7 @@
     <string name="adds_a_delay_between_a_finished">Adds a delay between a finished download and the next one in the queue.</string>
     <string name="seconds">Seconds</string>
     <string name="incognito_by_default">Incognito by default</string>
+    <string name="incognito">Incognito</string>
     <string name="downloads_are_still_saved_to_your">Downloads are still saved to your device, but won\'t appear in the app\'s History or Library.</string>
     <string name="prevent_duplicate_downloads">Prevent duplicate downloads</string>
     <string name="skips_downloading_a_link_if_it">Skips downloading a link if it\'s already queued, running, or finished.</string>

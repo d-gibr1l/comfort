@@ -439,6 +439,7 @@
     <string name="adds_a_delay_between_a_finished">Aggiunge un ritardo tra un download completato e il successivo in coda.</string>
     <string name="seconds">Secondi</string>
     <string name="incognito_by_default">Incognito per impostazione predefinita</string>
+    <string name="incognito">In incognito</string>
     <string name="downloads_are_still_saved_to_your">I download vengono comunque salvati sul dispositivo, ma non compaiono nella Cronologia o nella Libreria dell\'app.</string>
     <string name="prevent_duplicate_downloads">Evita download duplicati</string>
     <string name="skips_downloading_a_link_if_it">Salta il download di un link se è già in coda, in corso o completato.</string>
