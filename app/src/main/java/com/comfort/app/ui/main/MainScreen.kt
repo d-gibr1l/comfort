@@ -428,7 +428,9 @@ fun MainScreen(
 
         if (entity != null) {
             selectedTab = 1
-            if (entity.isAudio) {
+            if (com.comfort.app.data.PlayerChoice.openExternallyIfChosen(context, entity)) {
+                // Settings › Look & feel › Players: opened in the phone's player.
+            } else if (entity.isAudio) {
                 mediaViewer = null
                 val audioList = if (history.any { it.id == entity.id } && !com.comfort.app.music.MusicSettings.playTappedOnly.current) {
                     history.filter { it.isAudio }
@@ -460,7 +462,10 @@ fun MainScreen(
         // else opens the media viewer, which pages through the pictures and videos only.
         com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { request ->
             val tapped = request.downloads.firstOrNull { it.id == request.startId }
-            if (tapped?.isAudio == true) {
+            // Settings › Look & feel › Players: the phone's player for it, if chosen.
+            if (tapped != null && com.comfort.app.data.PlayerChoice.openExternallyIfChosen(context, tapped)) {
+                // Opened there.
+            } else if (tapped?.isAudio == true) {
                 // Music settings: Play only the tapped song.
                 val queue = if (com.comfort.app.music.MusicSettings.playTappedOnly.current) listOf(tapped) else request.downloads
                 com.comfort.app.music.MusicPlayer.play(context, queue, tapped.id)

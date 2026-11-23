@@ -1230,4 +1230,10 @@
     <string name="queue_help_select_body">Bir kartı seçmek için uzun basın, daha fazlasını seçmek için sürükleyin. Sekmeler arasında geçmek için yana kaydırın.</string>
     <string name="queue_help_errors_title">Bir indirme başarısız olursa</string>
     <string name="queue_help_errors_body">Ayrıntılar için karttaki ⓘ simgesine, yeniden denemek için Tekrar dene düğmesine dokunun.\n• Gizli, yaş sınırlı ya da oturum açmayı gerektiren gönderiler: hesabınızı Ayarlar › Çerezler ve Oturum bölümünden ekleyin.\n• Hız sınırı: site mola istiyor; indirme bekler ve kendiliğinden devam eder.\n• Bağlantı yok: bekleyen indirmeler yeniden çevrimiçi olunca başlar; çalışan bir indirme başarısız olabilir, o zaman Tekrar dene düğmesine dokunun.\n• Desteklenmeyen bağlantı: sayfadaki medyayı bulmak için Ana Sayfa sayfasında Web\'de gezin ile açın.</string>
+    <string name="players">Oynatıcılar</string>
+    <string name="videos_in_phone_player">Videoları telefonun oynatıcısında aç</string>
+    <string name="videos_in_phone_player_subtitle">Comfort\'un görüntüleyicisi yerine. Resimler yine Comfort\'ta açılır.</string>
+    <string name="music_in_phone_player">Müziği telefonun oynatıcısında çal</string>
+    <string name="music_in_phone_player_subtitle">Comfort\'un müzik çalarının yerine.</string>
+    <string name="no_app_to_open_this">Bu telefonda bunu açabilecek uygulama yok</string>
 </resources>

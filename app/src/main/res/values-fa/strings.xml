@@ -1230,4 +1230,10 @@
     <string name="queue_help_select_body">کارتی را لمس طولانی کنید تا انتخاب شود و بکشید تا بیشتر انتخاب کنید. به پهلو بکشید تا بین زبانه‌ها جابه‌جا شوید.</string>
     <string name="queue_help_errors_title">وقتی دانلودی ناموفق شد</string>
     <string name="queue_help_errors_body">روی ⓘ کارت بزنید تا جزئیات را ببینید و تلاش دوباره را برای تلاش دوباره.\n• پست‌های خصوصی، با محدودیت سنی یا نیازمند ورود: حسابتان را در تنظیمات › کوکی‌ها و ورود اضافه کنید.\n• محدودیت درخواست: سایت استراحت می‌خواهد؛ دانلود منتظر می‌ماند و خودش ادامه می‌دهد.\n• بدون اتصال: دانلودهای منتظر وقتی دوباره آنلاین شوید شروع می‌شوند؛ دانلود در حال اجرا ممکن است ناموفق شود، پس تلاش دوباره را بزنید.\n• پیوند پشتیبانی‌نشده: آن را با مرور وب در خانه باز کنید تا رسانهٔ صفحه را پیدا کنید.</string>
+    <string name="players">پخش‌کننده‌ها</string>
+    <string name="videos_in_phone_player">باز کردن ویدیوها در پخش‌کنندهٔ گوشی</string>
+    <string name="videos_in_phone_player_subtitle">به‌جای نمایشگر Comfort. عکس‌ها همچنان در Comfort باز می‌شوند.</string>
+    <string name="music_in_phone_player">پخش موسیقی در پخش‌کنندهٔ گوشی</string>
+    <string name="music_in_phone_player_subtitle">به‌جای پخش‌کنندهٔ موسیقی Comfort.</string>
+    <string name="no_app_to_open_this">هیچ برنامه‌ای در این گوشی نمی‌تواند این را باز کند</string>
 </resources>

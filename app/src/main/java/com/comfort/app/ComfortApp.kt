@@ -40,6 +40,7 @@ class ComfortApp : Application() {
         super.onCreate()
         // The swipe switches (Settings › Look & feel › Gestures), read before any screen is built.
         com.comfort.app.data.GestureSettings.init(this)
+        com.comfort.app.data.PlayerChoice.init(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             // Once: cards that showed a later file than their first (see pointThumbnailsAtFirstItem).
             val prefs = getSharedPreferences("app_repairs", MODE_PRIVATE)

@@ -1264,4 +1264,10 @@
     <string name="queue_help_select_body">Mantén pulsada una tarjeta para seleccionarla y arrastra para seleccionar más. Desliza de lado para cambiar de pestaña.</string>
     <string name="queue_help_errors_title">Cuando falla una descarga</string>
     <string name="queue_help_errors_body">Toca ⓘ en la tarjeta para ver los detalles y Reintentar para volver a intentarlo.\n• Publicaciones privadas, con restricción de edad o que requieren iniciar sesión: añade tu cuenta en Ajustes › Cookies e inicio de sesión.\n• Límite de solicitudes: el sitio pide una pausa; la descarga espera y sigue sola.\n• Sin conexión: las descargas en espera empiezan cuando vuelvas a estar en línea; una en curso puede fallar, así que toca Reintentar.\n• Enlace no compatible: ábrelo con Navegar por la web en Inicio para encontrar el contenido de la página.</string>
+    <string name="players">Reproductores</string>
+    <string name="videos_in_phone_player">Abrir vídeos en el reproductor del teléfono</string>
+    <string name="videos_in_phone_player_subtitle">En lugar del visor de Comfort. Las imágenes siguen abriéndose en Comfort.</string>
+    <string name="music_in_phone_player">Reproducir música en el reproductor del teléfono</string>
+    <string name="music_in_phone_player_subtitle">En lugar del reproductor de música de Comfort.</string>
+    <string name="no_app_to_open_this">Ninguna app del teléfono puede abrir esto</string>
 </resources>

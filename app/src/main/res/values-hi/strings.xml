@@ -1230,4 +1230,10 @@
     <string name="queue_help_select_body">किसी कार्ड को चुनने के लिए उसे देर तक दबाएँ, और और चुनने के लिए खींचें। टैब बदलने के लिए बगल में स्वाइप करें।</string>
     <string name="queue_help_errors_title">जब डाउनलोड फ़ेल हो</string>
     <string name="queue_help_errors_body">विवरण के लिए कार्ड पर ⓘ दबाएँ, और फिर से कोशिश के लिए फिर कोशिश करें।\n• निजी, उम्र-प्रतिबंधित या साइन-इन वाली पोस्ट: सेटिंग › कुकी और लॉगिन में अपना खाता जोड़ें।\n• रेट-लिमिट: साइट विराम चाहती है; डाउनलोड इंतज़ार करके अपने-आप आगे बढ़ता है।\n• कनेक्शन नहीं: इंतज़ार कर रहे डाउनलोड ऑनलाइन होते ही शुरू होते हैं; चल रहा डाउनलोड फ़ेल हो सकता है, तब फिर कोशिश करें दबाएँ।\n• लिंक समर्थित नहीं: पेज पर मीडिया ढूँढने के लिए उसे होम पर वेब ब्राउज़ करें से खोलें।</string>
+    <string name="players">प्लेयर</string>
+    <string name="videos_in_phone_player">वीडियो फ़ोन के प्लेयर में खोलें</string>
+    <string name="videos_in_phone_player_subtitle">Comfort के व्यूअर की जगह। तस्वीरें Comfort में ही खुलेंगी।</string>
+    <string name="music_in_phone_player">संगीत फ़ोन के प्लेयर में चलाएँ</string>
+    <string name="music_in_phone_player_subtitle">Comfort के संगीत प्लेयर की जगह।</string>
+    <string name="no_app_to_open_this">इस फ़ोन पर कोई ऐप इसे नहीं खोल सकता</string>
 </resources>

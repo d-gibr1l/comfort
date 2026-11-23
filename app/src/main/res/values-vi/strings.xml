@@ -1196,4 +1196,10 @@
     <string name="queue_help_select_body">Nhấn giữ một thẻ để chọn, rồi kéo để chọn thêm. Vuốt ngang để chuyển tab.</string>
     <string name="queue_help_errors_title">Khi tải xuống thất bại</string>
     <string name="queue_help_errors_body">Nhấn ⓘ trên thẻ để xem chi tiết, và Thử lại để thử lại.\n• Bài riêng tư, giới hạn độ tuổi hoặc cần đăng nhập: thêm tài khoản của bạn trong Cài đặt › Cookie và đăng nhập.\n• Bị giới hạn tốc độ: trang muốn nghỉ; tải xuống sẽ chờ rồi tự tiếp tục.\n• Không có kết nối: các tải xuống đang chờ bắt đầu khi bạn có mạng lại; tải xuống đang chạy có thể thất bại, khi đó nhấn Thử lại.\n• Liên kết không được hỗ trợ: mở bằng Duyệt web trên Trang chủ để tìm nội dung trên trang.</string>
+    <string name="players">Trình phát</string>
+    <string name="videos_in_phone_player">Mở video trong trình phát của điện thoại</string>
+    <string name="videos_in_phone_player_subtitle">Thay cho trình xem của Comfort. Ảnh vẫn mở trong Comfort.</string>
+    <string name="music_in_phone_player">Phát nhạc trong trình phát của điện thoại</string>
+    <string name="music_in_phone_player_subtitle">Thay cho trình phát nhạc của Comfort.</string>
+    <string name="no_app_to_open_this">Không có ứng dụng nào trên điện thoại mở được mục này</string>
 </resources>

@@ -1264,4 +1264,10 @@
     <string name="queue_help_select_body">Toque e segure um card para selecioná-lo, e arraste para selecionar mais. Deslize para o lado para trocar de aba.</string>
     <string name="queue_help_errors_title">Quando um download falha</string>
     <string name="queue_help_errors_body">Toque em ⓘ no card para ver os detalhes, e em Tentar de novo para tentar de novo.\n• Posts privados, com restrição de idade ou que exigem login: adicione sua conta em Configurações › Cookies e login.\n• Limite de requisições: o site quer uma pausa; o download espera e continua sozinho.\n• Sem conexão: os downloads esperando começam quando você voltar a ficar on-line; um em andamento pode falhar, então toque em Tentar de novo.\n• Link não compatível: abra com Navegar na web em Início para encontrar a mídia na página.</string>
+    <string name="players">Players</string>
+    <string name="videos_in_phone_player">Abrir vídeos no player do celular</string>
+    <string name="videos_in_phone_player_subtitle">Em vez do visualizador do Comfort. As imagens continuam abrindo no Comfort.</string>
+    <string name="music_in_phone_player">Tocar música no player do celular</string>
+    <string name="music_in_phone_player_subtitle">Em vez do player de música do Comfort.</string>
+    <string name="no_app_to_open_this">Nenhum app do celular consegue abrir isto</string>
 </resources>

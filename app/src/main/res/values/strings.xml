@@ -1280,4 +1280,10 @@
     <string name="queue_help_select_body">Long-press a card to select it, and drag to select more. Swipe sideways to move between the tabs.</string>
     <string name="queue_help_errors_title">When a download fails</string>
     <string name="queue_help_errors_body">Tap ⓘ on the card for the details, and Retry to try again.\n• Private, age-restricted or sign-in-only posts: add your account in Settings › Cookies &amp; Login.\n• Rate-limited: the site wants a break; the download waits and carries on by itself.\n• No connection: waiting downloads start once you\'re back online; a running one may fail, so tap Retry.\n• Link not supported: open it with Browse the web on Home to find the media on the page.</string>
+    <string name="players">Players</string>
+    <string name="videos_in_phone_player">Open videos in the phone\'s player</string>
+    <string name="videos_in_phone_player_subtitle">Instead of Comfort\'s viewer. Pictures still open in Comfort.</string>
+    <string name="music_in_phone_player">Play music in the phone\'s player</string>
+    <string name="music_in_phone_player_subtitle">Instead of Comfort\'s music player.</string>
+    <string name="no_app_to_open_this">No app on this phone can open this</string>
 </resources>

@@ -1264,4 +1264,10 @@
     <string name="queue_help_select_body">Appuyez longuement sur une carte pour la sélectionner, et faites glisser pour en sélectionner d\'autres. Balayez sur le côté pour changer d\'onglet.</string>
     <string name="queue_help_errors_title">Quand un téléchargement échoue</string>
     <string name="queue_help_errors_body">Touchez ⓘ sur la carte pour les détails, et Réessayer pour réessayer.\n• Publications privées, avec restriction d\'âge ou réservées aux comptes connectés : ajoutez votre compte dans Paramètres › Cookies et connexion.\n• Limite de requêtes : le site demande une pause ; le téléchargement attend et reprend tout seul.\n• Pas de connexion : les téléchargements en attente démarrent une fois de nouveau en ligne ; un téléchargement en cours peut échouer, touchez alors Réessayer.\n• Lien non pris en charge : ouvrez-le avec Naviguer sur le web sur Accueil pour trouver les médias de la page.</string>
+    <string name="players">Lecteurs</string>
+    <string name="videos_in_phone_player">Ouvrir les vidéos dans le lecteur du téléphone</string>
+    <string name="videos_in_phone_player_subtitle">Au lieu de la visionneuse de Comfort. Les images s\'ouvrent toujours dans Comfort.</string>
+    <string name="music_in_phone_player">Lire la musique dans le lecteur du téléphone</string>
+    <string name="music_in_phone_player_subtitle">Au lieu du lecteur de musique de Comfort.</string>
+    <string name="no_app_to_open_this">Aucune app de ce téléphone ne peut ouvrir ceci</string>
 </resources>

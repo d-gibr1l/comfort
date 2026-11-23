@@ -1230,4 +1230,10 @@
     <string name="queue_help_select_body">Halte eine Karte gedrückt, um sie auszuwählen, und ziehe, um weitere auszuwählen. Wische seitlich, um zwischen den Tabs zu wechseln.</string>
     <string name="queue_help_errors_title">Wenn ein Download fehlschlägt</string>
     <string name="queue_help_errors_body">Tippe auf der Karte auf ⓘ für Details und auf Wiederholen, um es erneut zu versuchen.\n• Private, altersbeschränkte oder nur angemeldet sichtbare Beiträge: füge dein Konto unter Einstellungen › Cookies &amp; Anmeldung hinzu.\n• Rate-Limit: Die Seite will eine Pause; der Download wartet und macht von selbst weiter.\n• Keine Verbindung: Wartende Downloads starten, sobald du wieder online bist; ein laufender kann fehlschlagen, dann tippe auf Wiederholen.\n• Link nicht unterstützt: Öffne ihn mit Im Web surfen auf Start, um die Medien auf der Seite zu finden.</string>
+    <string name="players">Player</string>
+    <string name="videos_in_phone_player">Videos im Player des Smartphones öffnen</string>
+    <string name="videos_in_phone_player_subtitle">Statt im Viewer von Comfort. Bilder öffnen weiterhin in Comfort.</string>
+    <string name="music_in_phone_player">Musik im Player des Smartphones abspielen</string>
+    <string name="music_in_phone_player_subtitle">Statt im Musikplayer von Comfort.</string>
+    <string name="no_app_to_open_this">Keine App auf diesem Smartphone kann das öffnen</string>
 </resources>

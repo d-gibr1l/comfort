@@ -1264,4 +1264,10 @@
     <string name="queue_help_select_body">לחיצה ארוכה על כרטיס בוחרת אותו, וגרירה בוחרת עוד. החלקה הצידה עוברת בין הכרטיסיות.</string>
     <string name="queue_help_errors_title">כשהורדה נכשלת</string>
     <string name="queue_help_errors_body">הקש על ⓘ בכרטיס לפרטים, ועל נסה שוב כדי לנסות שוב.\n• פוסטים פרטיים, מוגבלי גיל או שדורשים התחברות: הוסף את החשבון שלך בהגדרות › עוגיות והתחברות.\n• הגבלת קצב: האתר מבקש הפסקה; ההורדה ממתינה וממשיכה לבד.\n• אין חיבור: הורדות ממתינות יתחילו כשתחזור לרשת; הורדה פעילה עלולה להיכשל, אז הקש נסה שוב.\n• קישור לא נתמך: פתח אותו עם גלישה באינטרנט בבית כדי למצוא את המדיה בדף.</string>
+    <string name="players">נגנים</string>
+    <string name="videos_in_phone_player">פתיחת סרטונים בנגן של הטלפון</string>
+    <string name="videos_in_phone_player_subtitle">במקום המציג של Comfort. תמונות עדיין נפתחות ב-Comfort.</string>
+    <string name="music_in_phone_player">השמעת מוזיקה בנגן של הטלפון</string>
+    <string name="music_in_phone_player_subtitle">במקום נגן המוזיקה של Comfort.</string>
+    <string name="no_app_to_open_this">אין בטלפון אפליקציה שיכולה לפתוח את זה</string>
 </resources>

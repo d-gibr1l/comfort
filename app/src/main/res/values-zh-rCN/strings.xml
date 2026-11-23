@@ -1196,4 +1196,10 @@
     <string name="queue_help_select_body">长按卡片可选中它，拖动可选中更多。左右滑动可切换标签页。</string>
     <string name="queue_help_errors_title">下载失败时</string>
     <string name="queue_help_errors_body">点按卡片上的 ⓘ 查看详情，点按重试再试一次。\n• 私密、有年龄限制或需要登录的帖子：在设置 › Cookie 和登录中添加你的账号。\n• 请求受限：网站需要歇一下；下载会等待并自行继续。\n• 没有网络：等待中的下载会在你重新联网后开始；正在进行的可能失败，请点按重试。\n• 不支持的链接：在首页用浏览网页打开它，以找到页面上的媒体。</string>
+    <string name="players">播放器</string>
+    <string name="videos_in_phone_player">用手机的播放器打开视频</string>
+    <string name="videos_in_phone_player_subtitle">代替 Comfort 的查看器。图片仍在 Comfort 中打开。</string>
+    <string name="music_in_phone_player">用手机的播放器播放音乐</string>
+    <string name="music_in_phone_player_subtitle">代替 Comfort 的音乐播放器。</string>
+    <string name="no_app_to_open_this">这台手机上没有能打开此内容的应用</string>
 </resources>

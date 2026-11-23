@@ -1227,4 +1227,10 @@
     <string name="queue_help_select_body">Tekan lama kartu untuk memilihnya, lalu seret untuk memilih lebih banyak. Geser ke samping untuk berpindah tab.</string>
     <string name="queue_help_errors_title">Saat unduhan gagal</string>
     <string name="queue_help_errors_body">Ketuk ⓘ di kartu untuk detailnya, dan Coba lagi untuk mencoba lagi.\n• Postingan privat, berbatas usia, atau perlu masuk: tambahkan akun Anda di Setelan › Cookie &amp; Login.\n• Dibatasi: situs minta jeda; unduhan menunggu dan berlanjut sendiri.\n• Tanpa koneksi: unduhan yang menunggu mulai saat Anda kembali online; yang berjalan bisa gagal, jadi ketuk Coba lagi.\n• Link tidak didukung: buka dengan Jelajahi web di Beranda untuk menemukan media di halaman.</string>
+    <string name="players">Pemutar</string>
+    <string name="videos_in_phone_player">Buka video di pemutar ponsel</string>
+    <string name="videos_in_phone_player_subtitle">Sebagai ganti penampil Comfort. Gambar tetap dibuka di Comfort.</string>
+    <string name="music_in_phone_player">Putar musik di pemutar ponsel</string>
+    <string name="music_in_phone_player_subtitle">Sebagai ganti pemutar musik Comfort.</string>
+    <string name="no_app_to_open_this">Tidak ada aplikasi di ponsel ini yang bisa membukanya</string>
 </resources>
