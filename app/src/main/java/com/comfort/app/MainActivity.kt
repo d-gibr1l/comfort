@@ -86,7 +86,17 @@ class MainActivity : ComponentActivity() {
       intent.removeExtra(EXTRA_OPEN_DOWNLOAD_ID)
     }
     val action = intent.action
-    if (action == ACTION_OPEN_DOWNLOAD) {
+    // A .cbz opened with Comfort from another app (a file manager): the comic reader.
+    if (action == Intent.ACTION_VIEW && intent.data != null) {
+      val data = intent.data!!
+      val name = runCatching {
+        contentResolver.query(data, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
+      }.getOrNull() ?: data.lastPathSegment
+      if (com.comfort.app.data.ComicSites.isComicFile(name, intent.type ?: contentResolver.getType(data))) {
+        com.comfort.app.ui.comic.ComicReaderRequest.request = com.comfort.app.ui.comic.ComicRequest(data, name?.substringBeforeLast('.') ?: getString(R.string.comic))
+      }
+      intent.action = Intent.ACTION_MAIN
+    } else if (action == ACTION_OPEN_DOWNLOAD) {
       intent.action = Intent.ACTION_MAIN
     } else if (action in setOf(SHORTCUT_PASTE_DOWNLOAD, SHORTCUT_OPEN_LIBRARY, SHORTCUT_OPEN_QUEUE, SHORTCUT_SEARCH_LIBRARY, ACTION_OPEN_NOW_PLAYING)) {
       shortcut.value = com.comfort.app.ui.main.ShortcutRequest(action!!, (shortcut.value?.seq ?: 0) + 1)
@@ -264,6 +274,12 @@ class MainActivity : ComponentActivity() {
             androidx.compose.runtime.LaunchedEffect(Unit) { window.setBackgroundDrawable(null) }
             MainNavigation(openQueueSignal = openQueueSignal.intValue, shortcut = shortcut.value, openDownload = openDownloadRequest.value)
             if (showWelcome) com.comfort.app.ui.main.WelcomeScreen(onDone = { showWelcome = false })
+            // A comic being read, over everything.
+            com.comfort.app.ui.comic.ComicReaderRequest.request?.let { comic ->
+              androidx.compose.runtime.key(comic) {
+                com.comfort.app.ui.comic.ComicReader(comic, onClose = { com.comfort.app.ui.comic.ComicReaderRequest.request = null })
+              }
+            }
           }
         }
       }

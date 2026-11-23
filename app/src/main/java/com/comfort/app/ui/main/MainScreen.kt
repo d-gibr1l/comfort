@@ -462,8 +462,13 @@ fun MainScreen(
         // else opens the media viewer, which pages through the pictures and videos only.
         com.comfort.app.ui.viewer.LocalOpenMediaViewer provides { request ->
             val tapped = request.downloads.firstOrNull { it.id == request.startId }
-            // Settings › Look & feel › Players: the phone's player for it, if chosen.
-            if (tapped != null && com.comfort.app.data.PlayerChoice.openExternallyIfChosen(context, tapped)) {
+            // A comic (a chapter saved as .cbz): the comic reader.
+            val comicUri = tapped?.mediaUri?.let(android.net.Uri::parse)?.takeIf { uri ->
+                com.comfort.app.data.ComicSites.isComicFile(uri.lastPathSegment, runCatching { context.contentResolver.getType(uri) }.getOrNull())
+            }
+            if (tapped != null && comicUri != null) {
+                com.comfort.app.ui.comic.ComicReaderRequest.request = com.comfort.app.ui.comic.ComicRequest(comicUri, tapped.title.ifBlank { context.getString(R.string.comic) })
+            } else if (tapped != null && com.comfort.app.data.PlayerChoice.openExternallyIfChosen(context, tapped)) {
                 // Opened there.
             } else if (tapped?.isAudio == true) {
                 // Music settings: Play only the tapped song.

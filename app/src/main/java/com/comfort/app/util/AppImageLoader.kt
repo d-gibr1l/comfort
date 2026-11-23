@@ -63,6 +63,9 @@ object AppImageLoader {
                     // A song's cover (AudioCover) — see AudioCoverFetcher.
                     add(AudioCoverFetcher.Factory())
                     add(AudioCoverFetcher.Keyer())
+                    // A comic's pages, read out of its .cbz (ui/comic/ComicReader).
+                    add(com.comfort.app.ui.comic.ComicPageFetcher.Factory())
+                    add(com.comfort.app.ui.comic.ComicPageFetcher.PageKeyer())
                     // Registers frame extraction for video thumbnails (gallery-dl downloads are
                     // all images, but yt-dlp ones are video — without this decoder, a video's
                     // MediaStore thumbnail Uri just renders blank instead of a preview frame).
