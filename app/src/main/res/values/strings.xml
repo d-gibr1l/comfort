@@ -1382,4 +1382,6 @@
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>
     </plurals>
+    <string name="playlist_look_ahead">Look ahead in playlists</string>
+    <string name="playlist_look_ahead_subtitle">Gets a YouTube playlist\'s next songs ready while one downloads; turn off on a slow or metered connection</string>
 </resources>

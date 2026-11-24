@@ -2405,7 +2405,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
              override_title=None, override_artist=None, info_json_path=None,
              audio_format=None, normalize_audio=False, site=None,
              sponsorblock_remove=None, sponsorblock_mark=None, split_chapters=False,
-             audio_language=None, shared_extra_args=None, subtitle_auto=False):
+             audio_language=None, shared_extra_args=None, subtitle_auto=False, playlist_look_ahead=True):
     """Downloads a video via yt-dlp's embeddable YoutubeDL API — deliberately not yt_dlp.main(),
     which (like gallery-dl's CLI entry point) reads sys.argv, a process-global that two
     concurrent calls would race on. YoutubeDL instead takes all configuration as a constructor
@@ -3245,7 +3245,8 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
 
     def _attempt(opts, reuse_info):
         # A YouTube playlist: its next entries looked up while one downloads (_PlaylistPrefetch).
-        prefetch = _PlaylistPrefetch(url, opts, should_cancel) if _is_youtube_playlist_run(url, opts) else None
+        prefetch = _PlaylistPrefetch(url, opts, should_cancel) \
+            if playlist_look_ahead and _is_youtube_playlist_run(url, opts) else None
         try:
             _attempt_with(opts, reuse_info, prefetch)
         finally:
@@ -3898,5 +3899,6 @@ if __name__ == "__main__":
         audio_language=(_s(a[54]) if len(a) > 54 else None),
         shared_extra_args=(_s(a[55]) if len(a) > 55 else None),
         subtitle_auto=_b(a[56]) if len(a) > 56 else False,
+        playlist_look_ahead=_b(a[57]) if len(a) > 57 else True,
     )
     print(event("exit", status=status), flush=True)

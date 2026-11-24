@@ -149,6 +149,7 @@ internal class EngineCommands(
     private val bufferSizeKb = GalleryDlPreferences.getEffectiveBufferSizeKb(context)
     private val formatIdOverride = GalleryDlPreferences.getFormatIdOverride(context)
     private val youtubeClientRotation = GalleryDlPreferences.isYoutubeClientRotationEnabled(context)
+    private val playlistLookAhead = GalleryDlPreferences.isPlaylistLookAhead(context)
     private val impersonate = GalleryDlPreferences.isImpersonateEnabled(context)
     // Only once its downloaded libraries are there (Aria2Runtime): on without them (cleared, or
     // the download never finished), yt-dlp's own downloader is used rather than an aria2c that
@@ -215,6 +216,7 @@ internal class EngineCommands(
         audioLanguage = audioLanguage,
         sharedExtraArgs = sharedExtraArgs,
         subtitleAuto = subtitleAuto,
+        playlistLookAhead = playlistLookAhead,
     )
 
     // Always audio-only — spotify_wrapper.py hands each matched track to yt_dlp_wrapper's own

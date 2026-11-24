@@ -1366,4 +1366,6 @@
         <item quantity="one">%d dia</item>
         <item quantity="other">%d dias</item>
     </plurals>
+    <string name="playlist_look_ahead">Adiantar em playlists</string>
+    <string name="playlist_look_ahead_subtitle">Prepara as próximas músicas de uma playlist do YouTube enquanto uma baixa; desative em conexão lenta ou limitada</string>
 </resources>

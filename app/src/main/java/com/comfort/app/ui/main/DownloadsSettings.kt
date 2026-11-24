@@ -166,6 +166,18 @@ internal fun DownloadsSettingsScreen(onBack: () -> Unit, highlightKey: String? =
                         },
                     )
                 }
+                Spacer(Modifier.height(12.dp))
+                var lookAhead by remember { mutableStateOf(GalleryDlPreferences.isPlaylistLookAhead(context)) }
+                IconToggleRow(
+                    icon = Icons.Outlined.FastForward,
+                    title = stringResource(R.string.playlist_look_ahead),
+                    subtitle = stringResource(R.string.playlist_look_ahead_subtitle),
+                    checked = lookAhead,
+                    onCheckedChange = {
+                        lookAhead = it
+                        GalleryDlPreferences.setPlaylistLookAhead(context, it)
+                    },
+                )
             }
         }
 

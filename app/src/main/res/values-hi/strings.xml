@@ -1332,4 +1332,6 @@
         <item quantity="one">%d दिन</item>
         <item quantity="other">%d दिन</item>
     </plurals>
+    <string name="playlist_look_ahead">प्लेलिस्ट में आगे की तैयारी</string>
+    <string name="playlist_look_ahead_subtitle">एक गाना डाउनलोड होते समय YouTube प्लेलिस्ट के अगले गाने तैयार करता है; धीमे या सीमित कनेक्शन पर बंद करें</string>
 </resources>

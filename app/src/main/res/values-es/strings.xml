@@ -1366,4 +1366,6 @@
         <item quantity="one">%d día</item>
         <item quantity="other">%d días</item>
     </plurals>
+    <string name="playlist_look_ahead">Adelantarse en listas</string>
+    <string name="playlist_look_ahead_subtitle">Prepara las siguientes canciones de una lista de YouTube mientras se descarga una; desactívalo con una conexión lenta o limitada</string>
 </resources>

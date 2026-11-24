@@ -179,6 +179,7 @@ object GalleryDlPreferences {
     const val KEY_BUFFER_SIZE_ENABLED = "buffer_size_enabled"
     const val KEY_FORMAT_ID_OVERRIDE = "format_id_override"
     const val KEY_YOUTUBE_CLIENT_ROTATION_ENABLED = "youtube_client_rotation_enabled"
+    const val KEY_PLAYLIST_LOOK_AHEAD = "playlist_look_ahead"
     const val KEY_IMPERSONATE_ENABLED = "impersonate_enabled"
     const val KEY_INSTALOADER_FOR_INSTAGRAM = "instaloader_for_instagram"
     const val KEY_ARIA2_ENABLED = "aria2_enabled"
@@ -995,6 +996,15 @@ object GalleryDlPreferences {
 
     fun setYoutubeClientRotationEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_YOUTUBE_CLIENT_ROTATION_ENABLED, enabled).apply()
+    }
+
+    /** A YouTube playlist's next songs (or videos) looked up while one downloads (yt_dlp_wrapper's
+     * _PlaylistPrefetch). On by default: a playlist came down in about half the time on the phone;
+     * off, one entry at a time as yt-dlp does it, for a slow or metered connection. */
+    fun isPlaylistLookAhead(context: Context): Boolean = prefs(context).getBoolean(KEY_PLAYLIST_LOOK_AHEAD, true)
+
+    fun setPlaylistLookAhead(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_PLAYLIST_LOOK_AHEAD, enabled).apply()
     }
 
     /** yt-dlp only — spoofs a real browser's TLS handshake (via curl_cffi) for every download,

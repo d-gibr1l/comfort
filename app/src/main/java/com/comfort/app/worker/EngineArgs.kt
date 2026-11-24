@@ -64,6 +64,8 @@ internal data class YtDlpArgs(
     val sharedExtraArgs: String = "",
     // A requested subtitle language with no uploaded track gets the auto-generated one.
     val subtitleAuto: Boolean = false,
+    // A YouTube playlist's next entries looked up while one downloads.
+    val playlistLookAhead: Boolean = true,
 ) {
     fun toArgs() = listOf(
         "download", url, downloadDir, cookies,
@@ -106,6 +108,7 @@ internal data class YtDlpArgs(
         audioLanguage,
         sharedExtraArgs,
         flag(subtitleAuto),
+        flag(playlistLookAhead),
     )
 }
 

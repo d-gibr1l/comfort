@@ -1332,4 +1332,6 @@
         <item quantity="one">%d gün</item>
         <item quantity="other">%d gün</item>
     </plurals>
+    <string name="playlist_look_ahead">Çalma listelerinde önceden hazırla</string>
+    <string name="playlist_look_ahead_subtitle">Bir şarkı inerken YouTube çalma listesindeki sonraki şarkıları hazırlar; yavaş veya sınırlı bağlantıda kapatın</string>
 </resources>

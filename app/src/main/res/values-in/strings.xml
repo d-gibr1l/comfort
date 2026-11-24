@@ -1329,4 +1329,6 @@
         <item quantity="one">%d hari</item>
         <item quantity="other">%d hari</item>
     </plurals>
+    <string name="playlist_look_ahead">Siapkan lebih dulu di playlist</string>
+    <string name="playlist_look_ahead_subtitle">Menyiapkan lagu berikutnya di playlist YouTube saat satu lagu diunduh; matikan di koneksi lambat atau terbatas</string>
 </resources>

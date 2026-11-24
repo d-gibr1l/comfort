@@ -1298,4 +1298,6 @@
         <item quantity="one">%d 天</item>
         <item quantity="other">%d 天</item>
     </plurals>
+    <string name="playlist_look_ahead">播放列表预先准备</string>
+    <string name="playlist_look_ahead_subtitle">下载一首时预先准备 YouTube 播放列表中的后续歌曲；网速慢或按流量计费时请关闭</string>
 </resources>

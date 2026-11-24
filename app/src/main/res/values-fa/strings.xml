@@ -1332,4 +1332,6 @@
         <item quantity="one">%d روز</item>
         <item quantity="other">%d روز</item>
     </plurals>
+    <string name="playlist_look_ahead">پیش‌آماده‌سازی در فهرست‌های پخش</string>
+    <string name="playlist_look_ahead_subtitle">آهنگ‌های بعدی فهرست پخش YouTube را هنگام دانلود یکی آماده می‌کند؛ در اتصال کند یا محدود خاموشش کنید</string>
 </resources>

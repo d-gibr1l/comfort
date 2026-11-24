@@ -1332,4 +1332,6 @@
         <item quantity="one">%d Tag</item>
         <item quantity="other">%d Tagen</item>
     </plurals>
+    <string name="playlist_look_ahead">In Playlists vorausladen</string>
+    <string name="playlist_look_ahead_subtitle">Bereitet die nächsten Songs einer YouTube-Playlist vor, während einer lädt; bei langsamer oder getakteter Verbindung ausschalten</string>
 </resources>

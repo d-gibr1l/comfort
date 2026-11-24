@@ -1468,4 +1468,6 @@
         <item quantity="one">يوم واحد</item>
         <item quantity="other">%d أيام</item>
     </plurals>
+    <string name="playlist_look_ahead">الاستباق في قوائم التشغيل</string>
+    <string name="playlist_look_ahead_subtitle">يجهّز الأغاني التالية في قائمة تشغيل YouTube أثناء تنزيل إحداها؛ أوقفه على اتصال بطيء أو محدود</string>
 </resources>

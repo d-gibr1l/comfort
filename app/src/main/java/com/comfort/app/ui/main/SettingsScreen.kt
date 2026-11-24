@@ -98,6 +98,7 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     // Downloads
     SubpageSearchEntry(R.string.sharing_mode, R.string.configure_instant_or_always_ask_what, SettingsRoute.DOWNLOADS),
     SubpageSearchEntry(R.string.multiple_concurrent_downloads, R.string.run_more_than_one_download_at, SettingsRoute.DOWNLOADS),
+    SubpageSearchEntry(R.string.playlist_look_ahead, R.string.playlist_look_ahead_subtitle, SettingsRoute.DOWNLOADS),
     SubpageSearchEntry(R.string.wi_fi_only, R.string.queued_downloads_wait_for_a_wi, SettingsRoute.DOWNLOADS),
     SubpageSearchEntry(R.string.speed_limit, R.string.caps_download_bandwidth_for_all_future, SettingsRoute.DOWNLOADS),
     SubpageSearchEntry(R.string.retries, R.string.how_many_times_a_failed_request, SettingsRoute.DOWNLOADS),
