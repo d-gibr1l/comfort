@@ -720,14 +720,26 @@ fun DownloadsHistoryScreen(
             }
             }
         } else {
+            // Landscape: two cards a row (one column of cards left most of the width empty). A row
+            // is keyed by its first card's id, and stands for both its cards in the list's
+            // helpers (rise, parallax); a drag picks the card on its side.
+            val twoColumns = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val rows = remember(visibleItems, twoColumns) { if (twoColumns) visibleItems.chunked(2) else visibleItems.map { listOf(it) } }
+            val rowsByKey = remember(rows) { rows.associateBy { it.first().id } }
+            var listWidth by remember { mutableIntStateOf(0) }
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(top = topPaddingWhileSelecting, bottom = navBarClearance()),
                 // While a drag selects, the list doesn't scroll by the finger (DragSelect.kt).
                 userScrollEnabled = !dragSelect.active,
-                modifier = Modifier.fillMaxSize().dragToSelect(
+                modifier = Modifier.fillMaxSize().onSizeChanged { listWidth = it.width }.dragToSelect(
                     dragSelect, visibleIds,
-                    itemAt = { listState.idAt(it) },
+                    itemAt = { point ->
+                        listState.idAt(point)?.let { key ->
+                            val row = rowsByKey[key]
+                            if (row != null && row.size > 1 && point.x >= listWidth / 2f) row[1].id else key
+                        }
+                    },
                     scrollBy = { listState.scrollBy(it) },
                     onSelectionChange = { selectedIds = it },
                     topInset = selectionBarInset,
@@ -735,43 +747,54 @@ fun DownloadsHistoryScreen(
                 ),
             ) {
                 item(key = "library_header", contentType = "header") { fullHeaderContent() }
-                items(visibleItems, key = { it.id }) { item ->
+                items(rows, key = { it.first().id }) { row ->
+                    val rowKey = row.first().id
+                    // The thumbnail's parallax (LibraryScrollMotion.kt), read as it's drawn.
+                    val parallax = remember(rowKey) { { listState.viewportPosition(rowKey) } }
+                    // The rise's own clock: from the moment the row starts coming up, ~0.3 s to full,
+                    // so it's seen however fast the list is flung. A row that's already up when it's
+                    // first composed (the list opened, or scrolled back down to it) starts there.
+                    val rise = remember(rowKey) { androidx.compose.animation.core.Animatable(0f) }
+                    val riseDensity = androidx.compose.ui.platform.LocalDensity.current
+                    LaunchedEffect(rowKey) {
+                        val first = listState.riseProgress(rowKey, riseDensity)
+                        if (first != null && first >= 1f) {
+                            rise.snapTo(1f)
+                            return@LaunchedEffect
+                        }
+                        androidx.compose.runtime.snapshotFlow { (listState.riseProgress(rowKey, riseDensity) ?: 0f) > 0f }.first { it }
+                        rise.animateTo(1f, tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    }
+                    androidx.compose.runtime.CompositionLocalProvider(LocalThumbnailParallax provides parallax) {
+                    Row(
+                        Modifier
+                            .animateItem(fadeInSpec = null, fadeOutSpec = null)
+                            // Rises in from the bottom edge (LibraryScrollMotion.kt).
+                            .riseIn(listState, rowKey) { rise.value }
+                            .fillMaxWidth()
+                            .padding(horizontal = if (twoColumns) 8.dp else 0.dp),
+                    ) {
+                    row.forEach { item ->
                     // Inset rounded cards (same 16dp side margin and 20dp corners as the
                     // Queue's cards) rather than edge-to-edge rows on one continuous band.
                     // Always wrap in SwipeToDeleteCard — just disable it while selecting.
                     // Keeping the wrapper alive and passing enabled = !selectionMode lets the slot
                     // table stay intact; only drag-gesture handling flips on or off.
                     val swipeToRemove by com.comfort.app.data.GestureSettings.swipeToRemove.collectAsState()
-                    // The thumbnail's parallax (LibraryScrollMotion.kt), read as it's drawn.
-                    val parallax = remember(item.id) { { listState.viewportPosition(item.id) } }
-                    // The rise's own clock: from the moment the card starts coming up, ~0.3 s to full,
-                    // so it's seen however fast the list is flung. A card that's already up when it's
-                    // first composed (the list opened, or scrolled back down to it) starts there.
-                    val rise = remember(item.id) { androidx.compose.animation.core.Animatable(0f) }
-                    val riseDensity = androidx.compose.ui.platform.LocalDensity.current
-                    LaunchedEffect(item.id) {
-                        val first = listState.riseProgress(item.id, riseDensity)
-                        if (first != null && first >= 1f) {
-                            rise.snapTo(1f)
-                            return@LaunchedEffect
-                        }
-                        androidx.compose.runtime.snapshotFlow { (listState.riseProgress(item.id, riseDensity) ?: 0f) > 0f }.first { it }
-                        rise.animateTo(1f, tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                    }
-                    androidx.compose.runtime.CompositionLocalProvider(LocalThumbnailParallax provides parallax) {
                     SwipeToDeleteCard(
                         onDelete = { requestDelete(setOf(item.id)) },
                         shape = LIBRARY_CARD_SHAPE,
                         // Settings › Look & feel › Swipe to remove.
                         enabled = !selectionMode && swipeToRemove,
-                        modifier = Modifier
-                            .animateItem(fadeInSpec = null, fadeOutSpec = null)
-                            // Rises in from the bottom edge (LibraryScrollMotion.kt).
-                            .riseIn(listState, item.id) { rise.value }
-                            .fillMaxWidth()
-                            .wrapContentWidth(Alignment.CenterHorizontally)
-                            .widthIn(max = CONTENT_MAX_WIDTH)
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = if (twoColumns) {
+                            Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 4.dp)
+                        } else {
+                            Modifier
+                                .fillMaxWidth()
+                                .wrapContentWidth(Alignment.CenterHorizontally)
+                                .widthIn(max = CONTENT_MAX_WIDTH)
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                        },
                     ) {
                         HistoryRow(
                             item = item,
@@ -792,6 +815,10 @@ fun DownloadsHistoryScreen(
                             onRedownload = { viewModel.redownloadDeleted(item.id) },
                             onDownloadMissing = { viewModel.downloadMissing(item.id) },
                         )
+                    }
+                    }
+                    // An odd last card keeps half the width, like the ones above it.
+                    if (twoColumns && row.size == 1) Spacer(Modifier.weight(1f))
                     }
                     }
                 }
