@@ -79,6 +79,13 @@ android {
             versionNameSuffix = "-perf"
             matchingFallbacks += listOf("release")
         }
+        // Release build installed beside the debug build (own package name) so both can exist at once.
+        create("releaseSideBySide") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".release"
+            versionNameSuffix = "-release"
+            matchingFallbacks += listOf("release")
+        }
         // The debug build beside the everyday one (own package name, fresh data): first-run and
         // backup-restore checks without clearing the everyday install.
         create("debugSideBySide") {
