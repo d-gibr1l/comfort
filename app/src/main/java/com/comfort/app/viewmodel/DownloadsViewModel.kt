@@ -545,10 +545,12 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
     private val _deleteConsent = kotlinx.coroutines.flow.MutableSharedFlow<android.content.IntentSender>(extraBufferCapacity = 1)
     val deleteConsent: kotlinx.coroutines.flow.SharedFlow<android.content.IntentSender> = _deleteConsent
 
-    /** [confirmDelete], and the downloads' files deleted from the phone too ("Delete from phone").
-     * For good: they're deleted once the Undo window has passed, like the rows. Files the app may
-     * not delete on its own are asked about in the system's dialog (Android 11+); turned down,
-     * they stay, as they would with Remove. */
+    /** "Delete from phone": the downloads' files deleted from the phone once the Undo window has
+     * passed. A finished download's entry goes to the Library's Deleted section, as one whose
+     * files were deleted outside the app (to download again, or remove from there); anything else
+     * (one in the Queue, or already under Deleted) is removed as with [confirmDelete]. Files the
+     * app may not delete on its own are asked about in the system's dialog (Android 11+); turned
+     * down, they stay, and the next scan (scanForDeletedMedia) brings the entry back. */
     fun confirmDeleteFromPhone(ids: Set<String>) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
@@ -558,7 +560,12 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
                     val uris = ids.flatMap { DownloadDispatcher.savedFileUris(context, it) }
                     MediaStoreHelper.deleteSavedFiles(context, uris)
                 }
-                ids.map { id -> async { DownloadDispatcher.deleteDownload(context, id) } }.awaitAll()
+                ids.map { id ->
+                    async {
+                        if (dao.getById(id)?.status == DownloadStatus.FINISHED) dao.updateStatus(id, DownloadStatus.DELETED)
+                        else DownloadDispatcher.deleteDownload(context, id)
+                    }
+                }.awaitAll()
                 if (needConsent.isNotEmpty() && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                     runCatching {
                         _deleteConsent.emit(android.provider.MediaStore.createDeleteRequest(context.contentResolver, needConsent).intentSender)

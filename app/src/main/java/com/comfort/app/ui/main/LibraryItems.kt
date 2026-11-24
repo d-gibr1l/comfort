@@ -871,7 +871,7 @@ private fun DownloadActionsMenu(
             leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
             onClick = { onDismiss(); onDelete() },
         )
-        // The files as well as the entry, for good (once the snackbar's Undo has passed). Not for a
+        // The files (once the snackbar's Undo has passed), the entry going to Deleted. Not for a
         // download whose file is already gone: Remove is all there is to do then.
         if (!fileGone) {
             DropdownMenuItem(
