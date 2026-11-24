@@ -41,14 +41,14 @@ import androidx.compose.material.icons.outlined.*
 
 // Settings: the root list, its search, and the route each subpage is reached by.
 
-enum class SettingsRoute { ROOT, APPEARANCE, FOLDERS, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, BACKUP, SUBSCRIPTIONS, ABOUT }
+enum class SettingsRoute { ROOT, APPEARANCE, LIBRARY, DOWNLOADS, PROCESSING, ADVANCED, COOKIES, UPDATES, BACKUP, SUBSCRIPTIONS, ABOUT }
 
 /** The page's name, as a string resource. */
 @androidx.annotation.StringRes
 private fun SettingsRoute.displayName(): Int = when (this) {
     SettingsRoute.ROOT -> R.string.backup_part_settings
     SettingsRoute.APPEARANCE -> R.string.look_and_feel
-    SettingsRoute.FOLDERS -> R.string.folders
+    SettingsRoute.LIBRARY -> R.string.library_settings
     SettingsRoute.DOWNLOADS -> R.string.downloads
     SettingsRoute.PROCESSING -> R.string.processing
     SettingsRoute.ADVANCED -> R.string.advanced
@@ -62,7 +62,7 @@ private fun SettingsRoute.displayName(): Int = when (this) {
 private fun SettingsRoute.icon(): ImageVector = when (this) {
     SettingsRoute.ROOT -> Icons.Outlined.Settings
     SettingsRoute.APPEARANCE -> Icons.Outlined.WbSunny
-    SettingsRoute.FOLDERS -> Icons.Outlined.Folder
+    SettingsRoute.LIBRARY -> Icons.Outlined.VideoLibrary
     SettingsRoute.DOWNLOADS -> Icons.Outlined.Download
     SettingsRoute.PROCESSING -> Icons.Outlined.Movie
     SettingsRoute.ADVANCED -> Icons.Outlined.Terminal
@@ -120,11 +120,11 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     SubpageSearchEntry(R.string.clean_up_leftover_downloads, R.string.automatically_deletes_partial_files_when_a, SettingsRoute.DOWNLOADS),
 
     // Folders
-    SubpageSearchEntry(R.string.filename_format, R.string.how_downloaded_files_are_named, SettingsRoute.FOLDERS),
-    SubpageSearchEntry(R.string.restrict_filenames, R.string.removes_special_characters_and_replaces_spaces, SettingsRoute.FOLDERS),
-    SubpageSearchEntry(R.string.trim_filenames, R.string.caps_long_titles_at_150_characters, SettingsRoute.FOLDERS),
-    SubpageSearchEntry(R.string.download_location, R.string.where_downloaded_files_are_saved, SettingsRoute.FOLDERS),
-    SubpageSearchEntry(R.string.storage, R.string.how_much_space_downloads_are_using, SettingsRoute.FOLDERS),
+    SubpageSearchEntry(R.string.filename_format, R.string.how_downloaded_files_are_named, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.restrict_filenames, R.string.removes_special_characters_and_replaces_spaces, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.trim_filenames, R.string.caps_long_titles_at_150_characters, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.download_location, R.string.where_downloaded_files_are_saved, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.storage, R.string.how_much_space_downloads_are_using, SettingsRoute.LIBRARY),
 
     // Processing
     SubpageSearchEntry(R.string.single_video_only, R.string.only_downloads_the_specific_video_from, SettingsRoute.PROCESSING),
@@ -163,6 +163,15 @@ internal val SUBPAGE_SEARCH_INDEX = listOf(
     // Cookies & Login
     SubpageSearchEntry(R.string.cookies, R.string.sign_in_to_sites_that_require, SettingsRoute.COOKIES),
     SubpageSearchEntry(R.string.saved_cookies, R.string.sites_you_ve_already_signed_in, SettingsRoute.COOKIES),
+
+    // Library
+    SubpageSearchEntry(R.string.when_you_delete, R.string.when_you_delete_subtitle, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.swipe_to_remove, R.string.swipe_to_remove_subtitle, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.show_deleted_section, R.string.show_deleted_section_subtitle, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.clear_deleted_after, R.string.clear_deleted_after_subtitle, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.show_duplicates_section, R.string.show_duplicates_section_subtitle, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.videos_in_phone_player, R.string.videos_in_phone_player_subtitle, SettingsRoute.LIBRARY),
+    SubpageSearchEntry(R.string.music_in_phone_player, R.string.music_in_phone_player_subtitle, SettingsRoute.LIBRARY),
 
     // Appearance
     SubpageSearchEntry(R.string.follow_system_theme, R.string.switch_between_your_light_and_dark, SettingsRoute.APPEARANCE),
@@ -228,7 +237,7 @@ fun MoreScreen(
             when (route) {
                 SettingsRoute.ROOT -> Unit
                 SettingsRoute.APPEARANCE -> AppearanceScreen(onBack = onBack, highlightKey = highlightKey)
-                SettingsRoute.FOLDERS -> FoldersSettingsScreen(onBack = onBack, highlightKey = highlightKey)
+                SettingsRoute.LIBRARY -> LibrarySettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.DOWNLOADS -> DownloadsSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.PROCESSING -> ProcessingSettingsScreen(onBack = onBack, highlightKey = highlightKey)
                 SettingsRoute.ADVANCED -> AdvancedSettingsScreen(onBack = onBack, highlightKey = highlightKey)
@@ -298,7 +307,7 @@ internal fun SettingsRootScreen(onNavigate: (SettingsRoute, String?) -> Unit) {
     val mainItems = run {
         listOf(
             SettingsItemSpec(Icons.Outlined.WbSunny, stringResource(R.string.look_and_feel), themeSummary, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.APPEARANCE, null) },
-            SettingsItemSpec(Icons.Outlined.Folder, stringResource(R.string.folders), filenameFormat, SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.FOLDERS, null) },
+            SettingsItemSpec(Icons.Outlined.VideoLibrary, stringResource(R.string.library_settings), stringResource(R.string.library_settings_subtitle), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.LIBRARY, null) },
             SettingsItemSpec(Icons.Outlined.Download, stringResource(R.string.downloads), stringResource(R.string.network_scheduling_and_queue_behavior), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.DOWNLOADS, null) },
             SettingsItemSpec(Icons.Outlined.Movie, stringResource(R.string.processing), stringResource(R.string.quality_format_and_embedding), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.PROCESSING, null) },
             SettingsItemSpec(Icons.Outlined.Terminal, stringResource(R.string.advanced), stringResource(R.string.extra_arguments_for_each_engine), SettingsItemColor.SURFACE_HIGH) { onNavigate(SettingsRoute.ADVANCED, null) },

@@ -1279,4 +1279,23 @@
     <string name="reader_keep_screen_on">Giữ màn hình luôn bật</string>
     <string name="show_page_number">Hiện số trang</string>
     <string name="reader_fullscreen">Toàn màn hình</string>
+    <string name="library_settings">Thư viện và thư mục</string>
+    <string name="library_settings_subtitle">Xóa, Đã xóa, trình phát và thư mục</string>
+    <string name="deleting">Xóa</string>
+    <string name="when_you_delete">Xóa sẽ gỡ</string>
+    <string name="when_you_delete_subtitle">Việc Xóa làm trong Thư viện và trình xem</string>
+    <string name="delete_option_phone">Khỏi điện thoại</string>
+    <string name="delete_option_library">Chỉ Thư viện</string>
+    <string name="deleted_and_duplicates">Đã xóa và trùng lặp</string>
+    <string name="show_deleted_section">Hiện Đã xóa</string>
+    <string name="show_deleted_section_subtitle">Mục của Thư viện cho các lượt tải mà tệp đã mất</string>
+    <string name="clear_deleted_after">Dọn Đã xóa sau</string>
+    <string name="clear_deleted_after_subtitle">Các lượt tải trong Đã xóa bị quên sau khoảng này</string>
+    <string name="never">Không bao giờ</string>
+    <string name="show_duplicates_section">Hiện Trùng lặp</string>
+    <string name="show_duplicates_section_subtitle">Mục của Thư viện cho các liên kết bạn đã thử tải lại</string>
+    <plurals name="days_count">
+        <item quantity="one">%d ngày</item>
+        <item quantity="other">%d ngày</item>
+    </plurals>
 </resources>

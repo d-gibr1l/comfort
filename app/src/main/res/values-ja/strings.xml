@@ -1279,4 +1279,23 @@
     <string name="reader_keep_screen_on">画面をオンのままにする</string>
     <string name="show_page_number">ページ番号を表示</string>
     <string name="reader_fullscreen">全画面</string>
+    <string name="library_settings">ライブラリとフォルダ</string>
+    <string name="library_settings_subtitle">削除、削除済み、プレーヤー、フォルダ</string>
+    <string name="deleting">削除</string>
+    <string name="when_you_delete">削除の対象</string>
+    <string name="when_you_delete_subtitle">ライブラリとビューアでの削除の動作</string>
+    <string name="delete_option_phone">スマホから</string>
+    <string name="delete_option_library">ライブラリのみ</string>
+    <string name="deleted_and_duplicates">削除済みと重複</string>
+    <string name="show_deleted_section">削除済みを表示</string>
+    <string name="show_deleted_section_subtitle">ファイルがなくなったダウンロードのライブラリのセクション</string>
+    <string name="clear_deleted_after">削除済みを消去するまで</string>
+    <string name="clear_deleted_after_subtitle">削除済みのダウンロードはこの期間の後に消去されます</string>
+    <string name="never">しない</string>
+    <string name="show_duplicates_section">重複を表示</string>
+    <string name="show_duplicates_section_subtitle">もう一度ダウンロードしようとしたリンクのライブラリのセクション</string>
+    <plurals name="days_count">
+        <item quantity="one">%d日</item>
+        <item quantity="other">%d日</item>
+    </plurals>
 </resources>

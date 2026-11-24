@@ -143,7 +143,11 @@ fun MediaViewerHost(
                 mediaId = request.startId,
                 favoriteIds = remember(items, live) { items.filter { live[downloadIdOf(it)]?.isFavorite == true }.map { it.id }.toSet() },
                 onToggleFavorite = { item -> live[downloadIdOf(item)]?.let { viewModel.setFavorite(it.id, !it.isFavorite) } },
-                onDelete = { item -> requestDelete(setOf(downloadIdOf(item))) },
+                // As Settings › Library says: from the phone, or from the Library only.
+                onDelete = { item ->
+                    val ids = setOf(downloadIdOf(item))
+                    if (com.comfort.app.data.LibrarySettings.deleteFromPhone.value) requestDeleteFromPhone(ids) else requestDelete(ids)
+                },
                 renameText = { item -> live[downloadIdOf(item)]?.title.orEmpty() },
                 onRename = { item, name -> viewModel.renameDownload(downloadIdOf(item), name) },
                 groupKey = ::downloadIdOf,
@@ -160,11 +164,6 @@ fun MediaViewerHost(
                         scope.launch {
                             clipboard.setClipEntry(androidx.compose.ui.platform.ClipEntry(ClipData.newPlainText(context.getString(R.string.post_link), download.url)))
                         }
-                    })
-                    // The whole post's files, like the Library's (its Delete removes the entry only).
-                    ViewerMenuOption(ImageVector.vectorResource(R.drawable.ic_ms_delete), stringResource(R.string.delete_from_phone), color = MaterialTheme.colorScheme.error, onClick = {
-                        close()
-                        requestDeleteFromPhone(setOf(download.id))
                     })
                 },
                 onRedownload = onRedownload?.let { open -> { item -> live[downloadIdOf(item)]?.let { open(it.url) } } },

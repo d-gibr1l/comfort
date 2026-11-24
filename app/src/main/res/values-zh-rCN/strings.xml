@@ -1279,4 +1279,23 @@
     <string name="reader_keep_screen_on">保持屏幕常亮</string>
     <string name="show_page_number">显示页码</string>
     <string name="reader_fullscreen">全屏</string>
+    <string name="library_settings">媒体库和文件夹</string>
+    <string name="library_settings_subtitle">删除、已删除、播放器和文件夹</string>
+    <string name="deleting">删除</string>
+    <string name="when_you_delete">删除会移除</string>
+    <string name="when_you_delete_subtitle">“删除”在媒体库和查看器中的作用</string>
+    <string name="delete_option_phone">从手机</string>
+    <string name="delete_option_library">仅媒体库</string>
+    <string name="deleted_and_duplicates">已删除和重复</string>
+    <string name="show_deleted_section">显示“已删除”</string>
+    <string name="show_deleted_section_subtitle">媒体库中文件已不存在的下载</string>
+    <string name="clear_deleted_after">清除“已删除”</string>
+    <string name="clear_deleted_after_subtitle">“已删除”中的下载在此时间后被移除</string>
+    <string name="never">从不</string>
+    <string name="show_duplicates_section">显示“重复”</string>
+    <string name="show_duplicates_section_subtitle">媒体库中你尝试再次下载的链接</string>
+    <plurals name="days_count">
+        <item quantity="one">%d 天</item>
+        <item quantity="other">%d 天</item>
+    </plurals>
 </resources>

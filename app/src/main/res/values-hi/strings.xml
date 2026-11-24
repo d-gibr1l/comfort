@@ -1313,4 +1313,23 @@
     <string name="reader_keep_screen_on">स्क्रीन चालू रखें</string>
     <string name="show_page_number">पेज नंबर दिखाएँ</string>
     <string name="reader_fullscreen">फ़ुल स्क्रीन</string>
+    <string name="library_settings">लाइब्रेरी और फ़ोल्डर</string>
+    <string name="library_settings_subtitle">डिलीट, डिलीट किए गए, प्लेयर और फ़ोल्डर</string>
+    <string name="deleting">डिलीट करना</string>
+    <string name="when_you_delete">डिलीट हटाता है</string>
+    <string name="when_you_delete_subtitle">लाइब्रेरी और व्यूअर में डिलीट क्या करता है</string>
+    <string name="delete_option_phone">फ़ोन से</string>
+    <string name="delete_option_library">सिर्फ़ लाइब्रेरी</string>
+    <string name="deleted_and_duplicates">डिलीट किए गए और डुप्लिकेट</string>
+    <string name="show_deleted_section">डिलीट किए गए दिखाएँ</string>
+    <string name="show_deleted_section_subtitle">उन डाउनलोड के लिए लाइब्रेरी का सेक्शन जिनकी फ़ाइलें नहीं रहीं</string>
+    <string name="clear_deleted_after">डिलीट किए गए इतने बाद साफ़ करें</string>
+    <string name="clear_deleted_after_subtitle">डिलीट किए गए डाउनलोड इतने समय बाद भुला दिए जाते हैं</string>
+    <string name="never">कभी नहीं</string>
+    <string name="show_duplicates_section">डुप्लिकेट दिखाएँ</string>
+    <string name="show_duplicates_section_subtitle">उन लिंक के लिए लाइब्रेरी का सेक्शन जिन्हें आपने फिर से डाउनलोड करना चाहा</string>
+    <plurals name="days_count">
+        <item quantity="one">%d दिन</item>
+        <item quantity="other">%d दिन</item>
+    </plurals>
 </resources>

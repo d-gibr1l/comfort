@@ -866,20 +866,14 @@ private fun DownloadActionsMenu(
             },
         )
         HorizontalDivider()
+        // One Delete: from the phone or from the Library only, as Settings › Library says. A
+        // download whose files are already gone can only leave the Library.
+        val fromPhone by com.comfort.app.data.LibrarySettings.deleteFromPhone.collectAsState()
         DropdownMenuItem(
-            text = { Text(if (fileGone) stringResource(R.string.remove_from_library) else stringResource(R.string.sponsorblock_remove)) },
-            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
-            onClick = { onDismiss(); onDelete() },
+            text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+            leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            onClick = { onDismiss(); if (fromPhone && !fileGone) onDeleteFromPhone() else onDelete() },
         )
-        // The files (once the snackbar's Undo has passed), the entry going to Deleted. Not for a
-        // download whose file is already gone: Remove is all there is to do then.
-        if (!fileGone) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.delete_from_phone), color = MaterialTheme.colorScheme.error) },
-                leadingIcon = { Icon(Icons.Outlined.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                onClick = { onDismiss(); onDeleteFromPhone() },
-            )
-        }
     }
     }
 }

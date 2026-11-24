@@ -1449,4 +1449,23 @@
     <string name="reader_keep_screen_on">إبقاء الشاشة قيد التشغيل</string>
     <string name="show_page_number">إظهار رقم الصفحة</string>
     <string name="reader_fullscreen">ملء الشاشة</string>
+    <string name="library_settings">المكتبة والمجلدات</string>
+    <string name="library_settings_subtitle">الحذف والمحذوفات والمشغلات والمجلدات</string>
+    <string name="deleting">الحذف</string>
+    <string name="when_you_delete">الحذف يزيل</string>
+    <string name="when_you_delete_subtitle">ما يفعله الحذف في المكتبة والعارض</string>
+    <string name="delete_option_phone">من الهاتف</string>
+    <string name="delete_option_library">من المكتبة فقط</string>
+    <string name="deleted_and_duplicates">المحذوفات والمكررات</string>
+    <string name="show_deleted_section">إظهار المحذوفات</string>
+    <string name="show_deleted_section_subtitle">قسم المكتبة للتنزيلات التي اختفت ملفاتها</string>
+    <string name="clear_deleted_after">مسح المحذوفات بعد</string>
+    <string name="clear_deleted_after_subtitle">تُنسى التنزيلات المحذوفة بعد هذه المدة</string>
+    <string name="never">أبدًا</string>
+    <string name="show_duplicates_section">إظهار المكررات</string>
+    <string name="show_duplicates_section_subtitle">قسم المكتبة للروابط التي حاولت تنزيلها مرة أخرى</string>
+    <plurals name="days_count">
+        <item quantity="one">يوم واحد</item>
+        <item quantity="other">%d أيام</item>
+    </plurals>
 </resources>

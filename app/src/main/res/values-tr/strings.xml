@@ -1313,4 +1313,23 @@
     <string name="reader_keep_screen_on">Ekranı açık tut</string>
     <string name="show_page_number">Sayfa numarasını göster</string>
     <string name="reader_fullscreen">Tam ekran</string>
+    <string name="library_settings">Kitaplık ve klasörler</string>
+    <string name="library_settings_subtitle">Silme, Silinenler, oynatıcılar ve klasörler</string>
+    <string name="deleting">Silme</string>
+    <string name="when_you_delete">Sil şunu kaldırır</string>
+    <string name="when_you_delete_subtitle">Sil komutunun Kitaplık ve görüntüleyicide yaptığı</string>
+    <string name="delete_option_phone">Telefondan</string>
+    <string name="delete_option_library">Yalnızca Kitaplık</string>
+    <string name="deleted_and_duplicates">Silinenler ve kopyalar</string>
+    <string name="show_deleted_section">Silinenleri göster</string>
+    <string name="show_deleted_section_subtitle">Dosyaları artık olmayan indirmeler için Kitaplık bölümü</string>
+    <string name="clear_deleted_after">Silinenleri temizle</string>
+    <string name="clear_deleted_after_subtitle">Silinenlerdeki indirmeler bu süreden sonra unutulur</string>
+    <string name="never">Asla</string>
+    <string name="show_duplicates_section">Kopyaları göster</string>
+    <string name="show_duplicates_section_subtitle">Yeniden indirmeye çalıştığınız bağlantılar için Kitaplık bölümü</string>
+    <plurals name="days_count">
+        <item quantity="one">%d gün</item>
+        <item quantity="other">%d gün</item>
+    </plurals>
 </resources>

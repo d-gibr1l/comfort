@@ -371,6 +371,11 @@ class DownloadsViewModel(application: Application) : AndroidViewModel(applicatio
      * get deleted elsewhere, meanwhile) and when its downloads change. */
     fun refreshDeleted() {
         viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val due = com.comfort.app.data.LibrarySettings.dueForClearing(context, dao.getDeletedOnce().map { it.id })
+            due.forEach { DownloadDispatcher.deleteDownload(context, it) }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
             deletedCheck.withLock {
                 val multi = historyFlow.value.filter { it.status == DownloadStatus.FINISHED && it.downloadedItems > 1 }.map { it.id }
                 if (multi.isEmpty()) { _deletedCounts.value = emptyMap(); return@withLock }

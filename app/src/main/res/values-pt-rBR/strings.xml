@@ -1347,4 +1347,23 @@
     <string name="reader_keep_screen_on">Manter a tela ligada</string>
     <string name="show_page_number">Mostrar número da página</string>
     <string name="reader_fullscreen">Tela cheia</string>
+    <string name="library_settings">Biblioteca e pastas</string>
+    <string name="library_settings_subtitle">Exclusão, Excluídos, players e pastas</string>
+    <string name="deleting">Exclusão</string>
+    <string name="when_you_delete">Excluir remove</string>
+    <string name="when_you_delete_subtitle">O que Excluir faz na Biblioteca e no visualizador</string>
+    <string name="delete_option_phone">Do celular</string>
+    <string name="delete_option_library">Só da Biblioteca</string>
+    <string name="deleted_and_duplicates">Excluídos e duplicados</string>
+    <string name="show_deleted_section">Mostrar Excluídos</string>
+    <string name="show_deleted_section_subtitle">A seção da Biblioteca para downloads cujos arquivos sumiram</string>
+    <string name="clear_deleted_after">Limpar Excluídos após</string>
+    <string name="clear_deleted_after_subtitle">Downloads em Excluídos são esquecidos após esse tempo</string>
+    <string name="never">Nunca</string>
+    <string name="show_duplicates_section">Mostrar Duplicados</string>
+    <string name="show_duplicates_section_subtitle">A seção da Biblioteca para links que você tentou baixar de novo</string>
+    <plurals name="days_count">
+        <item quantity="one">%d dia</item>
+        <item quantity="other">%d dias</item>
+    </plurals>
 </resources>

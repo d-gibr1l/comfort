@@ -1363,4 +1363,23 @@
     <string name="reader_keep_screen_on">Keep screen on</string>
     <string name="show_page_number">Show page number</string>
     <string name="reader_fullscreen">Full screen</string>
+    <string name="library_settings">Library &amp; folders</string>
+    <string name="library_settings_subtitle">Deleting, Deleted, players and folders</string>
+    <string name="deleting">Deleting</string>
+    <string name="when_you_delete">Delete removes</string>
+    <string name="when_you_delete_subtitle">What Delete does in the Library and the viewer</string>
+    <string name="delete_option_phone">From phone</string>
+    <string name="delete_option_library">Library only</string>
+    <string name="deleted_and_duplicates">Deleted &amp; duplicates</string>
+    <string name="show_deleted_section">Show Deleted</string>
+    <string name="show_deleted_section_subtitle">The Library\'s section for downloads whose files are gone</string>
+    <string name="clear_deleted_after">Clear Deleted after</string>
+    <string name="clear_deleted_after_subtitle">Downloads under Deleted are forgotten after this long</string>
+    <string name="never">Never</string>
+    <string name="show_duplicates_section">Show Duplicates</string>
+    <string name="show_duplicates_section_subtitle">The Library\'s section for links you tried to download again</string>
+    <plurals name="days_count">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
 </resources>

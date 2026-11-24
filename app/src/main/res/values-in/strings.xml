@@ -1310,4 +1310,23 @@
     <string name="reader_keep_screen_on">Biarkan layar menyala</string>
     <string name="show_page_number">Tampilkan nomor halaman</string>
     <string name="reader_fullscreen">Layar penuh</string>
+    <string name="library_settings">Pustaka &amp; folder</string>
+    <string name="library_settings_subtitle">Penghapusan, Dihapus, pemutar, dan folder</string>
+    <string name="deleting">Penghapusan</string>
+    <string name="when_you_delete">Hapus menghapus</string>
+    <string name="when_you_delete_subtitle">Yang dilakukan Hapus di Pustaka dan penampil</string>
+    <string name="delete_option_phone">Dari ponsel</string>
+    <string name="delete_option_library">Pustaka saja</string>
+    <string name="deleted_and_duplicates">Dihapus &amp; duplikat</string>
+    <string name="show_deleted_section">Tampilkan Dihapus</string>
+    <string name="show_deleted_section_subtitle">Bagian Pustaka untuk unduhan yang filenya sudah hilang</string>
+    <string name="clear_deleted_after">Kosongkan Dihapus setelah</string>
+    <string name="clear_deleted_after_subtitle">Unduhan di Dihapus dilupakan setelah selama ini</string>
+    <string name="never">Tidak pernah</string>
+    <string name="show_duplicates_section">Tampilkan Duplikat</string>
+    <string name="show_duplicates_section_subtitle">Bagian Pustaka untuk link yang ingin Anda unduh lagi</string>
+    <plurals name="days_count">
+        <item quantity="one">%d hari</item>
+        <item quantity="other">%d hari</item>
+    </plurals>
 </resources>

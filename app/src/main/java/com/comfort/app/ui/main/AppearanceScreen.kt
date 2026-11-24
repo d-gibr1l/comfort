@@ -269,8 +269,6 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             Spacer(Modifier.height(16.dp))
             GesturesCard()
 
-            Spacer(Modifier.height(16.dp))
-            PlayersCard()
 
             Spacer(Modifier.height(navBarClearance()))
         }
@@ -299,7 +297,6 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
 @Composable
 private fun GesturesCard() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val swipeRemove by com.comfort.app.data.GestureSettings.swipeToRemove.collectAsState()
     val swipePages by com.comfort.app.data.GestureSettings.swipeBetweenPages.collectAsState()
     Surface(
         modifier = Modifier.fillMaxWidth().then(highlightRowModifier(stringResource(R.string.gestures))),
@@ -310,52 +307,11 @@ private fun GesturesCard() {
             Text(stringResource(R.string.gestures), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             IconToggleRow(
-                icon = Icons.Outlined.SwipeLeft,
-                title = stringResource(R.string.swipe_to_remove),
-                subtitle = stringResource(R.string.swipe_to_remove_subtitle),
-                checked = swipeRemove,
-                onCheckedChange = { com.comfort.app.data.GestureSettings.setSwipeToRemove(context, it) },
-            )
-            Spacer(Modifier.height(12.dp))
-            IconToggleRow(
                 icon = Icons.Outlined.SwipeRight,
                 title = stringResource(R.string.swipe_between_pages),
                 subtitle = stringResource(R.string.swipe_between_pages_subtitle),
                 checked = swipePages,
                 onCheckedChange = { com.comfort.app.data.GestureSettings.setSwipeBetweenPages(context, it) },
-            )
-        }
-    }
-}
-
-/** Settings › Look & feel › Players: Comfort's own players or the phone's, for videos and music. */
-@Composable
-private fun PlayersCard() {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val externalVideo by com.comfort.app.data.PlayerChoice.externalVideo.collectAsState()
-    val externalMusic by com.comfort.app.data.PlayerChoice.externalMusic.collectAsState()
-    Surface(
-        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(stringResource(R.string.players))),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.players), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            IconToggleRow(
-                icon = Icons.Outlined.OndemandVideo,
-                title = stringResource(R.string.videos_in_phone_player),
-                subtitle = stringResource(R.string.videos_in_phone_player_subtitle),
-                checked = externalVideo,
-                onCheckedChange = { com.comfort.app.data.PlayerChoice.setExternalVideo(context, it) },
-            )
-            Spacer(Modifier.height(12.dp))
-            IconToggleRow(
-                icon = Icons.Outlined.LibraryMusic,
-                title = stringResource(R.string.music_in_phone_player),
-                subtitle = stringResource(R.string.music_in_phone_player_subtitle),
-                checked = externalMusic,
-                onCheckedChange = { com.comfort.app.data.PlayerChoice.setExternalMusic(context, it) },
             )
         }
     }

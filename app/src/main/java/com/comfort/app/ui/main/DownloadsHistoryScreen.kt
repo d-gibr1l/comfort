@@ -199,6 +199,16 @@ fun DownloadsHistoryScreen(
     // Undo outlives this screen, which is rebuilt per visit while something downloads.
     val requestDelete = rememberUndoableDelete(viewModel)
     val requestDeleteFromPhone = rememberUndoableDelete(viewModel, fromPhone = true)
+    // Delete, as Settings › Library says: from the phone (the files, the download kept under
+    // Deleted) or from the Library only. Downloads already under Deleted only leave the Library.
+    val deleteFromPhone by com.comfort.app.data.LibrarySettings.deleteFromPhone.collectAsState()
+    val requestDeleteAsSet: (Set<String>) -> Unit = { ids -> if (deleteFromPhone) requestDeleteFromPhone(ids) else requestDelete(ids) }
+    val showDeletedChip by com.comfort.app.data.LibrarySettings.showDeleted.collectAsState()
+    val showDuplicatesChip by com.comfort.app.data.LibrarySettings.showDuplicates.collectAsState()
+    LaunchedEffect(showDeletedChip, showDuplicatesChip) {
+        if (!showDeletedChip) showDeletedOnly = false
+        if (!showDuplicatesChip) showDuplicatesOnly = false
+    }
 
     // MainScreen keeps this screen composed underneath the Download Queue overlay now (needed for
     // the predictive-back reveal animation), where it used to fully unmount and remount — which
@@ -782,7 +792,7 @@ fun DownloadsHistoryScreen(
                     // table stay intact; only drag-gesture handling flips on or off.
                     val swipeToRemove by com.comfort.app.data.GestureSettings.swipeToRemove.collectAsState()
                     SwipeToDeleteCard(
-                        onDelete = { requestDelete(setOf(item.id)) },
+                        onDelete = { if (item.status == DownloadStatus.DELETED) requestDelete(setOf(item.id)) else requestDeleteAsSet(setOf(item.id)) },
                         shape = LIBRARY_CARD_SHAPE,
                         // Settings › Look & feel › Swipe to remove.
                         enabled = !selectionMode && swipeToRemove,
@@ -933,17 +943,10 @@ fun DownloadsHistoryScreen(
                         Icon(ImageVector.vectorResource(R.drawable.ic_ms_favorite), contentDescription = stringResource(R.string.add_selected_to_favorites))
                     }
                     IconButton(onClick = {
-                        requestDelete(selectedIds)
+                        requestDeleteAsSet(selectedIds)
                         selectedIds = emptySet()
                     }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.remove_selected))
-                    }
-                    // The selected downloads' files too (Remove leaves them in the gallery).
-                    IconButton(onClick = {
-                        requestDeleteFromPhone(selectedIds)
-                        selectedIds = emptySet()
-                    }) {
-                        Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.delete_from_phone), tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

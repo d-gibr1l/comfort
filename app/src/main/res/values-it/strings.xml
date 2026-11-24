@@ -1316,4 +1316,23 @@
     <string name="reader_keep_screen_on">Mantieni lo schermo acceso</string>
     <string name="show_page_number">Mostra numero di pagina</string>
     <string name="reader_fullscreen">Schermo intero</string>
+    <string name="library_settings">Libreria e cartelle</string>
+    <string name="library_settings_subtitle">Eliminazione, Eliminati, lettori e cartelle</string>
+    <string name="deleting">Eliminazione</string>
+    <string name="when_you_delete">Elimina rimuove</string>
+    <string name="when_you_delete_subtitle">Cosa fa Elimina nella Libreria e nel visualizzatore</string>
+    <string name="delete_option_phone">Dal telefono</string>
+    <string name="delete_option_library">Solo Libreria</string>
+    <string name="deleted_and_duplicates">Eliminati e duplicati</string>
+    <string name="show_deleted_section">Mostra Eliminati</string>
+    <string name="show_deleted_section_subtitle">La sezione della Libreria per i download i cui file non ci sono più</string>
+    <string name="clear_deleted_after">Svuota Eliminati dopo</string>
+    <string name="clear_deleted_after_subtitle">I download in Eliminati vengono dimenticati dopo questo tempo</string>
+    <string name="never">Mai</string>
+    <string name="show_duplicates_section">Mostra Duplicati</string>
+    <string name="show_duplicates_section_subtitle">La sezione della Libreria per i link che hai provato a riscaricare</string>
+    <plurals name="days_count">
+        <item quantity="one">%d giorno</item>
+        <item quantity="other">%d giorni</item>
+    </plurals>
 </resources>

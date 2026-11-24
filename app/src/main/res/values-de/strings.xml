@@ -1313,4 +1313,23 @@
     <string name="reader_keep_screen_on">Bildschirm anlassen</string>
     <string name="show_page_number">Seitenzahl anzeigen</string>
     <string name="reader_fullscreen">Vollbild</string>
+    <string name="library_settings">Mediathek &amp; Ordner</string>
+    <string name="library_settings_subtitle">Löschen, Gelöscht, Player und Ordner</string>
+    <string name="deleting">Löschen</string>
+    <string name="when_you_delete">Löschen entfernt</string>
+    <string name="when_you_delete_subtitle">Was Löschen in der Mediathek und im Viewer tut</string>
+    <string name="delete_option_phone">Vom Telefon</string>
+    <string name="delete_option_library">Nur aus Mediathek</string>
+    <string name="deleted_and_duplicates">Gelöscht &amp; Duplikate</string>
+    <string name="show_deleted_section">Gelöscht anzeigen</string>
+    <string name="show_deleted_section_subtitle">Bereich der Mediathek für Downloads, deren Dateien fehlen</string>
+    <string name="clear_deleted_after">Gelöscht leeren nach</string>
+    <string name="clear_deleted_after_subtitle">Downloads unter Gelöscht werden nach dieser Zeit vergessen</string>
+    <string name="never">Nie</string>
+    <string name="show_duplicates_section">Duplikate anzeigen</string>
+    <string name="show_duplicates_section_subtitle">Bereich der Mediathek für Links, die du erneut laden wolltest</string>
+    <plurals name="days_count">
+        <item quantity="one">%d Tag</item>
+        <item quantity="other">%d Tagen</item>
+    </plurals>
 </resources>

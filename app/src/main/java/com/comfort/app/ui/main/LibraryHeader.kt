@@ -272,12 +272,18 @@ internal fun LibraryHeader(
                     .padding(top = 8.dp, bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
             ) {
+                // Deleted and Duplicates only when Settings › Library shows them; the group's ends
+                // rounded on whichever chips are there.
+                val withDeleted by com.comfort.app.data.LibrarySettings.showDeleted.collectAsState()
+                val withDuplicates by com.comfort.app.data.LibrarySettings.showDuplicates.collectAsState()
+                val chipCount = 2 + (if (withDeleted) 1 else 0) + (if (withDuplicates) 1 else 0)
+                val duplicatesIndex = if (withDeleted) 2 else 1
                 Box {
                     LibraryToolbarChip(
                         icon = Icons.Outlined.Tune,
                         label = stringResource(R.string.sort),
                         onClick = { onSortMenuExpandedChange(true) },
-                        groupIndex = 0, groupSize = 4,
+                        groupIndex = 0, groupSize = chipCount,
                     )
                     if (sortMenuExpanded) {
                         DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { onSortMenuExpandedChange(false) }) {
@@ -293,27 +299,27 @@ internal fun LibraryHeader(
                         }
                     }
                 }
-                LibraryToolbarChip(
+                if (withDeleted) LibraryToolbarChip(
                     icon = Icons.Outlined.Delete,
                     label = stringResource(R.string.deleted),
                     active = showDeletedOnly,
                     onClick = onToggleShowDeletedOnly,
-                    groupIndex = 1, groupSize = 4,
+                    groupIndex = 1, groupSize = chipCount,
                 )
-                LibraryToolbarChip(
+                if (withDuplicates) LibraryToolbarChip(
                     icon = Icons.Outlined.ContentCopy,
                     label = stringResource(R.string.duplicates),
                     active = showDuplicatesOnly,
                     count = duplicateAttemptsCount,
                     onClick = onToggleShowDuplicatesOnly,
-                    groupIndex = 2, groupSize = 4,
+                    groupIndex = duplicatesIndex, groupSize = chipCount,
                 )
                 LibraryToolbarChip(
                     icon = Icons.Outlined.MusicNote,
                     label = stringResource(R.string.audio),
                     active = audioOnly,
                     onClick = onToggleAudioOnly,
-                    groupIndex = 3, groupSize = 4,
+                    groupIndex = chipCount - 1, groupSize = chipCount,
                 )
             }
         }

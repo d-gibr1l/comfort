@@ -1347,4 +1347,23 @@
     <string name="reader_keep_screen_on">השארת המסך דלוק</string>
     <string name="show_page_number">הצגת מספר עמוד</string>
     <string name="reader_fullscreen">מסך מלא</string>
+    <string name="library_settings">ספרייה ותיקיות</string>
+    <string name="library_settings_subtitle">מחיקה, נמחקו, נגנים ותיקיות</string>
+    <string name="deleting">מחיקה</string>
+    <string name="when_you_delete">מחיקה מסירה</string>
+    <string name="when_you_delete_subtitle">מה מחיקה עושה בספרייה ובמציג</string>
+    <string name="delete_option_phone">מהטלפון</string>
+    <string name="delete_option_library">רק מהספרייה</string>
+    <string name="deleted_and_duplicates">נמחקו וכפולים</string>
+    <string name="show_deleted_section">הצגת נמחקו</string>
+    <string name="show_deleted_section_subtitle">החלק בספרייה להורדות שהקבצים שלהן נעלמו</string>
+    <string name="clear_deleted_after">ניקוי נמחקו אחרי</string>
+    <string name="clear_deleted_after_subtitle">הורדות בנמחקו נשכחות אחרי הזמן הזה</string>
+    <string name="never">אף פעם</string>
+    <string name="show_duplicates_section">הצגת כפולים</string>
+    <string name="show_duplicates_section_subtitle">החלק בספרייה לקישורים שניסית להוריד שוב</string>
+    <plurals name="days_count">
+        <item quantity="one">יום אחד</item>
+        <item quantity="other">%d ימים</item>
+    </plurals>
 </resources>

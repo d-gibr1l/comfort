@@ -1347,4 +1347,23 @@
     <string name="reader_keep_screen_on">Garder l\'écran allumé</string>
     <string name="show_page_number">Afficher le numéro de page</string>
     <string name="reader_fullscreen">Plein écran</string>
+    <string name="library_settings">Bibliothèque et dossiers</string>
+    <string name="library_settings_subtitle">Suppression, Supprimés, lecteurs et dossiers</string>
+    <string name="deleting">Suppression</string>
+    <string name="when_you_delete">Supprimer retire</string>
+    <string name="when_you_delete_subtitle">Ce que fait Supprimer dans la Bibliothèque et la visionneuse</string>
+    <string name="delete_option_phone">Du téléphone</string>
+    <string name="delete_option_library">Bibliothèque seule</string>
+    <string name="deleted_and_duplicates">Supprimés et doublons</string>
+    <string name="show_deleted_section">Afficher Supprimés</string>
+    <string name="show_deleted_section_subtitle">La section de la Bibliothèque pour les téléchargements dont les fichiers ont disparu</string>
+    <string name="clear_deleted_after">Vider Supprimés après</string>
+    <string name="clear_deleted_after_subtitle">Les téléchargements dans Supprimés sont oubliés après ce délai</string>
+    <string name="never">Jamais</string>
+    <string name="show_duplicates_section">Afficher Doublons</string>
+    <string name="show_duplicates_section_subtitle">La section de la Bibliothèque pour les liens que vous avez voulu retélécharger</string>
+    <plurals name="days_count">
+        <item quantity="one">%d jour</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
 </resources>

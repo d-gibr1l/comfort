@@ -27,13 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.outlined.*
 
-// Settings > Folders.
+// Settings › Library: the folders part.
 
-/** Paths, filenames, and local storage — split out of what used to be one long "Downloads" page,
- * matching YTDLnis's own Folders/Downloads/Processing split (see gallery-dl.md's "Break up the
- * Downloads settings page" entry) instead of one screen covering everything. */
+/** Paths, filenames, and local storage: once a Folders page of its own, now the end of
+ * Settings › Library (LibrarySettingsScreen), which adds these sections to its list. */
 @Composable
-internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = null) {
+internal fun foldersSettingsItems(): androidx.compose.foundation.lazy.LazyListScope.() -> Unit {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val sharedPreferences = remember { context.getSharedPreferences(GalleryDlPreferences.PREFS_NAME, android.content.Context.MODE_PRIVATE) }
@@ -110,7 +109,7 @@ internal fun FoldersSettingsScreen(onBack: () -> Unit, highlightKey: String? = n
         }
     }
 
-    SettingsSubScaffold(title = stringResource(R.string.folders), topicIcon = Icons.Outlined.Folder, onBack = onBack, highlightKey = highlightKey) {
+    return {
         item {
             SettingsSection(title = stringResource(R.string.filename_format), icon = Icons.Outlined.TextFields) {
                 Text(

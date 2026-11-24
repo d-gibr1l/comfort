@@ -1381,4 +1381,23 @@
     <string name="reader_keep_screen_on">Не выключать экран</string>
     <string name="show_page_number">Показывать номер страницы</string>
     <string name="reader_fullscreen">Полный экран</string>
+    <string name="library_settings">Библиотека и папки</string>
+    <string name="library_settings_subtitle">Удаление, Удалённые, плееры и папки</string>
+    <string name="deleting">Удаление</string>
+    <string name="when_you_delete">Удаление убирает</string>
+    <string name="when_you_delete_subtitle">Что делает Удалить в Библиотеке и просмотрщике</string>
+    <string name="delete_option_phone">С телефона</string>
+    <string name="delete_option_library">Только из Библиотеки</string>
+    <string name="deleted_and_duplicates">Удалённые и дубликаты</string>
+    <string name="show_deleted_section">Показывать Удалённые</string>
+    <string name="show_deleted_section_subtitle">Раздел Библиотеки для загрузок, файлов которых больше нет</string>
+    <string name="clear_deleted_after">Очищать Удалённые через</string>
+    <string name="clear_deleted_after_subtitle">Загрузки в Удалённых забываются через это время</string>
+    <string name="never">Никогда</string>
+    <string name="show_duplicates_section">Показывать Дубликаты</string>
+    <string name="show_duplicates_section_subtitle">Раздел Библиотеки для ссылок, которые вы пытались скачать снова</string>
+    <plurals name="days_count">
+        <item quantity="one">%d день</item>
+        <item quantity="other">%d дней</item>
+    </plurals>
 </resources>

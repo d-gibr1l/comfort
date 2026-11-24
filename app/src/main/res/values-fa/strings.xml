@@ -1313,4 +1313,23 @@
     <string name="reader_keep_screen_on">روشن نگه داشتن صفحه</string>
     <string name="show_page_number">نمایش شمارهٔ صفحه</string>
     <string name="reader_fullscreen">تمام‌صفحه</string>
+    <string name="library_settings">کتابخانه و پوشه‌ها</string>
+    <string name="library_settings_subtitle">حذف، حذف‌شده‌ها، پخش‌کننده‌ها و پوشه‌ها</string>
+    <string name="deleting">حذف</string>
+    <string name="when_you_delete">حذف پاک می‌کند</string>
+    <string name="when_you_delete_subtitle">کاری که حذف در کتابخانه و نمایشگر انجام می‌دهد</string>
+    <string name="delete_option_phone">از گوشی</string>
+    <string name="delete_option_library">فقط کتابخانه</string>
+    <string name="deleted_and_duplicates">حذف‌شده‌ها و تکراری‌ها</string>
+    <string name="show_deleted_section">نمایش حذف‌شده‌ها</string>
+    <string name="show_deleted_section_subtitle">بخش کتابخانه برای دانلودهایی که فایل‌هایشان از بین رفته</string>
+    <string name="clear_deleted_after">پاک کردن حذف‌شده‌ها پس از</string>
+    <string name="clear_deleted_after_subtitle">دانلودهای حذف‌شده پس از این مدت فراموش می‌شوند</string>
+    <string name="never">هرگز</string>
+    <string name="show_duplicates_section">نمایش تکراری‌ها</string>
+    <string name="show_duplicates_section_subtitle">بخش کتابخانه برای پیوندهایی که دوباره خواستید دانلود کنید</string>
+    <plurals name="days_count">
+        <item quantity="one">%d روز</item>
+        <item quantity="other">%d روز</item>
+    </plurals>
 </resources>
