@@ -324,7 +324,12 @@ object BackupRestore {
                     android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE -> android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
                     android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
                     android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO -> android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-                    else -> android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                    // Downloads is Android 10+; before it, the Files collection holds the row.
+                    else -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+                    } else {
+                        android.provider.MediaStore.Files.getContentUri("external")
+                    }
                 }
                 android.content.ContentUris.withAppendedId(collection, rowId).toString()
             }

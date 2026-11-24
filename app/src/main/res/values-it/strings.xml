@@ -1333,6 +1333,7 @@
     <string name="show_duplicates_section_subtitle">La sezione della Libreria per i link che hai provato a riscaricare</string>
     <plurals name="days_count">
         <item quantity="one">%d giorno</item>
+        <item quantity="many">%d giorni</item>
         <item quantity="other">%d giorni</item>
     </plurals>
     <string name="playlist_look_ahead">Anticipa nelle playlist</string>

@@ -305,7 +305,7 @@ private fun TopBar(title: String, pageText: String, onClose: () -> Unit) {
 @Composable
 private fun ReaderWindow(settings: ReaderSettings, bars: Boolean) {
     val view = androidx.compose.ui.platform.LocalView.current
-    val activity = LocalContext.current as? android.app.Activity
+    val activity = androidx.activity.compose.LocalActivity.current
     DisposableEffect(settings.keepScreenOn) {
         view.keepScreenOn = settings.keepScreenOn
         onDispose { view.keepScreenOn = false }

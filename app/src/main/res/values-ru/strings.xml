@@ -1398,7 +1398,9 @@
     <string name="show_duplicates_section_subtitle">Раздел Библиотеки для ссылок, которые вы пытались скачать снова</string>
     <plurals name="days_count">
         <item quantity="one">%d день</item>
-        <item quantity="other">%d дней</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
     </plurals>
     <string name="playlist_look_ahead">Опережать в плейлистах</string>
     <string name="playlist_look_ahead_subtitle">Готовит следующие песни плейлиста YouTube, пока скачивается одна; выключите на медленном или лимитном соединении</string>

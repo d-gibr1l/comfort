@@ -166,7 +166,10 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                 com.comfort.app.util.MediaStoreHelper.deleteSavedFiles(context, listOf(item.uri)).also { if (it.isEmpty()) forget(item) }
             }
             if (needsOk.isEmpty()) { gone = gone + item.uri.toString(); revision++; return@launch }
-            val request = runCatching { MediaStore.createDeleteRequest(context.contentResolver, needsOk) }.getOrNull()
+            // The system's delete dialog is Android 11+; before it, the file stays (said so below).
+            val request = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                runCatching { MediaStore.createDeleteRequest(context.contentResolver, needsOk) }.getOrNull()
+            } else null
             if (request != null) {
                 awaitingOk = item
                 consent.launch(androidx.activity.result.IntentSenderRequest.Builder(request.intentSender).build())

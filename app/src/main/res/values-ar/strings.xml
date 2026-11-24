@@ -1465,8 +1465,12 @@
     <string name="show_duplicates_section">إظهار المكررات</string>
     <string name="show_duplicates_section_subtitle">قسم المكتبة للروابط التي حاولت تنزيلها مرة أخرى</string>
     <plurals name="days_count">
+        <item quantity="zero">%d يوم</item>
         <item quantity="one">يوم واحد</item>
-        <item quantity="other">%d أيام</item>
+        <item quantity="two">يومان</item>
+        <item quantity="few">%d أيام</item>
+        <item quantity="many">%d يومًا</item>
+        <item quantity="other">%d يوم</item>
     </plurals>
     <string name="playlist_look_ahead">الاستباق في قوائم التشغيل</string>
     <string name="playlist_look_ahead_subtitle">يجهّز الأغاني التالية في قائمة تشغيل YouTube أثناء تنزيل إحداها؛ أوقفه على اتصال بطيء أو محدود</string>

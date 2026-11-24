@@ -1364,6 +1364,7 @@
     <string name="show_duplicates_section_subtitle">החלק בספרייה לקישורים שניסית להוריד שוב</string>
     <plurals name="days_count">
         <item quantity="one">יום אחד</item>
+        <item quantity="two">יומיים</item>
         <item quantity="other">%d ימים</item>
     </plurals>
     <string name="playlist_look_ahead">הכנה מראש בפלייליסטים</string>

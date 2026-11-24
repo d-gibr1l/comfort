@@ -1364,6 +1364,7 @@
     <string name="show_duplicates_section_subtitle">A seção da Biblioteca para links que você tentou baixar de novo</string>
     <plurals name="days_count">
         <item quantity="one">%d dia</item>
+        <item quantity="many">%d dias</item>
         <item quantity="other">%d dias</item>
     </plurals>
     <string name="playlist_look_ahead">Adiantar em playlists</string>
