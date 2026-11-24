@@ -333,13 +333,16 @@ class MusicService : MediaSessionService() {
     private var tailSeekCost = 160L
     private var tailStartedAt = 0L
     private var crossfadeSkip = false
-    private var crossfade: android.animation.ValueAnimator? = null
+    private var crossfade: kotlinx.coroutines.Job? = null
 
     /** Stops and lets go of the tail, whatever it was doing; the song on back at full volume. */
     private fun endTail() {
-        crossfade?.let { it.removeAllUpdateListeners(); it.removeAllListeners(); it.cancel() }
-        if (crossfade != null) exo?.volume = 1f
+        val running = crossfade
         crossfade = null
+        if (running != null) {
+            running.cancel()
+            exo?.volume = 1f
+        }
         tail?.let { runCatching { it.release() } }
         tail = null
         tailFor = null
@@ -350,27 +353,25 @@ class MusicService : MediaSessionService() {
     /** The crossfade itself: the next song (the main player, moved on) in, the tail out, along an
      * equal-power curve (sine in, cosine out) so the two together stay as loud as one song — a
      * straight line dips in the middle, two unrelated songs each at half adding up to less. Set
-     * every frame by an animator, not in steps. */
+     * every ~16 ms by the clock, not by an animator: a ValueAnimator runs on the display's frames,
+     * and with none coming (battery saver, the screen off) it never moved, the next song staying
+     * silent at volume 0 for good (seen on the phone 2026-11-24). */
     private fun startCrossfade(main: ExoPlayer, t: ExoPlayer, fadeMs: Long) {
-        crossfade = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = fadeMs
-            interpolator = android.view.animation.LinearInterpolator()
-            addUpdateListener {
-                val v = it.animatedValue as Float
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        crossfade = scope.launch {
+            while (true) {
+                val v = ((android.os.SystemClock.elapsedRealtime() - startedAt).toFloat() / fadeMs).coerceIn(0f, 1f)
                 val a = v * (Math.PI.toFloat() / 2f)
                 main.volume = kotlin.math.sin(a)
                 t.volume = kotlin.math.cos(a)
+                if (v >= 1f) break
+                kotlinx.coroutines.delay(16)
             }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    if (crossfade === animation) {
-                        crossfade = null
-                        main.volume = 1f
-                        endTail()
-                    }
-                }
-            })
-            start()
+            if (crossfade === coroutineContext[kotlinx.coroutines.Job]) {
+                crossfade = null
+                main.volume = 1f
+                endTail()
+            }
         }
     }
 
@@ -494,7 +495,7 @@ class MusicService : MediaSessionService() {
                     val now = if (fadingIn) player.currentPosition else pos
                     val inn = if (fadingIn) (now.toFloat() / fadeMs).coerceIn(0f, 1f) else 1f
                     if (fadingIn && now >= fadeMs) fadingIn = false
-                    // During the crossfade its animator sets the volumes.
+                    // During the crossfade its own loop sets the volumes.
                     if (crossfade == null) player.volume = minOf(out, inn)
                 }
                 kotlinx.coroutines.delay(if (fading) 50 else if (sleepAt != null) 1000 else 500)
