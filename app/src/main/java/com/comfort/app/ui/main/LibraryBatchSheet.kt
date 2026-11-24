@@ -146,12 +146,18 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
         if (!uncounted(item)) dao.decrementDownloadedItems(download.id, 1)
         if (item.sizeBytes > 0) dao.addBytes(download.id, -item.sizeBytes)
     }
+    // Deleted just now: out of the list at once, animated (the others close up the gap), before
+    // the items are looked at again.
+    var gone by remember { mutableStateOf(emptySet<String>()) }
     // A file Android only deletes with the user's OK (its own dialog).
     var awaitingOk by remember { mutableStateOf<BatchItem?>(null) }
     val consent = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()) { result ->
         val item = awaitingOk ?: return@rememberLauncherForActivityResult
         awaitingOk = null
-        if (result.resultCode == android.app.Activity.RESULT_OK) scope.launch { forget(item); revision++ }
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            gone = gone + item.uri.toString()
+            scope.launch { forget(item); revision++ }
+        }
     }
     fun delete(item: BatchItem) {
         scope.launch {
@@ -159,7 +165,7 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
             val needsOk = withContext(Dispatchers.IO) {
                 com.comfort.app.util.MediaStoreHelper.deleteSavedFiles(context, listOf(item.uri)).also { if (it.isEmpty()) forget(item) }
             }
-            if (needsOk.isEmpty()) { revision++; return@launch }
+            if (needsOk.isEmpty()) { gone = gone + item.uri.toString(); revision++; return@launch }
             val request = runCatching { MediaStore.createDeleteRequest(context.contentResolver, needsOk) }.getOrNull()
             if (request != null) {
                 awaitingOk = item
@@ -196,7 +202,7 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val shown = items
+                    val shown = items?.filterNot { it.uri.toString() in gone }
                     if (shown != null) {
                         val total = shown.sumOf { it.sizeBytes }
                         // Lyrics and subtitles are listed but aren't items of their own.
@@ -241,7 +247,7 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                     ) { Icon(Icons.Outlined.ViewAgenda, contentDescription = stringResource(R.string.list_view), modifier = Modifier.size(18.dp)) }
                 }
             }
-            val shown = items
+            val shown = items?.filterNot { it.uri.toString() in gone }
             when {
                 shown == null -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 grid -> LazyVerticalGrid(
@@ -251,14 +257,18 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    items(shown, key = { it.uri.toString() }) { item -> GridTile(item, onClick = { open(item) }, onDelete = { delete(item) }) }
+                    items(shown, key = { it.uri.toString() }) { item ->
+                        GridTile(item, onClick = { open(item) }, onDelete = { delete(item) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = BATCH_ITEM_OUT, placementSpec = BATCH_ITEM_MOVE))
+                    }
                 }
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f, fill = false).nestedScroll(keepSheet),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    items(shown, key = { it.uri.toString() }) { item -> ListRow(item, onClick = { open(item) }, onDelete = { delete(item) }) }
+                    items(shown, key = { it.uri.toString() }) { item ->
+                        ListRow(item, onClick = { open(item) }, onDelete = { delete(item) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = BATCH_ITEM_OUT, placementSpec = BATCH_ITEM_MOVE))
+                    }
                 }
             }
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
@@ -266,9 +276,16 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
     }
 }
 
+// A deleted item fading out, the rest moving up into its place.
+private val BATCH_ITEM_OUT = androidx.compose.animation.core.tween<Float>(220)
+private val BATCH_ITEM_MOVE = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(
+    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+)
+
 @Composable
-private fun GridTile(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
+private fun GridTile(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
         Column {
             Box(Modifier.fillMaxWidth().height(120.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Thumb(item, Modifier.fillMaxSize())
@@ -290,8 +307,8 @@ private fun GridTile(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit)
 }
 
 @Composable
-private fun ListRow(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
+private fun ListRow(item: BatchItem, onClick: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick)) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
                 Thumb(item, Modifier.fillMaxSize())
