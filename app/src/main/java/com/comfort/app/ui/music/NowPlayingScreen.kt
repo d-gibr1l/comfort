@@ -143,8 +143,8 @@ fun NowPlayingScreen(
     val lyricsShown = showLyrics && lyrics != null
 
     var position by remember { mutableLongStateOf(MusicPlayer.position()) }
-    // What the bar and the lyrics show: glides to [position] as the player opens or the app comes
-    // back, instead of jumping there.
+    // What the bar shows: glides to [position] as the player opens or the app comes back, instead
+    // of jumping there. The lyrics follow [position] itself, settling on its line.
     val shownPosition by rememberGlidingPosition { position }
     var dragPosition by remember { mutableStateOf<Float?>(null) }
     // Synced lyrics move on line by line (the full view, or the two lines under the cover), so
@@ -343,7 +343,8 @@ fun NowPlayingScreen(
                             if (previewLyrics != null) {
                                 LyricsPreview(
                                     lyrics = previewLyrics,
-                                    positionMs = shownPosition,
+                                    // The real position, not the bar's glide (rememberGlidingPosition).
+                                    positionMs = position,
                                     onClick = { showLyrics = true },
                                     compact = landscape,
                                     // Clear of the cover above and the title below.
@@ -371,7 +372,7 @@ fun NowPlayingScreen(
                         if (showingLyrics && shownLyrics != null) {
                             LyricsView(
                                 lyrics = shownLyrics,
-                                positionMs = shownPosition,
+                                positionMs = position,
                                 onSeek = { target ->
                                     MusicPlayer.seekTo(target)
                                     position = target

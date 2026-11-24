@@ -19,7 +19,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 private const val GLIDE_MS = 900f
 // Held at the old place a moment first: run at once, the glide was over behind the player's
 // slide in (or the app's splash) before it could be seen.
-private const val GLIDE_DELAY_MS = 280L
+internal const val GLIDE_DELAY_MS = 280L
 private val GlideEasing = CubicBezierEasing(0.3f, 0f, 0.15f, 1f)
 
 // When the app last came on screen (MainActivity.onStart): opened, or back from outside it.
@@ -33,10 +33,14 @@ internal fun markAppStarted() {
 // it showing, or back to it from outside); later, it was opened from inside the app.
 private const val CAME_WITH_APP_MS = 1500L
 
+/** Whether what's being composed now came up with the app (opened, or back from outside it). */
+internal fun cameWithApp() = android.os.SystemClock.uptimeMillis() - appStartedAt < CAME_WITH_APP_MS
+
 /** The playing position a player shows, from [live] (ms): the same as it, except when you come
  * back to the app — from outside it, or reopening it — when it glides there from where it was
  * instead of jumping. Not when a player is opened from inside the app: it's simply there (asked
- * for). The progress bar and the lyrics read this, so they glide together. */
+ * for). The progress bar reads this; the lyrics don't (they ran through every line on the way,
+ * a blur of lines): they follow the real position, and settle on its line (LyricsView). */
 @Composable
 internal fun rememberGlidingPosition(live: () -> Long): State<Long> {
     // Opened from inside the app: at the song's place from the start. Come up with the app (it

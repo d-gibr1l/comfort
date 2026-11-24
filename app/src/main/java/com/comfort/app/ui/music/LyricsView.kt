@@ -1,6 +1,7 @@
 package com.comfort.app.ui.music
 
 import androidx.compose.animation.animateColorAsState
+import kotlinx.coroutines.launch
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -70,6 +71,10 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
 
     val current = lyrics.lineAt(positionMs)
     val listState = rememberLazyListState()
+    // Settling on a line far from the last one followed (the player opening, the app back, a seek):
+    // the lines fade, are put there, and rise back in, rather than scrolling through all of them.
+    val settle = remember { androidx.compose.animation.core.Animatable(0f) }
+    var followed by remember { androidx.compose.runtime.mutableIntStateOf(Int.MIN_VALUE) }
     // When the user last scrolled by hand; following waits a few seconds after that.
     var userScrolledAt by remember { mutableLongStateOf(0L) }
     var autoScrolling by remember { mutableStateOf(false) }
@@ -89,7 +94,10 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
         val anchor = height / 3
         val density = LocalDensity.current
         LaunchedEffect(current, userScrolledAt) {
-            if (current < 0) return@LaunchedEffect
+            if (current < 0) {
+                settle.animateTo(1f, tween(320))
+                return@LaunchedEffect
+            }
             val sinceUser = System.currentTimeMillis() - userScrolledAt
             if (sinceUser < FOLLOW_AGAIN_AFTER_MS) {
                 kotlinx.coroutines.delay(FOLLOW_AGAIN_AFTER_MS - sinceUser)
@@ -97,7 +105,20 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
             autoScrolling = true
             try {
                 // The top content padding is the anchor: an item scrolled to the start sits there.
-                listState.animateScrollToItem(current)
+                // Far from the line the list shows (away from the app it doesn't move while the
+                // song goes on, and came back it ran through them all).
+                val first = followed == Int.MIN_VALUE
+                if (first || kotlin.math.abs(current - listState.firstVisibleItemIndex) > 2) {
+                    followed = current
+                    if (!first) settle.animateTo(0f, tween(160))
+                    else if (cameWithApp()) kotlinx.coroutines.delay(GLIDE_DELAY_MS)
+                    listState.scrollToItem(current)
+                    settle.animateTo(1f, tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                } else {
+                    followed = current
+                    if (settle.value < 1f) launch { settle.animateTo(1f, tween(320)) }
+                    listState.animateScrollToItem(current)
+                }
             } finally {
                 autoScrolling = false
             }
@@ -107,7 +128,11 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
             // Lines fade out toward the top and bottom edges rather than being cut off there.
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .graphicsLayer {
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    alpha = settle.value
+                    translationY = (1f - settle.value) * 28.dp.toPx()
+                }
                 .drawWithContent {
                     drawContent()
                     drawRect(
@@ -176,8 +201,27 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
     // The line shown as being sung; it follows [target], with the roll in between for a step on.
     var shown by remember(lyrics) { androidx.compose.runtime.mutableIntStateOf(target) }
     val roll = remember(lyrics) { androidx.compose.animation.core.Animatable(0f) }
+    // A jump to a line further on or back (the app back, a seek): the lines fade, change, and
+    // rise back in; coming up with the app, they rise in too.
+    val settle = remember(lyrics) { androidx.compose.animation.core.Animatable(if (cameWithApp()) 0f else 1f) }
+    SettleOnReturn(settle)
+    LaunchedEffect(shown) {
+        if (settle.value < 1f) {
+            if (settle.value == 0f && cameWithApp()) kotlinx.coroutines.delay(GLIDE_DELAY_MS)
+            settle.animateTo(1f, tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
+    }
     LaunchedEffect(lyrics, target) {
         if (target == shown) return@LaunchedEffect
+        if (!(shown >= 0 && target == shown + 1) && kotlin.math.abs(target - shown) > 1) {
+            try {
+                settle.animateTo(0f, tween(160))
+            } finally {
+                shown = target
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { roll.snapTo(0f) }
+            }
+            return@LaunchedEffect
+        }
         try {
             if (shown >= 0 && target == shown + 1) {
                 roll.snapTo(0f)
@@ -214,7 +258,11 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
         modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp)
+            .graphicsLayer {
+                alpha = settle.value
+                translationY = (1f - settle.value) * 14.dp.toPx()
+            },
     ) {
         Box(
             Modifier
@@ -281,4 +329,26 @@ private fun LyricPreviewLine(text: String, style: androidx.compose.ui.text.TextS
             }
         },
     )
+}
+
+/** [settle] from 0 back to 1 whenever the app comes back on screen (from outside it, or reopened):
+ * the lyric lines rise in on the line being sung, while the progress bar glides to the song's
+ * place (rememberGlidingPosition). */
+@Composable
+private fun SettleOnReturn(settle: androidx.compose.animation.core.Animatable<Float, *>) {
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.runtime.DisposableEffect(owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START && cameWithApp()) {
+                scope.launch {
+                    settle.snapTo(0f)
+                    kotlinx.coroutines.delay(GLIDE_DELAY_MS)
+                    settle.animateTo(1f, tween(520, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                }
+            }
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
 }
