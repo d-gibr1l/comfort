@@ -1140,6 +1140,172 @@ class _Mp4ConvertPP(FFmpegPostProcessor):
 _URL_RE = re.compile(r"https?://\S+")
 
 
+class _PlaylistPrefetch:
+    """A YouTube playlist's next songs (or videos) looked up while the one before downloads.
+
+    yt-dlp goes through a playlist one entry at a time: each one's page and player requests,
+    YouTube's challenge, its wait before the stream works ("available_at"), then the download and
+    the conversion — ~8-10 s a song before its download even starts, measured on the phone
+    (2026-11-24). Here a second YoutubeDL of its own, on a thread, lists the playlist and runs
+    each entry's extraction up to [AHEAD] entries ahead of the one being downloaded; the download's
+    own YouTube extractor then takes the result instead of extracting again (see [attach]).
+    Anything not looked up (an entry not in the list, a lookup that failed) is extracted as usual.
+    """
+
+    AHEAD = 2
+    WAIT_SECONDS = 180
+
+    def __init__(self, url, opts, should_cancel=None):
+        import threading
+        self._url = url
+        self._should_cancel = should_cancel
+        self._cond = threading.Condition()
+        self._ids = []          # the playlist's entry ids, in order
+        self._listed = False
+        self._results = {}      # id -> info, or None when the lookup failed
+        self._running = None    # the id being looked up now
+        self._claimed = set()   # ids the download extracted itself (not waited for)
+        self._taken = -1        # the furthest entry the download has asked for
+        self._stopped = False
+        self._tmp_cookies = None
+        base = {k: v for k, v in opts.items() if k not in (
+            "progress_hooks", "postprocessor_hooks", "postprocessors", "logger", "download_archive",
+            "match_filter", "playlist_items", "noplaylist", "outtmpl", "paths", "writethumbnail",
+            "writesubtitles", "writeautomaticsub", "writeinfojson")}
+        base.update({"quiet": True, "no_warnings": True, "simulate": True, "skip_download": True,
+                     "logger": _QuietLogger(), "ignoreerrors": True})
+        cookies = opts.get("cookiefile")
+        if cookies and os.path.isfile(cookies):
+            # Its own copy: yt-dlp writes the cookie file back as it closes, and two instances
+            # writing the same file at once could leave it broken.
+            import shutil
+            import tempfile
+            fd, self._tmp_cookies = tempfile.mkstemp(suffix=".txt")
+            os.close(fd)
+            shutil.copyfile(cookies, self._tmp_cookies)
+            base["cookiefile"] = self._tmp_cookies
+        self._opts = base
+        threading.Thread(target=self._run, name="playlist-prefetch", daemon=True).start()
+
+    def _cancelled(self):
+        return self._stopped or (self._should_cancel is not None and self._should_cancel())
+
+    def _run(self):
+        try:
+            with yt_dlp.YoutubeDL(dict(self._opts, extract_flat="in_playlist")) as ydl:
+                listing = ydl.extract_info(self._url, download=False)
+            ids = []
+            for entry in (listing or {}).get("entries") or []:
+                if entry and entry.get("id") and (entry.get("ie_key") or "Youtube") == "Youtube":
+                    ids.append(entry["id"])
+            with self._cond:
+                self._ids = ids
+                self._listed = True
+                self._cond.notify_all()
+            if len(ids) < 2:
+                return
+            with yt_dlp.YoutubeDL(self._opts) as ydl:
+                ie = ydl.get_info_extractor("Youtube")
+                for i, vid in enumerate(ids):
+                    with self._cond:
+                        # Not before the download has asked for its first entry (with chosen items,
+                        # the playlist's start isn't wanted: looked up, it only took bandwidth), then
+                        # up to AHEAD past the one it's on.
+                        while not self._cancelled() and (self._taken < 0 or i > self._taken + self.AHEAD):
+                            self._cond.wait(1.0)
+                        if self._cancelled():
+                            return
+                        # Passed already (the download asked for a later one), or taken over.
+                        if vid in self._results or vid in self._claimed or i < self._taken:
+                            continue
+                        self._running = vid
+                    try:
+                        info = ie.extract("https://www.youtube.com/watch?v=" + vid)
+                    except Exception:
+                        info = None
+                    with self._cond:
+                        self._results[vid] = info
+                        self._running = None
+                        self._cond.notify_all()
+        except Exception:
+            pass
+        finally:
+            with self._cond:
+                self._listed = True
+                self._stopped = True
+                self._cond.notify_all()
+
+    def take(self, vid):
+        """The entry [vid] looked up ahead (waiting for it if it's being looked up now), or None
+        to extract it as usual."""
+        import time as _time
+        deadline = _time.monotonic() + self.WAIT_SECONDS
+        with self._cond:
+            while not self._listed and _time.monotonic() < deadline and not self._cancelled():
+                self._cond.wait(0.5)
+            if vid not in self._ids:
+                return None
+            self._taken = max(self._taken, self._ids.index(vid))
+            self._cond.notify_all()
+            # Not being looked up now and not done: the download extracts it itself (waiting for
+            # the thread to come round to it would only be slower).
+            if vid not in self._results and self._running != vid:
+                self._claimed.add(vid)
+                return None
+            while vid not in self._results and not self._stopped and _time.monotonic() < deadline:
+                self._cond.wait(0.5)
+            return self._results.pop(vid, None)
+
+    def attach(self, ydl):
+        """The download's own YouTube extractor takes what's been looked up ahead."""
+        ie = ydl.get_info_extractor("Youtube")
+        original = ie.extract
+        prefetch = self
+
+        def extract(url):
+            vid = None
+            try:
+                vid = ie.get_temp_id(url)
+            except Exception:
+                pass
+            info = prefetch.take(vid) if vid else None
+            return info if info is not None else original(url)
+
+        ie.extract = extract
+
+    def close(self):
+        with self._cond:
+            self._stopped = True
+            self._cond.notify_all()
+        if self._tmp_cookies:
+            try:
+                os.remove(self._tmp_cookies)
+            except OSError:
+                pass
+
+
+class _QuietLogger:
+    def debug(self, msg):
+        pass
+
+    def info(self, msg):
+        pass
+
+    def warning(self, msg):
+        pass
+
+    def error(self, msg):
+        pass
+
+
+def _is_youtube_playlist_run(url, opts):
+    """A YouTube download that may be a playlist (not "Single video only")."""
+    if opts.get("noplaylist"):
+        return False
+    host = (re.match(r"https?://([^/]+)", url or "") or [None, ""])[1].lower()
+    return host.endswith("youtube.com") or host == "youtu.be"
+
+
 def short_id(value):
     """The id a default filename ends with: as is up to 11 characters (a YouTube id), otherwise
     a 6-character code from its SHA-1 — X post ids are 19 digits and Instagram's file names ~50
@@ -3078,7 +3244,18 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
     _patch_filename_byte_limit()
 
     def _attempt(opts, reuse_info):
+        # A YouTube playlist: its next entries looked up while one downloads (_PlaylistPrefetch).
+        prefetch = _PlaylistPrefetch(url, opts, should_cancel) if _is_youtube_playlist_run(url, opts) else None
+        try:
+            _attempt_with(opts, reuse_info, prefetch)
+        finally:
+            if prefetch:
+                prefetch.close()
+
+    def _attempt_with(opts, reuse_info, prefetch):
         with yt_dlp.YoutubeDL(opts) as ydl:
+            if prefetch:
+                prefetch.attach(ydl)
             # Added after ydl_opts' own pre_process MetadataParser, so it sees the cleaned uploader.
             ydl.add_post_processor(_CaptionPP(ydl, trim=trim_filenames, custom_format=custom_format, site=site), when="pre_process")
             ydl.add_post_processor(_RememberFormatsPP(ydl, download_dir), when="before_dl")
