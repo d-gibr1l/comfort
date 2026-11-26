@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
@@ -70,6 +71,13 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
     }
 
     val current = lyrics.lineAt(positionMs)
+    // The lines' words with their own times (word-timed lyrics), in [lines]' order; the line being
+    // sung fills word by word on a clock that moves every frame.
+    val rich = remember(lyrics) { lyrics.rich?.filterNot { it.isGap }?.sortedBy { it.timeMs }?.takeIf { it.size == lines.size } }
+    val playing by com.comfort.app.music.MusicPlayer.state.let { flow ->
+        androidx.compose.runtime.produceState(flow.value.isPlaying, flow) { flow.collect { value = it.isPlaying } }
+    }
+    val smoothPosition = rememberSmoothPosition(positionMs, playing)
     val listState = rememberLazyListState()
     // Settling on a line far from the last one followed (the player opening, the app back, a seek):
     // the lines fade, are put there, and rise back in, rather than scrolling through all of them.
@@ -85,7 +93,8 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
     }
 
     // Google Sans, as the app's titles (its bundled bold cut; other scripts fall back to the system font).
-    val lineStyle = MaterialTheme.typography.headlineSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily).let { base ->
+    // Big, as Apple Music's lyrics.
+    val lineStyle = MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily).let { base ->
         base.copy(fontSize = base.fontSize * zoom.factor, lineHeight = base.lineHeight * zoom.factor)
     }
     BoxWithConstraints(modifier.pinchToZoomText(zoom)) {
@@ -158,15 +167,19 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                 )
                 val scale by animateFloatAsState(if (active) 1f else 0.96f, animationSpec = tween(300), label = "lyricScale")
                 val color by animateColorAsState(if (active) Ink else Ink.copy(alpha = 0.9f), label = "lyricColor")
+                // Apple Music's depth: lines blur more the further they are from the one being sung
+                // (Android 12+), sharp again while the lyrics are scrolled by hand.
+                val handScrolled = listState.isScrollInProgress && !autoScrolling
+                val blur by androidx.compose.animation.core.animateDpAsState(
+                    if (handScrolled || current < 0) 0.dp else LINE_BLUR[kotlin.math.abs(index - current).coerceAtMost(LINE_BLUR.lastIndex)],
+                    tween(400), label = "lyricBlur",
+                )
+                val richLine = rich?.getOrNull(index)
                 // Shrinks towards the side the line is aligned to: its own script decides that (an
                 // Arabic or Hebrew line sits on the right, whatever the app's language).
                 val originX = remember(line.text) { if (java.text.Bidi(line.text, java.text.Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT).baseIsLeftToRight()) 0f else 1f }
-                Text(
-                    line.text.ifBlank { "♪" },
-                    style = lineStyle,
-                    fontWeight = FontWeight.Bold,
-                    color = color,
-                    modifier = Modifier
+                androidx.compose.foundation.layout.Column(
+                    Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .clickable { onSeek(line.timeMs) }
@@ -176,14 +189,35 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                             scaleY = scale
                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(originX, 0.5f)
                         }
+                        .then(if (blur > 0.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded) else Modifier)
                         .padding(vertical = 10.dp, horizontal = 4.dp),
-                )
+                ) {
+                    if (active && richLine != null && richLine.isWordSynced) {
+                        // Being sung, word by word: lit up to the word being sung, the rest dimmed.
+                        SweptLyricLine(richLine, smoothPosition, lineStyle, dimAlpha = 0.4f)
+                    } else {
+                        Text(line.text.ifBlank { "♪" }, style = lineStyle, fontWeight = FontWeight.Bold, color = color)
+                    }
+                    // Background vocals, smaller and dimmer under their line.
+                    richLine?.background?.text?.takeIf { it.isNotBlank() }?.let { backing ->
+                        Text(
+                            backing,
+                            style = lineStyle.copy(fontSize = lineStyle.fontSize * 0.7f, lineHeight = lineStyle.lineHeight * 0.7f),
+                            fontWeight = FontWeight.SemiBold,
+                            color = Ink.copy(alpha = if (active) 0.7f else 0.5f),
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 private const val FOLLOW_AGAIN_AFTER_MS = 3_000L
+
+/** The blur of a line 0, 1, 2, 3… lines from the one being sung (more beyond). */
+private val LINE_BLUR = arrayOf(0.dp, 1.5.dp, 2.5.dp, 3.5.dp, 4.dp)
 
 /**
  * Spotify's lyric line under the cover, as two: the line being sung, bright, and the next one,
