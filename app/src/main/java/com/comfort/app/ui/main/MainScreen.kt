@@ -454,7 +454,17 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize()) {
     // No background of its own: MainActivity's Surface paints it, and every page paints its own
     // over that — a third full-screen fill under each frame for nothing.
-    Row(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (playerSettled && !playerDragged) 0f else 1f }) {
+    // Clear of a navigation bar (or camera cutout) on the side, as 3-button navigation has in
+    // landscape: the right-hand cards ran under its buttons (seen on an Android 9 emulator).
+    Row(
+        modifier = Modifier.fillMaxSize()
+            .windowInsetsPadding(
+                androidx.compose.foundation.layout.WindowInsets.navigationBars
+                    .union(androidx.compose.foundation.layout.WindowInsets.displayCutout)
+                    .only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal),
+            )
+            .graphicsLayer { alpha = if (playerSettled && !playerDragged) 0f else 1f },
+    ) {
     if (useNavRail) {
         SideNavRail(
             selectedTab = selectedTab,

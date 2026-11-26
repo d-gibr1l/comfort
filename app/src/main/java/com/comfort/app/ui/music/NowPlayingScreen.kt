@@ -250,7 +250,9 @@ fun NowPlayingScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility.only(WindowInsetsSides.Top))
-                        .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom)),
+                        // Its sides too: 3-button navigation sits on the side in landscape, and the
+                        // lyrics button went under it.
+                        .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // Auxio's top bar: close, "Now playing" over where in the queue, and the queue.
