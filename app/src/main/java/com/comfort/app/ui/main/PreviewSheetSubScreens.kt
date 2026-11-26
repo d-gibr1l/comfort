@@ -386,12 +386,19 @@ internal fun TrimVideoScreen(
         val maxSliderMs = realDurationMs?.toFloat()
             ?: maxOf(effectiveDurationMs.toFloat(), active?.endMs?.toFloat() ?: 0f, playheadMs.toFloat())
 
-        Surface(
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-            shape = androidx.compose.ui.graphics.RectangleShape,
-            color = MaterialTheme.colorScheme.primaryContainer,
+        // The video gets what the controls below leave over (it took 16:9 of the full width
+        // first, and in a shorter sheet the start/end fields were left cut off): smaller then,
+        // centred on black.
+        Box(
+            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).background(androidx.compose.ui.graphics.Color.Black),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
                 if (streamUrls.isNotEmpty() && !streamLoadFailed) {
                     // Media3's own controls are off: they were a second seek bar over the one
                     // below, with previous/next buttons and a settings gear that do nothing here.
@@ -566,7 +573,6 @@ internal fun TrimVideoScreen(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .weight(1f, fill = false)
             .verticalScroll(rememberScrollState())
             .padding(top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
