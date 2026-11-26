@@ -342,7 +342,15 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
                     position = smoothPosition,
                 )
                 // The next line, which grows into the sung one as it rolls up.
-                LyricPreviewLine(text(first + 1), currentStyle, scale = nextScale + (1f - nextScale) * p, alpha = 0.55f + 0.45f * p)
+                // Rolling up into the sung line's place: already filled up to the word being sung
+                // (it rose fully lit, then dropped to dim as the fill took over).
+                LyricPreviewLine(
+                    text(first + 1), currentStyle, scale = nextScale + (1f - nextScale) * p, alpha = 0.55f + 0.45f * p,
+                    swept = rich?.getOrNull(first + 1)?.takeIf { p > 0f && it.isWordSynced },
+                    position = smoothPosition,
+                    // From the waiting line's dim to the sung line's.
+                    sweptDim = 0.55f + (0.4f - 0.55f) * p,
+                )
                 // The one after, coming in dimmed below as the others rise.
                 LyricPreviewLine(text(first + 2), currentStyle, scale = nextScale, alpha = 0.55f * p)
             }
@@ -362,6 +370,8 @@ private fun LyricPreviewLine(
     // A word-timed line being sung: lit word by word (on [position]), the rest dimmed.
     swept: com.comfort.app.music.lyrics.LyricLine? = null,
     position: () -> Long = { 0L },
+    // The unsung part's alpha when [swept] (else 40% of [alpha]).
+    sweptDim: Float? = null,
 ) {
     val scaled = modifier.layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
@@ -375,7 +385,7 @@ private fun LyricPreviewLine(
         }
     if (swept != null) {
         val a = alpha.coerceIn(0f, 1f)
-        SweptLyricLine(swept, position, style, dimAlpha = 0.4f * a, litAlpha = a, maxLines = 2, modifier = scaled)
+        SweptLyricLine(swept, position, style, dimAlpha = sweptDim ?: (0.4f * a), litAlpha = a, maxLines = 2, modifier = scaled)
         return
     }
     Text(
