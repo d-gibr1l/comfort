@@ -67,6 +67,8 @@ straight from them with Obtainium:
   instead of restarting it
 - **Subscriptions**: subscribe to a channel or playlist from the download sheet, and its new uploads
   download on their own (Settings › Subscriptions)
+- **Block a site** so nothing is downloaded from it, and see one download's own log lines from its
+  menu in the Library
 - yt-dlp, gallery-dl and Instaloader update independently of the app itself — automatically by
   default, on a Stable or Bleeding Edge channel per engine (Settings › Updates and engines) — no need
   to wait for a new app release to pick up a site-extractor fix
@@ -84,7 +86,11 @@ straight from them with Obtainium:
   file) — Library has a dedicated Audio filter, and a track's card shows "Artist — Album" instead
   of just the source domain
 - A YouTube Music download's cover art is cropped square from its video thumbnail, not left 16:9
-- Synced lyrics from [LRCLIB](https://lrclib.net) saved inside each song
+- Synced lyrics from [LRCLIB](https://lrclib.net) saved inside each song, looked up as soon as the
+  song starts downloading
+- YouTube playlists and albums download much faster: the next songs are prepared while one
+  downloads (Settings › Downloads › Look ahead in playlists)
+- Songs are saved to `Music/Comfort`, where music players find them
 - Save songs as MP3, M4A, Opus or FLAC (or the site's original audio), with an option to level
   every song to the same loudness
 
@@ -94,6 +100,12 @@ straight from them with Obtainium:
 - A full music player, with Auxio's playback engine and look: a queue, shuffle, Now Playing with
   synced lyrics, and a video with sound pauses the music, which plays on after. Controls on the lock
   screen, from headphones and Bluetooth, and a home-screen widget
+- **Comics and manga**: chapters from manga sites are saved as one `.cbz`, and a built-in reader
+  opens them — right to left, left to right or a vertical webtoon strip, with zoom and its own
+  settings (page scale, tap zones, margins, background, orientation, volume keys)
+- A multi-item download's items in their own sheet, from the stack button on its card: open, play
+  or delete any one of them
+- Or open videos and music in your phone's own players instead
 
 🎛️ **Per-download options** (the preview sheet)
 - Video quality: Best / 4K / 1440p / 1080p / 720p / 480p / Audio-only, showing the size of the
@@ -124,12 +136,17 @@ straight from them with Obtainium:
 🎨 **App**
 - Library with search, filters, favorites, duplicates, and a grid/list view toggle; swipe a card
   to remove it
+- Settings › Library & folders: whether Delete removes a download from your phone or only from the
+  Library, showing the Deleted and Duplicates sections, clearing Deleted after 7 or 30 days, and
+  where downloads are saved
+- A welcome screen on first launch, and layouts for landscape (the Library in two columns, the
+  music player side by side)
 - Swipe sideways between Home, Library and Settings, and between the Queue's tabs
 - Backup & restore of your settings, command templates, Library history and logins
 - Light/dark/system theme, several named color themes, dynamic color, and a pure-black OLED option
 - 16 languages — English, Spanish, Portuguese (Brazil), German, French, Italian, Russian, Turkish,
   Indonesian, Vietnamese, Hindi, Japanese, Chinese (Simplified), and right-to-left Arabic, Hebrew and
-  Persian — picked in Settings › Appearance › Language
+  Persian — picked in Settings › Look & feel › Language
 
 ## Screenshots
 
@@ -148,9 +165,13 @@ straight from them with Obtainium:
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/settings_processing.png" width="200" alt="Processing settings"><br>Processing</td>
-    <td align="center"><img src="docs/screenshots/settings_folders.png" width="200" alt="Folder settings"><br>Folders</td>
+    <td align="center"><img src="docs/screenshots/settings_library.png" width="200" alt="Library and folders settings"><br>Library &amp; folders</td>
     <td align="center"><img src="docs/screenshots/settings_advanced.png" width="200" alt="Advanced settings"><br>Advanced</td>
     <td align="center"><img src="docs/screenshots/settings_about.png" width="200" alt="About"><br>About</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/items_sheet.png" width="200" alt="A download's items"><br>A download's items</td>
+    <td align="center"><img src="docs/screenshots/comic_reader.png" width="200" alt="Comic reader"><br>Comic reader</td>
   </tr>
 </table>
 
@@ -218,6 +239,8 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
 - [Photon Gallery](https://github.com/Bn5prS/Photon_Gallery) (GPLv3) — the built-in picture and
   video viewer
 - [LRCLIB](https://lrclib.net) — synced lyrics
+- [@Vmratef](https://github.com/Vmratef) — Android 9 fixes, faster previews and saving music to the
+  Music folder
 
 ## License
 
