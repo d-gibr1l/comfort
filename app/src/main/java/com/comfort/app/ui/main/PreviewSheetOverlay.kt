@@ -102,7 +102,9 @@ internal fun PreviewSheetOverlayHost(
     // Null hides Subscribe: the link isn't a YouTube channel or playlist.
     onSubscribe: ((com.comfort.app.data.SubscriptionOptions) -> Unit)?,
 ) {
-    val overlayOpen = screen != PreviewScreen.MAIN
+    // Trim isn't drawn in this panel but in a sheet of its own (below), so it can be as tall as its
+    // video needs without the main sheet growing behind it.
+    val overlayOpen = screen != PreviewScreen.MAIN && screen != PreviewScreen.TRIM
 
     // "Start at…": the time this download waits for, if one was picked (StartAtDialog, shared
     // with the Queue's cards). Only this sheet's: a new opening starts without one.
@@ -412,24 +414,7 @@ internal fun PreviewSheetOverlayHost(
                                     onCancel = onRevertOverlay,
                                     onDone = onCommitOverlay,
                                 )
-                                PreviewScreen.TRIM -> TrimVideoScreen(
-                                    segments = segments,
-                                    onSegmentsChange = {
-                                        // The only place segments actually change once TrimVideoScreen
-                                        // is showing — marking edited here (rather than in
-                                        // onSegmentsChange itself) leaves onOpenTrim's initial default-
-                                        // segment seed, which runs before this screen ever composes,
-                                        // correctly NOT counted as a real edit.
-                                        onSegmentsEdited()
-                                        onSegmentsChange(it)
-                                    },
-                                    thumbnail = previewThumbnail,
-                                    pageUrl = url,
-                                    streamUrls = previewStreamUrls,
-                                    durationMs = previewDurationMs,
-                                    onCancel = onRevertOverlay,
-                                    onDone = onCommitOverlay,
-                                )
+                                PreviewScreen.TRIM -> {}
 
                                 PreviewScreen.TEMPLATES -> FilenameTemplatesScreen(
                                     current = filenameTemplate ?: GalleryDlPreferences.getFilenameFormat(context),
@@ -453,6 +438,41 @@ internal fun PreviewSheetOverlayHost(
                     }
                 }
             }
+            }
+        }
+
+        // Trim, a sheet of its own over the main one: as tall as its video needs (a portrait video
+        // nearly the whole screen) while the main sheet stays as it is. Swiping it down or Back
+        // (with its own predictive shrink) leaves it as Cancel does.
+        if (screen == PreviewScreen.TRIM) {
+            androidx.compose.material3.ModalBottomSheet(
+                onDismissRequest = onRevertOverlay,
+                sheetState = rememberSturdySheetState(),
+                // Never under the status bar, as the main sheet (a tall video's opened it up there).
+                modifier = Modifier.statusBarsPadding(),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentWindowInsets = { androidx.compose.foundation.layout.WindowInsets(0) },
+            ) {
+                Column(modifier = Modifier.navigationBarsPadding()) {
+            TrimVideoScreen(
+                segments = segments,
+                onSegmentsChange = {
+                    // The only place segments actually change once TrimVideoScreen
+                    // is showing — marking edited here (rather than in
+                    // onSegmentsChange itself) leaves onOpenTrim's initial default-
+                    // segment seed, which runs before this screen ever composes,
+                    // correctly NOT counted as a real edit.
+                    onSegmentsEdited()
+                    onSegmentsChange(it)
+                },
+                thumbnail = previewThumbnail,
+                pageUrl = url,
+                streamUrls = previewStreamUrls,
+                durationMs = previewDurationMs,
+                onCancel = onRevertOverlay,
+                onDone = onCommitOverlay,
+                            )
+                }
             }
         }
     }

@@ -261,6 +261,8 @@ internal fun TrimVideoScreen(
     durationMs: Long?,
     onCancel: () -> Unit,
     onDone: () -> Unit,
+    // The video's shape (width / height) once the player knows it: the sheet grows to fit it.
+    onVideoAspect: (Float) -> Unit = {},
 ) {
     var activeId by remember(segments.firstOrNull()?.id) { mutableStateOf(segments.firstOrNull()?.id) }
     val active = segments.firstOrNull { it.id == activeId } ?: segments.firstOrNull()
@@ -276,6 +278,11 @@ internal fun TrimVideoScreen(
     }
     val context = LocalContext.current
     var playerPlaying by remember { mutableStateOf(false) }
+    // Until the video is ready (and while it buffers): the shape-changing loading indicator.
+    var playerLoading by remember { mutableStateOf(true) }
+    // 16:9 until the player reports the video's own size.
+    var videoAspect by remember { androidx.compose.runtime.mutableFloatStateOf(16f / 9f) }
+    val reportAspect by androidx.compose.runtime.rememberUpdatedState(onVideoAspect)
     val exoPlayer = remember { 
         androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
             playWhenReady = true
@@ -284,6 +291,16 @@ internal fun TrimVideoScreen(
                     android.util.Log.e("ExoPlayer", "Playback error", error)
                 }
                 override fun onIsPlayingChanged(isPlaying: Boolean) { playerPlaying = isPlaying }
+                override fun onPlaybackStateChanged(state: Int) {
+                    playerLoading = state == androidx.media3.common.Player.STATE_BUFFERING ||
+                        state == androidx.media3.common.Player.STATE_IDLE
+                }
+                override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                    if (videoSize.width > 0 && videoSize.height > 0) {
+                        videoAspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+                        reportAspect(videoAspect)
+                    }
+                }
             })
         }
     }
@@ -395,7 +412,7 @@ internal fun TrimVideoScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
+                    .aspectRatio(videoAspect, matchHeightConstraintsFirst = true)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
@@ -428,7 +445,14 @@ internal fun TrimVideoScreen(
                             },
                     )
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = !playerPlaying,
+                        visible = playerLoading,
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(),
+                    ) {
+                        androidx.compose.material3.LoadingIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !playerPlaying && !playerLoading,
                         enter = androidx.compose.animation.fadeIn(),
                         exit = androidx.compose.animation.fadeOut(),
                     ) {
