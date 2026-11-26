@@ -412,6 +412,12 @@ object PythonRuntime {
                 // worked YouTube's player out again on every extraction. The fork server's jobs
                 // inherit it.
                 environment()["XDG_CACHE_HOME"] = File(context.cacheDir, "engine_cache").absolutePath
+                // A temp folder: newer Android sets TMPDIR for an app, Android 9 doesn't, and
+                // Python's tempfile then found none (only the Termux one and "/"). yt-dlp's
+                // QuickJS solver for YouTube's challenges writes its script to a temp file, so
+                // there it failed and YouTube asked to confirm "you're not a bot" (Android 9
+                // emulator).
+                environment()["TMPDIR"] = context.cacheDir.absolutePath
             }
     }
 
