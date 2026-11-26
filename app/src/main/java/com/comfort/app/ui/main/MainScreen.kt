@@ -935,7 +935,7 @@ private fun SideNavRail(
                         else -> Icon(tab.icon, contentDescription = tab.label)
                     }
                 },
-                label = { Text(tab.label) },
+                label = { Text(tab.label, fontFamily = com.comfort.app.theme.HeaderFontFamily) },
             )
         }
         Spacer(Modifier.weight(1f))
@@ -1127,7 +1127,7 @@ private fun FloatingNavBar(
                         ) {
                             Row {
                                 Spacer(Modifier.width(8.dp))
-                                Text(tab.label, color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                Text(tab.label, color = tint, style = MaterialTheme.typography.labelLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold, maxLines = 1)
                             }
                         }
                     }
