@@ -1306,4 +1306,6 @@
     <string name="update_all_engines">すべて更新 (%1$d)</string>
     <string name="cover_fade">カバーをフェード</string>
     <string name="cover_fade_subtitle">カバーの下側をぼかし、その下に色をにじませます。オフにすると通常の四角いカバーです。</string>
+    <string name="online_lyrics">ウェブから歌詞を取得</string>
+    <string name="online_lyrics_subtitle">単語ごとに同期されていない曲は、タイトル・アーティスト・長さで lrc.red、BetterLyrics、LyricsPlus、LRCLIB を検索します。</string>
 </resources>

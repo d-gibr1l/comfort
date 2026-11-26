@@ -219,6 +219,7 @@ internal fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean)
         SettingSwitch(stringResource(R.string.cover_fade), stringResource(R.string.cover_fade_subtitle), m.coverFade)
 
         SettingsGroup(stringResource(R.string.lyrics))
+        SettingSwitch(stringResource(R.string.online_lyrics), stringResource(R.string.online_lyrics_subtitle), m.onlineLyrics)
         SettingRow(stringResource(R.string.lyric_lines), stringResource(R.string.lyric_lines_subtitle), onClick = {
             haptics.performHapticFeedback(if (lyricLine) androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOff else androidx.compose.ui.hapticfeedback.HapticFeedbackType.ToggleOn)
             onLyricLineChange(!lyricLine)

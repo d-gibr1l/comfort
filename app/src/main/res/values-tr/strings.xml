@@ -1340,4 +1340,6 @@
     <string name="update_all_engines">Tümünü güncelle (%1$d)</string>
     <string name="cover_fade">Kapak solması</string>
     <string name="cover_fade_subtitle">Kapak aşağıya doğru bulanıklaşır ve rengi altına yayılır. Kapalıyken düz kare kapak.</string>
+    <string name="online_lyrics">Web\'den şarkı sözleri</string>
+    <string name="online_lyrics_subtitle">Sözleri kelime kelime zamanlanmamış bir şarkı için: başlık, sanatçı ve süreye göre lrc.red, BetterLyrics, LyricsPlus ve LRCLIB\'de aranır.</string>
 </resources>

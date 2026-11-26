@@ -1340,4 +1340,6 @@
     <string name="update_all_engines">به‌روزرسانی همه (%1$d)</string>
     <string name="cover_fade">محو شدن کاور</string>
     <string name="cover_fade_subtitle">کاور به سمت پایین تار می‌شود و رنگش زیر آن پخش می‌شود. خاموش، یک کاور مربعی ساده.</string>
+    <string name="online_lyrics">متن آهنگ از وب</string>
+    <string name="online_lyrics_subtitle">برای آهنگی که متنش کلمه‌به‌کلمه زمان‌بندی نشده: در lrc.red، BetterLyrics، LyricsPlus و LRCLIB با عنوان، هنرمند و مدت جستجو می‌شود.</string>
 </resources>

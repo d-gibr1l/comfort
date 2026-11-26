@@ -1375,4 +1375,6 @@
     <string name="update_all_engines">עדכון הכול (%1$d)</string>
     <string name="cover_fade">עטיפה שמתמוססת</string>
     <string name="cover_fade_subtitle">העטיפה מיטשטשת כלפי מטה וזוהרת מתחתיה. כבוי, עטיפה ריבועית רגילה.</string>
+    <string name="online_lyrics">מילים מהרשת</string>
+    <string name="online_lyrics_subtitle">לשיר שהמילים שלו לא מתוזמנות מילה במילה: חיפוש ב-lrc.red, ‏BetterLyrics, ‏LyricsPlus ו-LRCLIB לפי שם, אמן ואורך.</string>
 </resources>

@@ -81,6 +81,7 @@ import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.comfort.app.music.MusicPlayer
 import com.comfort.app.music.Song
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.semantics.contentDescription
@@ -136,6 +137,16 @@ private fun NowPlayingContent(
     LaunchedEffect(song?.uri) {
         lyrics = null
         lyrics = song?.let { com.comfort.app.music.Lyrics.load(context, it.uri) }
+        // Not timed word by word (or none at all): looked up on the web, Music settings ›
+        // Lyrics from the web. Once the song's length is known, which the sources match on.
+        val own = lyrics
+        if (song != null && own?.wordSynced != true && com.comfort.app.music.MusicSettings.onlineLyrics.value.value) {
+            val length = MusicPlayer.state.first { it.duration > 0 }.duration
+            val found = com.comfort.app.music.lyrics.OnlineLyrics.find(song, length)
+            // The web's replaces the song's own only when it's better: timed where the song's
+            // aren't, or timed word by word.
+            if (found != null && (own == null || found.wordSynced || (found.synced && !own.synced))) lyrics = found
+        }
     }
     var showLyrics by remember { mutableStateOf(false) }
     // The two lyric lines under the cover, on or off (the top bar's lyrics button), kept.

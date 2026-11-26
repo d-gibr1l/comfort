@@ -12,9 +12,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-/** A song's lyrics: [lines] when they're synced (each with the time it's sung), else [plain]. */
-data class Lyrics(val lines: List<Line>?, val plain: String?) {
+/** A song's lyrics: [lines] when they're synced (each with the time it's sung), else [plain].
+ * [rich]: the same lines with each word's own time and any background vocals, when the source
+ * has them (Mixify's model, music.lyrics); [source]: where they came from (null: the song's own). */
+data class Lyrics(
+    val lines: List<Line>?,
+    val plain: String?,
+    val rich: List<com.comfort.app.music.lyrics.LyricLine>? = null,
+    val source: com.comfort.app.music.lyrics.LyricsSource? = null,
+) {
     data class Line(val timeMs: Long, val text: String)
+
+    /** Whether the words of its lines are timed one by one (sung word by word, Apple Music's look). */
+    val wordSynced: Boolean get() = rich?.any { it.isWordSynced } == true
 
     val synced: Boolean get() = !lines.isNullOrEmpty()
 
@@ -40,6 +50,11 @@ data class Lyrics(val lines: List<Line>?, val plain: String?) {
         fun parse(text: String): Lyrics? {
             val trimmed = text.trim()
             if (trimmed.isEmpty()) return null
+            // Word-timed LRC ("<mm:ss.xx>" before each word): Mixify's parser keeps the words' times.
+            if (WORD_STAMP.containsMatchIn(trimmed)) {
+                runCatching { com.comfort.app.music.lyrics.LrcLib.parseLrc(trimmed) }.getOrNull()
+                    ?.takeIf { it.size >= 2 }?.let { return fromRich(it, null) }
+            }
             val lines = mutableListOf<Line>()
             for (raw in trimmed.lines()) {
                 val stamps = STAMP.findAll(raw).toList()
@@ -55,6 +70,17 @@ data class Lyrics(val lines: List<Line>?, val plain: String?) {
             // Not synced: the text as it is, without any stray [ar:..]-style header tags.
             val plain = trimmed.lines().filterNot { it.trim().matches(Regex("""\[[a-z]+:.*]""")) }.joinToString("\n").trim()
             return if (plain.isEmpty()) null else Lyrics(null, plain)
+        }
+
+        private val WORD_STAMP = Regex("""<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>""")
+
+        /** Lyrics from Mixify's lines (an online source's, or word-timed LRC); [lines] from them. */
+        fun fromRich(rich: List<com.comfort.app.music.lyrics.LyricLine>, source: com.comfort.app.music.lyrics.LyricsSource?): Lyrics? {
+            val sung = rich.filterNot { it.isGap }
+            if (sung.isEmpty()) return null
+            val synced = sung.any { it.timeMs > 0 }
+            return if (synced) Lyrics(sung.map { Line(it.timeMs, it.text) }.sortedBy { it.timeMs }, null, rich, source)
+            else Lyrics(null, sung.joinToString("\n") { it.text }, null, source)
         }
 
         private val cache = object : LinkedHashMap<Uri, Lyrics?>(16, 0.75f, true) {

@@ -108,6 +108,8 @@ internal fun AboutScreen(onBack: () -> Unit, highlightKey: String? = null) {
                         CreditEntry(icon = Icons.Outlined.Memory, title = "QuickJS", url = "https://bellard.org/quickjs/"),
                         CreditEntry(iconRes = com.comfort.app.R.drawable.ic_credit_python, title = context.getString(R.string.python_runtime), url = "https://github.com/deniscerri/ytdlnis-packages"),
                         CreditEntry(icon = Icons.Outlined.Bolt, title = "aria2", url = "https://aria2.github.io/"),
+                        // The word-by-word lyrics (music.lyrics) are ported from it.
+                        CreditEntry(icon = Icons.Outlined.MusicNote, title = "Mixify", url = "https://github.com/MixifyTeam/Mixify"),
                     )
                 }
                 credits.chunked(2).forEachIndexed { rowIndex, row ->

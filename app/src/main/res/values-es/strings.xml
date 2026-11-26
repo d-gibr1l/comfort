@@ -1375,4 +1375,6 @@
     <string name="update_all_engines">Actualizar todo (%1$d)</string>
     <string name="cover_fade">La portada se desvanece</string>
     <string name="cover_fade_subtitle">La portada se difumina hacia abajo y su color se extiende por debajo. Desactivado, una portada cuadrada simple.</string>
+    <string name="online_lyrics">Letras de la web</string>
+    <string name="online_lyrics_subtitle">Para una canción cuya letra no está sincronizada palabra por palabra: se busca en lrc.red, BetterLyrics, LyricsPlus y LRCLIB por título, artista y duración.</string>
 </resources>

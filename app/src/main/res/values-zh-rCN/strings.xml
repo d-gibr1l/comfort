@@ -1306,4 +1306,6 @@
     <string name="update_all_engines">全部更新 (%1$d)</string>
     <string name="cover_fade">封面渐隐</string>
     <string name="cover_fade_subtitle">封面底部逐渐模糊，颜色向下晕开。关闭后为普通方形封面。</string>
+    <string name="online_lyrics">从网络获取歌词</string>
+    <string name="online_lyrics_subtitle">歌曲自带歌词未逐字计时时：按标题、艺人和时长在 lrc.red、BetterLyrics、LyricsPlus 和 LRCLIB 上查找。</string>
 </resources>

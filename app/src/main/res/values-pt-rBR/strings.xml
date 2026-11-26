@@ -1375,4 +1375,6 @@
     <string name="update_all_engines">Atualizar tudo (%1$d)</string>
     <string name="cover_fade">Capa esmaecida</string>
     <string name="cover_fade_subtitle">A capa desfoca em direção à parte de baixo e brilha abaixo dela. Desativado, uma capa quadrada simples.</string>
+    <string name="online_lyrics">Letras da web</string>
+    <string name="online_lyrics_subtitle">Para uma música cuja letra não é sincronizada palavra por palavra: busca no lrc.red, BetterLyrics, LyricsPlus e LRCLIB por título, artista e duração.</string>
 </resources>

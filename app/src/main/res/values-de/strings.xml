@@ -1340,4 +1340,6 @@
     <string name="update_all_engines">Alle aktualisieren (%1$d)</string>
     <string name="cover_fade">Cover blendet aus</string>
     <string name="cover_fade_subtitle">Das Cover wird nach unten hin unscharf und leuchtet darunter weiter. Aus: ein schlichtes quadratisches Cover.</string>
+    <string name="online_lyrics">Liedtexte aus dem Netz</string>
+    <string name="online_lyrics_subtitle">Für einen Song, dessen eigener Text nicht Wort für Wort getaktet ist: Suche auf lrc.red, BetterLyrics, LyricsPlus und LRCLIB nach Titel, Interpret und Länge.</string>
 </resources>
