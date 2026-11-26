@@ -349,10 +349,16 @@ object MediaStoreHelper {
      * exposing all of cacheDir — see file_paths.xml) turns the resulting cache file back into a
      * content:// Uri so both Coil (in-process) and the Library screen's own share/open intents
      * (out-of-process) can read it the same way any other thumbnailPath already works. */
-    fun extractAudioArtworkUri(context: Context, savedUri: Uri, downloadId: String): Uri? {
+    fun extractAudioArtworkUri(context: Context, savedUri: Uri, downloadId: String, sourceFile: File? = null): Uri? {
         val retriever = android.media.MediaMetadataRetriever()
         return try {
-            retriever.setDataSource(context, savedUri)
+            // The downloaded file itself when it's still there: read through its MediaStore row,
+            // older Android could hand back another song's (a playlist's songs all with one cover).
+            if (sourceFile != null && sourceFile.isFile && sourceFile.length() > 0) {
+                retriever.setDataSource(sourceFile.absolutePath)
+            } else {
+                retriever.setDataSource(context, savedUri)
+            }
             val art = retriever.embeddedPicture ?: return null
             val dir = File(context.cacheDir, "audio_art").apply { mkdirs() }
             // One per song, not per download: a playlist's songs used to share "<id>.jpg", each

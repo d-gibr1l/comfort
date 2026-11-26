@@ -763,6 +763,14 @@ class DownloadWorker(
                         lastErrorLine.compareAndSet(null, "Couldn't save ${original.name} to the gallery")
                         dao.forgetDownloadedFile(downloadId, original.name)
                     } else {
+                        // A song's cover read from the downloaded file itself, before it's
+                        // deleted: the gallery copy can be read back as another row's on older
+                        // Android (after Vmratef's fork, 35d65f4/6f9b25f).
+                        val artworkUri = if (isAudioFile) {
+                            MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId, sourceFile = candidate)
+                        } else {
+                            null
+                        }
                         candidate.delete()
                         // Saved on a second try (the sweep): no longer missing.
                         if (saveFailures.remove(original.name) != null && saveFailures.isEmpty() &&
@@ -788,11 +796,6 @@ class DownloadWorker(
                         // isAudio is extension-derived and always right for a given
                         // file, so it's set unconditionally, not IfAbsent.
                         if (isAudioFile) dao.setIsAudio(downloadId, true)
-                        val artworkUri = if (isAudioFile) {
-                            MediaStoreHelper.extractAudioArtworkUri(applicationContext, savedUri, downloadId)
-                        } else {
-                            null
-                        }
                         val thumbnailUri = artworkUri ?: savedUri
                         // The download's first item is its card's picture, and only that one: a
                         // video saved with its thumbnail counts as a single item, and each of its
