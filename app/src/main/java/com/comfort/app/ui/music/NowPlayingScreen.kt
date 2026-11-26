@@ -66,6 +66,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -380,7 +381,13 @@ fun NowPlayingScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
-                                CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
+                                Box(Modifier.fillMaxSize()) {
+                                    CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
+                                    // The cover's lower part melts into a blur (Apple Music's
+                                    // look): the blurred copy the backdrop already has (no blur
+                                    // run per frame), shown more and more toward the bottom.
+                                    CoverImage(shown, blurred = true, modifier = Modifier.fillMaxSize().bottomBlurMask())
+                                }
                             }
                         }
                         }
@@ -915,3 +922,19 @@ private fun ColumnScope.PortraitOrSideBySide(
 
 /** Landscape: the room under the cover for the two lyric lines. */
 private val LANDSCAPE_LYRICS_SPACE = 100.dp
+
+/** Shows this layer only toward the bottom: clear over the top half, then more and more of it. */
+private fun Modifier.bottomBlurMask(): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(
+            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                0f to Color.Transparent,
+                0.55f to Color.Transparent,
+                0.78f to Color.Black.copy(alpha = 0.8f),
+                1f to Color.Black,
+            ),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }
