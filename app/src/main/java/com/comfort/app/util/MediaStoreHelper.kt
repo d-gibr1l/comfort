@@ -230,7 +230,29 @@ object MediaStoreHelper {
         for (uri in uris) {
             try {
                 if (uri.authority == MediaStore.AUTHORITY) {
+                    // Android 9 and older: MediaStore deletes an image's or a video's file with its
+                    // row, but only the row for a song (the old MediaProvider leaves audio files),
+                    // so a deleted song stayed in Music/Comfort. Its file is deleted here too
+                    // (the app holds the storage permission there).
+                    val legacyPath = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                        @Suppress("DEPRECATION")
+                        runCatching {
+                            context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                                ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                        }.getOrNull()
+                    } else null
+                    // A song's name, for its .lrc lyrics (saved apart from it, not recorded with the
+                    // download): deleted with the song, not left behind in Download/Comfort/Music.
+                    val songName = runCatching {
+                        context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.MIME_TYPE), null, null, null)
+                            ?.use { if (it.moveToFirst() && it.getString(1)?.startsWith("audio/") == true) it.getString(0) else null }
+                    }.getOrNull()
                     val rows = context.contentResolver.delete(uri, null, null)
+                    if (legacyPath != null) {
+                        val f = File(legacyPath)
+                        if (f.exists() && !f.delete()) android.util.Log.w("MediaStoreHelper", "Couldn't delete $legacyPath")
+                    }
+                    if (songName != null && rows > 0) deleteLyricsOf(context, songName)
                     // Nothing deleted, no error, the file still there: one MediaStore won't let this
                     // app delete quietly (not its own to it). The user's OK is asked for, as on Android
                     // 11+'s SecurityException.
@@ -246,6 +268,28 @@ object MediaStoreHelper {
             }
         }
         return needConsent
+    }
+
+    /** Deletes the .lrc lyrics saved for the song named [songName] (DownloadWorker saves it to
+     * Download/Comfort/Music under the song's name), if this app saved one there. */
+    private fun deleteLyricsOf(context: Context, songName: String) {
+        val lrcName = songName.substringBeforeLast('.') + ".lrc"
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.delete(
+                    MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL),
+                    "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND " +
+                        "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
+                    arrayOf("$RELATIVE_DIR/Music/", lrcName, context.packageName),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val f = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "Comfort/Music/$lrcName")
+                @Suppress("DEPRECATION")
+                context.contentResolver.delete(MediaStore.Files.getContentUri("external"), "${MediaStore.MediaColumns.DATA} = ?", arrayOf(f.absolutePath))
+                f.delete()
+            }
+        }.onFailure { android.util.Log.w("MediaStoreHelper", "Couldn't delete $lrcName", it) }
     }
 
     /** Copies [sourceFile] into the user's configured download location — a custom SAF folder if
