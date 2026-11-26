@@ -272,7 +272,7 @@ private fun videoDetails(context: Context, uri: Uri): List<Pair<Int, String>> {
         resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
             if (c.moveToFirst()) {
                 c.getString(0)?.let { out += R.string.prop_file to it }
-                if (!c.isNull(1)) out += R.string.prop_size to android.text.format.Formatter.formatFileSize(context, c.getLong(1))
+                if (!c.isNull(1)) out += R.string.prop_size to com.comfort.app.ui.main.formatFileSize(c.getLong(1))
             }
         }
     }

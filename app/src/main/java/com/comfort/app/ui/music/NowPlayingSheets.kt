@@ -360,6 +360,6 @@ private fun songProperties(context: android.content.Context, uri: android.net.Ur
         }
         bitrate?.takeIf { it > 0 }?.let { add(R.string.prop_bitrate to "${(it + 500) / 1000} kbps") }
         sampleRate?.takeIf { it > 0 }?.let { hz -> add(R.string.prop_sample_rate to (if (hz % 1000 == 0) "${hz / 1000} kHz" else "%.1f kHz".format(hz / 1000f))) }
-        size?.let { add(R.string.sort_size to android.text.format.Formatter.formatFileSize(context, it)) }
+        size?.let { add(R.string.sort_size to com.comfort.app.ui.main.formatFileSize(it)) }
     }
 }

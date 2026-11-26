@@ -213,7 +213,7 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                         val count = shown.count { !uncounted(it) }
                         Text(
                             pluralStringResource(R.plurals.item_count, count, count) +
-                                (if (total > 0) " · " + android.text.format.Formatter.formatShortFileSize(context, total) else ""),
+                                (if (total > 0) " · " + com.comfort.app.ui.main.formatFileSize(total) else ""),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -395,7 +395,7 @@ private fun meta(item: BatchItem): String {
     return listOfNotNull(
         kind,
         item.durationMs?.takeIf { it > 0 }?.let { android.text.format.DateUtils.formatElapsedTime(it / 1000) },
-        item.sizeBytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
+        item.sizeBytes.takeIf { it > 0 }?.let { com.comfort.app.ui.main.formatFileSize(it) },
     ).joinToString(" · ")
 }
 

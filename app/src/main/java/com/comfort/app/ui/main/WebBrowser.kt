@@ -641,7 +641,7 @@ private fun CaughtMediaSheet(
                                         else -> stringResource(R.string.video)
                                     },
                                     size?.let { (w, h) -> qualityLabel(item.kind, w, h) },
-                                    item.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
+                                    item.bytes.takeIf { it > 0 }?.let { com.comfort.app.ui.main.formatFileSize(it) },
                                 ).joinToString(" · "),
                             )
                         },
@@ -748,8 +748,8 @@ private fun RecordingBar(bytes: Long, ended: Boolean, saving: Boolean, onStop: (
             Text(
                 when {
                     saving -> stringResource(R.string.saving_the_recording)
-                    ended -> stringResource(R.string.recorded_to_the_end_x, android.text.format.Formatter.formatShortFileSize(context, bytes))
-                    bytes > 0 -> stringResource(R.string.recording_x, android.text.format.Formatter.formatShortFileSize(context, bytes))
+                    ended -> stringResource(R.string.recorded_to_the_end_x, com.comfort.app.ui.main.formatFileSize(bytes))
+                    bytes > 0 -> stringResource(R.string.recording_x, com.comfort.app.ui.main.formatFileSize(bytes))
                     else -> stringResource(R.string.recording_play_the_video)
                 },
                 style = MaterialTheme.typography.labelLarge,
