@@ -555,6 +555,9 @@ fun MediaViewerScreen(
                             muted = videosMuted,
                             onMutedChange = { videosMuted = it },
                             onPlayingChange = { playing -> if (page == pagerState.currentPage) currentVideoPlaying = playing },
+                            // Play or Pause pressed: the controls stay up (until tapped away), as
+                            // after tapping them back; they hid 6 s after Play.
+                            onPlayPausePressed = { autoHide = false },
                             onTracksChange = { tracks -> pageTracks = page to tracks },
                             // Comfort: above a carousel's filmstrip.
                             controlsBottomPadding = if (galleryItems.count { groupKey(it) == groupKey(item) } > 1) 64.dp + FILMSTRIP_SPACE else 64.dp,

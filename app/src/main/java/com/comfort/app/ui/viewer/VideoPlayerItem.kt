@@ -75,6 +75,8 @@ fun VideoPlayerItem(
     muted: Boolean = true,
     onMutedChange: (Boolean) -> Unit = {},
     onPlayingChange: (Boolean) -> Unit = {},
+    // Comfort: Play or Pause pressed (the viewer keeps its controls up after).
+    onPlayPausePressed: () -> Unit = {},
     // Comfort: the audio and subtitle tracks of the video on screen, for the viewer's ⋮ menu.
     onTracksChange: (VideoTracks?) -> Unit = {},
     /** Comfort: on the video itself, not its controls (the viewer's zoom). */
@@ -88,6 +90,7 @@ fun VideoPlayerItem(
         muted = muted,
         onMutedChange = onMutedChange,
         onPlayingChange = onPlayingChange,
+        onPlayPausePressed = onPlayPausePressed,
         onTracksChange = onTracksChange,
         controlsBottomPadding = controlsBottomPadding,
         modifier = modifier,
@@ -107,6 +110,7 @@ fun VideoPlayerItemWithResolvedUri(
     muted: Boolean = true,
     onMutedChange: (Boolean) -> Unit = {},
     onPlayingChange: (Boolean) -> Unit = {},
+    onPlayPausePressed: () -> Unit = {},
     onTracksChange: (VideoTracks?) -> Unit = {},
     videoModifier: Modifier = Modifier,
     onTap: (() -> Unit)? = null,
@@ -399,6 +403,7 @@ fun VideoPlayerItemWithResolvedUri(
         ) {
             FilledTonalIconButton(
                 onClick = {
+                    onPlayPausePressed()
                     if (isPlaying) {
                         exoPlayer.pause()
                     } else {
