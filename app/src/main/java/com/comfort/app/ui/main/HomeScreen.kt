@@ -630,7 +630,7 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = navBarClearance(), end = 24.dp)
-                .reportsFabInset("home_paste"),
+                .reportsFabInset("home_paste", active),
         )
     }
 }

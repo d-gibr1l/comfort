@@ -701,9 +701,17 @@ object FabInset {
     fun clear(name: String) { heights.remove(name) }
 }
 
-/** Reports this floating button's height (plus a gap) to [FabInset] while it's composed. */
-fun Modifier.reportsFabInset(name: String): Modifier = composed {
+/** Reports this floating button's height (plus a gap) to [FabInset] while it's composed and
+ * [active]: a page kept composed under another (Home's Paste under the Library) mustn't lift the
+ * snackbars on the page in front, where no button is. */
+fun Modifier.reportsFabInset(name: String, active: () -> Boolean = { true }): Modifier = composed {
     val density = androidx.compose.ui.platform.LocalDensity.current
+    var height by remember { mutableStateOf<androidx.compose.ui.unit.Dp?>(null) }
+    val on = active()
+    androidx.compose.runtime.SideEffect {
+        val h = height
+        if (on && h != null) FabInset.set(name, h) else FabInset.clear(name)
+    }
     androidx.compose.runtime.DisposableEffect(name) { onDispose { FabInset.clear(name) } }
-    onSizeChanged { FabInset.set(name, with(density) { it.height.toDp() } + 8.dp) }
+    onSizeChanged { height = with(density) { it.height.toDp() } + 8.dp }
 }
