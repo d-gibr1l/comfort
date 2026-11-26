@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -422,11 +423,14 @@ private fun NowPlayingContent(
                                 Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.08f)))
                                 SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
                                     Box(Modifier.fillMaxSize()) {
-                                        CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
-                                        if (coverFade) CoverImage(
-                                            shown, blurred = true,
-                                            modifier = Modifier.fillMaxSize()
-                                                .alphaMask(0f to Color.Transparent, 0.4f to Color.Transparent, 0.72f to Color.Black, 1f to Color.Black),
+                                        // Android 12+: a real progressive blur (Haze), its radius
+                                        // growing down the cover, so the cover stays itself as it
+                                        // softens. Older Android can't blur on screen: the cover
+                                        // stays sharp there (a blurred copy faded in looked smeared).
+                                        val progressive = coverFade && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                                        CoverImage(
+                                            shown, blurred = false,
+                                            modifier = Modifier.fillMaxSize().then(if (progressive) Modifier.progressiveCoverBlur() else Modifier),
                                         )
                                     }
                                 }
@@ -977,3 +981,18 @@ private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boo
             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
         )
     }
+
+/** The cover's own pixels blurred more and more toward its bottom: none over its top 40%, then a
+ * radius growing to [COVER_BLUR_RADIUS] at its bottom edge (Haze's progressive blur). */
+private fun Modifier.progressiveCoverBlur(): Modifier = hazeEffect {
+    blurRadius = COVER_BLUR_RADIUS
+    noiseFactor = 0f
+    tints = emptyList()
+    progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
+        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.4f) / 0.6f).coerceIn(0f, 1f).let { it * it } },
+        startIntensity = 0f,
+        endIntensity = 1f,
+    )
+}
+
+private val COVER_BLUR_RADIUS = 36.dp
