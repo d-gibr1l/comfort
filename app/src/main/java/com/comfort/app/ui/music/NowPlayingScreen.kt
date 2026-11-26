@@ -415,7 +415,7 @@ private fun NowPlayingContent(
                             contentAlignment = Alignment.Center,
                         ) {
                             // A subtle softening at the cover's bottom (the reference app's), Android
-                            // 12+: its last fifth blurs lightly and fades a little into the
+                            // 12+: its lower third blurs, its last quarter fading into the
                             // background; the cover keeps its shape and corners. Older Android, or
                             // Cover fades out off: the plain cover.
                             val coverFade by com.comfort.app.music.MusicSettings.coverFade.value.collectAsState()
@@ -436,8 +436,8 @@ private fun NowPlayingContent(
                                         // [coverEffects] after the cover settles).
                                         .alphaMask(
                                             0f to Color.Black,
-                                            0.8f to Color.Black,
-                                            1f to Color.Black.copy(alpha = 1f - 0.45f * coverEffects),
+                                            0.74f to Color.Black,
+                                            1f to Color.Black.copy(alpha = 1f - 0.65f * coverEffects),
                                         )
                                         .progressiveCoverBlur(coverEffects),
                                 ) {
@@ -1000,7 +1000,7 @@ private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boo
         )
     }
 
-/** Blurred toward the bottom (Haze's progressive blur): none over the cover's top four fifths, then
+/** Blurred toward the bottom (Haze's progressive blur): none over the cover's top ~two thirds, then
  * a radius growing smoothly to [COVER_BLUR_RADIUS] at its bottom edge. */
 private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEffect {
     // Its own alpha (faded in after the cover settles): not a parent layer's.
@@ -1009,10 +1009,10 @@ private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEf
     noiseFactor = 0f
     tints = emptyList()
     progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.78f) / 0.22f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
+        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.64f) / 0.36f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
         startIntensity = 0f,
         endIntensity = 1f,
     )
 }
 
-private val COVER_BLUR_RADIUS = 12.dp
+private val COVER_BLUR_RADIUS = 20.dp
