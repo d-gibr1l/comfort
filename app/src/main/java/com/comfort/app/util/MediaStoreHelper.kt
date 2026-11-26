@@ -23,6 +23,10 @@ object MediaStoreHelper {
      * lyrics couldn't sit beside it there), and galleries and music players still index the media
      * in it. */
     const val RELATIVE_DIR = "Download/Comfort"
+    /** Songs go in Android's own Music folder instead, where music players look (after Vmratef's
+     * fork, 6d1d9f1). Their lyrics (.lrc) stay in Download/Comfort/Music: Android takes only audio
+     * into Music/. */
+    const val MUSIC_RELATIVE_DIR = "Music/Comfort"
 
     /** Android 7-9 save into the public Downloads folder directly ([saveToMediaStore]'s legacy
      * path), which needs WRITE_EXTERNAL_STORAGE — a runtime permission there, declared in the
@@ -68,8 +72,11 @@ object MediaStoreHelper {
         return folder.startsWith("$RELATIVE_DIR/") || OLD_RELATIVE_DIRS.any { folder.startsWith(it) }
     }
 
-    /** Where downloads went before they moved to [RELATIVE_DIR] — [organizeSavedFiles] moves them. */
+    /** Where downloads went before they moved to [RELATIVE_DIR] — [organizeSavedFiles] moves them.
+     * Music/Comfort is one again: today's songs ([MUSIC_RELATIVE_DIR]). */
     private val OLD_RELATIVE_DIRS = listOf("Pictures/Comfort/", "Movies/Comfort/", "Music/Comfort/", "Download/Comfort/")
+    // What organizeSavedFiles moves: not Music/Comfort, where songs are saved now.
+    private val MOVED_RELATIVE_DIRS = OLD_RELATIVE_DIRS - "$MUSIC_RELATIVE_DIR/"
 
     /** Renames files saved under the old naming to today's (see [OldNames.tidy]) — the poster
      * no longer repeated, no links, X files named after their poster rather than "twitter".
@@ -151,9 +158,9 @@ object MediaStoreHelper {
             resolver.query(
                 files,
                 arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.MIME_TYPE),
-                "${MediaStore.MediaColumns.RELATIVE_PATH} IN (${OLD_RELATIVE_DIRS.joinToString { "?" }}) AND " +
+                "${MediaStore.MediaColumns.RELATIVE_PATH} IN (${MOVED_RELATIVE_DIRS.joinToString { "?" }}) AND " +
                     "${MediaStore.MediaColumns.OWNER_PACKAGE_NAME} = ?",
-                (OLD_RELATIVE_DIRS + context.packageName).toTypedArray(),
+                (MOVED_RELATIVE_DIRS + context.packageName).toTypedArray(),
                 null,
             )?.use { c ->
                 while (c.moveToNext()) c.getString(1)?.let { rows += Triple(c.getLong(0), it, c.getString(2)) }
@@ -442,6 +449,8 @@ object MediaStoreHelper {
             // and only fall back to lying about the type if that actually fails, keeping the
             // original fix's safety net for whatever device/OS combination still needs it.
             insertIntoMediaStore(context, sourceFile, mimeType)
+                // A song Music/ wouldn't take: where everything else goes.
+                ?: (if (mimeType.startsWith("audio/")) insertIntoMediaStore(context, sourceFile, mimeType, inDownloads = true) else null)
                 ?: when (mimeType) {
                     "video/x-matroska" -> insertIntoMediaStore(context, sourceFile, "video/mp4")
                     // "audio/webm" isn't a MIME MediaStore's Audio collection reliably accepts on
@@ -451,15 +460,16 @@ object MediaStoreHelper {
                     // link"). Falling back to the plain, always-accepted "video/webm" guess trades
                     // away its indexing as a song, but a download that succeeds as a "video"
                     // beats one that fails outright.
-                    "audio/webm" -> insertIntoMediaStore(context, sourceFile, "video/webm")
+                    "audio/webm" -> insertIntoMediaStore(context, sourceFile, "video/webm", inDownloads = true)
                     else -> null
                 }
         } else {
             // Pre-scoped-storage devices (API 24-28): write straight into the public dir, then index it.
             val collection = legacyCollectionFor(mimeType)
+            val isSong = mimeType.startsWith("audio/")
             @Suppress("DEPRECATION")
-            val publicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val publicDir = File(publicRoot, "Comfort/${subfolderFor(sourceFile.name, mimeType)}")
+            val publicRoot = Environment.getExternalStoragePublicDirectory(if (isSong) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_DOWNLOADS)
+            val publicDir = File(publicRoot, if (isSong) "Comfort" else "Comfort/${subfolderFor(sourceFile.name, mimeType)}")
             if (!publicDir.exists()) publicDir.mkdirs()
             val destFile = uniqueFile(publicDir, sourceFile.name)
             try {
@@ -492,15 +502,17 @@ object MediaStoreHelper {
     }
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
-    private fun insertIntoMediaStore(context: Context, sourceFile: File, mimeType: String): Uri? {
+    private fun insertIntoMediaStore(context: Context, sourceFile: File, mimeType: String, inDownloads: Boolean = false): Uri? {
         val resolver = context.contentResolver
-        // The Downloads collection is the one that accepts Download/ paths, for any file type; the
-        // media scanner still files each row as an image, video or song by its MIME type.
-        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        // A song: the Audio collection, in Music/Comfort ([MUSIC_RELATIVE_DIR]). Anything else (or
+        // a song Music/ refused): the Downloads collection, the one that accepts Download/ paths,
+        // for any file type; the media scanner still files each row by its MIME type.
+        val toMusic = !inDownloads && mimeType.startsWith("audio/")
+        val collection = if (toMusic) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI else MediaStore.Downloads.EXTERNAL_CONTENT_URI
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, sourceFile.name)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "$RELATIVE_DIR/${subfolderFor(sourceFile.name, mimeType)}")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, if (toMusic) MUSIC_RELATIVE_DIR else "$RELATIVE_DIR/${subfolderFor(sourceFile.name, mimeType)}")
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
         val uri = runCatching { resolver.insert(collection, values) }.getOrNull() ?: return null
