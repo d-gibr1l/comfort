@@ -444,8 +444,9 @@ private fun NowPlayingContent(
                                         .then(
                                             if (!extended) Modifier
                                             else Modifier
-                                                // Opaque down to the cover's bottom, the mirror fading out.
-                                                .alphaMask(0f to Color.Black, COVER_END to Color.Black, 1f to Color.Transparent)
+                                                // Opaque down to the cover's bottom, the mirror fading out at
+                                                // once (a long, solid one read as a taller poster).
+                                                .alphaMask(0f to Color.Black, COVER_END to Color.Black, COVER_END + (1f - COVER_END) * 0.5f to Color.Black.copy(alpha = 0.35f), 1f to Color.Transparent)
                                                 .progressiveCoverBlur(coverEffects),
                                         ),
                                 ) {
@@ -456,7 +457,9 @@ private fun NowPlayingContent(
                                             }
                                             // The cover's own bottom, mirrored: what's below it.
                                             androidx.compose.foundation.layout.BoxWithConstraints(
-                                                Modifier.fillMaxWidth().weight(1f).clipToBounds().graphicsLayer { alpha = coverEffects },
+                                                Modifier.fillMaxWidth().weight(1f).clipToBounds().graphicsLayer { alpha = coverEffects }
+                                                    // Its sides taper in: no straight edge carrying on below the cover.
+                                                    .alphaMask(0f to Color.Transparent, 0.1f to Color.Black, 0.9f to Color.Black, 1f to Color.Transparent, horizontal = true),
                                             ) {
                                                 CoverImage(
                                                     shown, blurred = false,
@@ -1040,7 +1043,7 @@ private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEf
 }
 
 /** How much of the cover's height its mirror hangs below it, and where the cover ends in the whole. */
-private const val COVER_MIRROR = 0.35f
+private const val COVER_MIRROR = 0.16f
 private const val COVER_END = 1f / (1f + COVER_MIRROR)
 
 private val COVER_BLUR_RADIUS = 36.dp
