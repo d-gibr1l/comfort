@@ -252,12 +252,6 @@ fun MediaViewerScreen(
     // Auto hide UI after 6 seconds of inactivity (e.g., no swiping/page change). Comfort: 6 s, not
     // Photon's 4, and never while the video on screen is paused, so its controls stay at hand.
     val pausedVideo = currentItem?.isVideo == true && !currentVideoPlaying
-    LaunchedEffect(showUi, autoHide, pagerState.isScrollInProgress, pagerState.currentPage, pausedVideo) {
-        if (showUi && autoHide && !pausedVideo) {
-            kotlinx.coroutines.delay(6000)
-            showUi = false
-        }
-    }
 
     // Comfort: volume up unmutes, as in most galleries; the key isn't consumed, so it still turns
     // the volume up. The viewer takes focus so the key reaches it.
@@ -353,6 +347,15 @@ fun MediaViewerScreen(
     }
 
     var showInfoCard by remember { mutableStateOf(false) }
+    // Not while one of the controls' sheets is open: the ⋮ menu is part of the toolbar, and went
+    // away with it when the controls hid by themselves.
+    val sheetOpen = showMoreMenu || videoSettingsOpen || videoDetailsOpen || showInfoCard
+    LaunchedEffect(showUi, autoHide, pagerState.isScrollInProgress, pagerState.currentPage, pausedVideo, sheetOpen) {
+        if (showUi && autoHide && !pausedVideo && !sheetOpen) {
+            kotlinx.coroutines.delay(6000)
+            showUi = false
+        }
+    }
     var currentExif by remember { mutableStateOf<DetailedExifData?>(null) }
     
 
