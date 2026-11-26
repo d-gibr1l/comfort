@@ -24,8 +24,8 @@ object MediaStoreHelper {
      * in it. */
     const val RELATIVE_DIR = "Download/Comfort"
     /** Songs go in Android's own Music folder instead, where music players look (after Vmratef's
-     * fork, 6d1d9f1). Their lyrics (.lrc) stay in Download/Comfort/Music: Android takes only audio
-     * into Music/. */
+     * fork, 6d1d9f1). Their lyrics (.lrc) stay in Download/Comfort/Music on Android 10+, which takes
+     * only audio into Music/; older Android saves them beside the song. */
     const val MUSIC_RELATIVE_DIR = "Music/Comfort"
 
     /** Android 7-9 save into the public Downloads folder directly ([saveToMediaStore]'s legacy
@@ -283,11 +283,18 @@ object MediaStoreHelper {
                     arrayOf("$RELATIVE_DIR/Music/", lrcName, context.packageName),
                 )
             } else {
+                // Beside the song in Music/Comfort, or in Download/Comfort/Music (where they went
+                // before).
                 @Suppress("DEPRECATION")
-                val f = File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "Comfort/Music/$lrcName")
-                @Suppress("DEPRECATION")
-                context.contentResolver.delete(MediaStore.Files.getContentUri("external"), "${MediaStore.MediaColumns.DATA} = ?", arrayOf(f.absolutePath))
-                f.delete()
+                val places = listOf(
+                    File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_MUSIC), "Comfort/$lrcName"),
+                    File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "Comfort/Music/$lrcName"),
+                )
+                for (f in places) {
+                    @Suppress("DEPRECATION")
+                    context.contentResolver.delete(MediaStore.Files.getContentUri("external"), "${MediaStore.MediaColumns.DATA} = ?", arrayOf(f.absolutePath))
+                    f.delete()
+                }
             }
         }.onFailure { android.util.Log.w("MediaStoreHelper", "Couldn't delete $lrcName", it) }
     }
@@ -513,7 +520,9 @@ object MediaStoreHelper {
         } else {
             // Pre-scoped-storage devices (API 24-28): write straight into the public dir, then index it.
             val collection = legacyCollectionFor(mimeType)
-            val isSong = mimeType.startsWith("audio/")
+            // A song's .lrc lyrics beside it in Music/Comfort, where music players look for them:
+            // Android 10+ takes only audio into Music/, older Android writes any file there.
+            val isSong = mimeType.startsWith("audio/") || sourceFile.extension.equals("lrc", ignoreCase = true)
             @Suppress("DEPRECATION")
             val publicRoot = Environment.getExternalStoragePublicDirectory(if (isSong) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_DOWNLOADS)
             val publicDir = File(publicRoot, if (isSong) "Comfort" else "Comfort/${subfolderFor(sourceFile.name, mimeType)}")
