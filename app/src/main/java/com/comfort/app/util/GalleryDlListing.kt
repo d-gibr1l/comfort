@@ -33,6 +33,11 @@ data class GalleryItem(
     val sizesByQuality: Map<String, Long> = emptyMap(),
     /** Who posted it — the preview card's line under the title. */
     val uploader: String? = null,
+    /** A video item's own stream and length, from the same yt-dlp lookup: what the Trim screen
+     * plays. [url] can't be: for a video it's swapped for the thumbnail (enrichVideoThumbnails),
+     * and the Trim player was handed that picture, so it never played. */
+    val streamUrls: List<String> = emptyList(),
+    val durationMs: Long? = null,
 )
 
 /** What the download preview sheet shows about a link before committing to downloading it. Every
@@ -661,6 +666,17 @@ object GalleryDlListing {
      * top-to-bottom, so the Nth video gallery-dl found should be the Nth video yt-dlp found too. A
      * mismatch (yt-dlp failing entirely, or the counts not lining up) just leaves the original
      * items untouched rather than guessing wrong. */
+    /** An extracted entry's playable stream(s): its chosen formats' URLs, else its own URL (only
+     * when it was fully extracted — a flat entry's "url" is its page). */
+    private fun streamUrlsOf(entry: JSONObject): List<String> {
+        val requested = entry.optJSONArray("requested_formats")
+        if (requested != null && requested.length() > 0) {
+            return (0 until requested.length()).mapNotNull { requested.optJSONObject(it)?.optString("url")?.takeIf { u -> u.isNotBlank() } }
+        }
+        if (!entry.optBoolean("url_is_media", false) && !entry.has("formats") && !entry.has("format_id")) return emptyList()
+        return listOfNotNull(entry.optString("url").takeIf { it.isNotBlank() })
+    }
+
     private fun enrichVideoThumbnails(items: List<GalleryItem>, info: JSONObject?): List<GalleryItem> {
         info ?: return items
         val ytEntries = info.optJSONArray("entries")?.let { arr ->
@@ -681,6 +697,8 @@ object GalleryDlListing {
             val size = entry?.let { e -> e.optLong("filesize", 0L).takeIf { it > 0L } ?: e.optLong("filesize_approx", 0L).takeIf { it > 0L } }
             item.copy(
                 url = thumbnail ?: item.url,
+                streamUrls = entry?.let(::streamUrlsOf).orEmpty(),
+                durationMs = entry?.optDouble("duration", 0.0)?.takeIf { it > 0.0 }?.let { (it * 1000).toLong() },
                 sizeBytes = item.sizeBytes ?: size,
                 sizesByQuality = entry?.let(::sizesByQualityOf).orEmpty(),
                 uploader = item.uploader ?: entry?.optString("uploader")?.takeIf { it.isNotBlank() && it != "null" },
@@ -844,7 +862,7 @@ object GalleryDlListing {
             val only = items[0]
             return PreviewInfo(
                 title = only.title, uploader = only.uploader, thumbnail = only.url, filesizeBytes = only.sizeBytes,
-                sizesByQuality = only.sizesByQuality, durationMs = null, streamUrls = listOf(only.url),
+                sizesByQuality = only.sizesByQuality, durationMs = only.durationMs, streamUrls = only.streamUrls,
             )
         }
         val tracks = items.map { item -> TrackPreview(num = item.num, title = item.title, artist = null, durationMs = null, thumbnail = item.url, isVideo = item.filename?.let(VideoSiteRouter::isVideoFilename), sizeBytes = item.sizeBytes) }

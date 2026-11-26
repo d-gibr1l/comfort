@@ -3737,6 +3737,9 @@ def list_info(url, cookies_path=None, extra_args=None, js_runtime_path=None, imp
             "filesize": filesize,
             "duration": entry.get("duration"),
             "url": entry.get("url"),
+            # Whether "url" is the media itself (a chosen format), not the entry's page as a flat
+            # listing gives it — GalleryDlListing's gallery items take their Trim stream from it.
+            "url_is_media": bool(entry.get("format_id") or entry.get("protocol")),
             "requested_formats": (
                 [{"url": f.get("url")} for f in requested_formats if f.get("url")]
                 if requested_formats else None
