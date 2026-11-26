@@ -59,12 +59,22 @@ private fun revealedChars(line: LyricLine, positionMs: Long): Float {
 
 /** [line] lit word by word as it's sung, the rest of it dimmed ([dimAlpha]). */
 @Composable
-internal fun SweptLyricLine(line: LyricLine, position: () -> Long, style: TextStyle, dimAlpha: Float, modifier: Modifier = Modifier) {
+internal fun SweptLyricLine(
+    line: LyricLine,
+    position: () -> Long,
+    style: TextStyle,
+    dimAlpha: Float,
+    modifier: Modifier = Modifier,
+    // The lit part's own alpha (the line under the cover fades as it rolls away).
+    litAlpha: Float = 1f,
+    maxLines: Int = Int.MAX_VALUE,
+) {
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val overflow = if (maxLines == Int.MAX_VALUE) androidx.compose.ui.text.style.TextOverflow.Clip else androidx.compose.ui.text.style.TextOverflow.Ellipsis
     Box(modifier) {
-        Text(line.text, style = style, fontWeight = FontWeight.Bold, color = Ink.copy(alpha = dimAlpha), onTextLayout = { layout = it })
+        Text(line.text, style = style, fontWeight = FontWeight.Bold, color = Ink.copy(alpha = dimAlpha), maxLines = maxLines, overflow = overflow, onTextLayout = { layout = it })
         Text(
-            line.text, style = style, fontWeight = FontWeight.Bold, color = Ink,
+            line.text, style = style, fontWeight = FontWeight.Bold, color = Ink.copy(alpha = litAlpha), maxLines = maxLines, overflow = overflow,
             modifier = Modifier
                 .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                 .drawWithContent {

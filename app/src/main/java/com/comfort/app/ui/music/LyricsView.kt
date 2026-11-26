@@ -232,6 +232,12 @@ private val LINE_BLUR = arrayOf(0.dp, 1.5.dp, 2.5.dp, 3.5.dp, 4.dp)
 internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     val lines = lyrics.lines ?: return
     val target = lyrics.lineAt(positionMs)
+    // Word-timed lyrics: the line being sung fills word by word, as in the full lyrics.
+    val rich = remember(lyrics) { lyrics.rich?.filterNot { it.isGap }?.sortedBy { it.timeMs }?.takeIf { it.size == lines.size } }
+    val playing by com.comfort.app.music.MusicPlayer.state.let { flow ->
+        androidx.compose.runtime.produceState(flow.value.isPlaying, flow) { flow.collect { value = it.isPlaying } }
+    }
+    val smoothPosition = rememberSmoothPosition(positionMs, playing)
     // The line shown as being sung; it follows [target], with the roll in between for a step on.
     var shown by remember(lyrics) { androidx.compose.runtime.mutableIntStateOf(target) }
     val roll = remember(lyrics) { androidx.compose.animation.core.Animatable(0f) }
@@ -331,6 +337,9 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
                 LyricPreviewLine(
                     text(first), currentStyle, scale = 1f, alpha = firstAlpha * (1f - p),
                     modifier = Modifier.onSizeChanged { outgoingHeight = it.height },
+                    // Being sung (not before the first line starts): filled word by word.
+                    swept = rich?.getOrNull(first)?.takeIf { shown >= 0 && it.isWordSynced },
+                    position = smoothPosition,
                 )
                 // The next line, which grows into the sung one as it rolls up.
                 LyricPreviewLine(text(first + 1), currentStyle, scale = nextScale + (1f - nextScale) * p, alpha = 0.55f + 0.45f * p)
@@ -344,7 +353,31 @@ internal fun LyricsPreview(lyrics: Lyrics, positionMs: Long, onClick: () -> Unit
 /** One line of [LyricsPreview], drawn at [scale] of its laid-out size from its top-left corner, and
  * taking up only that scaled space, so the lines under it sit right below what shows. */
 @Composable
-private fun LyricPreviewLine(text: String, style: androidx.compose.ui.text.TextStyle, scale: Float, alpha: Float, modifier: Modifier = Modifier) {
+private fun LyricPreviewLine(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    scale: Float,
+    alpha: Float,
+    modifier: Modifier = Modifier,
+    // A word-timed line being sung: lit word by word (on [position]), the rest dimmed.
+    swept: com.comfort.app.music.lyrics.LyricLine? = null,
+    position: () -> Long = { 0L },
+) {
+    val scaled = modifier.layout { measurable, constraints ->
+            val placeable = measurable.measure(constraints)
+            layout((placeable.width * scale).toInt(), (placeable.height * scale).toInt()) {
+                placeable.placeWithLayer(0, 0) {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                }
+            }
+        }
+    if (swept != null) {
+        val a = alpha.coerceIn(0f, 1f)
+        SweptLyricLine(swept, position, style, dimAlpha = 0.4f * a, litAlpha = a, maxLines = 2, modifier = scaled)
+        return
+    }
     Text(
         text,
         style = style,
