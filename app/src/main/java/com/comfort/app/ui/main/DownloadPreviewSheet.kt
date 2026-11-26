@@ -440,17 +440,8 @@ fun DownloadPreviewSheet(
         }
     }
 
-    // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
-    // the whole sheet, matching the forward navigation — and, like every other non-Done way out,
-    // discards whatever this visit changed rather than leaving it silently applied.
-    BackHandler(enabled = screen != PreviewScreen.MAIN) {
-        if (screen == PreviewScreen.VIEW_TEMPLATES) {
-            screen = PreviewScreen.TEMPLATES
-        } else {
-            revertOverlay()
-        }
-    }
-
+    // How far a back swipe on a sub-screen has gone (0 to 1): the panel shrinks with it.
+    var overlayBack by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     ModalBottomSheet(
         // Tapping the scrim outside the sheet's own bounds fires this directly (it doesn't go
         // through sheetState/confirmValueChange above, which only guards drag-to-hide). With an
@@ -495,6 +486,37 @@ fun DownloadPreviewSheet(
         // the exact same space at every screen — invisible, never absent.
         dragHandle = null,
     ) {
+        // Back returns to the main screen from a sub-screen (reversing the slide) rather than closing
+        // the whole sheet, matching the forward navigation — and, like every other non-Done way out,
+        // discards whatever this visit changed rather than leaving it silently applied. In here, on
+        // the sheet's own window: the sheet's own back handling came first otherwise, playing its
+        // predictive shrink, then not closing (an overlay open), and the sheet stayed shrunk.
+        // Predictive: the open panel shrinks toward the bottom with the swipe ([overlayBack]).
+        androidx.activity.compose.PredictiveBackHandler(enabled = screen != PreviewScreen.MAIN) { progress ->
+            try {
+                progress.collect { overlayBack = it.progress }
+                if (screen == PreviewScreen.VIEW_TEMPLATES) {
+                    screen = PreviewScreen.TEMPLATES
+                } else {
+                    revertOverlay()
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Swipe given up: the panel settles back.
+                androidx.compose.animation.core.animate(overlayBack, 0f) { v, _ -> overlayBack = v }
+            }
+        }
+        // Back done: the panel slides away as it was (shrunk), and is full size for next time; or,
+        // staying open (View templates to Templates), it grows back.
+        LaunchedEffect(screen) {
+            if (overlayBack > 0f) {
+                if (screen == PreviewScreen.MAIN) {
+                    kotlinx.coroutines.delay(320)
+                    overlayBack = 0f
+                } else {
+                    androidx.compose.animation.core.animate(overlayBack, 0f) { v, _ -> overlayBack = v }
+                }
+            }
+        }
         // Broken out into its own (non-extension) composable so the AnimatedVisibility calls below
         // aren't lexically inside ModalBottomSheet's ColumnScope receiver — with that receiver in
         // scope, Kotlin resolves the plain top-level AnimatedVisibility to Compose's ColumnScope-
@@ -506,6 +528,7 @@ fun DownloadPreviewSheet(
             onOpenOverlay = ::openOverlay,
             onRevertOverlay = ::revertOverlay,
             onCommitOverlay = ::commitOverlay,
+            backProgress = { overlayBack },
             url = url,
             context = context,
             scope = scope,

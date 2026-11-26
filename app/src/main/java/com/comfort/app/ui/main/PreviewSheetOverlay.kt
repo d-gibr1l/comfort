@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import android.content.ClipData
@@ -53,6 +54,8 @@ internal fun PreviewSheetOverlayHost(
     onOpenOverlay: (PreviewScreen) -> Unit,
     onRevertOverlay: () -> Unit,
     onCommitOverlay: () -> Unit,
+    // A back swipe's progress (0 to 1): the panel shrinks toward the bottom with it.
+    backProgress: () -> Float = { 0f },
     url: String,
     context: android.content.Context,
     scope: kotlinx.coroutines.CoroutineScope,
@@ -324,6 +327,13 @@ internal fun PreviewSheetOverlayHost(
                 modifier = Modifier
                     .fillMaxWidth()
                     .nestedScroll(nestedScrollConnection)
+                    // Predictive back: smaller toward its bottom edge as the swipe goes on.
+                    .graphicsLayer {
+                        val p = backProgress()
+                        scaleX = 1f - 0.1f * p
+                        scaleY = scaleX
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                    }
                     // Moves the whole panel down with the finger as dragOffsetPx tracks the drag
                     // below — this is what actually makes the drag look like it's moving the
                     // sheet, rather than just quietly counting distance toward a threshold.
