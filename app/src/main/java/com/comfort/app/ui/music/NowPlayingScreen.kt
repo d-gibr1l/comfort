@@ -414,11 +414,10 @@ private fun NowPlayingContent(
                                 .scale(coverScale),
                             contentAlignment = Alignment.Center,
                         ) {
-                            // The cover melts away at its bottom (Apple Music's look), Android 12+:
-                            // its lower part blurs more and more (a progressive blur over the cover
-                            // itself) and, as it does, fades into the background, so it dissolves
-                            // with no edge, band or corner where it ends. Older Android, or Cover
-                            // fades out off: the plain cover.
+                            // A subtle softening at the cover's bottom (the reference app's), Android
+                            // 12+: its last fifth blurs lightly and fades a little into the
+                            // background; the cover keeps its shape and corners. Older Android, or
+                            // Cover fades out off: the plain cover.
                             val coverFade by com.comfort.app.music.MusicSettings.coverFade.value.collectAsState()
                             val melting = coverFade && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
                             if (!melting || coverEffects == 0f) {
@@ -432,16 +431,13 @@ private fun NowPlayingContent(
                                 Box(
                                     Modifier
                                         .fillMaxSize()
-                                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                                        // Fading out as it blurs: whole down to ~70%, gone at the bottom
-                                        // (eased, no line where the fade begins). Faded in with
-                                        // [coverEffects] after the cover settles.
+                                        .clip(RoundedCornerShape(20.dp))
+                                        // A little see-through at the very bottom (faded in with
+                                        // [coverEffects] after the cover settles).
                                         .alphaMask(
                                             0f to Color.Black,
-                                            0.66f to Color.Black,
-                                            0.78f to Color.Black.copy(alpha = 1f - 0.25f * coverEffects),
-                                            0.9f to Color.Black.copy(alpha = 1f - 0.7f * coverEffects),
-                                            1f to Color.Black.copy(alpha = 1f - coverEffects),
+                                            0.8f to Color.Black,
+                                            1f to Color.Black.copy(alpha = 1f - 0.45f * coverEffects),
                                         )
                                         .progressiveCoverBlur(coverEffects),
                                 ) {
@@ -1004,8 +1000,8 @@ private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boo
         )
     }
 
-/** Blurred more and more toward the bottom (Haze's progressive blur): none over the cover's top
- * 40%, then a radius growing smoothly to full by its last fifth. */
+/** Blurred toward the bottom (Haze's progressive blur): none over the cover's top four fifths, then
+ * a radius growing smoothly to [COVER_BLUR_RADIUS] at its bottom edge. */
 private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEffect {
     // Its own alpha (faded in after the cover settles): not a parent layer's.
     alpha = amount
@@ -1013,10 +1009,10 @@ private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEf
     noiseFactor = 0f
     tints = emptyList()
     progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.4f) / 0.42f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
+        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.78f) / 0.22f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
         startIntensity = 0f,
         endIntensity = 1f,
     )
 }
 
-private val COVER_BLUR_RADIUS = 36.dp
+private val COVER_BLUR_RADIUS = 12.dp
