@@ -261,9 +261,9 @@ object MediaStoreHelper {
         sourceFile.setLastModified(at)
         val ext = sourceFile.name.substringAfterLast('.', "").lowercase()
         if (ext == "mp4" || ext == "m4v" || ext == "mov") rewriteMp4CreationTime(sourceFile, at)
-        var mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
-            ?: URLConnection.guessContentTypeFromName(sourceFile.name)
-            ?: when (ext) {
+        // The app's own list first, then Android's: Android 9's calls .mkv "audio/x-matroska", and a
+        // video was saved and indexed as a song (into Music/Comfort, seen on an Android 9 emulator).
+        var mimeType = when (ext) {
                 "mp4", "m4v" -> "video/mp4"
                 "mov" -> "video/quicktime"
                 "mkv" -> "video/x-matroska"
@@ -290,11 +290,14 @@ object MediaStoreHelper {
                 // Images collection incorrectly, the exact failure this whole chain exists to fix.
                 "vtt" -> "text/vtt"
                 "srt" -> "application/x-subrip"
-                // Honest "unknown binary" instead of the previous blanket "image/jpeg" guess — lets
-                // collectionFor()'s own else branch (Files collection, accepts any type) correctly
-                // catch whatever this still doesn't recognize, rather than silently mislabeling it.
-                else -> "application/octet-stream"
+                else -> null
             }
+            ?: android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            ?: URLConnection.guessContentTypeFromName(sourceFile.name)
+            // Honest "unknown binary" instead of the previous blanket "image/jpeg" guess — lets
+            // collectionFor()'s own else branch (Files collection, accepts any type) correctly
+            // catch whatever this still doesn't recognize, rather than silently mislabeling it.
+            ?: "application/octet-stream"
         // Overrides a video/* guess for a file the caller already knows is audio-only —
         // needed for Spotify's own opus/vorbis-sourced tracks, which this app's stripped
         // ffmpeg build can only remux into a bare .webm container (see yt_dlp_wrapper.py's

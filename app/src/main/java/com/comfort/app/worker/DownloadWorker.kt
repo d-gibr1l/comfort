@@ -162,11 +162,32 @@ private fun isAudioOnlyContainer(file: File): Boolean = runCatching {
     try {
         extractor.setDataSource(file.absolutePath)
         val mimes = (0 until extractor.trackCount).map { extractor.getTrackFormat(it).getString(android.media.MediaFormat.KEY_MIME).orEmpty() }
-        mimes.any { it.startsWith("audio/") } && mimes.none { it.startsWith("video/") }
+        mimes.any { it.startsWith("audio/") } && mimes.none { it.startsWith("video/") } &&
+            // Android only lists the tracks it can decode: Android 9 left out an AV1 video track,
+            // and a YouTube video was saved as a song. The container's own track list says.
+            !hasMatroskaVideoTrack(file)
     } finally {
         extractor.release()
     }
 }.getOrDefault(false)
+
+/** Whether a Matroska/WebM file declares a video track: its track entries (near the start) carry
+ * the codec ID as text, "V_AV1", "V_VP9", "V_MPEG4/ISO/AVC" and so on. */
+private fun hasMatroskaVideoTrack(file: File): Boolean = runCatching {
+    val head = ByteArray(minOf(file.length(), 4L * 1024 * 1024).toInt())
+    file.inputStream().use { input ->
+        var read = 0
+        while (read < head.size) {
+            val n = input.read(head, read, head.size - read)
+            if (n <= 0) break
+            read += n
+        }
+    }
+    val text = String(head, Charsets.ISO_8859_1)
+    MATROSKA_VIDEO_CODECS.any { text.contains(it) }
+}.getOrDefault(false)
+
+private val MATROSKA_VIDEO_CODECS = listOf("V_AV1", "V_VP9", "V_VP8", "V_MPEG4/", "V_MPEGH/", "V_THEORA", "V_MPEG1", "V_MPEG2")
 
 class DownloadWorker(
     appContext: Context,
