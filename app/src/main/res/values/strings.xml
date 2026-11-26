@@ -1385,4 +1385,6 @@
     <string name="playlist_look_ahead">Look ahead in playlists</string>
     <string name="playlist_look_ahead_subtitle">Gets a YouTube playlist\'s next songs ready while one downloads; turn off on a slow or metered connection</string>
     <string name="engines_couldnt_start">The download engines couldn\'t start on this device</string>
+    <string name="app_size">Size</string>
+    <string name="app_size_subtitle">Everything in Comfort smaller or larger, text too</string>
 </resources>

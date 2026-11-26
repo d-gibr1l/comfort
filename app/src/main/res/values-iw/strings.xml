@@ -1370,4 +1370,6 @@
     <string name="playlist_look_ahead">הכנה מראש בפלייליסטים</string>
     <string name="playlist_look_ahead_subtitle">מכין את השירים הבאים בפלייליסט של YouTube בזמן שאחד יורד; כבו בחיבור איטי או מוגבל</string>
     <string name="engines_couldnt_start">מנועי ההורדה לא הצליחו לפעול במכשיר הזה</string>
+    <string name="app_size">גודל</string>
+    <string name="app_size_subtitle">כל מה שב-Comfort קטן או גדול יותר, גם הטקסט</string>
 </resources>

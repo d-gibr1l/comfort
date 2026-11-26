@@ -1335,4 +1335,6 @@
     <string name="playlist_look_ahead">In Playlists vorausladen</string>
     <string name="playlist_look_ahead_subtitle">Bereitet die nächsten Songs einer YouTube-Playlist vor, während einer lädt; bei langsamer oder getakteter Verbindung ausschalten</string>
     <string name="engines_couldnt_start">Die Download-Engines konnten auf diesem Gerät nicht starten</string>
+    <string name="app_size">Größe</string>
+    <string name="app_size_subtitle">Alles in Comfort kleiner oder größer, auch der Text</string>
 </resources>

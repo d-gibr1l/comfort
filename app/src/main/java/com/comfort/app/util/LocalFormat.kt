@@ -16,6 +16,9 @@ object LocalFormat {
     private val measureFormats = ConcurrentHashMap<Pair<Locale, Int>, MeasureFormat>()
     private val datePatterns = ConcurrentHashMap<Pair<Locale, String>, String>()
 
+    /** [percent]% as the app's language writes it ("90 %" in French, "٩٠٪" in Arabic). */
+    fun percent(percent: Int): String = NumberFormat.getPercentInstance(Locale.getDefault()).format(percent / 100.0)
+
     /** [value] [unit] with exactly [decimals] decimals; per second when [perSecond]. */
     fun measure(value: Double, unit: MeasureUnit, decimals: Int, perSecond: Boolean = false): String {
         val locale = Locale.getDefault()

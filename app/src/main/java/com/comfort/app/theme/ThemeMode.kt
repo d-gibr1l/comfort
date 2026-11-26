@@ -96,3 +96,31 @@ object ThemePreferences {
             .apply()
     }
 }
+
+/** Settings › Look & feel › Size: the whole app, text too, drawn this much smaller or larger than
+ * Android's own size ([MIN]…[MAX], 1 = as Android draws it). GalleryDLTheme scales the screen
+ * density by it, so every page follows at once. Kept with the theme's prefs (in backups too). */
+object AppSize {
+    const val MIN = 0.8f
+    const val MAX = 1.1f
+    const val STEP = 0.05f
+    private const val KEY = "app_size"
+
+    private val _scale = kotlinx.coroutines.flow.MutableStateFlow(1f)
+    val scale: kotlinx.coroutines.flow.StateFlow<Float> = _scale
+
+    @Volatile private var loaded = false
+
+    fun init(context: Context) {
+        if (loaded) return
+        _scale.value = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getFloat(KEY, 1f).coerceIn(MIN, MAX)
+        loaded = true
+    }
+
+    fun set(context: Context, scale: Float) {
+        val s = (Math.round(scale / STEP) * STEP).coerceIn(MIN, MAX)
+        _scale.value = s
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putFloat(KEY, s).apply()
+    }
+}

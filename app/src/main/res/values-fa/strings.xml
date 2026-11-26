@@ -1335,4 +1335,6 @@
     <string name="playlist_look_ahead">پیش‌آماده‌سازی در فهرست‌های پخش</string>
     <string name="playlist_look_ahead_subtitle">آهنگ‌های بعدی فهرست پخش YouTube را هنگام دانلود یکی آماده می‌کند؛ در اتصال کند یا محدود خاموشش کنید</string>
     <string name="engines_couldnt_start">موتورهای دانلود روی این دستگاه اجرا نشدند</string>
+    <string name="app_size">اندازه</string>
+    <string name="app_size_subtitle">همه چیز در Comfort کوچک‌تر یا بزرگ‌تر، از جمله متن</string>
 </resources>

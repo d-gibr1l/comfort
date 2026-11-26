@@ -1475,4 +1475,6 @@
     <string name="playlist_look_ahead">الاستباق في قوائم التشغيل</string>
     <string name="playlist_look_ahead_subtitle">يجهّز الأغاني التالية في قائمة تشغيل YouTube أثناء تنزيل إحداها؛ أوقفه على اتصال بطيء أو محدود</string>
     <string name="engines_couldnt_start">تعذّر تشغيل محركات التنزيل على هذا الجهاز</string>
+    <string name="app_size">الحجم</string>
+    <string name="app_size_subtitle">تصغير كل ما في Comfort أو تكبيره، والنص أيضًا</string>
 </resources>

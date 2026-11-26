@@ -1301,4 +1301,6 @@
     <string name="playlist_look_ahead">播放列表预先准备</string>
     <string name="playlist_look_ahead_subtitle">下载一首时预先准备 YouTube 播放列表中的后续歌曲；网速慢或按流量计费时请关闭</string>
     <string name="engines_couldnt_start">下载引擎无法在此设备上启动</string>
+    <string name="app_size">大小</string>
+    <string name="app_size_subtitle">让 Comfort 中的一切（包括文字）变小或变大</string>
 </resources>

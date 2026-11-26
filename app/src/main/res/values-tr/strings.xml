@@ -1335,4 +1335,6 @@
     <string name="playlist_look_ahead">Çalma listelerinde önceden hazırla</string>
     <string name="playlist_look_ahead_subtitle">Bir şarkı inerken YouTube çalma listesindeki sonraki şarkıları hazırlar; yavaş veya sınırlı bağlantıda kapatın</string>
     <string name="engines_couldnt_start">İndirme motorları bu cihazda başlatılamadı</string>
+    <string name="app_size">Boyut</string>
+    <string name="app_size_subtitle">Comfort\'taki her şey, metin dahil, daha küçük veya daha büyük</string>
 </resources>

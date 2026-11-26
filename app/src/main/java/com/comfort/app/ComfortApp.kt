@@ -40,6 +40,7 @@ class ComfortApp : Application() {
         super.onCreate()
         // The swipe switches (Settings › Look & feel › Gestures), read before any screen is built.
         com.comfort.app.data.GestureSettings.init(this)
+        com.comfort.app.theme.AppSize.init(this)
         com.comfort.app.data.LibrarySettings.init(this)
         com.comfort.app.data.PlayerChoice.init(this)
         com.comfort.app.ui.viewer.VideoSettings.init(this)

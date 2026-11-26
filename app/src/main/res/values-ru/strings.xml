@@ -1405,4 +1405,6 @@
     <string name="playlist_look_ahead">Опережать в плейлистах</string>
     <string name="playlist_look_ahead_subtitle">Готовит следующие песни плейлиста YouTube, пока скачивается одна; выключите на медленном или лимитном соединении</string>
     <string name="engines_couldnt_start">Не удалось запустить движки загрузки на этом устройстве</string>
+    <string name="app_size">Размер</string>
+    <string name="app_size_subtitle">Всё в Comfort меньше или больше, включая текст</string>
 </resources>

@@ -1301,4 +1301,6 @@
     <string name="playlist_look_ahead">Chuẩn bị trước trong danh sách phát</string>
     <string name="playlist_look_ahead_subtitle">Chuẩn bị các bài tiếp theo của danh sách phát YouTube trong khi một bài đang tải; tắt khi mạng chậm hoặc giới hạn dữ liệu</string>
     <string name="engines_couldnt_start">Không thể khởi động công cụ tải xuống trên thiết bị này</string>
+    <string name="app_size">Kích thước</string>
+    <string name="app_size_subtitle">Mọi thứ trong Comfort nhỏ hơn hoặc lớn hơn, cả chữ</string>
 </resources>

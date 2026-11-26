@@ -11,6 +11,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +53,27 @@ fun GalleryDLTheme(
     }
 
     val isExpressive = selected == AppTheme.EXPRESSIVE
+    // Settings › Look & feel › Size: the density (and with it every dp and sp, text included)
+    // scaled, so the whole app is drawn smaller or larger.
+    val size by AppSize.scale.collectAsState()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val scaled = remember(density, size) {
+        androidx.compose.ui.unit.Density(density.density * size, density.fontScale)
+    }
+    // The screen's size in dp too, which some screens size things from (sheets' heights, the
+    // share picker's grid, the nav rail's switch), measured in the same scaled dp.
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val scaledConfiguration = remember(configuration, size) {
+        if (size == 1f) configuration else android.content.res.Configuration(configuration).apply {
+            screenWidthDp = (configuration.screenWidthDp / size).toInt()
+            screenHeightDp = (configuration.screenHeightDp / size).toInt()
+            smallestScreenWidthDp = (configuration.smallestScreenWidthDp / size).toInt()
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides scaled,
+        androidx.compose.ui.platform.LocalConfiguration provides scaledConfiguration,
+    ) {
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
@@ -59,6 +83,7 @@ fun GalleryDLTheme(
         motionScheme = if (isExpressive) MotionScheme.expressive() else MotionScheme.standard(),
         content = content,
     )
+    }
 }
 
 /** [scheme] on pure black (Settings › Appearance › Pure black dark mode): black pages, and cards a

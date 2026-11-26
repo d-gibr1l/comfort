@@ -264,6 +264,9 @@ fun AppearanceScreen(onBack: () -> Unit, highlightKey: String? = null) {
             }
 
             Spacer(Modifier.height(16.dp))
+            AppSizeCard()
+
+            Spacer(Modifier.height(16.dp))
             LanguageRow()
 
             Spacer(Modifier.height(16.dp))
@@ -313,6 +316,60 @@ private fun GesturesCard() {
                 checked = swipePages,
                 onCheckedChange = { com.comfort.app.data.GestureSettings.setSwipeBetweenPages(context, it) },
             )
+        }
+    }
+}
+
+/** Settings › Look & feel › Size: everything in the app (text too) smaller or larger
+ * (theme.AppSize). Applied when the slider is let go: the whole page resizing under the finger
+ * made the slider jump away from it. */
+@Composable
+private fun AppSizeCard() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val saved by com.comfort.app.theme.AppSize.scale.collectAsState()
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val shown = dragging ?: saved
+    val title = stringResource(R.string.app_size)
+    Surface(
+        modifier = Modifier.fillMaxWidth().then(highlightRowModifier(title)),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.FormatSize, contentDescription = null)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.app_size_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    com.comfort.app.util.LocalFormat.percent(Math.round(shown * 100)),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            val min = com.comfort.app.theme.AppSize.MIN
+            val max = com.comfort.app.theme.AppSize.MAX
+            androidx.compose.material3.Slider(
+                value = shown,
+                onValueChange = { dragging = it },
+                onValueChangeFinished = {
+                    dragging?.let { com.comfort.app.theme.AppSize.set(context, it) }
+                    dragging = null
+                },
+                valueRange = min..max,
+                steps = Math.round((max - min) / com.comfort.app.theme.AppSize.STEP) - 1,
+            )
+            AnimatedVisibility(visible = saved != 1f && dragging == null) {
+                androidx.compose.material3.TextButton(onClick = { com.comfort.app.theme.AppSize.set(context, 1f) }) {
+                    Text(stringResource(R.string.reset_to_default))
+                }
+            }
         }
     }
 }
