@@ -309,14 +309,14 @@
     <string name="trim_filenames">קיצור שמות קבצים</string>
     <string name="caps_long_titles_at_150_characters">חותך כותרות ארוכות ב-150 תווים (חל רק על פורמט שם הקובץ המוגדר כברירת מחדל).</string>
     <string name="download_location">מיקום ההורדה</string>
-    <string name="saving_to_the_default_download_comfort">שמירה בתיקיית ברירת המחדל Download/Comfort.</string>
+    <string name="saving_to_the_default_download_comfort">שמירה בתיקיית ברירת המחדל Download/Comfort; שירים נשמרים ב-Music/Comfort.</string>
     <string name="saving_to_x">שמירה ב-\"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">התיקייה שנבחרה אינה נגישה או שההרשאה אבדה. חוזר לתיקיית ברירת המחדל Download/Comfort.</string>
     <string name="custom_folders_won_t_automatically_appear">תיקיות מותאמות לא יופיעו אוטומטית באפליקציות התמונות/הגלריה — רק מיקום ברירת המחדל מאונדקס כמדיה.</string>
     <string name="choose_folder">בחירת תיקייה</string>
     <string name="use_default">שימוש בברירת המחדל</string>
     <string name="audio_folder">תיקיית שמע</string>
-    <string name="audio_downloads_land_in_the_folder">הורדות שמע נשמרות בתיקייה שלמעלה (או בברירת המחדל) אלא אם זה מוגדר.</string>
+    <string name="audio_downloads_land_in_the_folder">הורדות שמע נשמרות בתיקייה שלמעלה (או ב-Music/Comfort) אלא אם זה מוגדר.</string>
     <string name="video_folder">תיקיית וידאו</string>
     <string name="video_downloads_land_in_the_folder">הורדות וידאו נשמרות בתיקייה שלמעלה (או בברירת המחדל) אלא אם זה מוגדר.</string>
     <string name="storage">אחסון</string>

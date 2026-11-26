@@ -329,14 +329,14 @@
     <string name="trim_filenames">Encurtar nomes de arquivo</string>
     <string name="caps_long_titles_at_150_characters">Limita títulos longos a 150 caracteres (só vale para o formato de nome padrão).</string>
     <string name="download_location">Local de download</string>
-    <string name="saving_to_the_default_download_comfort">Salvando na pasta padrão Download/Comfort.</string>
+    <string name="saving_to_the_default_download_comfort">Salvando na pasta padrão Download/Comfort; as músicas vão para Music/Comfort.</string>
     <string name="saving_to_x">Salvando em \"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">A pasta escolhida está inacessível ou a permissão foi perdida. Usando a pasta padrão Download/Comfort.</string>
     <string name="custom_folders_won_t_automatically_appear">Pastas personalizadas não aparecem automaticamente em apps de Fotos/Galeria — só o local padrão é indexado como mídia.</string>
     <string name="choose_folder">Escolher pasta</string>
     <string name="use_default">Usar padrão</string>
     <string name="audio_folder">Pasta de áudio</string>
-    <string name="audio_downloads_land_in_the_folder">downloads de áudio vão para a pasta acima (ou a padrão), a não ser que esta esteja definida.</string>
+    <string name="audio_downloads_land_in_the_folder">downloads de áudio vão para a pasta acima (ou para Music/Comfort), a não ser que esta esteja definida.</string>
     <string name="video_folder">Pasta de vídeo</string>
     <string name="video_downloads_land_in_the_folder">downloads de vídeo vão para a pasta acima (ou a padrão), a não ser que esta esteja definida.</string>
     <string name="storage">Armazenamento</string>

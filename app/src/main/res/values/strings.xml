@@ -339,14 +339,14 @@
     <string name="trim_filenames">Trim filenames</string>
     <string name="caps_long_titles_at_150_characters">Caps long titles at 150 characters (only applies to the default filename format).</string>
     <string name="download_location">Download location</string>
-    <string name="saving_to_the_default_download_comfort">Saving to the default Download/Comfort folder.</string>
+    <string name="saving_to_the_default_download_comfort">Saving to the default Download/Comfort folder; songs go to Music/Comfort.</string>
     <string name="saving_to_x">Saving to \"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">Selected folder is inaccessible or permission was lost. Falling back to default Download/Comfort folder.</string>
     <string name="custom_folders_won_t_automatically_appear">Custom folders won\'t automatically appear in Photos/Gallery apps — only the default location is indexed as media.</string>
     <string name="choose_folder">Choose folder</string>
     <string name="use_default">Use default</string>
     <string name="audio_folder">Audio folder</string>
-    <string name="audio_downloads_land_in_the_folder">audio downloads land in the folder above (or the default) unless this is set.</string>
+    <string name="audio_downloads_land_in_the_folder">audio downloads land in the folder above (or Music/Comfort) unless this is set.</string>
     <string name="video_folder">Video folder</string>
     <string name="video_downloads_land_in_the_folder">video downloads land in the folder above (or the default) unless this is set.</string>
     <string name="storage">Storage</string>

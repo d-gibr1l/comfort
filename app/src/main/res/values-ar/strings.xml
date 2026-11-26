@@ -309,14 +309,14 @@
     <string name="trim_filenames">تقصير أسماء الملفات</string>
     <string name="caps_long_titles_at_150_characters">يقصّ العناوين الطويلة عند 150 حرفًا (ينطبق فقط على صيغة اسم الملف الافتراضية).</string>
     <string name="download_location">مكان التنزيل</string>
-    <string name="saving_to_the_default_download_comfort">الحفظ في المجلد الافتراضي Download/Comfort.</string>
+    <string name="saving_to_the_default_download_comfort">الحفظ في المجلد الافتراضي Download/Comfort، والأغاني في Music/Comfort.</string>
     <string name="saving_to_x">الحفظ في \"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">المجلد المحدد غير متاح أو فُقد الإذن. سيُستخدم المجلد الافتراضي Download/Comfort.</string>
     <string name="custom_folders_won_t_automatically_appear">لن تظهر المجلدات المخصصة تلقائيًا في تطبيقات الصور/المعرض — يُفهرَس المكان الافتراضي فقط كوسائط.</string>
     <string name="choose_folder">اختيار مجلد</string>
     <string name="use_default">استخدام الافتراضي</string>
     <string name="audio_folder">مجلد الصوت</string>
-    <string name="audio_downloads_land_in_the_folder">تُحفظ التنزيلات الصوتية في المجلد أعلاه (أو الافتراضي) ما لم يُضبط هذا.</string>
+    <string name="audio_downloads_land_in_the_folder">تُحفظ التنزيلات الصوتية في المجلد أعلاه (أو Music/Comfort) ما لم يُضبط هذا.</string>
     <string name="video_folder">مجلد الفيديو</string>
     <string name="video_downloads_land_in_the_folder">تُحفظ تنزيلات الفيديو في المجلد أعلاه (أو الافتراضي) ما لم يُضبط هذا.</string>
     <string name="storage">التخزين</string>

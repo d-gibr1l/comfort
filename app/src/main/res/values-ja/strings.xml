@@ -309,14 +309,14 @@
     <string name="trim_filenames">ファイル名を短縮</string>
     <string name="caps_long_titles_at_150_characters">長いタイトルを 150 文字で切り詰めます(既定のファイル名形式のみ)。</string>
     <string name="download_location">保存先</string>
-    <string name="saving_to_the_default_download_comfort">既定の Download/Comfort フォルダに保存しています。</string>
+    <string name="saving_to_the_default_download_comfort">既定の Download/Comfort フォルダに保存しています。曲は Music/Comfort に保存されます。</string>
     <string name="saving_to_x">\"%1$s\" に保存しています。</string>
     <string name="selected_folder_is_inaccessible_or_permission">選択したフォルダにアクセスできないか、権限が失われました。既定の Download/Comfort フォルダに戻します。</string>
     <string name="custom_folders_won_t_automatically_appear">カスタムフォルダは写真・ギャラリーアプリに自動で表示されません。メディアとしてインデックスされるのは既定の場所だけです。</string>
     <string name="choose_folder">フォルダを選択</string>
     <string name="use_default">既定を使用</string>
     <string name="audio_folder">音声フォルダ</string>
-    <string name="audio_downloads_land_in_the_folder">これを設定しない限り、音声のダウンロードは上のフォルダ(または既定)に保存されます。</string>
+    <string name="audio_downloads_land_in_the_folder">これを設定しない限り、音声のダウンロードは上のフォルダ(または Music/Comfort)に保存されます。</string>
     <string name="video_folder">動画フォルダ</string>
     <string name="video_downloads_land_in_the_folder">これを設定しない限り、動画のダウンロードは上のフォルダ(または既定)に保存されます。</string>
     <string name="storage">ストレージ</string>

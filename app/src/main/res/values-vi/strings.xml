@@ -309,14 +309,14 @@
     <string name="trim_filenames">Rút gọn tên tệp</string>
     <string name="caps_long_titles_at_150_characters">Cắt tiêu đề dài ở 150 ký tự (chỉ áp dụng cho định dạng tên tệp mặc định).</string>
     <string name="download_location">Nơi lưu tải xuống</string>
-    <string name="saving_to_the_default_download_comfort">Đang lưu vào thư mục mặc định Download/Comfort.</string>
+    <string name="saving_to_the_default_download_comfort">Đang lưu vào thư mục mặc định Download/Comfort; bài hát được lưu vào Music/Comfort.</string>
     <string name="saving_to_x">Đang lưu vào \"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">Không truy cập được thư mục đã chọn hoặc đã mất quyền. Chuyển về thư mục mặc định Download/Comfort.</string>
     <string name="custom_folders_won_t_automatically_appear">Thư mục tùy chỉnh sẽ không tự hiện trong ứng dụng Ảnh/Thư viện ảnh — chỉ vị trí mặc định được lập chỉ mục làm phương tiện.</string>
     <string name="choose_folder">Chọn thư mục</string>
     <string name="use_default">Dùng mặc định</string>
     <string name="audio_folder">Thư mục âm thanh</string>
-    <string name="audio_downloads_land_in_the_folder">tệp âm thanh được lưu vào thư mục ở trên (hoặc mặc định) trừ khi đặt mục này.</string>
+    <string name="audio_downloads_land_in_the_folder">tệp âm thanh được lưu vào thư mục ở trên (hoặc Music/Comfort) trừ khi đặt mục này.</string>
     <string name="video_folder">Thư mục video</string>
     <string name="video_downloads_land_in_the_folder">tệp video được lưu vào thư mục ở trên (hoặc mặc định) trừ khi đặt mục này.</string>
     <string name="storage">Bộ nhớ</string>

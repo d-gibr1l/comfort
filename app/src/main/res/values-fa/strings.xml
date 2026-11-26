@@ -309,14 +309,14 @@
     <string name="trim_filenames">کوتاه کردن نام فایل‌ها</string>
     <string name="caps_long_titles_at_150_characters">عنوان‌های طولانی را در ۱۵۰ نویسه کوتاه می‌کند (فقط برای قالب نام فایل پیش‌فرض).</string>
     <string name="download_location">محل دانلود</string>
-    <string name="saving_to_the_default_download_comfort">ذخیره در پوشه پیش‌فرض Download/Comfort.</string>
+    <string name="saving_to_the_default_download_comfort">ذخیره در پوشه پیش‌فرض Download/Comfort؛ آهنگ‌ها در Music/Comfort.</string>
     <string name="saving_to_x">ذخیره در \"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">پوشه انتخاب‌شده در دسترس نیست یا مجوز از دست رفته. به پوشه پیش‌فرض Download/Comfort بازگشت.</string>
     <string name="custom_folders_won_t_automatically_appear">پوشه‌های سفارشی به‌طور خودکار در برنامه‌های عکس/گالری ظاهر نمی‌شوند — فقط محل پیش‌فرض به‌عنوان رسانه فهرست می‌شود.</string>
     <string name="choose_folder">انتخاب پوشه</string>
     <string name="use_default">استفاده از پیش‌فرض</string>
     <string name="audio_folder">پوشه صدا</string>
-    <string name="audio_downloads_land_in_the_folder">دانلودهای صوتی در پوشه بالا (یا پیش‌فرض) ذخیره می‌شوند، مگر اینکه این تنظیم شده باشد.</string>
+    <string name="audio_downloads_land_in_the_folder">دانلودهای صوتی در پوشه بالا (یا Music/Comfort) ذخیره می‌شوند، مگر اینکه این تنظیم شده باشد.</string>
     <string name="video_folder">پوشه ویدیو</string>
     <string name="video_downloads_land_in_the_folder">دانلودهای ویدیو در پوشه بالا (یا پیش‌فرض) ذخیره می‌شوند، مگر اینکه این تنظیم شده باشد.</string>
     <string name="storage">فضای ذخیره‌سازی</string>

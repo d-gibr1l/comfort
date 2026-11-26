@@ -309,14 +309,14 @@
     <string name="trim_filenames">फ़ाइल नाम छोटे करें</string>
     <string name="caps_long_titles_at_150_characters">लंबे शीर्षकों को 150 अक्षरों पर काटता है (केवल डिफ़ॉल्ट फ़ाइल-नाम फ़ॉर्मेट पर लागू)।</string>
     <string name="download_location">डाउनलोड का स्थान</string>
-    <string name="saving_to_the_default_download_comfort">डिफ़ॉल्ट Download/Comfort फ़ोल्डर में सहेजा जा रहा है।</string>
+    <string name="saving_to_the_default_download_comfort">डिफ़ॉल्ट Download/Comfort फ़ोल्डर में सहेजा जा रहा है; गाने Music/Comfort में जाते हैं।</string>
     <string name="saving_to_x">\"%1$s\" में सहेजा जा रहा है।</string>
     <string name="selected_folder_is_inaccessible_or_permission">चुना गया फ़ोल्डर उपलब्ध नहीं है या अनुमति चली गई। डिफ़ॉल्ट Download/Comfort फ़ोल्डर पर लौटा जा रहा है।</string>
     <string name="custom_folders_won_t_automatically_appear">कस्टम फ़ोल्डर Photos/Gallery ऐप में अपने-आप नहीं दिखेंगे — केवल डिफ़ॉल्ट स्थान मीडिया के रूप में इंडेक्स होता है।</string>
     <string name="choose_folder">फ़ोल्डर चुनें</string>
     <string name="use_default">डिफ़ॉल्ट इस्तेमाल करें</string>
     <string name="audio_folder">ऑडियो फ़ोल्डर</string>
-    <string name="audio_downloads_land_in_the_folder">जब तक यह सेट न हो, ऑडियो डाउनलोड ऊपर वाले फ़ोल्डर (या डिफ़ॉल्ट) में जाते हैं।</string>
+    <string name="audio_downloads_land_in_the_folder">जब तक यह सेट न हो, ऑडियो डाउनलोड ऊपर वाले फ़ोल्डर (या Music/Comfort) में जाते हैं।</string>
     <string name="video_folder">वीडियो फ़ोल्डर</string>
     <string name="video_downloads_land_in_the_folder">जब तक यह सेट न हो, वीडियो डाउनलोड ऊपर वाले फ़ोल्डर (या डिफ़ॉल्ट) में जाते हैं।</string>
     <string name="storage">स्टोरेज</string>

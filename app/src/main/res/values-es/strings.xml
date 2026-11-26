@@ -326,14 +326,14 @@
     <string name="trim_filenames">Acortar nombres de archivo</string>
     <string name="caps_long_titles_at_150_characters">Limita los títulos largos a 150 caracteres (solo con el formato de nombre predeterminado).</string>
     <string name="download_location">Ubicación de descarga</string>
-    <string name="saving_to_the_default_download_comfort">Se guarda en la carpeta predeterminada Download/Comfort.</string>
+    <string name="saving_to_the_default_download_comfort">Se guarda en la carpeta predeterminada Download/Comfort; las canciones, en Music/Comfort.</string>
     <string name="saving_to_x">Se guarda en \"%1$s\".</string>
     <string name="selected_folder_is_inaccessible_or_permission">No se puede acceder a la carpeta elegida o se perdió el permiso. Se usará la carpeta predeterminada Download/Comfort.</string>
     <string name="custom_folders_won_t_automatically_appear">Las carpetas personalizadas no aparecen solas en las apps de Fotos/Galería; solo la ubicación predeterminada se indexa como multimedia.</string>
     <string name="choose_folder">Elegir carpeta</string>
     <string name="use_default">Predeterminada</string>
     <string name="audio_folder">Carpeta de audio</string>
-    <string name="audio_downloads_land_in_the_folder">las descargas de audio van a la carpeta de arriba (o a la predeterminada) si esto no se configura.</string>
+    <string name="audio_downloads_land_in_the_folder">las descargas de audio van a la carpeta de arriba (o a Music/Comfort) si esto no se configura.</string>
     <string name="video_folder">Carpeta de video</string>
     <string name="video_downloads_land_in_the_folder">las descargas de video van a la carpeta de arriba (o a la predeterminada) si esto no se configura.</string>
     <string name="storage">Almacenamiento</string>
