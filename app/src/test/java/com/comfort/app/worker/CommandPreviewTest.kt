@@ -45,7 +45,7 @@ class CommandPreviewTest {
             listOf(
                 "-f bestvideo+bestaudio/best", "-S proto", "--no-mtime",
                 "--ffmpeg-location libffmpeg.so", "--merge-output-format mkv",
-                "--parse-metadata \"%(uploader,channel,creator|Unknown)s:(?P<uploader>.*?)(?: - Topic)?\\\$\"",
+                "--parse-metadata \"%(uploader,channel,creator|)s:(?P<uploader>.*?)(?: - Topic)?\\\$\"",
             ),
             yt(ff).options,
         )
@@ -358,7 +358,7 @@ class CommandPreviewTest {
                 "--downloader aria2c --downloader-args aria2c:--ca-certificate=cacert.pem", "--add-header Referer:https://a.b",
                 "--retries 2", "--fragment-retries 6", "--no-playlist",
                 "--ffmpeg-location libffmpeg.so", "--merge-output-format mkv",
-                "--parse-metadata \"%(uploader,channel,creator|Unknown)s:(?P<uploader>.*?)(?: - Topic)?\\\$\"",
+                "--parse-metadata \"%(uploader,channel,creator|)s:(?P<uploader>.*?)(?: - Topic)?\\\$\"",
                 "--embed-metadata", "--no-embed-chapters", "--no-js-runtimes --js-runtimes quickjs:libqjs.so", "--cookies cookies.txt", "--download-archive a.txt", "-r 1M",
                 "--proxy \"socks5://p:***@h:1\"", "--live-from-start", "--extractor-args youtube:player_client=default,android,web,ios",
                 "--write-thumbnail", "--max-filesize 9M", "--write-info-json --write-description", "--no-part",
@@ -371,7 +371,7 @@ class CommandPreviewTest {
     fun ytDlpConstantsAreTheWrapper() {
         val src = script("yt_dlp_wrapper.py")
         // The --parse-metadata pair is the MetadataParser action's.
-        assertTrue(src.contains("\"%(uploader,channel,creator|Unknown)s\",\n                r\"(?P<uploader>.*?)(?: - Topic)?\$\","))
+        assertTrue(src.contains("\"%(uploader,channel,creator|)s\",\n                r\"(?P<uploader>.*?)(?: - Topic)?\$\","))
         assertTrue(src.contains("youtube_args.setdefault(\"player_client\", [\"default\", \"android\", \"web\", \"ios\"])"))
         assertTrue(src.contains("ydl_opts[\"sleep_interval\"] = 2"))
         // An extra --audio-quality wins over these defaults.
