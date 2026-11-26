@@ -100,6 +100,11 @@ object MediaAccess {
         // Files restored from another phone (copied over, so under new ids there) or moved by an
         // app that copied them: their old links lead nowhere; found again by their saved name now
         // that the phone's media can be seen (BackupRestore.relinkByName).
+        // Not onto a file another download already has: a deleted download whose file was
+        // downloaded again under the same name took the new one too, and came back from Deleted
+        // as a second card for it (seen on an Android 9 emulator).
+        val taken = HashSet<String>()
+        db.query("SELECT uri FROM saved_files").use { c -> while (c.moveToNext()) c.getString(0)?.let { taken += it } }
         db.query("SELECT uri, path FROM saved_files WHERE path IS NOT NULL").use { c ->
             while (c.moveToNext()) {
                 val old = c.getString(0) ?: continue
@@ -107,7 +112,7 @@ object MediaAccess {
                 val uri = runCatching { Uri.parse(old) }.getOrNull() ?: continue
                 if (uri.authority != MediaStore.AUTHORITY || !com.comfort.app.util.MediaStoreHelper.reallyGone(context, uri)) continue
                 val name = c.getString(1).substringAfterLast('/').takeIf { it.isNotBlank() } ?: continue
-                com.comfort.app.data.BackupRestore.relinkByName(context, old, name)?.takeIf { it != old }?.let { moves[old] = it }
+                com.comfort.app.data.BackupRestore.relinkByName(context, old, name)?.takeIf { it != old && it !in taken }?.let { moves[old] = it }
             }
         }
         // In Room's own transaction, so the Library's lists see the change at once (written
