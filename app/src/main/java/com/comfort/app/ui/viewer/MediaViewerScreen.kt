@@ -854,7 +854,8 @@ fun MediaViewerScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    shape = CircleShape,
+                    // The continuous (squircle-cornered) capsule the app's other pills use.
+                    shape = com.comfort.app.theme.ContinuousCapsuleShape,
                     color = MaterialTheme.colorScheme.surfaceContainer,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ) {
