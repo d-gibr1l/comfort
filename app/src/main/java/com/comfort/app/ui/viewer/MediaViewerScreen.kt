@@ -10,25 +10,15 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.material3.FilledTonalIconButton
-import android.content.Context
 
 import android.net.Uri
-import android.provider.MediaStore
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -40,27 +30,15 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,20 +50,15 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,13 +69,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.ContentScale
@@ -110,31 +81,16 @@ import androidx.compose.ui.platform.LocalContext
 import coil.imageLoader
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -142,7 +98,6 @@ import coil.request.ImageRequest
 import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
-import android.os.Build
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.flow.first
@@ -151,9 +106,6 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.vectorResource
 import com.comfort.app.R
 import androidx.compose.ui.graphics.vector.ImageVector
-
-
-
 
 // Comfort: the items and what the buttons do come from the caller (MediaViewerHost) instead of
 // Photon's GalleryViewModel; Photon's own defaults stand in for its settings (no forced max
@@ -266,12 +218,10 @@ fun MediaViewerScreen(
         }
     }
 
-
     val resolvedCurrentUri by produceState<Uri?>(initialValue = currentItem?.uri, key1 = currentItem) {
         val uri = currentItem?.uri
         value = uri
     }
-
 
     var activeHighlight by remember { mutableStateOf<String?>(null) }
     var highlightRects by remember { mutableStateOf<List<android.graphics.Rect>>(emptyList()) }
@@ -412,7 +362,6 @@ fun MediaViewerScreen(
         }
     }
 
-
     // ── Swipe-to-dismiss state ─────────────────────────────────────────────
     // Vertical drag offset (px). When the user drags the image downward at
     // 1× zoom, this translates the pager and fades the black scrim.
@@ -483,8 +432,6 @@ fun MediaViewerScreen(
                 )
             }
         }
-
-
 
         HorizontalPager(
             state = pagerState,
@@ -868,8 +815,6 @@ fun MediaViewerScreen(
             }
         }
 
-
-
         // UI Overlay — Top bar: back button (left) + info button (right)
         AnimatedVisibility(
             visible = showUi,
@@ -1159,361 +1104,5 @@ fun MediaViewerScreen(
     }
 }
 
-
-data class ExifData(
-    val model: String?,
-    val aperture: String?,
-    val iso: String?,
-    val shutterSpeed: String?,
-    val focalLength: String?,
-    val resolution: String?
-)
-
-suspend fun extractExif(context: android.content.Context, uri: Uri): ExifData = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-    var model: String? = null
-    var aperture: String? = null
-    var iso: String? = null
-    var shutterSpeed: String? = null
-    var focalLength: String? = null
-    var resolution: String? = null
-
-    try {
-        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-            val exif = androidx.exifinterface.media.ExifInterface(inputStream)
-            model = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_MODEL)
-            aperture = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_F_NUMBER)?.let { "f/$it" }
-            iso = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)?.let { "ISO $it" }
-            shutterSpeed = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_EXPOSURE_TIME)?.let { "${it}s" }
-            focalLength = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_FOCAL_LENGTH)?.let { "${it}mm" }
-            
-            val width = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_IMAGE_WIDTH)
-            val length = exif.getAttribute(androidx.exifinterface.media.ExifInterface.TAG_IMAGE_LENGTH)
-            if (width != null && length != null) {
-                resolution = "${width}x${length}"
-            }
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-    
-    ExifData(model, aperture, iso, shutterSpeed, focalLength, resolution)
-}
-
-fun formatExifDate(timestamp: Long): String {
-    return com.comfort.app.util.LocalFormat.date(timestamp, "yMMddHHmm")
-}
-
-fun formatSizeToMB(sizeBytes: Long): String {
-    return com.comfort.app.util.LocalFormat.measure(sizeBytes / (1024.0 * 1024.0), android.icu.util.MeasureUnit.MEGABYTE, 2)
-}
-
-@Composable
-fun ExifInfoCard(galleryItem: GalleryItem?, exifData: ExifData?, modifier: Modifier = Modifier) {
-    if (galleryItem == null) return
-    Surface(
-        modifier = modifier.widthIn(min = 280.dp, max = 340.dp),
-        shape = ShapeLargeIncreased,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // File Name — full wrap
-            InfoBlock(label = stringResource(R.string.command_template_name), value = galleryItem.name)
-
-            // Time + Size row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                InfoBlock(
-                    label = stringResource(R.string.modified),
-                    value = formatExifDate(galleryItem.dateModified * 1000L),
-                    modifier = Modifier.weight(1f)
-                )
-                InfoBlock(
-                    label = stringResource(R.string.sort_size),
-                    value = formatSizeToMB(galleryItem.size),
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // Resolution + Device row
-            val resolution = exifData?.resolution
-            val device = exifData?.model
-            if (resolution != null || device != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    if (resolution != null) {
-                        InfoBlock(label = stringResource(R.string.resolution), value = resolution, modifier = Modifier.weight(1f))
-                    }
-                    if (device != null) {
-                        InfoBlock(label = stringResource(R.string.device), value = device, modifier = Modifier.weight(1f))
-                    }
-                }
-            }
-
-            // Camera parameters
-            val paramsParts = listOfNotNull(exifData?.focalLength, exifData?.shutterSpeed, exifData?.iso, exifData?.aperture).filter { it.isNotBlank() }
-            if (paramsParts.isNotEmpty()) {
-                InfoBlock(label = stringResource(R.string.parameters), value = paramsParts.joinToString("  •  "))
-            }
-
-            // Path — full wrap
-            InfoBlock(label = stringResource(R.string.path), value = galleryItem.path)
-        }
-    }
-}
-
-@Composable
-private fun InfoBlock(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(
-
-                letterSpacing = 0.8.sp
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
 // How far up (px) a page is dragged to open the info sheet (after the 0.35 resistance).
 private const val INFO_SWIPE_PX = 60f
-
-/** A video's subtitle tracks ("Off" first) or audio tracks, as a radio list; picking one switches
- * the playing video to it. */
-@Composable
-private fun TrackPickerDialog(tracks: VideoTracks, subtitles: Boolean, onDismiss: () -> Unit) {
-    val options: List<VideoTrack?> = if (subtitles) listOf<VideoTrack?>(null) + tracks.subtitles else tracks.audio
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (subtitles) R.string.subtitles else R.string.audio_track)) },
-        text = {
-            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
-                options.forEach { option ->
-                    val selected = if (option == null) tracks.subtitlesOff else option.selected
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(MaterialTheme.shapes.medium)
-                            .clickable {
-                                if (subtitles) tracks.selectSubtitles(option) else option?.let(tracks::selectAudio)
-                                onDismiss()
-                            }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        androidx.compose.material3.RadioButton(selected = selected, onClick = null)
-                        Spacer(Modifier.width(12.dp))
-                        Text(option?.label ?: stringResource(R.string.subtitles_off_short), style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
-}
-
-/** The viewer's zoom: pinch, double-tap and pan (with a fling) a page's [scale] and offsets, for a
- * photo and a video alike. Before the page's graphicsLayer, so the pointer events arrive in layout
- * space (see the photo's note). A single tap is [onTap]; [onScaleChange] hears the scale when the
- * page goes in or out of being zoomed (the pager and swipe-to-dismiss are off while zoomed). */
-internal fun Modifier.viewerZoom(
-    scale: androidx.compose.runtime.MutableFloatState,
-    offsetX: androidx.compose.runtime.MutableFloatState,
-    offsetY: androidx.compose.runtime.MutableFloatState,
-    animJob: androidx.compose.runtime.MutableState<kotlinx.coroutines.Job?>,
-    scope: kotlinx.coroutines.CoroutineScope,
-    currentScale: () -> Float,
-    onScaleChange: (Float) -> Unit,
-    onZoomIn: () -> Unit,
-    onTap: () -> Unit,
-): Modifier = this
-    .pointerInput(Unit) {
-        detectTapGestures(
-            onTap = { onTap() },
-            onDoubleTap = { centroid ->
-                animJob.value?.cancel()
-                animJob.value = scope.launch {
-                    val composableW = size.width.toFloat()
-                    val composableH = size.height.toFloat()
-                    if (scale.floatValue > 1f) {
-                        // Zoom out to fit
-                        onScaleChange(1f)
-                        launch { androidx.compose.animation.core.animate(scale.floatValue, 1f, animationSpec = MotionTokens.gentleSpring()) { v, _ -> scale.floatValue = v } }
-                        launch { androidx.compose.animation.core.animate(offsetX.floatValue, 0f, animationSpec = MotionTokens.gentleSpring()) { v, _ -> offsetX.floatValue = v } }
-                        launch { androidx.compose.animation.core.animate(offsetY.floatValue, 0f, animationSpec = MotionTokens.gentleSpring()) { v, _ -> offsetY.floatValue = v } }
-                    } else {
-                        // Zoom in to tapped point
-                        val targetScale = 3.5f
-                        onScaleChange(targetScale)
-                        val targetX = -(centroid.x - composableW / 2f) * (targetScale - 1)
-                        val targetY = -(centroid.y - composableH / 2f) * (targetScale - 1)
-                        val maxX = (composableW * (targetScale - 1)) / 2f
-                        val maxY = (composableH * (targetScale - 1)) / 2f
-                        launch { androidx.compose.animation.core.animate(scale.floatValue, targetScale, animationSpec = MotionTokens.gentleSpring()) { v, _ -> scale.floatValue = v } }
-                        launch { androidx.compose.animation.core.animate(offsetX.floatValue, targetX.coerceIn(-maxX, maxX), animationSpec = MotionTokens.gentleSpring()) { v, _ -> offsetX.floatValue = v } }
-                        launch { androidx.compose.animation.core.animate(offsetY.floatValue, targetY.coerceIn(-maxY, maxY), animationSpec = MotionTokens.gentleSpring()) { v, _ -> offsetY.floatValue = v } }
-                    }
-                }
-            }
-        )
-    }
-    .pointerInput(Unit) {
-        // Unified gesture handler: pinch-zoom, pan
-        awaitEachGesture {
-            val firstDown = awaitFirstDown(requireUnconsumed = false)
-            val downTime = System.currentTimeMillis()
-            val downPosition = firstDown.position
-
-            var shouldStartZoomPan = scale.floatValue > 1f
-            if (!shouldStartZoomPan) {
-                // Wait to see if a second finger is placed down (pinch-to-zoom)
-                while (true) {
-                    val event = awaitPointerEvent()
-                    if (event.changes.any { it.isConsumed }) break
-                    if (event.changes.size > 1) {
-                        shouldStartZoomPan = true
-                        break
-                    }
-                    if (!event.changes.any { it.pressed }) break
-                }
-            }
-
-            if (shouldStartZoomPan) {
-                var accumulatedZoom = 1f
-                var accumulatedPan = Offset.Zero
-                var pastTouchSlop = false
-                val touchSlop = viewConfiguration.touchSlop
-                val composableW = size.width.toFloat()
-                val composableH = size.height.toFloat()
-                val velocityTracker = VelocityTracker()
-                var maxPointerCount = 0
-
-                while (true) {
-                    val event = awaitPointerEvent()
-                    if (event.changes.any { it.isConsumed }) break
-
-                    val pressedCount = event.changes.count { it.pressed }
-                    maxPointerCount = maxOf(maxPointerCount, pressedCount)
-
-                    if (pressedCount == 1) {
-                        event.changes.firstOrNull { it.pressed }
-                            ?.let { velocityTracker.addPointerInputChange(it) }
-                    }
-
-                    val zoomChange = event.calculateZoom()
-                    val panChange = event.calculatePan()
-
-                    if (!pastTouchSlop) {
-                        accumulatedZoom *= zoomChange
-                        accumulatedPan += panChange
-                        val centroidSize = event.calculateCentroidSize(useCurrent = false)
-                        val zoomMotion = kotlin.math.abs(1 - accumulatedZoom) * centroidSize
-                        val panMotion = accumulatedPan.getDistance()
-                        if (zoomMotion > touchSlop || panMotion > touchSlop) {
-                            pastTouchSlop = true
-                        }
-                    }
-
-                    if (pastTouchSlop && scale.floatValue <= 1.05f && maxPointerCount == 1) {
-                        break
-                    }
-
-                    if (pastTouchSlop && (zoomChange != 1f || panChange != Offset.Zero)) {
-                        val centroid = event.calculateCentroid(useCurrent = false)
-                        animJob.value?.cancel()
-                        val newScale = (scale.floatValue * zoomChange).coerceIn(1f, 20f)
-
-                        if (newScale > 1.05f && currentScale() <= 1.05f) {
-                            onScaleChange(newScale)
-                        } else if (newScale <= 1.05f && currentScale() > 1.05f) {
-                            onScaleChange(newScale)
-                        }
-
-                        val maxX = (composableW * (newScale - 1)) / 2f
-                        val maxY = (composableH * (newScale - 1)) / 2f
-
-                        val focalX = centroid.x - composableW / 2f
-                        val focalY = centroid.y - composableH / 2f
-                        val effectiveZoom = newScale / scale.floatValue
-                        var newOffsetX = (offsetX.floatValue - focalX) * effectiveZoom + focalX + panChange.x
-                        var newOffsetY = (offsetY.floatValue - focalY) * effectiveZoom + focalY + panChange.y
-
-                        newOffsetX = newOffsetX.coerceIn(-maxX, maxX)
-                        newOffsetY = newOffsetY.coerceIn(-maxY, maxY)
-
-                        scale.floatValue = newScale
-                        offsetX.floatValue = newOffsetX
-                        offsetY.floatValue = newOffsetY
-
-                        if (newScale > 1f) {
-                            val hittingLeft = newOffsetX >= maxX && panChange.x > 0
-                            val hittingRight = newOffsetX <= -maxX && panChange.x < 0
-                            if (!hittingLeft && !hittingRight) {
-                                event.changes.forEach { if (it.positionChanged()) it.consume() }
-                            }
-                        }
-                    }
-
-                    if (!event.changes.any { it.pressed }) break
-                }
-
-                // The controls hide once the fingers are up, not during the pinch: hiding them
-                // there (the system bars, the backdrop, the controls all animating at once) made
-                // the pinch stutter.
-                if (scale.floatValue > 1.02f) onZoomIn()
-
-                if (pastTouchSlop && scale.floatValue > 1.05f && maxPointerCount == 1) {
-                    val velocity = velocityTracker.calculateVelocity()
-                    val currentMaxX = (composableW * (scale.floatValue - 1)) / 2f
-                    val currentMaxY = (composableH * (scale.floatValue - 1)) / 2f
-                    val flingFactor = 0.4f
-                    val targetFlingX = (offsetX.floatValue + velocity.x * flingFactor)
-                        .coerceIn(-currentMaxX, currentMaxX)
-                    val targetFlingY = (offsetY.floatValue + velocity.y * flingFactor)
-                        .coerceIn(-currentMaxY, currentMaxY)
-                    animJob.value?.cancel()
-                    animJob.value = scope.launch {
-                        launch {
-                            androidx.compose.animation.core.animate(
-                                initialValue = offsetX.floatValue,
-                                targetValue = targetFlingX,
-                                initialVelocity = velocity.x,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessVeryLow
-                                )
-                            ) { v, _ -> offsetX.floatValue = v }
-                        }
-                        launch {
-                            androidx.compose.animation.core.animate(
-                                initialValue = offsetY.floatValue,
-                                targetValue = targetFlingY,
-                                initialVelocity = velocity.y,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessVeryLow
-                                )
-                            ) { v, _ -> offsetY.floatValue = v }
-                        }
-                    }
-                }
-            }
-        }
-    }
