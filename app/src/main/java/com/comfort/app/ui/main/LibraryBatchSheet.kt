@@ -1,5 +1,6 @@
 package com.comfort.app.ui.main
 
+import androidx.compose.animation.togetherWith
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
@@ -251,26 +252,41 @@ internal fun LibraryBatchSheet(download: DownloadEntity, onDismiss: () -> Unit, 
                 }
             }
             val shown = items?.filterNot { it.uri.toString() in gone }
-            when {
-                shown == null -> Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                grid -> LazyVerticalGrid(
-                    columns = GridCells.Adaptive(150.dp),
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).nestedScroll(keepSheet),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                ) {
-                    items(shown, key = { it.uri.toString() }) { item ->
-                        GridTile(item, onClick = { open(item) }, onDelete = { delete(item) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = BATCH_ITEM_OUT, placementSpec = BATCH_ITEM_MOVE))
-                    }
-                }
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false).nestedScroll(keepSheet),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                ) {
-                    items(shown, key = { it.uri.toString() }) { item ->
-                        ListRow(item, onClick = { open(item) }, onDelete = { delete(item) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = BATCH_ITEM_OUT, placementSpec = BATCH_ITEM_MOVE))
+            if (shown == null) {
+                Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else {
+                // Grid to list and back: the one fades and settles in as the other fades out, the
+                // sheet's height following.
+                androidx.compose.animation.AnimatedContent(
+                    targetState = grid,
+                    modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) +
+                            androidx.compose.animation.scaleIn(initialScale = 0.96f, animationSpec = androidx.compose.animation.core.tween(280, delayMillis = 60)))
+                            .togetherWith(androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120)))
+                            .using(androidx.compose.animation.SizeTransform(clip = false))
+                    },
+                    contentAlignment = Alignment.TopCenter,
+                    label = "batchGridOrList",
+                ) { asGrid ->
+                    if (asGrid) LazyVerticalGrid(
+                        columns = GridCells.Adaptive(150.dp),
+                        modifier = Modifier.fillMaxWidth().nestedScroll(keepSheet),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                    ) {
+                        items(shown, key = { it.uri.toString() }) { item ->
+                            GridTile(item, onClick = { open(item) }, onDelete = { delete(item) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = BATCH_ITEM_OUT, placementSpec = BATCH_ITEM_MOVE))
+                        }
+                    } else LazyColumn(
+                        modifier = Modifier.fillMaxWidth().nestedScroll(keepSheet),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                    ) {
+                        items(shown, key = { it.uri.toString() }) { item ->
+                            ListRow(item, onClick = { open(item) }, onDelete = { delete(item) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = BATCH_ITEM_OUT, placementSpec = BATCH_ITEM_MOVE))
+                        }
                     }
                 }
             }
