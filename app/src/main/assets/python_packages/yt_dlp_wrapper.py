@@ -3063,14 +3063,16 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
         # channels (for albums/singles with no official upload) report an uploader literally named
         # "<Artist> - Topic". Stripping that suffix here, unconditionally and pre_process (so it
         # runs before the filename template above is evaluated), cleans up both the embedded
-        # metadata and the "%(uploader,channel,creator|Unknown)s" piece of the default filename —
+        # metadata and the poster part of the default filename —
         # same field/fallback chain the outtmpl above already uses, for consistency.
         postprocessors.append({
             "key": "MetadataParser",
             "when": "pre_process",
             "actions": [(
                 MetadataParserPP.Actions.INTERPRET,
-                "%(uploader,channel,creator|Unknown)s",
+                # An empty fallback, not "Unknown": that became the uploader of a post without
+                # one, and its file "Unknown - <title>" (a Streamable clip).
+                "%(uploader,channel,creator|)s",
                 r"(?P<uploader>.*?)(?: - Topic)?$",
             )],
         })

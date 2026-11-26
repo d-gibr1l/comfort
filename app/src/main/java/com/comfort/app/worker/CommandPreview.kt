@@ -91,7 +91,7 @@ internal object CommandPreview {
             o += "--ffmpeg-location ${File(a.ffmpeg).name}"
             o += "--merge-output-format ${if (a.outputFormat == "mp4") "mp4/mkv" else a.outputFormat.ifEmpty { "mkv" }}"
             // YouTube's "<Artist> - Topic" channels: the uploader without the suffix.
-            o += "--parse-metadata ${quote("%(uploader,channel,creator|Unknown)s:(?P<uploader>.*?)(?: - Topic)?$")}"
+            o += "--parse-metadata ${quote("%(uploader,channel,creator|)s:(?P<uploader>.*?)(?: - Topic)?$")}"
             if (a.audioOnly) {
                 val codec = a.audioFormat.takeIf { it in setOf("mp3", "m4a", "opus", "flac") } ?: "best"
                 o += "-x --audio-format $codec" + (mapOf("mp3" to "0", "m4a" to "256K", "opus" to "160K")[codec]?.let { " --audio-quality $it" } ?: "")
