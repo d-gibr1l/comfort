@@ -135,7 +135,12 @@ internal class EngineCommands(
     private val noCheckCertificates = GalleryDlPreferences.isNoCheckCertificates(context)
     private val sleepIntervalSeconds = GalleryDlPreferences.getEffectiveSleepIntervalSeconds(context)
     private val customHeaders = GalleryDlPreferences.getCustomHeaders(context)
-    private val formatSort = GalleryDlPreferences.getFormatSort(context)
+    // A phone that can't decode AV1 (Android 9, and plenty of newer ones) gets VP9 or H.264 at the
+    // same resolution: an AV1 video saved there played nowhere and showed no thumbnail. After the
+    // user's own Format sort, which still has the last word.
+    private val formatSort = GalleryDlPreferences.getFormatSort(context).let { user ->
+        if (DeviceCodecs.canDecodeAv1) user else listOf(user, "vcodec:vp9").filter { it.isNotBlank() }.joinToString(",")
+    }
     private val verboseLogging = GalleryDlPreferences.isVerboseLogging(context)
     private val embedChapters = GalleryDlPreferences.isEmbedChapters(context)
     private val splitChapters = GalleryDlPreferences.isSplitChapters(context)
@@ -279,3 +284,14 @@ internal class EngineCommands(
 /** A comic chapter's page: "<manga> c001 - p0001.jpg". [DownloadWorker.packComic] names the .cbz
  * after the part before " - p". */
 internal const val COMIC_FILENAME_FORMAT = "{manga|title|category}{chapter:? c//>03}{chapter_minor} - p{page|num:>04}.{extension}"
+
+/** What the phone can decode, asked once. */
+internal object DeviceCodecs {
+    val canDecodeAv1: Boolean by lazy {
+        runCatching {
+            android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
+                !info.isEncoder && info.supportedTypes.any { it.equals("video/av01", ignoreCase = true) }
+            }
+        }.getOrDefault(false)
+    }
+}
