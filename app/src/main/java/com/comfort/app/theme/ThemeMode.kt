@@ -8,9 +8,9 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 data class ThemeState(
     val mode: ThemeMode = ThemeMode.SYSTEM,
     val setMode: (ThemeMode) -> Unit = {},
-    val lightTheme: AppTheme = AppTheme.MONOCHROME,
+    val lightTheme: AppTheme = AppTheme.EXPRESSIVE,
     val setLightTheme: (AppTheme) -> Unit = {},
-    val darkTheme: AppTheme = AppTheme.MONOCHROME,
+    val darkTheme: AppTheme = AppTheme.EXPRESSIVE,
     val setDarkTheme: (AppTheme) -> Unit = {},
     val pureBlack: Boolean = false,
     val setPureBlack: (Boolean) -> Unit = {},
@@ -73,9 +73,9 @@ object ThemePreferences {
 
     private fun getAppTheme(context: Context, key: String): AppTheme {
         val stored = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(key, AppTheme.MONOCHROME.name)
-        return runCatching { AppTheme.valueOf(stored ?: AppTheme.MONOCHROME.name) }
-            .getOrDefault(AppTheme.MONOCHROME)
+            .getString(key, AppTheme.EXPRESSIVE.name)
+        return runCatching { AppTheme.valueOf(stored ?: AppTheme.EXPRESSIVE.name) }
+            .getOrDefault(AppTheme.EXPRESSIVE)
     }
 
     private fun setAppTheme(context: Context, key: String, theme: AppTheme) {

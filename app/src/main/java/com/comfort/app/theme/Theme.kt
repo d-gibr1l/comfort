@@ -53,7 +53,9 @@ fun GalleryDLTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        shapes = if (isExpressive) ExpressiveShapes else Shapes,
+        // The expressive corners in every theme: the app looks the same whichever colours are
+        // picked (they were only Expressive Purple's, every other theme squarer).
+        shapes = ExpressiveShapes,
         motionScheme = if (isExpressive) MotionScheme.expressive() else MotionScheme.standard(),
         content = content,
     )
