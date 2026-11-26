@@ -629,7 +629,8 @@ fun HomeScreen(
             shape = com.comfort.app.theme.ContinuousCapsuleShape,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = navBarClearance(), end = 24.dp),
+                .padding(bottom = navBarClearance(), end = 24.dp)
+                .reportsFabInset("home_paste"),
         )
     }
 }

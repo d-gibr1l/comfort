@@ -690,3 +690,20 @@ fun Modifier.isolatedVerticalScroll(state: ScrollState): Modifier {
             },
         )
 }
+
+/** The floating buttons showing at the bottom of the page (Home's Paste, the Library's scroll to
+ * top), by name, each with the room it takes above the navigation pill: the app's snackbars rise
+ * above them instead of covering them ([fabClearance], used by MainScreen's snackbar host). */
+object FabInset {
+    private val heights = androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.unit.Dp>()
+    val current: androidx.compose.ui.unit.Dp get() = heights.values.maxOrNull() ?: 0.dp
+    fun set(name: String, height: androidx.compose.ui.unit.Dp) { heights[name] = height }
+    fun clear(name: String) { heights.remove(name) }
+}
+
+/** Reports this floating button's height (plus a gap) to [FabInset] while it's composed. */
+fun Modifier.reportsFabInset(name: String): Modifier = composed {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.runtime.DisposableEffect(name) { onDispose { FabInset.clear(name) } }
+    onSizeChanged { FabInset.set(name, with(density) { it.height.toDp() } + 8.dp) }
+}

@@ -874,6 +874,7 @@ fun DownloadsHistoryScreen(
                 },
                 // The arch, as the Library's thumbnails are.
                 shape = thumbnailShape(),
+                modifier = Modifier.reportsFabInset("library_top"),
             ) {
                 Icon(Icons.Outlined.ArrowUpward, contentDescription = stringResource(R.string.scroll_to_top))
             }

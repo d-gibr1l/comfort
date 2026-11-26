@@ -648,9 +648,11 @@ fun MainScreen(
         // the media viewer over itself — two live copies showed every snackbar twice (TalkBack
         // read each one twice).
         if (!showQueueScreen && mediaViewer == null) {
+            // Above a floating button showing at the bottom (Paste, scroll to top), not over it.
+            val fabClearance by androidx.compose.animation.core.animateDpAsState(FabInset.current, label = "snackbarOverFab")
             DownloadEventSnackbarHost(
                 librarySnackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance()),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBarClearance() + fabClearance),
             )
         }
         // Engine updates (tapped in Settings, or automatic at launch), on any tab: "Updating yt-dlp
