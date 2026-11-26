@@ -415,61 +415,38 @@ private fun NowPlayingContent(
                             contentAlignment = Alignment.Center,
                         ) {
                             // The cover melts away at its bottom (Apple Music's look), Android 12+:
-                            // it carries on below itself as a mirror of its own bottom part (its
-                            // colours continue exactly), and one progressive blur runs over both,
-                            // sharp at the top, fully blurred across the join, the mirror fading
-                            // out under it. No edge where the cover ends. Older Android, or Cover
+                            // its lower part blurs more and more (a progressive blur over the cover
+                            // itself) and, as it does, fades into the background, so it dissolves
+                            // with no edge, band or corner where it ends. Older Android, or Cover
                             // fades out off: the plain cover.
                             val coverFade by com.comfort.app.music.MusicSettings.coverFade.value.collectAsState()
                             val melting = coverFade && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                            if (!melting) {
-                                Box(Modifier.fillMaxSize().shadow(24.dp, RoundedCornerShape(20.dp)).clip(RoundedCornerShape(20.dp))) {
+                            if (!melting || coverEffects == 0f) {
+                                Box(Modifier.fillMaxSize().then(if (melting) Modifier else Modifier.shadow(24.dp, RoundedCornerShape(20.dp))).clip(RoundedCornerShape(20.dp))) {
                                     Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.08f)))
                                     SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
                                         CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
                                     }
                                 }
                             } else {
-                                val extended = coverEffects > 0f
                                 Box(
                                     Modifier
-                                        .fillMaxWidth()
-                                        // Laid out as the square, drawn taller: the mirror hangs below.
-                                        .layout { measurable, constraints ->
-                                            val w = constraints.maxWidth
-                                            val placeable = measurable.measure(androidx.compose.ui.unit.Constraints.fixed(w, (w * (1f + COVER_MIRROR)).toInt()))
-                                            layout(w, w) { placeable.place(0, 0) }
-                                        }
+                                        .fillMaxSize()
                                         .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                                        .then(
-                                            if (!extended) Modifier
-                                            else Modifier
-                                                // Opaque down to the cover's bottom, the mirror fading out at
-                                                // once (a long, solid one read as a taller poster).
-                                                .alphaMask(0f to Color.Black, COVER_END to Color.Black, COVER_END + (1f - COVER_END) * 0.5f to Color.Black.copy(alpha = 0.35f), 1f to Color.Transparent)
-                                                .progressiveCoverBlur(coverEffects),
-                                        ),
+                                        // Fading out as it blurs: whole down to ~70%, gone at the bottom
+                                        // (eased, no line where the fade begins). Faded in with
+                                        // [coverEffects] after the cover settles.
+                                        .alphaMask(
+                                            0f to Color.Black,
+                                            0.66f to Color.Black,
+                                            0.78f to Color.Black.copy(alpha = 1f - 0.25f * coverEffects),
+                                            0.9f to Color.Black.copy(alpha = 1f - 0.7f * coverEffects),
+                                            1f to Color.Black.copy(alpha = 1f - coverEffects),
+                                        )
+                                        .progressiveCoverBlur(coverEffects),
                                 ) {
-                                    SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip, clip = false) { shown ->
-                                        Column(Modifier.fillMaxSize()) {
-                                            Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Ink.copy(alpha = 0.08f))) {
-                                                CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
-                                            }
-                                            // The cover's own bottom, mirrored: what's below it.
-                                            androidx.compose.foundation.layout.BoxWithConstraints(
-                                                Modifier.fillMaxWidth().weight(1f).clipToBounds().graphicsLayer { alpha = coverEffects }
-                                                    // Its sides taper in: no straight edge carrying on below the cover.
-                                                    .alphaMask(0f to Color.Transparent, 0.1f to Color.Black, 0.9f to Color.Black, 1f to Color.Transparent, horizontal = true),
-                                            ) {
-                                                CoverImage(
-                                                    shown, blurred = false,
-                                                    modifier = Modifier
-                                                        .wrapContentHeight(Alignment.Top, unbounded = true)
-                                                        .size(maxWidth)
-                                                        .graphicsLayer { scaleY = -1f },
-                                                )
-                                            }
-                                        }
+                                    SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
+                                        CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
                                     }
                                 }
                             }
@@ -1027,8 +1004,8 @@ private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boo
         )
     }
 
-/** Blurred more and more toward the bottom (Haze's progressive blur): none over the cover's top,
- * full radius by the join with its mirror. Over the cover and its mirror, COVER_MIRROR taller. */
+/** Blurred more and more toward the bottom (Haze's progressive blur): none over the cover's top
+ * 40%, then a radius growing smoothly to full by its last fifth. */
 private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEffect {
     // Its own alpha (faded in after the cover settles): not a parent layer's.
     alpha = amount
@@ -1036,14 +1013,10 @@ private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEf
     noiseFactor = 0f
     tints = emptyList()
     progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.42f) / (COVER_END + 0.04f - 0.42f)).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
+        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.4f) / 0.42f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
         startIntensity = 0f,
         endIntensity = 1f,
     )
 }
-
-/** How much of the cover's height its mirror hangs below it, and where the cover ends in the whole. */
-private const val COVER_MIRROR = 0.16f
-private const val COVER_END = 1f / (1f + COVER_MIRROR)
 
 private val COVER_BLUR_RADIUS = 36.dp
