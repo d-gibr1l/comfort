@@ -436,8 +436,10 @@ private fun NowPlayingContent(
                                         // [coverEffects] after the cover settles).
                                         .alphaMask(
                                             0f to Color.Black,
-                                            0.74f to Color.Black,
-                                            1f to Color.Black.copy(alpha = 1f - 0.65f * coverEffects),
+                                            0.78f to Color.Black,
+                                            // Keeps most of its colour, tinted by the background (the
+                                            // reference's), rather than washing out.
+                                            1f to Color.Black.copy(alpha = 1f - 0.4f * coverEffects),
                                         )
                                         .progressiveCoverBlur(coverEffects),
                                 ) {
@@ -1009,10 +1011,10 @@ private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEf
     noiseFactor = 0f
     tints = emptyList()
     progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.64f) / 0.36f).coerceIn(0f, 1f).let { it * it * (3f - 2f * it) } },
+        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.52f) / 0.48f).coerceIn(0f, 1f).let { it * it * it } },
         startIntensity = 0f,
         endIntensity = 1f,
     )
 }
 
-private val COVER_BLUR_RADIUS = 20.dp
+private val COVER_BLUR_RADIUS = 28.dp
