@@ -1,6 +1,5 @@
 package com.comfort.app.ui.music
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
@@ -43,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -112,7 +112,21 @@ private fun SheetLayer(host: PlayerSheetHost) {
     var shown by remember { mutableStateOf<PlayerSheetHost.Entry?>(null) }
     if (top != null && shown !== top) shown = top
     val visible = top != null
-    BackHandler(enabled = visible) { top?.onDismiss?.invoke() }
+    // Predictive back: the sheet shrinks toward the bottom as Back is swiped (Material's sheets'
+    // own look), closing once the swipe is let go; called off, it grows back.
+    val backProgress = remember { Animatable(0f) }
+    val backScope = rememberCoroutineScope()
+    androidx.activity.compose.PredictiveBackHandler(enabled = visible) { events ->
+        try {
+            events.collect { backProgress.snapTo(it.progress) }
+            top?.onDismiss?.invoke()
+            // Its slide out starts from where the swipe left it, then it's whole again.
+            backScope.launch { kotlinx.coroutines.delay(220); backProgress.snapTo(0f) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            backScope.launch { backProgress.animateTo(0f, tween(160)) }
+            throw e
+        }
+    }
     val scrim by animateFloatAsState(if (visible) 0.5f else 0f, tween(220), label = "sheetScrim")
     if (scrim > 0f) {
         // The dim over the player, drawn (no layer); it takes every touch, a tap closing the sheet.
@@ -170,6 +184,12 @@ private fun SheetLayer(host: PlayerSheetHost) {
                     .fillMaxWidth()
                     .heightIn(max = maxSheet)
                     .offset { IntOffset(0, drag.value.roundToInt()) }
+                    .graphicsLayer {
+                        val p = backProgress.value
+                        scaleX = 1f - 0.1f * p
+                        scaleY = 1f - 0.05f * p
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                    }
                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainer)
                     // Its own taps stay on it (not the dim behind).
