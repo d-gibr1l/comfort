@@ -1369,4 +1369,5 @@
     </plurals>
     <string name="playlist_look_ahead">Anticiper dans les playlists</string>
     <string name="playlist_look_ahead_subtitle">Prépare les titres suivants d\'une playlist YouTube pendant qu\'un titre se télécharge ; à désactiver sur une connexion lente ou limitée</string>
+    <string name="engines_couldnt_start">Les moteurs de téléchargement n\'ont pas pu démarrer sur cet appareil</string>
 </resources>

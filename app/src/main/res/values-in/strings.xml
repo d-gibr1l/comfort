@@ -1331,4 +1331,5 @@
     </plurals>
     <string name="playlist_look_ahead">Siapkan lebih dulu di playlist</string>
     <string name="playlist_look_ahead_subtitle">Menyiapkan lagu berikutnya di playlist YouTube saat satu lagu diunduh; matikan di koneksi lambat atau terbatas</string>
+    <string name="engines_couldnt_start">Mesin unduhan tidak dapat dijalankan di perangkat ini</string>
 </resources>

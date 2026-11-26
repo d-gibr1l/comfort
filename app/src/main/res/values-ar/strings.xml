@@ -1474,4 +1474,5 @@
     </plurals>
     <string name="playlist_look_ahead">الاستباق في قوائم التشغيل</string>
     <string name="playlist_look_ahead_subtitle">يجهّز الأغاني التالية في قائمة تشغيل YouTube أثناء تنزيل إحداها؛ أوقفه على اتصال بطيء أو محدود</string>
+    <string name="engines_couldnt_start">تعذّر تشغيل محركات التنزيل على هذا الجهاز</string>
 </resources>

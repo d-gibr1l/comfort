@@ -1300,4 +1300,5 @@
     </plurals>
     <string name="playlist_look_ahead">プレイリストで先読み</string>
     <string name="playlist_look_ahead_subtitle">1曲をダウンロードしている間に YouTube プレイリストの次の曲を準備します。遅い回線や従量制の回線ではオフに</string>
+    <string name="engines_couldnt_start">このデバイスではダウンロードエンジンを起動できませんでした</string>
 </resources>

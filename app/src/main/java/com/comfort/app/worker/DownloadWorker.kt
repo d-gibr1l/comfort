@@ -603,6 +603,8 @@ class DownloadWorker(
                 // "[error] ..." lines — shown instead of the generic fallback below when nothing
                 // gets saved, so a real cause (blocked, login required, no formats found, ...) is
                 // visible instead of every failure looking identical.
+                // Set when the engine process itself failed to start (ENGINE_START_FAILURE).
+                val enginesCouldntStart = java.util.concurrent.atomic.AtomicBoolean(false)
                 val lastErrorLine = java.util.concurrent.atomic.AtomicReference<String?>(null)
                 // Files the engines downloaded that couldn't be saved to the gallery, with their
                 // place in the download. By name: the end-of-run sweep tries a file that failed
@@ -988,6 +990,10 @@ class DownloadWorker(
                 val actualCallback: suspend (String) -> Unit = actualCallback@{ line ->
                     // Not in the system log either for an incognito one: Export logs includes it.
                     if (!incognito) android.util.Log.d("DownloadEngine", "Python output: $line")
+                    // The engine itself couldn't start (its program or libraries refused by the
+                    // device: an x86 emulator translating ARM, a broken install): said so at the
+                    // end, not "No downloadable content found", which blamed the link.
+                    if (ENGINE_START_FAILURE.containsMatchIn(line)) enginesCouldntStart.set(true)
                     DownloadLog.line(applicationContext, downloadId, line)
                     checkScheduleWindow()
 
@@ -1456,8 +1462,12 @@ class DownloadWorker(
                     // preview step) can also surface gallery-dl's raw HTML/CSS-blob exception text
                     // verbatim as its "error", which used to show up unfiltered in this terminal
                     // failure notification and toast.
-                    val errorMsg = GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this), applicationContext.resources)
-                        ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this)
+                    val errorMsg = if (enginesCouldntStart.get()) {
+                        applicationContext.getString(R.string.engines_couldnt_start)
+                    } else {
+                        GalleryDlListing.sanitizeErrorMessage(lastErrorLine.get() ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this), applicationContext.resources)
+                            ?: applicationContext.getString(R.string.no_downloadable_content_found_at_this)
+                    }
                     dao.updateError(downloadId, DownloadStatus.ERRORED, errorMsg)
                     DownloadLog.line(applicationContext, downloadId, "failed: $errorMsg")
                     dao.setErrorDetails(downloadId, errorDetailsJson())
@@ -1644,3 +1654,8 @@ private const val HOLD_MAX_BYTES = 300L * 1024 * 1024
 
 // lyrics.py makes at most two LRCLIB requests (10s timeout each); past this the song saves without.
 private const val LYRICS_CAP_MS = 25_000L
+
+/** What the system prints when a program can't be started at all: the dynamic linker refusing it
+ * or one of its libraries (the wrong architecture, a missing or broken file), or the kernel
+ * refusing the program itself. */
+private val ENGINE_START_FAILURE = Regex("CANNOT LINK EXECUTABLE|Exec format error|cannot execute binary file|has unexpected e_machine")
