@@ -1372,4 +1372,5 @@
     <string name="engines_couldnt_start">Les moteurs de téléchargement n\'ont pas pu démarrer sur cet appareil</string>
     <string name="app_size">Taille</string>
     <string name="app_size_subtitle">Tout Comfort en plus petit ou plus grand, texte compris</string>
+    <string name="update_all_engines">Tout mettre à jour (%1$d)</string>
 </resources>

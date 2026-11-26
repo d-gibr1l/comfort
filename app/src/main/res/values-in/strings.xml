@@ -1334,4 +1334,5 @@
     <string name="engines_couldnt_start">Mesin unduhan tidak dapat dijalankan di perangkat ini</string>
     <string name="app_size">Ukuran</string>
     <string name="app_size_subtitle">Semua di Comfort lebih kecil atau lebih besar, termasuk teks</string>
+    <string name="update_all_engines">Perbarui semua (%1$d)</string>
 </resources>

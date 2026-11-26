@@ -232,6 +232,14 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
         if (_engineStatuses.value == null) checkEngines(offer = true)
     }
 
+    // Engine updates put off by a running download, by package, until downloads are done.
+    private val putOff = LinkedHashMap<String, EngineUpdater.VersionStatus>()
+
+    /** Every engine with an update that's turned on (Update all), installed side by side. */
+    fun updateAllEngines() = updateEngines(
+        _engineStatuses.value.orEmpty().filter { it.updateAvailable && it.artifactUrl != null && EngineUpdater.isOn(context, it.engine) },
+    )
+
     /** A tapped Update for one engine. */
     fun updateEngine(status: EngineUpdater.VersionStatus) {
         if (status.artifactUrl == null) return
@@ -253,8 +261,10 @@ class UpdatesViewModel(application: Application) : AndroidViewModel(application)
                 }
                 result.onFailure { e ->
                     if (e is EngineUpdater.DownloadRunningException) {
-                        // A download is running: no "Couldn't update"; tried again once it's done.
-                        retryWhenIdle { updateEngine(status) }
+                        // A download is running: no "Couldn't update"; tried again once it's done
+                        // (every engine put off, not only the first: they're tapped all at once).
+                        synchronized(putOff) { putOff[status.engine.packageDirName] = status }
+                        retryWhenIdle { updateEngines(synchronized(putOff) { putOff.values.toList().also { putOff.clear() } }) }
                         return@onFailure
                     }
                     announceFailure(status)

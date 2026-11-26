@@ -1372,4 +1372,5 @@
     <string name="engines_couldnt_start">Los motores de descarga no pudieron iniciarse en este dispositivo</string>
     <string name="app_size">Tamaño</string>
     <string name="app_size_subtitle">Todo en Comfort más pequeño o más grande, también el texto</string>
+    <string name="update_all_engines">Actualizar todo (%1$d)</string>
 </resources>

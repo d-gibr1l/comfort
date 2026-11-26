@@ -1303,4 +1303,5 @@
     <string name="engines_couldnt_start">下载引擎无法在此设备上启动</string>
     <string name="app_size">大小</string>
     <string name="app_size_subtitle">让 Comfort 中的一切（包括文字）变小或变大</string>
+    <string name="update_all_engines">全部更新 (%1$d)</string>
 </resources>

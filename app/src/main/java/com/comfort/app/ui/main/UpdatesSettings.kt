@@ -403,6 +403,19 @@ private fun AppUpdateRow(status: AppUpdater.UpdateStatus, downloadProgress: Floa
     }
 }
 
+/** "Update all", under the engines when more than one has an update and none of them is
+ * installing yet: they install side by side. */
+@Composable
+private fun UpdateAllEnginesButton(outdated: Int, anyUpdating: Boolean, onClick: () -> Unit) {
+    if (outdated < 2 || anyUpdating) return
+    Spacer(Modifier.height(12.dp))
+    androidx.compose.material3.FilledTonalButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Icon(Icons.Outlined.SystemUpdateAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.update_all_engines, outdated))
+    }
+}
+
 /** Compact teaser on the Settings root list, so an available engine update is both visible and
  * actionable without drilling into Updates > Engines first — mirrors that section's own check/update
  * logic (see EnginesSection() below) but renders nothing at all when everything's already current,
@@ -432,6 +445,7 @@ internal fun QuickEngineUpdateSection() {
             )
             if (index != outdated.lastIndex) Spacer(Modifier.height(12.dp))
         }
+        UpdateAllEnginesButton(outdated.size, updatingEngines.isNotEmpty()) { updates.updateAllEngines() }
         if (errorText != null) {
             Spacer(Modifier.height(10.dp))
             SettingsErrorBanner(errorText.orEmpty())
@@ -513,6 +527,10 @@ private fun EnginesSection() {
                 )
                 if (index != currentStatuses.lastIndex) Spacer(Modifier.height(12.dp))
             }
+            UpdateAllEnginesButton(
+                currentStatuses.count { it.updateAvailable && it.artifactUrl != null && EngineUpdater.isOn(context, it.engine) },
+                updatingEngines.isNotEmpty(),
+            ) { updates.updateAllEngines() }
         }
         if (errorText != null) {
             Spacer(Modifier.height(10.dp))

@@ -1387,4 +1387,5 @@
     <string name="engines_couldnt_start">The download engines couldn\'t start on this device</string>
     <string name="app_size">Size</string>
     <string name="app_size_subtitle">Everything in Comfort smaller or larger, text too</string>
+    <string name="update_all_engines">Update all (%1$d)</string>
 </resources>

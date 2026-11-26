@@ -1303,4 +1303,5 @@
     <string name="engines_couldnt_start">Không thể khởi động công cụ tải xuống trên thiết bị này</string>
     <string name="app_size">Kích thước</string>
     <string name="app_size_subtitle">Mọi thứ trong Comfort nhỏ hơn hoặc lớn hơn, cả chữ</string>
+    <string name="update_all_engines">Cập nhật tất cả (%1$d)</string>
 </resources>

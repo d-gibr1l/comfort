@@ -1337,4 +1337,5 @@
     <string name="engines_couldnt_start">İndirme motorları bu cihazda başlatılamadı</string>
     <string name="app_size">Boyut</string>
     <string name="app_size_subtitle">Comfort\'taki her şey, metin dahil, daha küçük veya daha büyük</string>
+    <string name="update_all_engines">Tümünü güncelle (%1$d)</string>
 </resources>

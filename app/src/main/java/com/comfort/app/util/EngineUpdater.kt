@@ -370,8 +370,10 @@ object EngineUpdater {
     // both run at app start, and used to install the same engines side by side. The second one now
     // waits, then finds them up to date.
     private val autoUpdateMutex = Mutex()
-    // One install at a time, so an auto-update and a tapped Update can't swap the same engine twice.
-    private val installMutex = Mutex()
+    // One install per engine at a time, so an auto-update and a tapped Update can't swap the same
+    // engine twice; different engines install side by side (each in its own staging folder; the
+    // swap itself is under PythonRuntime's provision lock).
+    private val installMutexes = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
     /** [onUpdated] hears about each engine it installs a new version of (name, new version). */
     /** [onStarting] as an engine's install begins, then [onUpdated] or [onFailed] as it ends. */
@@ -391,13 +393,14 @@ object EngineUpdater {
     ): List<VersionStatus> = withContext(Dispatchers.IO) {
         PythonRuntime.ensureProvisioned(context)
         var statuses = checkAll(context)
-        var deferredDueToRunning = false
+        val deferredDueToRunning = java.util.concurrent.atomic.AtomicBoolean(false)
         if (GalleryDlPreferences.isAutoUpdateEnginesEnabled(context)) {
-            statuses = statuses.map { status ->
+            // All of them at once, not one after another.
+            statuses = coroutineScope { statuses.map { status -> async {
                 if (status.updateAvailable && status.artifactUrl != null && isOn(context, status.engine)) {
                     val isRunning = AppDatabase.getDatabase(context).downloadDao().getRunningOnce().isNotEmpty()
                     if (isRunning) {
-                        deferredDueToRunning = true
+                        deferredDueToRunning.set(true)
                         status
                     } else {
                         onStarting(status)
@@ -409,7 +412,7 @@ object EngineUpdater {
                             // A download started meanwhile (the message is translated, so not
                             // matched on its words: it never matched, and showed as a failure).
                             if (res.exceptionOrNull() is DownloadRunningException) {
-                                deferredDueToRunning = true
+                                deferredDueToRunning.set(true)
                                 // Not a failure: it waits for the download to end.
                                 onUpdated(status, "")
                             } else {
@@ -421,10 +424,10 @@ object EngineUpdater {
                 } else {
                     status
                 }
-            }
+            } }.awaitAll() }
         }
         GalleryDlPreferences.setEngineUpdateAvailable(context, statuses.any { it.updateAvailable && isOn(context, it.engine) })
-        if (!deferredDueToRunning) {
+        if (!deferredDueToRunning.get()) {
             GalleryDlPreferences.setEngineUpdateLastCheckMs(context, System.currentTimeMillis())
         }
         statuses
@@ -458,7 +461,8 @@ object EngineUpdater {
      * wheels from, just against a freshly downloaded one here instead of an asset. A source tarball
      * or repo zip (BLEEDING_EDGE channels) carries no dist-info of its own, so one's synthesized
      * here afterward purely so [installedVersion] keeps working the same way regardless of channel. */
-    suspend fun update(context: Context, status: VersionStatus): Result<String> = installMutex.withLock {
+    suspend fun update(context: Context, status: VersionStatus): Result<String> =
+        installMutexes.getOrPut(status.engine.packageDirName) { Mutex() }.withLock {
         withContext(Dispatchers.IO) {
             runCatching {
                 val artifactUrl = status.artifactUrl ?: error("Nothing to install")
@@ -497,7 +501,9 @@ object EngineUpdater {
                 }
 
                 val sitePackages = PythonRuntime.sitePackagesDir(context)
-                sitePackages.parentFile?.listFiles { f -> f.name.startsWith(".update-") }?.forEach { it.deleteRecursively() }
+                // A failed earlier attempt's leftovers, this engine's only: another engine may be
+                // installing into its own staging folder right now.
+                sitePackages.parentFile?.listFiles { f -> f.name.startsWith(".update-${engine.packageDirName}-") }?.forEach { it.deleteRecursively() }
                 val staging = File(sitePackages.parentFile, ".update-${engine.packageDirName}-${System.nanoTime()}").apply {
                     deleteRecursively()
                     mkdirs()

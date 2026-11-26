@@ -1477,4 +1477,5 @@
     <string name="engines_couldnt_start">تعذّر تشغيل محركات التنزيل على هذا الجهاز</string>
     <string name="app_size">الحجم</string>
     <string name="app_size_subtitle">تصغير كل ما في Comfort أو تكبيره، والنص أيضًا</string>
+    <string name="update_all_engines">تحديث الكل (%1$d)</string>
 </resources>

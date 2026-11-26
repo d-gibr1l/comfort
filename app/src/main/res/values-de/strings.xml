@@ -1337,4 +1337,5 @@
     <string name="engines_couldnt_start">Die Download-Engines konnten auf diesem Gerät nicht starten</string>
     <string name="app_size">Größe</string>
     <string name="app_size_subtitle">Alles in Comfort kleiner oder größer, auch der Text</string>
+    <string name="update_all_engines">Alle aktualisieren (%1$d)</string>
 </resources>

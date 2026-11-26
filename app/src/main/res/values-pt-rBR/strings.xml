@@ -1372,4 +1372,5 @@
     <string name="engines_couldnt_start">Os mecanismos de download não puderam ser iniciados neste dispositivo</string>
     <string name="app_size">Tamanho</string>
     <string name="app_size_subtitle">Tudo no Comfort menor ou maior, inclusive o texto</string>
+    <string name="update_all_engines">Atualizar tudo (%1$d)</string>
 </resources>

@@ -1341,4 +1341,5 @@
     <string name="engines_couldnt_start">I motori di download non sono riusciti ad avviarsi su questo dispositivo</string>
     <string name="app_size">Dimensione</string>
     <string name="app_size_subtitle">Tutto in Comfort più piccolo o più grande, testo compreso</string>
+    <string name="update_all_engines">Aggiorna tutto (%1$d)</string>
 </resources>

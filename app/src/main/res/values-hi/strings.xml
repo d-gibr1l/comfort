@@ -1337,4 +1337,5 @@
     <string name="engines_couldnt_start">इस डिवाइस पर डाउनलोड इंजन शुरू नहीं हो सके</string>
     <string name="app_size">आकार</string>
     <string name="app_size_subtitle">Comfort में सब कुछ छोटा या बड़ा, टेक्स्ट भी</string>
+    <string name="update_all_engines">सभी अपडेट करें (%1$d)</string>
 </resources>

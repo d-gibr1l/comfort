@@ -1337,4 +1337,5 @@
     <string name="engines_couldnt_start">موتورهای دانلود روی این دستگاه اجرا نشدند</string>
     <string name="app_size">اندازه</string>
     <string name="app_size_subtitle">همه چیز در Comfort کوچک‌تر یا بزرگ‌تر، از جمله متن</string>
+    <string name="update_all_engines">به‌روزرسانی همه (%1$d)</string>
 </resources>

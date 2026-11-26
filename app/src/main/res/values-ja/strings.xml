@@ -1303,4 +1303,5 @@
     <string name="engines_couldnt_start">このデバイスではダウンロードエンジンを起動できませんでした</string>
     <string name="app_size">サイズ</string>
     <string name="app_size_subtitle">Comfort 全体を文字も含めて小さく、または大きく表示します</string>
+    <string name="update_all_engines">すべて更新 (%1$d)</string>
 </resources>
