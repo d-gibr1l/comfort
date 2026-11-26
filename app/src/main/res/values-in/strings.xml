@@ -1335,8 +1335,6 @@
     <string name="app_size">Ukuran</string>
     <string name="app_size_subtitle">Semua di Comfort lebih kecil atau lebih besar, termasuk teks</string>
     <string name="update_all_engines">Perbarui semua (%1$d)</string>
-    <string name="cover_fade">Sampul memudar</string>
-    <string name="cover_fade_subtitle">Sampul makin kabur ke bawah dan warnanya berpendar di bawahnya. Nonaktif, sampul persegi biasa.</string>
     <string name="online_lyrics">Lirik dari web</string>
     <string name="online_lyrics_subtitle">Untuk lagu yang liriknya tidak diatur per kata: dicari di lrc.red, BetterLyrics, LyricsPlus, dan LRCLIB menurut judul, artis, dan durasi.</string>
     <string name="lyrics_source">Sumber lirik</string>

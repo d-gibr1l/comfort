@@ -69,7 +69,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.ui.draw.drawWithContent
-import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -380,20 +379,11 @@ private fun NowPlayingContent(
                                 (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 50)) +
                                     androidx.compose.animation.scaleIn(initialScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(250, delayMillis = 50))) togetherWith
                                     (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
-                                        androidx.compose.animation.scaleOut(targetScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(150))) using
-                                    // Not clipped: the cover's glow spills out below it.
-                                    androidx.compose.animation.SizeTransform(clip = false)
+                                        androidx.compose.animation.scaleOut(targetScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(150)))
                             },
                             contentAlignment = Alignment.Center,
                             label = "coverOrLyrics",
                         ) { showingLyrics ->
-                        // The cover's blur and glow only once it's settled: while it fades and
-                        // shrinks to or from the lyrics, Haze blurred the whole of it and the glow
-                        // showed as a grey box (a screen recording). Faded in after.
-                        val coverSettled = this@AnimatedContent.transition.let {
-                            it.currentState == androidx.compose.animation.EnterExitState.Visible && it.targetState == androidx.compose.animation.EnterExitState.Visible
-                        }
-                        val coverEffects by androidx.compose.animation.core.animateFloatAsState(if (coverSettled) 1f else 0f, androidx.compose.animation.core.tween(if (coverSettled) 350 else 0), label = "coverEffects")
                         val shownLyrics = lyrics
                         if (showingLyrics && shownLyrics != null) {
                             LyricsView(
@@ -414,38 +404,10 @@ private fun NowPlayingContent(
                                 .scale(coverScale),
                             contentAlignment = Alignment.Center,
                         ) {
-                            // A subtle softening at the cover's bottom (the reference app's), Android
-                            // 12+: its lower third blurs, its last quarter fading into the
-                            // background; the cover keeps its shape and corners. Older Android, or
-                            // Cover fades out off: the plain cover.
-                            val coverFade by com.comfort.app.music.MusicSettings.coverFade.value.collectAsState()
-                            val melting = coverFade && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
-                            if (!melting || coverEffects == 0f) {
-                                Box(Modifier.fillMaxSize().then(if (melting) Modifier else Modifier.shadow(24.dp, RoundedCornerShape(20.dp))).clip(RoundedCornerShape(20.dp))) {
-                                    Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.08f)))
-                                    SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
-                                        CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
-                                    }
-                                }
-                            } else {
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(20.dp))
-                                        // A little see-through at the very bottom (faded in with
-                                        // [coverEffects] after the cover settles).
-                                        .alphaMask(
-                                            0f to Color.Black,
-                                            0.78f to Color.Black,
-                                            // Keeps most of its colour, tinted by the background (the
-                                            // reference's), rather than washing out.
-                                            1f to Color.Black.copy(alpha = 1f - 0.4f * coverEffects),
-                                        )
-                                        .progressiveCoverBlur(coverEffects),
-                                ) {
-                                    SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
-                                        CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
-                                    }
+                            Box(Modifier.fillMaxSize().shadow(24.dp, RoundedCornerShape(20.dp)).clip(RoundedCornerShape(20.dp))) {
+                                Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.08f)))
+                                SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
+                                    CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
                                 }
                             }
                         }
@@ -989,32 +951,3 @@ private fun ColumnScope.PortraitOrSideBySide(
 
 /** Landscape: the room under the cover for the two lyric lines. */
 private val LANDSCAPE_LYRICS_SPACE = 100.dp
-
-/** This layer's alpha by height: each stop's colour alpha (black = shown, transparent = hidden). */
-private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boolean = false): Modifier = this
-    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        drawRect(
-            brush = if (horizontal) androidx.compose.ui.graphics.Brush.horizontalGradient(*stops)
-                else androidx.compose.ui.graphics.Brush.verticalGradient(*stops),
-            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-        )
-    }
-
-/** Blurred toward the bottom (Haze's progressive blur): none over the cover's top ~two thirds, then
- * a radius growing smoothly to [COVER_BLUR_RADIUS] at its bottom edge. */
-private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEffect {
-    // Its own alpha (faded in after the cover settles): not a parent layer's.
-    alpha = amount
-    blurRadius = COVER_BLUR_RADIUS
-    noiseFactor = 0f
-    tints = emptyList()
-    progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-        easing = androidx.compose.animation.core.Easing { f -> ((f - 0.52f) / 0.48f).coerceIn(0f, 1f).let { it * it * it } },
-        startIntensity = 0f,
-        endIntensity = 1f,
-    )
-}
-
-private val COVER_BLUR_RADIUS = 28.dp

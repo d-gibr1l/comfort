@@ -1388,8 +1388,6 @@
     <string name="app_size">Size</string>
     <string name="app_size_subtitle">Everything in Comfort smaller or larger, text too</string>
     <string name="update_all_engines">Update all (%1$d)</string>
-    <string name="cover_fade">Cover fades out</string>
-    <string name="cover_fade_subtitle">The cover blurs toward the bottom and glows on below it. Off, a plain square cover.</string>
     <string name="online_lyrics">Lyrics from the web</string>
     <string name="online_lyrics_subtitle">For a song whose own lyrics aren\'t timed word by word: looked up on lrc.red, BetterLyrics, LyricsPlus and LRCLIB by its title, artist and length.</string>
     <string name="lyrics_source">Lyrics source</string>

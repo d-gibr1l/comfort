@@ -1338,8 +1338,6 @@
     <string name="app_size">आकार</string>
     <string name="app_size_subtitle">Comfort में सब कुछ छोटा या बड़ा, टेक्स्ट भी</string>
     <string name="update_all_engines">सभी अपडेट करें (%1$d)</string>
-    <string name="cover_fade">कवर फ़ेड</string>
-    <string name="cover_fade_subtitle">कवर नीचे की ओर धुंधला होता है और उसके नीचे चमकता है। बंद होने पर, सादा चौकोर कवर।</string>
     <string name="online_lyrics">वेब से बोल</string>
     <string name="online_lyrics_subtitle">जिस गाने के बोल शब्द-दर-शब्द समयबद्ध नहीं हैं, उसके लिए: शीर्षक, कलाकार और अवधि से lrc.red, BetterLyrics, LyricsPlus और LRCLIB पर खोजा जाता है।</string>
     <string name="lyrics_source">बोलों का स्रोत</string>

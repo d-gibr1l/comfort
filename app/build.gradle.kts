@@ -168,9 +168,6 @@ dependencies {
   // Expressive) only exists starting in this alpha train, nothing else here depends on it.
   implementation("androidx.compose.material3:material3:1.5.0-alpha18")
   implementation("io.coil-kt:coil-compose:2.6.0")
-  // A real progressive blur (radius growing down the image) for the player's cover, as Apple Music's.
-  // 1.7.2: the last release on Compose UI 1.10 / Kotlin 2.2 (1.7.3 and 2.x need Compose 1.12).
-  implementation("dev.chrisbanes.haze:haze:1.7.2")
   // Coil can't decode a preview frame from video files out of the box — without this, any video
   // thumbnail (MediaStore video Uri) just renders blank instead of falling through to an error
   // state, since coil-compose alone has no decoder that understands video content at all.

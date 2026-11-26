@@ -241,7 +241,6 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
   and model are ported from it
 - [LRCLIB](https://lrclib.net), [lrc.red](https://lrc.red), BetterLyrics, LyricsPlus and BiniLyrics
   — synced and word-timed lyrics
-- [Haze](https://github.com/chrisbanes/haze) (Apache-2.0) — the player cover's progressive blur
 - [@Vmratef](https://github.com/Vmratef) — Android 9 fixes, faster previews and saving music to the
   Music folder
 

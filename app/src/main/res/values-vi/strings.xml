@@ -1304,8 +1304,6 @@
     <string name="app_size">Kích thước</string>
     <string name="app_size_subtitle">Mọi thứ trong Comfort nhỏ hơn hoặc lớn hơn, cả chữ</string>
     <string name="update_all_engines">Cập nhật tất cả (%1$d)</string>
-    <string name="cover_fade">Ảnh bìa mờ dần</string>
-    <string name="cover_fade_subtitle">Ảnh bìa mờ dần về phía dưới và tỏa màu xuống bên dưới. Tắt: ảnh bìa vuông thường.</string>
     <string name="online_lyrics">Lời bài hát từ web</string>
     <string name="online_lyrics_subtitle">Với bài hát có lời chưa đồng bộ theo từng từ: tìm trên lrc.red, BetterLyrics, LyricsPlus và LRCLIB theo tên, nghệ sĩ và thời lượng.</string>
     <string name="lyrics_source">Nguồn lời bài hát</string>

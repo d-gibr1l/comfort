@@ -1408,8 +1408,6 @@
     <string name="app_size">Размер</string>
     <string name="app_size_subtitle">Всё в Comfort меньше или больше, включая текст</string>
     <string name="update_all_engines">Обновить все (%1$d)</string>
-    <string name="cover_fade">Размытие обложки</string>
-    <string name="cover_fade_subtitle">Обложка размывается книзу, а её цвет растекается под ней. Выкл.: обычная квадратная обложка.</string>
     <string name="online_lyrics">Тексты из интернета</string>
     <string name="online_lyrics_subtitle">Для песни без пословной синхронизации текста: поиск на lrc.red, BetterLyrics, LyricsPlus и LRCLIB по названию, исполнителю и длительности.</string>
     <string name="lyrics_source">Источник текста</string>
