@@ -1339,4 +1339,14 @@
     <string name="cover_fade_subtitle">Sampul makin kabur ke bawah dan warnanya berpendar di bawahnya. Nonaktif, sampul persegi biasa.</string>
     <string name="online_lyrics">Lirik dari web</string>
     <string name="online_lyrics_subtitle">Untuk lagu yang liriknya tidak diatur per kata: dicari di lrc.red, BetterLyrics, LyricsPlus, dan LRCLIB menurut judul, artis, dan durasi.</string>
+    <string name="lyrics_source">Sumber lirik</string>
+    <string name="lyrics_source_in_song">Di lagu</string>
+    <string name="lyrics_source_showing">Ditampilkan</string>
+    <string name="lyrics_source_found">Ditemukan · ketuk untuk menampilkan</string>
+    <string name="lyrics_source_searching">Mencari…</string>
+    <string name="lyrics_source_not_found">Tidak ditemukan · ketuk untuk coba lagi</string>
+    <string name="lyrics_source_not_asked">Belum dicari · ketuk untuk mencari</string>
+    <string name="lyrics_word_by_word">Per kata</string>
+    <string name="lyrics_by_line">Per baris</string>
+    <string name="lyrics_unsynced">Tidak tersinkron</string>
 </resources>

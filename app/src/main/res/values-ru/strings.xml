@@ -1412,4 +1412,14 @@
     <string name="cover_fade_subtitle">Обложка размывается книзу, а её цвет растекается под ней. Выкл.: обычная квадратная обложка.</string>
     <string name="online_lyrics">Тексты из интернета</string>
     <string name="online_lyrics_subtitle">Для песни без пословной синхронизации текста: поиск на lrc.red, BetterLyrics, LyricsPlus и LRCLIB по названию, исполнителю и длительности.</string>
+    <string name="lyrics_source">Источник текста</string>
+    <string name="lyrics_source_in_song">В песне</string>
+    <string name="lyrics_source_showing">Показывается</string>
+    <string name="lyrics_source_found">Найден · нажмите, чтобы показать</string>
+    <string name="lyrics_source_searching">Поиск…</string>
+    <string name="lyrics_source_not_found">Не найден · нажмите, чтобы повторить</string>
+    <string name="lyrics_source_not_asked">Не запрошен · нажмите для поиска</string>
+    <string name="lyrics_word_by_word">По словам</string>
+    <string name="lyrics_by_line">По строкам</string>
+    <string name="lyrics_unsynced">Без синхронизации</string>
 </resources>

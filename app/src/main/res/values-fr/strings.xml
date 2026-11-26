@@ -1377,4 +1377,14 @@
     <string name="cover_fade_subtitle">La pochette se floute vers le bas et sa lueur déborde en dessous. Désactivé, une pochette carrée simple.</string>
     <string name="online_lyrics">Paroles depuis le web</string>
     <string name="online_lyrics_subtitle">Pour un morceau dont les paroles ne sont pas synchronisées mot à mot : recherche sur lrc.red, BetterLyrics, LyricsPlus et LRCLIB par titre, artiste et durée.</string>
+    <string name="lyrics_source">Source des paroles</string>
+    <string name="lyrics_source_in_song">Dans le morceau</string>
+    <string name="lyrics_source_showing">Affichées</string>
+    <string name="lyrics_source_found">Trouvées · touchez pour afficher</string>
+    <string name="lyrics_source_searching">Recherche…</string>
+    <string name="lyrics_source_not_found">Introuvables · touchez pour réessayer</string>
+    <string name="lyrics_source_not_asked">Non consultée · touchez pour chercher</string>
+    <string name="lyrics_word_by_word">Mot à mot</string>
+    <string name="lyrics_by_line">Par ligne</string>
+    <string name="lyrics_unsynced">Non synchronisées</string>
 </resources>

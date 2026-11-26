@@ -1342,4 +1342,14 @@
     <string name="cover_fade_subtitle">कवर नीचे की ओर धुंधला होता है और उसके नीचे चमकता है। बंद होने पर, सादा चौकोर कवर।</string>
     <string name="online_lyrics">वेब से बोल</string>
     <string name="online_lyrics_subtitle">जिस गाने के बोल शब्द-दर-शब्द समयबद्ध नहीं हैं, उसके लिए: शीर्षक, कलाकार और अवधि से lrc.red, BetterLyrics, LyricsPlus और LRCLIB पर खोजा जाता है।</string>
+    <string name="lyrics_source">बोलों का स्रोत</string>
+    <string name="lyrics_source_in_song">गाने में</string>
+    <string name="lyrics_source_showing">दिखाए जा रहे हैं</string>
+    <string name="lyrics_source_found">मिले · दिखाने के लिए टैप करें</string>
+    <string name="lyrics_source_searching">खोजा जा रहा है…</string>
+    <string name="lyrics_source_not_found">नहीं मिले · फिर से टैप करें</string>
+    <string name="lyrics_source_not_asked">पूछा नहीं गया · खोजने के लिए टैप करें</string>
+    <string name="lyrics_word_by_word">शब्द-दर-शब्द</string>
+    <string name="lyrics_by_line">पंक्ति-दर-पंक्ति</string>
+    <string name="lyrics_unsynced">समयबद्ध नहीं</string>
 </resources>

@@ -1342,4 +1342,14 @@
     <string name="cover_fade_subtitle">کاور به سمت پایین تار می‌شود و رنگش زیر آن پخش می‌شود. خاموش، یک کاور مربعی ساده.</string>
     <string name="online_lyrics">متن آهنگ از وب</string>
     <string name="online_lyrics_subtitle">برای آهنگی که متنش کلمه‌به‌کلمه زمان‌بندی نشده: در lrc.red، BetterLyrics، LyricsPlus و LRCLIB با عنوان، هنرمند و مدت جستجو می‌شود.</string>
+    <string name="lyrics_source">منبع متن</string>
+    <string name="lyrics_source_in_song">در خود آهنگ</string>
+    <string name="lyrics_source_showing">در حال نمایش</string>
+    <string name="lyrics_source_found">پیدا شد · برای نمایش بزنید</string>
+    <string name="lyrics_source_searching">در حال جستجو…</string>
+    <string name="lyrics_source_not_found">پیدا نشد · برای تلاش دوباره بزنید</string>
+    <string name="lyrics_source_not_asked">پرسیده نشده · برای جستجو بزنید</string>
+    <string name="lyrics_word_by_word">کلمه‌به‌کلمه</string>
+    <string name="lyrics_by_line">خط‌به‌خط</string>
+    <string name="lyrics_unsynced">بدون زمان‌بندی</string>
 </resources>

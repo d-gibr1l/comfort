@@ -1377,4 +1377,14 @@
     <string name="cover_fade_subtitle">העטיפה מיטשטשת כלפי מטה וזוהרת מתחתיה. כבוי, עטיפה ריבועית רגילה.</string>
     <string name="online_lyrics">מילים מהרשת</string>
     <string name="online_lyrics_subtitle">לשיר שהמילים שלו לא מתוזמנות מילה במילה: חיפוש ב-lrc.red, ‏BetterLyrics, ‏LyricsPlus ו-LRCLIB לפי שם, אמן ואורך.</string>
+    <string name="lyrics_source">מקור המילים</string>
+    <string name="lyrics_source_in_song">בשיר עצמו</string>
+    <string name="lyrics_source_showing">מוצג</string>
+    <string name="lyrics_source_found">נמצא · הקש להצגה</string>
+    <string name="lyrics_source_searching">מחפש…</string>
+    <string name="lyrics_source_not_found">לא נמצא · הקש לנסות שוב</string>
+    <string name="lyrics_source_not_asked">לא נבדק · הקש לחיפוש</string>
+    <string name="lyrics_word_by_word">מילה במילה</string>
+    <string name="lyrics_by_line">שורה בשורה</string>
+    <string name="lyrics_unsynced">לא מתוזמן</string>
 </resources>

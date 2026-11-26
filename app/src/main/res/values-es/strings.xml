@@ -1377,4 +1377,14 @@
     <string name="cover_fade_subtitle">La portada se difumina hacia abajo y su color se extiende por debajo. Desactivado, una portada cuadrada simple.</string>
     <string name="online_lyrics">Letras de la web</string>
     <string name="online_lyrics_subtitle">Para una canción cuya letra no está sincronizada palabra por palabra: se busca en lrc.red, BetterLyrics, LyricsPlus y LRCLIB por título, artista y duración.</string>
+    <string name="lyrics_source">Fuente de la letra</string>
+    <string name="lyrics_source_in_song">En la canción</string>
+    <string name="lyrics_source_showing">Mostrando</string>
+    <string name="lyrics_source_found">Encontrada · toca para mostrar</string>
+    <string name="lyrics_source_searching">Buscando…</string>
+    <string name="lyrics_source_not_found">No encontrada · toca para reintentar</string>
+    <string name="lyrics_source_not_asked">Sin consultar · toca para buscar</string>
+    <string name="lyrics_word_by_word">Palabra por palabra</string>
+    <string name="lyrics_by_line">Por línea</string>
+    <string name="lyrics_unsynced">Sin sincronizar</string>
 </resources>

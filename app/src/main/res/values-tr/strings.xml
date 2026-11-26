@@ -1342,4 +1342,14 @@
     <string name="cover_fade_subtitle">Kapak aşağıya doğru bulanıklaşır ve rengi altına yayılır. Kapalıyken düz kare kapak.</string>
     <string name="online_lyrics">Web\'den şarkı sözleri</string>
     <string name="online_lyrics_subtitle">Sözleri kelime kelime zamanlanmamış bir şarkı için: başlık, sanatçı ve süreye göre lrc.red, BetterLyrics, LyricsPlus ve LRCLIB\'de aranır.</string>
+    <string name="lyrics_source">Şarkı sözü kaynağı</string>
+    <string name="lyrics_source_in_song">Şarkının içinde</string>
+    <string name="lyrics_source_showing">Gösteriliyor</string>
+    <string name="lyrics_source_found">Bulundu · göstermek için dokunun</string>
+    <string name="lyrics_source_searching">Aranıyor…</string>
+    <string name="lyrics_source_not_found">Bulunamadı · tekrar denemek için dokunun</string>
+    <string name="lyrics_source_not_asked">Sorulmadı · aramak için dokunun</string>
+    <string name="lyrics_word_by_word">Kelime kelime</string>
+    <string name="lyrics_by_line">Satır satır</string>
+    <string name="lyrics_unsynced">Zamanlanmamış</string>
 </resources>

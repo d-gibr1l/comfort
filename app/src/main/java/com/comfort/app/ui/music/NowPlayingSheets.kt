@@ -2,6 +2,14 @@ package com.comfort.app.ui.music
 
 // The music player's own sheets: sleep timer, speed and pitch, music settings, a song's properties.
 
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.ui.res.stringResource
 import com.comfort.app.R
 import androidx.compose.foundation.clickable
@@ -363,5 +371,99 @@ private fun songProperties(context: android.content.Context, uri: android.net.Ur
         bitrate?.takeIf { it > 0 }?.let { add(R.string.prop_bitrate to "${(it + 500) / 1000} kbps") }
         sampleRate?.takeIf { it > 0 }?.let { hz -> add(R.string.prop_sample_rate to (if (hz % 1000 == 0) "${hz / 1000} kHz" else "%.1f kHz".format(hz / 1000f))) }
         size?.let { add(R.string.sort_size to com.comfort.app.ui.main.formatFileSize(it)) }
+    }
+}
+
+/** Where the song's lyrics come from (Mixify's sources sheet): its own, or a web source's. Each
+ * row says how that source fared; a tap on one that has them shows them, on any other asks it. */
+@Composable
+internal fun LyricsSourceSheet(song: com.comfort.app.music.Song, onDismiss: () -> Unit) {
+    val ol = com.comfort.app.music.lyrics.OnlineLyrics
+    val status by ol.status.collectAsState()
+    val shown by ol.shown.collectAsState()
+    val own by ol.own.collectAsState()
+    val state by com.comfort.app.music.MusicPlayer.state.collectAsState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val songStatus = status.takeIf { it.songId == song.id }
+    val showing = shown?.takeIf { it.songId == song.id }
+    PlayerSheet(stringResource(R.string.lyrics_source), onDismiss) {
+        val ownLyrics = own?.takeIf { it.first == song.id }?.second
+        if (ownLyrics != null) {
+            LyricsSourceRow(
+                title = stringResource(R.string.lyrics_source_in_song),
+                wordSynced = ownLyrics.wordSynced, synced = ownLyrics.synced,
+                state = if (showing != null && showing.source == null) LyricsRowState.Showing else LyricsRowState.Found,
+            ) { scope.launch { ol.pick(song, null, state.duration) } }
+        }
+        com.comfort.app.music.lyrics.LyricsSource.offered.forEach { source ->
+            val found = songStatus?.found?.get(source)
+            val rowState = when {
+                showing?.source == source -> LyricsRowState.Showing
+                found != null -> LyricsRowState.Found
+                songStatus?.sources?.get(source) == com.comfort.app.music.lyrics.OnlineLyrics.State.Searching -> LyricsRowState.Searching
+                songStatus?.sources?.get(source) == com.comfort.app.music.lyrics.OnlineLyrics.State.NotFound -> LyricsRowState.NotFound
+                else -> LyricsRowState.NotAsked
+            }
+            LyricsSourceRow(
+                title = source.label,
+                wordSynced = found?.wordSynced ?: source.wordSynced,
+                synced = found?.synced ?: true,
+                state = rowState,
+            ) {
+                if (rowState != LyricsRowState.Searching) scope.launch { ol.pick(song, source, state.duration) }
+            }
+        }
+    }
+}
+
+private enum class LyricsRowState { Showing, Found, Searching, NotFound, NotAsked }
+
+@Composable
+private fun LyricsSourceRow(title: String, wordSynced: Boolean, synced: Boolean, state: LyricsRowState, onClick: () -> Unit) {
+    val showing = state == LyricsRowState.Showing
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (showing) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(if (wordSynced) R.string.lyrics_word_by_word else if (synced) R.string.lyrics_by_line else R.string.lyrics_unsynced),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+            Text(
+                stringResource(
+                    when (state) {
+                        LyricsRowState.Showing -> R.string.lyrics_source_showing
+                        LyricsRowState.Found -> R.string.lyrics_source_found
+                        LyricsRowState.Searching -> R.string.lyrics_source_searching
+                        LyricsRowState.NotFound -> R.string.lyrics_source_not_found
+                        LyricsRowState.NotAsked -> R.string.lyrics_source_not_asked
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        when (state) {
+            LyricsRowState.Searching -> androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            LyricsRowState.Showing, LyricsRowState.Found -> Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            LyricsRowState.NotFound -> Icon(Icons.Rounded.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            LyricsRowState.NotAsked -> Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

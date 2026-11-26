@@ -1377,4 +1377,14 @@
     <string name="cover_fade_subtitle">A capa desfoca em direção à parte de baixo e brilha abaixo dela. Desativado, uma capa quadrada simples.</string>
     <string name="online_lyrics">Letras da web</string>
     <string name="online_lyrics_subtitle">Para uma música cuja letra não é sincronizada palavra por palavra: busca no lrc.red, BetterLyrics, LyricsPlus e LRCLIB por título, artista e duração.</string>
+    <string name="lyrics_source">Fonte da letra</string>
+    <string name="lyrics_source_in_song">Na música</string>
+    <string name="lyrics_source_showing">Exibindo</string>
+    <string name="lyrics_source_found">Encontrada · toque para exibir</string>
+    <string name="lyrics_source_searching">Buscando…</string>
+    <string name="lyrics_source_not_found">Não encontrada · toque para tentar de novo</string>
+    <string name="lyrics_source_not_asked">Não consultada · toque para buscar</string>
+    <string name="lyrics_word_by_word">Palavra por palavra</string>
+    <string name="lyrics_by_line">Por linha</string>
+    <string name="lyrics_unsynced">Sem sincronia</string>
 </resources>

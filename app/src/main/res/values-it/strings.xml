@@ -1346,4 +1346,14 @@
     <string name="cover_fade_subtitle">La copertina si sfoca verso il basso e il suo colore si diffonde sotto. Disattivato, una semplice copertina quadrata.</string>
     <string name="online_lyrics">Testi dal web</string>
     <string name="online_lyrics_subtitle">Per un brano il cui testo non è sincronizzato parola per parola: cercato su lrc.red, BetterLyrics, LyricsPlus e LRCLIB per titolo, artista e durata.</string>
+    <string name="lyrics_source">Fonte del testo</string>
+    <string name="lyrics_source_in_song">Nel brano</string>
+    <string name="lyrics_source_showing">Mostrato</string>
+    <string name="lyrics_source_found">Trovato · tocca per mostrarlo</string>
+    <string name="lyrics_source_searching">Ricerca…</string>
+    <string name="lyrics_source_not_found">Non trovato · tocca per riprovare</string>
+    <string name="lyrics_source_not_asked">Non cercato · tocca per cercare</string>
+    <string name="lyrics_word_by_word">Parola per parola</string>
+    <string name="lyrics_by_line">Per riga</string>
+    <string name="lyrics_unsynced">Non sincronizzato</string>
 </resources>

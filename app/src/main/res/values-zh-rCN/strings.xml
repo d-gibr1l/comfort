@@ -1308,4 +1308,14 @@
     <string name="cover_fade_subtitle">封面底部逐渐模糊，颜色向下晕开。关闭后为普通方形封面。</string>
     <string name="online_lyrics">从网络获取歌词</string>
     <string name="online_lyrics_subtitle">歌曲自带歌词未逐字计时时：按标题、艺人和时长在 lrc.red、BetterLyrics、LyricsPlus 和 LRCLIB 上查找。</string>
+    <string name="lyrics_source">歌词来源</string>
+    <string name="lyrics_source_in_song">歌曲自带</string>
+    <string name="lyrics_source_showing">正在显示</string>
+    <string name="lyrics_source_found">已找到 · 点按显示</string>
+    <string name="lyrics_source_searching">正在搜索…</string>
+    <string name="lyrics_source_not_found">未找到 · 点按重试</string>
+    <string name="lyrics_source_not_asked">未查询 · 点按搜索</string>
+    <string name="lyrics_word_by_word">逐字</string>
+    <string name="lyrics_by_line">逐行</string>
+    <string name="lyrics_unsynced">未计时</string>
 </resources>

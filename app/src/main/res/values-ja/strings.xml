@@ -1308,4 +1308,14 @@
     <string name="cover_fade_subtitle">カバーの下側をぼかし、その下に色をにじませます。オフにすると通常の四角いカバーです。</string>
     <string name="online_lyrics">ウェブから歌詞を取得</string>
     <string name="online_lyrics_subtitle">単語ごとに同期されていない曲は、タイトル・アーティスト・長さで lrc.red、BetterLyrics、LyricsPlus、LRCLIB を検索します。</string>
+    <string name="lyrics_source">歌詞のソース</string>
+    <string name="lyrics_source_in_song">曲に含まれる歌詞</string>
+    <string name="lyrics_source_showing">表示中</string>
+    <string name="lyrics_source_found">見つかりました · タップで表示</string>
+    <string name="lyrics_source_searching">検索中…</string>
+    <string name="lyrics_source_not_found">見つかりません · タップで再試行</string>
+    <string name="lyrics_source_not_asked">未検索 · タップで検索</string>
+    <string name="lyrics_word_by_word">単語ごと</string>
+    <string name="lyrics_by_line">行ごと</string>
+    <string name="lyrics_unsynced">同期なし</string>
 </resources>

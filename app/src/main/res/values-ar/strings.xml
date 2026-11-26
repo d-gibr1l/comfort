@@ -1482,4 +1482,14 @@
     <string name="cover_fade_subtitle">يصبح الغلاف ضبابيًا نحو الأسفل ويتوهّج تحته. عند الإيقاف، غلاف مربع عادي.</string>
     <string name="online_lyrics">كلمات من الويب</string>
     <string name="online_lyrics_subtitle">لأغنية لا تُوقَّت كلماتها كلمةً بكلمة: يُبحث عنها في lrc.red وBetterLyrics وLyricsPlus وLRCLIB بالعنوان والفنان والمدة.</string>
+    <string name="lyrics_source">مصدر الكلمات</string>
+    <string name="lyrics_source_in_song">في الأغنية</string>
+    <string name="lyrics_source_showing">معروضة</string>
+    <string name="lyrics_source_found">موجودة · انقر لعرضها</string>
+    <string name="lyrics_source_searching">جارٍ البحث…</string>
+    <string name="lyrics_source_not_found">غير موجودة · انقر للمحاولة مجددًا</string>
+    <string name="lyrics_source_not_asked">لم يُسأل · انقر للبحث</string>
+    <string name="lyrics_word_by_word">كلمة بكلمة</string>
+    <string name="lyrics_by_line">سطرًا بسطر</string>
+    <string name="lyrics_unsynced">غير مُوقّتة</string>
 </resources>

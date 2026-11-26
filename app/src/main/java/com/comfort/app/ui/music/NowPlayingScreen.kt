@@ -133,21 +133,19 @@ private fun NowPlayingContent(
 
     // The song's lyrics (from its own tags), and whether they're shown in place of the cover.
     val context = androidx.compose.ui.platform.LocalContext.current
-    var lyrics by remember { mutableStateOf<com.comfort.app.music.Lyrics?>(null) }
+    // Its own (from its tags), unless a web source's are better or one is picked in the
+    // Lyrics source sheet (OnlineLyrics): looked up once the song's length is known.
+    var ownLyrics by remember { mutableStateOf<com.comfort.app.music.Lyrics?>(null) }
     LaunchedEffect(song?.uri) {
-        lyrics = null
-        lyrics = song?.let { com.comfort.app.music.Lyrics.load(context, it.uri) }
-        // Not timed word by word (or none at all): looked up on the web, Music settings ›
-        // Lyrics from the web. Once the song's length is known, which the sources match on.
-        val own = lyrics
-        if (song != null && own?.wordSynced != true && com.comfort.app.music.MusicSettings.onlineLyrics.value.value) {
-            val length = MusicPlayer.state.first { it.duration > 0 }.duration
-            val found = com.comfort.app.music.lyrics.OnlineLyrics.find(song, length)
-            // The web's replaces the song's own only when it's better: timed where the song's
-            // aren't, or timed word by word.
-            if (found != null && (own == null || found.wordSynced || (found.synced && !own.synced))) lyrics = found
-        }
+        ownLyrics = null
+        val current = song ?: return@LaunchedEffect
+        val own = com.comfort.app.music.Lyrics.load(context, current.uri)
+        ownLyrics = own
+        val length = MusicPlayer.state.first { it.duration > 0 }.duration
+        com.comfort.app.music.lyrics.OnlineLyrics.settle(current, own, length, com.comfort.app.music.MusicSettings.onlineLyrics.value.value)
     }
+    val pickedLyrics by com.comfort.app.music.lyrics.OnlineLyrics.shown.collectAsState()
+    val lyrics = pickedLyrics?.takeIf { it.songId == song?.id }?.lyrics ?: ownLyrics
     var showLyrics by remember { mutableStateOf(false) }
     // The two lyric lines under the cover, on or off (the top bar's lyrics button), kept.
     val playerPrefs = androidx.compose.ui.platform.LocalContext.current.let { remember { it.getSharedPreferences("music_player", android.content.Context.MODE_PRIVATE) } }
@@ -682,6 +680,7 @@ private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolea
     var propertiesOpen by remember { mutableStateOf(false) }
     var sleepOpen by remember { mutableStateOf(false) }
     var speedOpen by remember { mutableStateOf(false) }
+    var lyricsSourceOpen by remember { mutableStateOf(false) }
     val hasFile = song != null && song.uri != android.net.Uri.EMPTY
     // Over the artwork's dark backdrop: a light fill while the menu is open, the dots stay white.
     IconButton(onClick = { open = true }, colors = com.comfort.app.ui.main.menuButtonColors(open, Ink.copy(alpha = 0.2f))) {
@@ -730,6 +729,11 @@ private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolea
                     value = if (speed == 1f && pitch == 1f) null else "${formatFactor(speed)} · ${formatFactor(pitch)}",
                 ) { pick { speedOpen = true } }
                 SongMenuOption(Icons.Outlined.Info, stringResource(R.string.song_properties), enabled = hasFile) { pick { propertiesOpen = true } }
+                val lyricsShown by com.comfort.app.music.lyrics.OnlineLyrics.shown.collectAsState()
+                SongMenuOption(
+                    Icons.Outlined.Lyrics, stringResource(R.string.lyrics_source),
+                    value = lyricsShown?.takeIf { it.songId == song.id && it.lyrics != null }?.let { it.source?.label ?: stringResource(R.string.lyrics_source_in_song) },
+                ) { pick { lyricsSourceOpen = true } }
                 SongMenuOption(Icons.Rounded.Share, stringResource(R.string.share), enabled = hasFile) {
                     pick {
                         // Leaves the app for the share sheet: the menu's done.
@@ -748,6 +752,7 @@ private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolea
     if (sleepOpen) SleepTimerSheet(onDismiss = { sleepOpen = false })
     if (speedOpen) SpeedPitchSheet(onDismiss = { speedOpen = false })
     if (propertiesOpen && song != null) SongPropertiesSheet(song, onDismiss = { propertiesOpen = false })
+    if (lyricsSourceOpen && song != null) LyricsSourceSheet(song, onDismiss = { lyricsSourceOpen = false })
 }
 
 /** One of the song menu's options: an icon and its name, the whole row a tap target. */

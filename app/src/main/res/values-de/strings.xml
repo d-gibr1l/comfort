@@ -1342,4 +1342,14 @@
     <string name="cover_fade_subtitle">Das Cover wird nach unten hin unscharf und leuchtet darunter weiter. Aus: ein schlichtes quadratisches Cover.</string>
     <string name="online_lyrics">Liedtexte aus dem Netz</string>
     <string name="online_lyrics_subtitle">Für einen Song, dessen eigener Text nicht Wort für Wort getaktet ist: Suche auf lrc.red, BetterLyrics, LyricsPlus und LRCLIB nach Titel, Interpret und Länge.</string>
+    <string name="lyrics_source">Liedtextquelle</string>
+    <string name="lyrics_source_in_song">Im Song</string>
+    <string name="lyrics_source_showing">Wird angezeigt</string>
+    <string name="lyrics_source_found">Gefunden · zum Anzeigen tippen</string>
+    <string name="lyrics_source_searching">Wird gesucht…</string>
+    <string name="lyrics_source_not_found">Nicht gefunden · erneut versuchen</string>
+    <string name="lyrics_source_not_asked">Nicht gefragt · zum Suchen tippen</string>
+    <string name="lyrics_word_by_word">Wort für Wort</string>
+    <string name="lyrics_by_line">Zeilenweise</string>
+    <string name="lyrics_unsynced">Ohne Timing</string>
 </resources>

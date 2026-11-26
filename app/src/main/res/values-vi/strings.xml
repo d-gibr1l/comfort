@@ -1308,4 +1308,14 @@
     <string name="cover_fade_subtitle">Ảnh bìa mờ dần về phía dưới và tỏa màu xuống bên dưới. Tắt: ảnh bìa vuông thường.</string>
     <string name="online_lyrics">Lời bài hát từ web</string>
     <string name="online_lyrics_subtitle">Với bài hát có lời chưa đồng bộ theo từng từ: tìm trên lrc.red, BetterLyrics, LyricsPlus và LRCLIB theo tên, nghệ sĩ và thời lượng.</string>
+    <string name="lyrics_source">Nguồn lời bài hát</string>
+    <string name="lyrics_source_in_song">Trong bài hát</string>
+    <string name="lyrics_source_showing">Đang hiển thị</string>
+    <string name="lyrics_source_found">Đã tìm thấy · chạm để hiển thị</string>
+    <string name="lyrics_source_searching">Đang tìm…</string>
+    <string name="lyrics_source_not_found">Không tìm thấy · chạm để thử lại</string>
+    <string name="lyrics_source_not_asked">Chưa tìm · chạm để tìm</string>
+    <string name="lyrics_word_by_word">Theo từng từ</string>
+    <string name="lyrics_by_line">Theo từng dòng</string>
+    <string name="lyrics_unsynced">Không đồng bộ</string>
 </resources>
