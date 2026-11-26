@@ -193,7 +193,7 @@
     <string name="issue_idea_subtitle">Sesuatu yang bisa dilakukan Comfort, atau dilakukan lebih baik.</string>
     <string name="report_an_issue_subtitle">Membuka formulir singkat di GitHub dengan versi Anda (%1$s) sudah terisi.</string>
     <string name="player_background">Latar sampul</string>
-    <string name="player_background_subtitle">Latar pemutar adalah sampul lagu yang diburamkan. Jika mati, latar gelap polos.</string>
+    <string name="player_background_subtitle">Latar pemutar adalah sampul lagu, diburamkan. Nonaktif, putih polos di mode terang dan hitam di mode gelap.</string>
     <string name="sleep_custom">Kustom</string>
     <string name="sleep_start">Mulai</string>
     <string name="sleep_x_h">%1$d jam</string>

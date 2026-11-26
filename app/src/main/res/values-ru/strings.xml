@@ -205,7 +205,7 @@
     <string name="issue_idea_subtitle">Что-то, что Comfort мог бы делать, или делать лучше.</string>
     <string name="report_an_issue_subtitle">Откроет короткую форму на GitHub с уже указанной версией (%1$s).</string>
     <string name="player_background">Фон из обложки</string>
-    <string name="player_background_subtitle">Фон плеера — размытая обложка трека. Если выключено — простой тёмный фон.</string>
+    <string name="player_background_subtitle">Фон плеера — размытая обложка песни. Выкл.: просто белый в светлой теме и чёрный в тёмной.</string>
     <string name="sleep_custom">Своё время</string>
     <string name="sleep_start">Запустить</string>
     <string name="sleep_x_h">%1$d ч</string>

@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">Qualcosa che Comfort potrebbe fare, o fare meglio.</string>
     <string name="report_an_issue_subtitle">Apre un breve modulo su GitHub con la tua versione (%1$s) già inserita.</string>
     <string name="player_background">Sfondo copertina</string>
-    <string name="player_background_subtitle">Lo sfondo del lettore è la copertina del brano, sfocata. Disattivato, uno scuro semplice.</string>
+    <string name="player_background_subtitle">Lo sfondo del lettore è la copertina del brano, sfocata. Disattivato, bianco semplice in modalità chiara e nero in modalità scura.</string>
     <string name="sleep_custom">Personalizzato</string>
     <string name="sleep_start">Avvia</string>
     <string name="sleep_x_h">%1$d h</string>

@@ -194,7 +194,7 @@
     <string name="issue_idea_subtitle">Etwas, das Comfort tun oder besser machen könnte.</string>
     <string name="report_an_issue_subtitle">Öffnet ein kurzes Formular auf GitHub, deine Version (%1$s) ist schon eingetragen.</string>
     <string name="player_background">Cover-Hintergrund</string>
-    <string name="player_background_subtitle">Der Hintergrund des Players ist das Cover des Songs, verschwommen. Aus: ein schlichter dunkler.</string>
+    <string name="player_background_subtitle">Der Hintergrund des Players ist das Cover des Songs, unscharf. Aus: schlicht weiß im hellen und schwarz im dunklen Modus.</string>
     <string name="sleep_custom">Eigene Dauer</string>
     <string name="sleep_start">Starten</string>
     <string name="sleep_x_h">%1$d Std.</string>

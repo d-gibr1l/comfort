@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">کاری که Comfort می‌تواند انجام دهد یا بهتر انجام دهد.</string>
     <string name="report_an_issue_subtitle">یک فرم کوتاه در GitHub باز می‌کند که نسخه شما (%1$s) در آن پر شده است.</string>
     <string name="player_background">پس‌زمینه کاور</string>
-    <string name="player_background_subtitle">پس‌زمینه پخش‌کننده کاور آهنگ است، محو شده. خاموش، یک پس‌زمینه تیره ساده.</string>
+    <string name="player_background_subtitle">پس‌زمینه پخش‌کننده کاور آهنگ است، تار. خاموش، سفید ساده در حالت روشن و سیاه در حالت تیره.</string>
     <string name="sleep_custom">سفارشی</string>
     <string name="sleep_start">شروع</string>
     <string name="sleep_x_h">%1$d ساعت</string>

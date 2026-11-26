@@ -121,7 +121,7 @@ internal fun QueuePanel(headerScrolls: Boolean = false) {
 
     val header: @Composable () -> Unit = {
         Box(Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.35f)))
+            Box(Modifier.size(width = 32.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Ink.copy(alpha = 0.35f)))
         }
         // "Up next" and how many, Clear; then shuffle and repeat.
         Row(
@@ -129,11 +129,11 @@ internal fun QueuePanel(headerScrolls: Boolean = false) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.queue_up_next), style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Bold, color = Color.White)
+                Text(stringResource(R.string.queue_up_next), style = MaterialTheme.typography.titleLarge.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.Bold, color = Ink)
                 Text(
                     androidx.compose.ui.res.pluralStringResource(R.plurals.queue_songs_count, upcoming, upcoming),
                     style = MaterialTheme.typography.bodyMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = Ink.copy(alpha = 0.6f),
                 )
             }
             if (state.count > 1) {
@@ -141,8 +141,8 @@ internal fun QueuePanel(headerScrolls: Boolean = false) {
                 androidx.compose.material3.FilledTonalButton(
                     onClick = MusicPlayer::clearQueue,
                     colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.16f),
-                        contentColor = Color.White,
+                        containerColor = Ink.copy(alpha = 0.16f),
+                        contentColor = Ink,
                     ),
                     contentPadding = PaddingValues(start = 14.dp, end = 18.dp),
                     modifier = Modifier.padding(end = 12.dp),
@@ -295,17 +295,17 @@ private fun ModeChip(selected: Boolean, label: String, icon: ImageVector, onClic
         leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
         shape = RoundedCornerShape(50),
         colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-            containerColor = Color.White.copy(alpha = 0.08f),
-            labelColor = Color.White.copy(alpha = 0.85f),
-            iconColor = Color.White.copy(alpha = 0.85f),
-            selectedContainerColor = Color.White,
-            selectedLabelColor = Color.Black,
-            selectedLeadingIconColor = Color.Black,
+            containerColor = Ink.copy(alpha = 0.08f),
+            labelColor = Ink.copy(alpha = 0.85f),
+            iconColor = Ink.copy(alpha = 0.85f),
+            selectedContainerColor = Ink,
+            selectedLabelColor = Paper,
+            selectedLeadingIconColor = Paper,
         ),
         border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            borderColor = Color.White.copy(alpha = 0.25f),
+            borderColor = Ink.copy(alpha = 0.25f),
             selectedBorderWidth = 0.dp,
         ),
         modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
@@ -362,11 +362,11 @@ private fun QueueRowContent(
                     // Lifted: solid, over the rows it passes.
                     dragged -> Color(0xFF2E2E2E)
                     // The song on: a lit card.
-                    current -> Color.White.copy(alpha = 0.14f)
+                    current -> Ink.copy(alpha = 0.14f)
                     else -> Color.Transparent
                 }
             )
-            .then(if (current) Modifier.border(1.dp, Color.White.copy(alpha = 0.18f), ROW_SHAPE) else Modifier)
+            .then(if (current) Modifier.border(1.dp, Ink.copy(alpha = 0.18f), ROW_SHAPE) else Modifier)
             .swipeRemoveAction()
             .clickable(onClick = onClick)
             .padding(start = 8.dp, end = 4.dp)
@@ -388,17 +388,17 @@ private fun QueueRowContent(
                 song.title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (current) FontWeight.Bold else FontWeight.Medium,
-                color = Color.White,
+                color = Ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             song.subtitle?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = Ink.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (handle != null) {
             Box(modifier = Modifier.size(48.dp).then(handle), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.DragHandle, contentDescription = stringResource(R.string.drag_to_reorder), tint = Color.White.copy(alpha = 0.55f))
+                Icon(Icons.Rounded.DragHandle, contentDescription = stringResource(R.string.drag_to_reorder), tint = Ink.copy(alpha = 0.55f))
             }
         }
     }
@@ -431,7 +431,7 @@ private fun PlayingBars(animating: Boolean) {
 private fun Bars(heights: List<Float>) {
     Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom, modifier = Modifier.height(18.dp)) {
         heights.forEach { h ->
-            Box(Modifier.width(4.dp).fillMaxHeight(h).clip(RoundedCornerShape(2.dp)).background(Color.White))
+            Box(Modifier.width(4.dp).fillMaxHeight(h).clip(RoundedCornerShape(2.dp)).background(Ink))
         }
     }
 }

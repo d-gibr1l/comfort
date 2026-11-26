@@ -62,7 +62,7 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                 lyrics.plain.orEmpty(),
                 style = base.copy(fontSize = base.fontSize * zoom.factor, lineHeight = base.lineHeight * zoom.factor),
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White.copy(alpha = 0.9f),
+                color = Ink.copy(alpha = 0.9f),
                 modifier = Modifier.padding(vertical = 24.dp),
             )
         }
@@ -157,7 +157,7 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                     label = "lyricAlpha",
                 )
                 val scale by animateFloatAsState(if (active) 1f else 0.96f, animationSpec = tween(300), label = "lyricScale")
-                val color by animateColorAsState(if (active) Color.White else Color.White.copy(alpha = 0.9f), label = "lyricColor")
+                val color by animateColorAsState(if (active) Ink else Ink.copy(alpha = 0.9f), label = "lyricColor")
                 // Shrinks towards the side the line is aligned to: its own script decides that (an
                 // Arabic or Hebrew line sits on the right, whatever the app's language).
                 val originX = remember(line.text) { if (java.text.Bidi(line.text, java.text.Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT).baseIsLeftToRight()) 0f else 1f }
@@ -315,7 +315,7 @@ private fun LyricPreviewLine(text: String, style: androidx.compose.ui.text.TextS
         text,
         style = style,
         fontWeight = FontWeight.Bold,
-        color = Color.White.copy(alpha = alpha.coerceIn(0f, 1f)),
+        color = Ink.copy(alpha = alpha.coerceIn(0f, 1f)),
         maxLines = 2,
         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         modifier = modifier.layout { measurable, constraints ->

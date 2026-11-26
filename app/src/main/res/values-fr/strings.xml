@@ -201,7 +201,7 @@
     <string name="issue_idea_subtitle">Quelque chose que Comfort pourrait faire, ou mieux faire.</string>
     <string name="report_an_issue_subtitle">Ouvre un court formulaire sur GitHub avec votre version (%1$s) déjà remplie.</string>
     <string name="player_background">Fond de pochette</string>
-    <string name="player_background_subtitle">Le fond du lecteur est la pochette du titre, floutée. Désactivé, un fond sombre uni.</string>
+    <string name="player_background_subtitle">Le fond du lecteur est la pochette du morceau, floutée. Désactivé, blanc uni en mode clair et noir en mode sombre.</string>
     <string name="sleep_custom">Personnalisé</string>
     <string name="sleep_start">Démarrer</string>
     <string name="sleep_x_h">%1$d h</string>

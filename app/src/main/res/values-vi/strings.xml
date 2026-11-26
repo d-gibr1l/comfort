@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">Điều Comfort có thể làm, hoặc làm tốt hơn.</string>
     <string name="report_an_issue_subtitle">Mở một biểu mẫu ngắn trên GitHub, đã điền sẵn phiên bản của bạn (%1$s).</string>
     <string name="player_background">Nền ảnh bìa</string>
-    <string name="player_background_subtitle">Nền trình phát là ảnh bìa bài hát được làm mờ. Khi tắt, là nền tối đơn giản.</string>
+    <string name="player_background_subtitle">Nền trình phát là ảnh bìa bài hát được làm mờ. Tắt: trắng trơn ở chế độ sáng và đen ở chế độ tối.</string>
     <string name="sleep_custom">Tùy chỉnh</string>
     <string name="sleep_start">Bắt đầu</string>
     <string name="sleep_x_h">%1$d giờ</string>

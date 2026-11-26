@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">कुछ ऐसा जो Comfort कर सकता है, या बेहतर कर सकता है।</string>
     <string name="report_an_issue_subtitle">GitHub पर एक छोटा फ़ॉर्म खोलता है जिसमें आपका संस्करण (%1$s) भरा होता है।</string>
     <string name="player_background">कवर पृष्ठभूमि</string>
-    <string name="player_background_subtitle">प्लेयर की पृष्ठभूमि गाने का धुंधला कवर है। बंद होने पर सादी गहरी पृष्ठभूमि।</string>
+    <string name="player_background_subtitle">प्लेयर का बैकग्राउंड गाने का धुंधला कवर है। बंद होने पर, लाइट मोड में सादा सफ़ेद और डार्क मोड में काला।</string>
     <string name="sleep_custom">कस्टम</string>
     <string name="sleep_start">शुरू करें</string>
     <string name="sleep_x_h">%1$d घं</string>

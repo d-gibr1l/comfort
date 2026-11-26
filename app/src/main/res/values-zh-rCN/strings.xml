@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">Comfort 可以做或可以做得更好的事。</string>
     <string name="report_an_issue_subtitle">在 GitHub 上打开一个简短表单，并已填入你的版本（%1$s）。</string>
     <string name="player_background">封面背景</string>
-    <string name="player_background_subtitle">播放器背景为歌曲封面的模糊效果。关闭后为纯深色背景。</string>
+    <string name="player_background_subtitle">播放器背景为模糊处理的歌曲封面。关闭后，浅色模式为纯白，深色模式为纯黑。</string>
     <string name="sleep_custom">自定义</string>
     <string name="sleep_start">开始</string>
     <string name="sleep_x_h">%1$d 小时</string>

@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">Comfort にできそうなこと、もっと良くできること。</string>
     <string name="report_an_issue_subtitle">バージョン (%1$s) が入力済みの短いフォームを GitHub で開きます。</string>
     <string name="player_background">ジャケットの背景</string>
-    <string name="player_background_subtitle">プレーヤーの背景を曲のジャケットのぼかしにします。オフにすると無地の暗い背景になります。</string>
+    <string name="player_background_subtitle">プレーヤーの背景は曲のカバーをぼかしたものです。オフにすると、ライトモードでは白、ダークモードでは黒の無地になります。</string>
     <string name="sleep_custom">カスタム</string>
     <string name="sleep_start">開始</string>
     <string name="sleep_x_h">%1$d 時間</string>

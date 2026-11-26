@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">شيء يمكن لـ Comfort فعله، أو فعله بشكل أفضل.</string>
     <string name="report_an_issue_subtitle">يفتح نموذجًا قصيرًا على GitHub مع ملء إصدارك (%1$s).</string>
     <string name="player_background">خلفية الغلاف</string>
-    <string name="player_background_subtitle">خلفية المشغّل هي غلاف الأغنية مموّهًا. عند الإيقاف، خلفية داكنة بسيطة.</string>
+    <string name="player_background_subtitle">خلفية المشغّل هي غلاف الأغنية مموّهًا. عند الإيقاف، أبيض عادي في الوضع الفاتح وأسود في الوضع الداكن.</string>
     <string name="sleep_custom">مخصّص</string>
     <string name="sleep_start">ابدأ</string>
     <string name="sleep_x_h">%1$d س</string>

@@ -91,6 +91,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 
 /**
  * The music player's full screen: the song's cover blurred behind, the cover, title and
@@ -107,11 +108,26 @@ fun NowPlayingScreen(
     // Whether it's being dragged away from its place (what's under it then shows).
     onDragged: (Boolean) -> Unit = {},
 ) {
+    // Music settings › Cover background off, in light mode: a white player (PlayerInk).
+    val coverBackdropOn by com.comfort.app.music.MusicSettings.coverBackground.value.collectAsState()
+    val playerLight = !coverBackdropOn && MaterialTheme.colorScheme.background.luminance() > 0.5f
+    androidx.compose.runtime.CompositionLocalProvider(LocalPlayerLight provides playerLight) {
+        NowPlayingContent(onClose, showing, onDragged)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@Composable
+private fun NowPlayingContent(
+    onClose: () -> Unit,
+    showing: Boolean,
+    onDragged: (Boolean) -> Unit,
+) {
     val state by MusicPlayer.state.collectAsState()
     val song = state.song
     BackHandler(onBack = onClose)
     // Declared after the player's own, so it runs first while the queue is open.
-    LightSystemBars()
+    LightSystemBars(dark = LocalPlayerLight.current)
 
     // The song's lyrics (from its own tags), and whether they're shown in place of the cover.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -174,7 +190,7 @@ fun NowPlayingScreen(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer { translationY = if (showQueue) 0f else dragY.value.coerceAtLeast(0f) }
-            .background(Color.Black)
+            .background(Paper)
             // Takes every touch: nothing under this screen reacts.
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .pointerInput(Unit) {
@@ -221,7 +237,7 @@ fun NowPlayingScreen(
         val seenBackdrop = remember { arrayOfNulls<String>(1) }
         val priorBackdrop = remember(song?.id) { seenBackdrop[0].also { seenBackdrop[0] = song?.id } }
         if (coverBackdrop) CoverImage(song, blurred = true, modifier = Modifier.fillMaxSize().clipToBounds().scale(1.2f), priorId = priorBackdrop)
-        Box(
+        if (coverBackdrop) Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     0f to Color.Black.copy(alpha = 0.45f),
@@ -261,14 +277,14 @@ fun NowPlayingScreen(
                     androidx.compose.animation.AnimatedVisibility(visible = !(landscapeLayout && showQueue)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
-                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.close_player), tint = Color.White, modifier = Modifier.size(30.dp))
+                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.close_player), tint = Ink, modifier = Modifier.size(30.dp))
                         }
                         if (landscapeLayout) Spacer(Modifier.weight(1f)) else Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text(stringResource(R.string.now_playing), style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), fontWeight = FontWeight.SemiBold, color = Ink)
                             Text(
                                 if (state.count > 1) stringResource(R.string.song_x_of_x, state.index + 1, state.count) else stringResource(R.string.your_library),
                                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = Ink.copy(alpha = 0.7f),
                             )
                         }
                         // Synced lyrics: turns the lyric lines under the cover on and off (a tap on
@@ -294,7 +310,7 @@ fun NowPlayingScreen(
                                 },
                                 modifier = Modifier.size(48.dp),
                                 colors = IconButtonDefaults.iconButtonColors(
-                                    containerColor = if (lit) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+                                    containerColor = if (lit) Ink.copy(alpha = 0.2f) else Color.Transparent,
                                 ),
                             ) {
                                 Icon(
@@ -307,7 +323,7 @@ fun NowPlayingScreen(
                                             else -> com.comfort.app.R.string.lyrics_show
                                         },
                                     ),
-                                    tint = Color.White,
+                                    tint = Ink,
                                 )
                             }
                         } else {
@@ -403,7 +419,7 @@ fun NowPlayingScreen(
                                     .clip(RoundedCornerShape(20.dp))
                                     .then(if (coverFade) Modifier.alphaMask(0f to Color.Black, 0.82f to Color.Black, 1f to Color.Transparent) else Modifier),
                             ) {
-                                Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.08f)))
+                                Box(Modifier.fillMaxSize().background(Ink.copy(alpha = 0.08f)))
                                 SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
                                     Box(Modifier.fillMaxSize()) {
                                         CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
@@ -442,7 +458,7 @@ fun NowPlayingScreen(
                             Text(
                                 stringResource(R.string.now_playing) + (if (state.count > 1) " · " + stringResource(R.string.song_x_of_x, state.index + 1, state.count) else ""),
                                 style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
-                                color = Color.White.copy(alpha = 0.7f),
+                                color = Ink.copy(alpha = 0.7f),
                             )
                             Spacer(Modifier.height(6.dp))
                         }
@@ -456,12 +472,12 @@ fun NowPlayingScreen(
                                         shown?.title ?: "",
                                         style = MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = Ink,
                                         maxLines = 1,
                                         modifier = Modifier.fillMaxWidth().basicMarquee(),
                                     )
                                     shown?.artist?.takeIf { it.isNotBlank() }?.let {
-                                        Text(it, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(it, style = MaterialTheme.typography.titleMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily), color = Ink.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }
@@ -505,22 +521,22 @@ fun NowPlayingScreen(
                             .padding(top = 6.dp, bottom = 10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(Modifier.size(width = 36.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.6f)))
+                        Box(Modifier.size(width = 36.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Ink.copy(alpha = 0.6f)))
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(Color.White.copy(alpha = 0.14f))
+                                .background(Ink.copy(alpha = 0.14f))
                                 .clickable { showQueue = true }
                                 .padding(horizontal = 18.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Rounded.QueueMusic, contentDescription = null, tint = Ink, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.size(8.dp))
                             Text(
                                 stringResource(R.string.queue),
                                 style = MaterialTheme.typography.titleSmall.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily),
-                                color = Color.White,
+                                color = Ink,
                             )
                         }
                     }
@@ -603,22 +619,23 @@ internal fun CoverImage(song: Song?, blurred: Boolean, modifier: Modifier = Modi
         )
     } else if (!blurred) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Icon(Icons.Outlined.MusicNote, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(96.dp))
+            Icon(Icons.Outlined.MusicNote, contentDescription = null, tint = Ink.copy(alpha = 0.5f), modifier = Modifier.size(96.dp))
         }
     }
 }
 
 /** Light status and navigation bar icons while this dark screen is up, the theme's after. */
 @Composable
-private fun LightSystemBars() {
+private fun LightSystemBars(dark: Boolean) {
     val view = androidx.compose.ui.platform.LocalView.current
-    DisposableEffect(view) {
+    DisposableEffect(view, dark) {
         val window = (view.context as? android.app.Activity)?.window
         val controller = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
         val wasLightStatus = controller?.isAppearanceLightStatusBars
         val wasLightNav = controller?.isAppearanceLightNavigationBars
-        controller?.isAppearanceLightStatusBars = false
-        controller?.isAppearanceLightNavigationBars = false
+        // Dark icons on the white player.
+        controller?.isAppearanceLightStatusBars = dark
+        controller?.isAppearanceLightNavigationBars = dark
         onDispose {
             wasLightStatus?.let { controller.isAppearanceLightStatusBars = it }
             wasLightNav?.let { controller.isAppearanceLightNavigationBars = it }
@@ -652,8 +669,8 @@ private fun SongMenu(song: Song?, lyricLine: Boolean, onLyricLineChange: (Boolea
     var speedOpen by remember { mutableStateOf(false) }
     val hasFile = song != null && song.uri != android.net.Uri.EMPTY
     // Over the artwork's dark backdrop: a light fill while the menu is open, the dots stay white.
-    IconButton(onClick = { open = true }, colors = com.comfort.app.ui.main.menuButtonColors(open, Color.White.copy(alpha = 0.2f))) {
-        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Color.White)
+    IconButton(onClick = { open = true }, colors = com.comfort.app.ui.main.menuButtonColors(open, Ink.copy(alpha = 0.2f))) {
+        Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.more_options), tint = Ink)
     }
     if (open && song != null) {
         // An option opens its own sheet over this one; Back (or a tap outside, or a pull down)
@@ -798,8 +815,8 @@ private fun QueueLayout(
                 Spacer(Modifier.size(12.dp))
             }
             Column(modifier = Modifier.weight(1f).then(titleModifier)) {
-                Text(state.song?.title.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                state.song?.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                Text(state.song?.title.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                state.song?.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Ink.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             }
             }
             // Previous, play, next in any language (see MediaLtr).
@@ -807,8 +824,8 @@ private fun QueueLayout(
             androidx.compose.material3.OutlinedIconButton(
                 // As the player's own: restarts the song, or goes back one near its start.
                 onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() },
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
-                colors = IconButtonDefaults.outlinedIconButtonColors(contentColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Ink.copy(alpha = 0.5f)),
+                colors = IconButtonDefaults.outlinedIconButtonColors(contentColor = Ink),
                 modifier = Modifier.size(44.dp),
             ) {
                 Icon(Icons.Rounded.SkipPrevious, contentDescription = stringResource(R.string.widget_music_previous))
@@ -817,7 +834,7 @@ private fun QueueLayout(
             FilledIconButton(
                 onClick = MusicPlayer::togglePlay,
                 shape = RoundedCornerShape(12.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color.Black),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = Ink, contentColor = Paper),
                 modifier = Modifier.size(width = 48.dp, height = 44.dp),
             ) {
                 Icon(if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = if (state.isPlaying) stringResource(R.string.widget_music_pause) else stringResource(R.string.widget_music_play))
@@ -826,8 +843,8 @@ private fun QueueLayout(
             androidx.compose.material3.OutlinedIconButton(
                 onClick = { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.next() },
                 enabled = state.hasNext,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
-                colors = IconButtonDefaults.outlinedIconButtonColors(contentColor = Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Ink.copy(alpha = 0.5f)),
+                colors = IconButtonDefaults.outlinedIconButtonColors(contentColor = Ink),
                 modifier = Modifier.size(44.dp),
             ) {
                 Icon(Icons.Rounded.SkipNext, contentDescription = stringResource(R.string.widget_music_next))
@@ -837,8 +854,8 @@ private fun QueueLayout(
         com.comfort.app.ui.MediaLtr {
         androidx.compose.material3.LinearProgressIndicator(
             progress = { if (state.duration > 0) (position.toFloat() / state.duration).coerceIn(0f, 1f) else 0f },
-            color = Color.White,
-            trackColor = Color.White.copy(alpha = 0.25f),
+            color = Ink,
+            trackColor = Ink.copy(alpha = 0.25f),
             gapSize = 0.dp,
             drawStopIndicator = {},
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(3.dp),
@@ -870,8 +887,8 @@ private fun QueueLayout(
         // See-through: the queue stays on the player's own dark, blurred-cover backdrop.
         androidx.compose.material3.Surface(
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            color = Color.White.copy(alpha = 0.06f),
-            contentColor = Color.White,
+            color = Ink.copy(alpha = 0.06f),
+            contentColor = Ink,
             modifier = panelModifier.fillMaxSize().nestedScroll(pullToClose),
         ) {
             QueuePanel(headerScrolls = inPanel)

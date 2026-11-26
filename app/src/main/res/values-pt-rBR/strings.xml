@@ -201,7 +201,7 @@
     <string name="issue_idea_subtitle">Algo que o Comfort poderia fazer, ou fazer melhor.</string>
     <string name="report_an_issue_subtitle">Abre um formulário curto no GitHub com a sua versão (%1$s) já preenchida.</string>
     <string name="player_background">Fundo com a capa</string>
-    <string name="player_background_subtitle">O fundo do player é a capa da música, desfocada. Desativado, um fundo escuro simples.</string>
+    <string name="player_background_subtitle">O fundo do player é a capa da música, desfocada. Desativado, branco liso no modo claro e preto no modo escuro.</string>
     <string name="sleep_custom">Personalizado</string>
     <string name="sleep_start">Iniciar</string>
     <string name="sleep_x_h">%1$d h</string>

@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">Comfort\'un yapabileceği ya da daha iyi yapabileceği bir şey.</string>
     <string name="report_an_issue_subtitle">Sürümünüzün (%1$s) dolu olduğu kısa bir formu GitHub\'da açar.</string>
     <string name="player_background">Kapak arka planı</string>
-    <string name="player_background_subtitle">Oynatıcının arka planı şarkının bulanık kapağıdır. Kapalıyken düz koyu bir arka plan.</string>
+    <string name="player_background_subtitle">Oynatıcının arka planı şarkının bulanık kapağıdır. Kapalıyken açık modda düz beyaz, koyu modda siyah.</string>
     <string name="sleep_custom">Özel</string>
     <string name="sleep_start">Başlat</string>
     <string name="sleep_x_h">%1$d sa</string>

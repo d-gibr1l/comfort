@@ -207,7 +207,7 @@
     <string name="issue_idea_subtitle">Something Comfort could do, or do better.</string>
     <string name="report_an_issue_subtitle">Opens a short form on GitHub with your version (%1$s) filled in.</string>
     <string name="player_background">Cover background</string>
-    <string name="player_background_subtitle">The player\'s backdrop is the song\'s cover, blurred. Off, a plain dark one.</string>
+    <string name="player_background_subtitle">The player\'s backdrop is the song\'s cover, blurred. Off, plain white in light mode and black in dark mode.</string>
     <string name="sleep_custom">Custom</string>
     <string name="sleep_start">Start</string>
     <string name="sleep_x_h">%1$d h</string>

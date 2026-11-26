@@ -181,7 +181,7 @@
     <string name="issue_idea_subtitle">משהו ש-Comfort יכולה לעשות, או לעשות טוב יותר.</string>
     <string name="report_an_issue_subtitle">פותח טופס קצר ב-GitHub עם הגרסה שלך (%1$s) כבר ממולאת.</string>
     <string name="player_background">רקע העטיפה</string>
-    <string name="player_background_subtitle">הרקע של הנגן הוא עטיפת השיר, מטושטשת. כבוי, רקע כהה פשוט.</string>
+    <string name="player_background_subtitle">הרקע של הנגן הוא עטיפת השיר, מטושטשת. כבוי, לבן רגיל במצב בהיר ושחור במצב כהה.</string>
     <string name="sleep_custom">מותאם אישית</string>
     <string name="sleep_start">התחלה</string>
     <string name="sleep_x_h">%1$d שע׳</string>

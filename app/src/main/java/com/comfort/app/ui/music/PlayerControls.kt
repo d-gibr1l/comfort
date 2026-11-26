@@ -67,8 +67,8 @@ internal fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDra
             // Calmer than the default (a wavelength a second): longer waves, drifting slowly.
             wavelength = 40.dp,
             waveSpeed = if (moving) 10.dp else 0.dp,
-            color = Color.White,
-            trackColor = Color.White.copy(alpha = 0.25f),
+            color = Ink,
+            trackColor = Ink.copy(alpha = 0.25f),
             modifier = Modifier
                 .fillMaxWidth()
                 // The Slider's own track: inset half the handle's width at each end, so the wave
@@ -94,7 +94,7 @@ internal fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDra
         }
         val thumbInteraction = remember { MutableInteractionSource() }
         val colors = SliderDefaults.colors(
-            thumbColor = Color.White,
+            thumbColor = Ink,
             activeTrackColor = Color.Transparent,
             inactiveTrackColor = Color.Transparent,
         )
@@ -110,8 +110,8 @@ internal fun WavySeekBar(position: Long, duration: Long, playing: Boolean, onDra
         )
     }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(formatTime(position), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
-        Text(formatTime(duration), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
+        Text(formatTime(position), style = MaterialTheme.typography.labelMedium, color = Ink.copy(alpha = 0.7f))
+        Text(formatTime(duration), style = MaterialTheme.typography.labelMedium, color = Ink.copy(alpha = 0.7f))
     }
     }
 }
@@ -141,17 +141,17 @@ internal fun PlaybackButtons(state: com.comfort.app.music.MusicState) {
             },
             modifier = Modifier.weight(1f),
         )
-        ControlButton(Icons.Rounded.SkipPrevious, stringResource(R.string.widget_music_previous), { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() }, Color.White.copy(alpha = 0.16f), Color.White, Modifier.weight(1.2f))
+        ControlButton(Icons.Rounded.SkipPrevious, stringResource(R.string.widget_music_previous), { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.previous() }, Ink.copy(alpha = 0.16f), Ink, Modifier.weight(1.2f))
         ControlButton(
             if (state.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
             if (state.isPlaying) stringResource(R.string.widget_music_pause) else stringResource(R.string.widget_music_play),
             MusicPlayer::togglePlay,
-            Color.White,
-            Color.Black,
+            Ink,
+            Paper,
             Modifier.weight(2f),
             iconSize = 36.dp,
         )
-        ControlButton(Icons.Rounded.SkipNext, stringResource(R.string.widget_music_next), { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.next() }, Color.White.copy(alpha = 0.16f), Color.White, Modifier.weight(1.2f))
+        ControlButton(Icons.Rounded.SkipNext, stringResource(R.string.widget_music_next), { haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.ContextClick); MusicPlayer.next() }, Ink.copy(alpha = 0.16f), Ink, Modifier.weight(1.2f))
         ToggleButton(
             icon = Icons.Rounded.Shuffle,
             description = if (state.shuffle) stringResource(R.string.shuffle_on) else stringResource(R.string.shuffle_off),
@@ -207,9 +207,9 @@ private fun ToggleButton(
     androidx.compose.material3.Surface(
         onClick = onClick,
         shape = RoundedCornerShape(36.dp),
-        color = if (checked) Color.White.copy(alpha = 0.9f) else Color.Transparent,
-        contentColor = if (checked) Color.Black else Color.White,
-        border = if (checked) null else androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+        color = if (checked) Ink.copy(alpha = 0.9f) else Color.Transparent,
+        contentColor = if (checked) Paper else Ink,
+        border = if (checked) null else androidx.compose.foundation.BorderStroke(1.dp, Ink.copy(alpha = 0.4f)),
         modifier = modifier.height(56.dp).semantics {
             contentDescription = description
             stateDescription = toggleState
