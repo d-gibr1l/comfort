@@ -158,7 +158,7 @@ straight from them with Obtainium:
     <td align="center"><img src="docs/screenshots/library.png" width="200" alt="Library"><br>Library</td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/appearance_light.png" width="200" alt="Appearance, light"><br>Appearance</td>
+    <td align="center"><img src="docs/screenshots/appearance_light.png" width="200" alt="Look &amp; feel, light"><br>Look &amp; feel</td>
     <td align="center"><img src="docs/screenshots/appearance_dark.png" width="200" alt="Appearance, dark"><br>Pure black</td>
     <td align="center"><img src="docs/screenshots/settings.png" width="200" alt="Settings"><br>Settings</td>
     <td align="center"><img src="docs/screenshots/settings_downloads.png" width="200" alt="Download settings"><br>Downloads</td>
