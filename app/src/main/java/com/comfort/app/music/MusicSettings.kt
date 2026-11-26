@@ -39,6 +39,8 @@ object MusicSettings {
     val keepQueue = bool("keep_queue", true)
     /** The player's backdrop is the song's cover, blurred; off, a plain dark one. */
     val coverBackground = bool("cover_background", true)
+    /** The player cover's lower part blurs and glows out below it; off, a plain square cover. */
+    val coverFade = bool("cover_fade", true)
     /** Playback speed and pitch, 1 being normal. */
     val speed = float("speed", 1f)
     val pitch = float("pitch", 1f)
@@ -79,7 +81,7 @@ object MusicSettings {
     }
 
     private val all: List<Setting<*>> by lazy {
-        listOf(coverBackground, skipSilence, fadeSeconds, resumeAfterInterruption, pauseOnDisconnect, volumeLevelling, previousRestarts, playTappedOnly, keepQueue, speed, pitch)
+        listOf(coverBackground, coverFade, skipSilence, fadeSeconds, resumeAfterInterruption, pauseOnDisconnect, volumeLevelling, previousRestarts, playTappedOnly, keepQueue, speed, pitch)
     }
 
     /** One setting: its value as a flow, set (and kept) with [set]. */

@@ -1373,4 +1373,6 @@
     <string name="app_size">גודל</string>
     <string name="app_size_subtitle">כל מה שב-Comfort קטן או גדול יותר, גם הטקסט</string>
     <string name="update_all_engines">עדכון הכול (%1$d)</string>
+    <string name="cover_fade">עטיפה שמתמוססת</string>
+    <string name="cover_fade_subtitle">העטיפה מיטשטשת כלפי מטה וזוהרת מתחתיה. כבוי, עטיפה ריבועית רגילה.</string>
 </resources>

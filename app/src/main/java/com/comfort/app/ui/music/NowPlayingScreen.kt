@@ -352,7 +352,9 @@ fun NowPlayingScreen(
                                 (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 50)) +
                                     androidx.compose.animation.scaleIn(initialScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(250, delayMillis = 50))) togetherWith
                                     (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)) +
-                                        androidx.compose.animation.scaleOut(targetScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(150)))
+                                        androidx.compose.animation.scaleOut(targetScale = 0.94f, animationSpec = androidx.compose.animation.core.tween(150))) using
+                                    // Not clipped: the cover's glow spills out below it.
+                                    androidx.compose.animation.SizeTransform(clip = false)
                             },
                             contentAlignment = Alignment.Center,
                             label = "coverOrLyrics",
@@ -374,19 +376,43 @@ fun NowPlayingScreen(
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
                                 .sharedElement(rememberSharedContentState("cover"), anim)
-                                .scale(coverScale)
-                                .shadow(24.dp, RoundedCornerShape(20.dp))
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color.White.copy(alpha = 0.08f)),
+                                .scale(coverScale),
                             contentAlignment = Alignment.Center,
                         ) {
-                            SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
-                                Box(Modifier.fillMaxSize()) {
-                                    CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
-                                    // The cover's lower part melts into a blur (Apple Music's
-                                    // look): the blurred copy the backdrop already has (no blur
-                                    // run per frame), shown more and more toward the bottom.
-                                    CoverImage(shown, blurred = true, modifier = Modifier.fillMaxSize().bottomBlurMask())
+                            // The cover's lower part melts away (Apple Music's look): it blurs
+                            // toward the bottom, its bottom edge fades out, and its colours glow on
+                            // below it. All from the blurred copy the backdrop already has (no blur
+                            // run per frame).
+                            val coverFade by com.comfort.app.music.MusicSettings.coverFade.value.collectAsState()
+                            if (coverFade) SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip, clip = false) { shown ->
+                                CoverImage(
+                                    shown, blurred = true,
+                                    modifier = Modifier.fillMaxSize()
+                                        .graphicsLayer {
+                                            translationY = size.height * 0.2f
+                                            scaleX = 1.08f
+                                        }
+                                        .alphaMask(0f to Color.Transparent, 0.45f to Color.Transparent, 0.7f to Color.Black, 1f to Color.Transparent)
+                                        // Soft sides too, no hard edge beside the cover.
+                                        .alphaMask(0f to Color.Transparent, 0.12f to Color.Black, 0.88f to Color.Black, 1f to Color.Transparent, horizontal = true),
+                                )
+                            }
+                            Box(
+                                Modifier.fillMaxSize()
+                                    .then(if (coverFade) Modifier else Modifier.shadow(24.dp, RoundedCornerShape(20.dp)))
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .then(if (coverFade) Modifier.alphaMask(0f to Color.Black, 0.82f to Color.Black, 1f to Color.Transparent) else Modifier),
+                            ) {
+                                Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.08f)))
+                                SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip) { shown ->
+                                    Box(Modifier.fillMaxSize()) {
+                                        CoverImage(shown, blurred = false, modifier = Modifier.fillMaxSize())
+                                        if (coverFade) CoverImage(
+                                            shown, blurred = true,
+                                            modifier = Modifier.fillMaxSize()
+                                                .alphaMask(0f to Color.Transparent, 0.4f to Color.Transparent, 0.72f to Color.Black, 1f to Color.Black),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -923,18 +949,14 @@ private fun ColumnScope.PortraitOrSideBySide(
 /** Landscape: the room under the cover for the two lyric lines. */
 private val LANDSCAPE_LYRICS_SPACE = 100.dp
 
-/** Shows this layer only toward the bottom: clear over the top half, then more and more of it. */
-private fun Modifier.bottomBlurMask(): Modifier = this
+/** This layer's alpha by height: each stop's colour alpha (black = shown, transparent = hidden). */
+private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boolean = false): Modifier = this
     .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
         drawRect(
-            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                0f to Color.Transparent,
-                0.55f to Color.Transparent,
-                0.78f to Color.Black.copy(alpha = 0.8f),
-                1f to Color.Black,
-            ),
+            brush = if (horizontal) androidx.compose.ui.graphics.Brush.horizontalGradient(*stops)
+                else androidx.compose.ui.graphics.Brush.verticalGradient(*stops),
             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
         )
     }

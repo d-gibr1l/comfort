@@ -1335,4 +1335,6 @@
     <string name="app_size">Ukuran</string>
     <string name="app_size_subtitle">Semua di Comfort lebih kecil atau lebih besar, termasuk teks</string>
     <string name="update_all_engines">Perbarui semua (%1$d)</string>
+    <string name="cover_fade">Sampul memudar</string>
+    <string name="cover_fade_subtitle">Sampul makin kabur ke bawah dan warnanya berpendar di bawahnya. Nonaktif, sampul persegi biasa.</string>
 </resources>

@@ -1373,4 +1373,6 @@
     <string name="app_size">Tamaño</string>
     <string name="app_size_subtitle">Todo en Comfort más pequeño o más grande, también el texto</string>
     <string name="update_all_engines">Actualizar todo (%1$d)</string>
+    <string name="cover_fade">La portada se desvanece</string>
+    <string name="cover_fade_subtitle">La portada se difumina hacia abajo y su color se extiende por debajo. Desactivado, una portada cuadrada simple.</string>
 </resources>

@@ -1304,4 +1304,6 @@
     <string name="app_size">Kích thước</string>
     <string name="app_size_subtitle">Mọi thứ trong Comfort nhỏ hơn hoặc lớn hơn, cả chữ</string>
     <string name="update_all_engines">Cập nhật tất cả (%1$d)</string>
+    <string name="cover_fade">Ảnh bìa mờ dần</string>
+    <string name="cover_fade_subtitle">Ảnh bìa mờ dần về phía dưới và tỏa màu xuống bên dưới. Tắt: ảnh bìa vuông thường.</string>
 </resources>

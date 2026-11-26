@@ -1338,4 +1338,6 @@
     <string name="app_size">आकार</string>
     <string name="app_size_subtitle">Comfort में सब कुछ छोटा या बड़ा, टेक्स्ट भी</string>
     <string name="update_all_engines">सभी अपडेट करें (%1$d)</string>
+    <string name="cover_fade">कवर फ़ेड</string>
+    <string name="cover_fade_subtitle">कवर नीचे की ओर धुंधला होता है और उसके नीचे चमकता है। बंद होने पर, सादा चौकोर कवर।</string>
 </resources>

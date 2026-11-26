@@ -1373,4 +1373,6 @@
     <string name="app_size">Taille</string>
     <string name="app_size_subtitle">Tout Comfort en plus petit ou plus grand, texte compris</string>
     <string name="update_all_engines">Tout mettre à jour (%1$d)</string>
+    <string name="cover_fade">Pochette en fondu</string>
+    <string name="cover_fade_subtitle">La pochette se floute vers le bas et sa lueur déborde en dessous. Désactivé, une pochette carrée simple.</string>
 </resources>

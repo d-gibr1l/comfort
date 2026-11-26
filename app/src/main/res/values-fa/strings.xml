@@ -1338,4 +1338,6 @@
     <string name="app_size">اندازه</string>
     <string name="app_size_subtitle">همه چیز در Comfort کوچک‌تر یا بزرگ‌تر، از جمله متن</string>
     <string name="update_all_engines">به‌روزرسانی همه (%1$d)</string>
+    <string name="cover_fade">محو شدن کاور</string>
+    <string name="cover_fade_subtitle">کاور به سمت پایین تار می‌شود و رنگش زیر آن پخش می‌شود. خاموش، یک کاور مربعی ساده.</string>
 </resources>

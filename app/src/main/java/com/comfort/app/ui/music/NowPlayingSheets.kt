@@ -216,6 +216,7 @@ internal fun MusicSettingsSheet(lyricLine: Boolean, onLyricLineChange: (Boolean)
 
         SettingsGroup(stringResource(R.string.appearance))
         SettingSwitch(stringResource(R.string.player_background), stringResource(R.string.player_background_subtitle), m.coverBackground)
+        SettingSwitch(stringResource(R.string.cover_fade), stringResource(R.string.cover_fade_subtitle), m.coverFade)
 
         SettingsGroup(stringResource(R.string.lyrics))
         SettingRow(stringResource(R.string.lyric_lines), stringResource(R.string.lyric_lines_subtitle), onClick = {

@@ -175,6 +175,8 @@ fun Modifier.swipeToSkip(skip: SwipeSkipState? = null): Modifier {
 fun SongTransition(
     modifier: Modifier = Modifier,
     skip: SwipeSkipState? = null,
+    // False for what's drawn past its bounds (the player cover's glow).
+    clip: Boolean = true,
     content: @Composable (com.comfort.app.music.Song?) -> Unit,
 ) {
     val state by MusicPlayer.state.collectAsState()
@@ -185,13 +187,14 @@ fun SongTransition(
         transitionSpec = {
             if (skip?.from != null && skip.from == initialState.first) {
                 // A swipe changed it: its own slide is already on screen.
-                return@AnimatedContent androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None
+                return@AnimatedContent (androidx.compose.animation.EnterTransition.None togetherWith androidx.compose.animation.ExitTransition.None) using
+                    androidx.compose.animation.SizeTransform(clip = clip)
             }
             val forward = state.forward
             (androidx.compose.animation.slideInHorizontally(spring(stiffness = 400f)) { if (forward) it else -it } +
                 androidx.compose.animation.fadeIn()) togetherWith
                 (androidx.compose.animation.slideOutHorizontally(spring(stiffness = 400f)) { if (forward) -it else it } +
-                    androidx.compose.animation.fadeOut())
+                    androidx.compose.animation.fadeOut()) using androidx.compose.animation.SizeTransform(clip = clip)
         },
         label = "song",
         modifier = modifier,
