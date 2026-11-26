@@ -385,6 +385,13 @@ private fun NowPlayingContent(
                             contentAlignment = Alignment.Center,
                             label = "coverOrLyrics",
                         ) { showingLyrics ->
+                        // The cover's blur and glow only once it's settled: while it fades and
+                        // shrinks to or from the lyrics, Haze blurred the whole of it and the glow
+                        // showed as a grey box (a screen recording). Faded in after.
+                        val coverSettled = this@AnimatedContent.transition.let {
+                            it.currentState == androidx.compose.animation.EnterExitState.Visible && it.targetState == androidx.compose.animation.EnterExitState.Visible
+                        }
+                        val coverEffects by androidx.compose.animation.core.animateFloatAsState(if (coverSettled) 1f else 0f, androidx.compose.animation.core.tween(if (coverSettled) 350 else 0), label = "coverEffects")
                         val shownLyrics = lyrics
                         if (showingLyrics && shownLyrics != null) {
                             LyricsView(
@@ -411,12 +418,13 @@ private fun NowPlayingContent(
                             // run per frame).
                             val coverFade by com.comfort.app.music.MusicSettings.coverFade.value.collectAsState()
                             if (coverFade) SongTransition(modifier = Modifier.fillMaxSize(), skip = coverSkip, clip = false) { shown ->
-                                CoverImage(
+                                if (coverEffects > 0f) CoverImage(
                                     shown, blurred = true,
                                     modifier = Modifier.fillMaxSize()
                                         .graphicsLayer {
                                             translationY = size.height * 0.2f
                                             scaleX = 1.08f
+                                            alpha = coverEffects
                                         }
                                         .alphaMask(0f to Color.Transparent, 0.45f to Color.Transparent, 0.7f to Color.Black, 1f to Color.Transparent)
                                         // Soft sides too, no hard edge beside the cover.
@@ -439,7 +447,7 @@ private fun NowPlayingContent(
                                         val progressive = coverFade && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
                                         CoverImage(
                                             shown, blurred = false,
-                                            modifier = Modifier.fillMaxSize().then(if (progressive) Modifier.progressiveCoverBlur() else Modifier),
+                                            modifier = Modifier.fillMaxSize().then(if (progressive && coverEffects > 0f) Modifier.progressiveCoverBlur(coverEffects) else Modifier),
                                         )
                                     }
                                 }
@@ -1000,7 +1008,9 @@ private fun Modifier.alphaMask(vararg stops: Pair<Float, Color>, horizontal: Boo
 
 /** The cover's own pixels blurred more and more toward its bottom: none over its top 40%, then a
  * radius growing to [COVER_BLUR_RADIUS] at its bottom edge (Haze's progressive blur). */
-private fun Modifier.progressiveCoverBlur(): Modifier = hazeEffect {
+private fun Modifier.progressiveCoverBlur(amount: Float = 1f): Modifier = hazeEffect {
+    // Its own alpha (faded in after the cover settles): not a parent layer's.
+    alpha = amount
     blurRadius = COVER_BLUR_RADIUS
     noiseFactor = 0f
     tints = emptyList()
