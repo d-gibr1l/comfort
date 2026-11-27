@@ -168,6 +168,10 @@ dependencies {
   // Expressive) only exists starting in this alpha train, nothing else here depends on it.
   implementation("androidx.compose.material3:material3:1.5.0-alpha18")
   implementation("io.coil-kt:coil-compose:2.6.0")
+  // Apple Music-style lyrics (word lift, breathing dots in gaps, springs, blur), as MeiloX's.
+  // 1.0.19: the last release on Compose 1.10 / Kotlin 2.3 (2.0 needs Compose 1.12).
+  implementation("com.mocharealm.accompanist:lyrics-ui:1.0.19")
+  implementation("com.mocharealm.accompanist:lyrics-core:0.4.5")
   // Coil can't decode a preview frame from video files out of the box — without this, any video
   // thumbnail (MediaStore video Uri) just renders blank instead of falling through to an error
   // state, since coil-compose alone has no decoder that understands video content at all.

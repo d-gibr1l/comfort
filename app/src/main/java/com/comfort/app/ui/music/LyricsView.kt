@@ -70,6 +70,11 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
         return
     }
 
+    // Synced: Apple Music's look, drawn by accompanist-lyrics-ui (KaraokeLyrics).
+    if (USE_KARAOKE_VIEW && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        KaraokeLyrics(lyrics, positionMs, onSeek, zoom.factor, modifier.pinchToZoomText(zoom))
+        return
+    }
     val current = lyrics.lineAt(positionMs)
     // The lines' words with their own times (word-timed lyrics), in [lines]' order; the line being
     // sung fills word by word on a clock that moves every frame.
@@ -215,6 +220,9 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
 }
 
 private const val FOLLOW_AGAIN_AFTER_MS = 3_000L
+
+/** The full lyrics drawn by accompanist-lyrics-ui (true) or by the view below (false). */
+private const val USE_KARAOKE_VIEW = true
 
 /** The blur of a line 0, 1, 2, 3… lines from the one being sung (more beyond). */
 private val LINE_BLUR = arrayOf(0.dp, 1.5.dp, 2.5.dp, 3.5.dp, 4.dp)
