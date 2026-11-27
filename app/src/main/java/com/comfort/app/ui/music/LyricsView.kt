@@ -233,38 +233,40 @@ private fun LyricPreviewLine(
     // The unsung part's alpha when [swept] (else 40% of [alpha]).
     sweptDim: Float? = null,
 ) {
-    val scaled = modifier.layout { measurable, constraints ->
+    // Each line sits by its own script (an English line on the left, an Arabic or Hebrew one on the
+    // right), whatever the app's language, and shrinks towards that side. Laid out at the full
+    // width (only its height scaled), so it lands at the same edge in either layout direction.
+    val shown = swept?.text ?: text
+    val rtl = remember(shown) { shown.isNotEmpty() && !java.text.Bidi(shown, java.text.Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT).baseIsLeftToRight() }
+    val lineStyle = style.copy(
+        textAlign = if (rtl) androidx.compose.ui.text.style.TextAlign.Right else androidx.compose.ui.text.style.TextAlign.Left,
+        textDirection = if (rtl) androidx.compose.ui.text.style.TextDirection.Rtl else androidx.compose.ui.text.style.TextDirection.Ltr,
+    )
+    val scaled = modifier
+        .layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
-            layout((placeable.width * scale).toInt(), (placeable.height * scale).toInt()) {
+            layout(placeable.width, (placeable.height * scale).toInt()) {
                 placeable.placeWithLayer(0, 0) {
                     scaleX = scale
                     scaleY = scale
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(if (rtl) 1f else 0f, 0f)
                 }
             }
         }
+        .fillMaxWidth()
     if (swept != null) {
         val a = alpha.coerceIn(0f, 1f)
-        SweptLyricLine(swept, position, style, dimAlpha = sweptDim ?: (0.4f * a), litAlpha = a, maxLines = 2, modifier = scaled)
+        SweptLyricLine(swept, position, lineStyle, dimAlpha = sweptDim ?: (0.4f * a), litAlpha = a, maxLines = 2, modifier = scaled)
         return
     }
     Text(
         text,
-        style = style,
+        style = lineStyle,
         fontWeight = FontWeight.Bold,
         color = Ink.copy(alpha = alpha.coerceIn(0f, 1f)),
         maxLines = 2,
         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-        modifier = modifier.layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints)
-            layout((placeable.width * scale).toInt(), (placeable.height * scale).toInt()) {
-                placeable.placeWithLayer(0, 0) {
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                }
-            }
-        },
+        modifier = scaled,
     )
 }
 

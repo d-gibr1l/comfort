@@ -3,6 +3,7 @@
 package com.comfort.app.ui.music
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,10 +56,11 @@ internal fun SweptLyricLine(
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val overflow = if (maxLines == Int.MAX_VALUE) androidx.compose.ui.text.style.TextOverflow.Clip else androidx.compose.ui.text.style.TextOverflow.Ellipsis
     Box(modifier) {
-        Text(line.text, style = style, fontWeight = FontWeight.Bold, color = Ink.copy(alpha = dimAlpha), maxLines = maxLines, overflow = overflow, onTextLayout = { layout = it })
+        Text(line.text, style = style, fontWeight = FontWeight.Bold, color = Ink.copy(alpha = dimAlpha), maxLines = maxLines, overflow = overflow, onTextLayout = { layout = it }, modifier = Modifier.fillMaxWidth())
         Text(
             line.text, style = style, fontWeight = FontWeight.Bold, color = Ink.copy(alpha = litAlpha), maxLines = maxLines, overflow = overflow,
             modifier = Modifier
+                .fillMaxWidth()
                 .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
                 .drawWithContent {
                     val l = layout ?: return@drawWithContent
