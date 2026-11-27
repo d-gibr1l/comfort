@@ -237,6 +237,8 @@ not just emulators) and `x86_64`, plus a universal APK with all three.
   and look
 - [Photon Gallery](https://github.com/Bn5prS/Photon_Gallery) (GPLv3) — the built-in picture and
   video viewer
+- [accompanist-lyrics-ui](https://github.com/6xingyv/accompanist-lyrics-ui) (Apache-2.0) — the full
+  lyrics' Apple Music-style view (word lift, breathing dots, spring motion), on Android 10+
 - [Mixify](https://github.com/MixifyTeam/Mixify) (GPLv3) — the word-by-word lyrics: their sources
   and model are ported from it
 - [LRCLIB](https://lrclib.net), [lrc.red](https://lrc.red), BetterLyrics, LyricsPlus and BiniLyrics
