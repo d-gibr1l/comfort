@@ -869,7 +869,7 @@
     <string name="reload">Actualiser</string>
     <string name="close_find">Fermer la recherche</string>
     <string name="no_matches_found">Aucun résultat</string>
-    <string name="x_of_x_matches">%1$s sur %2$s résultats</string>
+    <string name="x_of_x_matches">%1$d sur %2$d résultats</string>
     <string name="previous_match">Résultat précédent</string>
     <string name="next_match">Résultat suivant</string>
     <string name="couldn_t_open_this_page">Impossible d\'ouvrir cette page</string>
@@ -907,7 +907,7 @@
     <string name="tap_a_queued_download_s_up">Appuie sur «\u00A0Démarrer maintenant\u00A0» d\'un téléchargement en file pour le lancer tout de suite, sans attendre sa plage horaire. Si toutes les places sont prises, le dernier téléchargement lancé attend son tour.</string>
     <string name="choose_mp4_or_mkv_output_and">Choisis la sortie MP4 ou MKV, et le nombre de tentatives d\'un téléchargement échoué, dans Paramètres &gt; Téléchargements.</string>
     <string name="next_tip">Astuce suivante</string>
-    <string name="x_of_x_selected">%1$s sur %2$s sélectionnés</string>
+    <string name="x_of_x_selected">%1$d sur %2$d sélectionnés</string>
     <string name="preview_unavailable">Aperçu indisponible</string>
     <string name="redownload_x">Retélécharger %1$s</string>
     <string name="download_x">Télécharger %1$s</string>
@@ -959,7 +959,7 @@
     <string name="stop_music">Arrêter la musique</string>
     <string name="close_player">Fermer le lecteur</string>
     <string name="now_playing">En cours de lecture</string>
-    <string name="song_x_of_x">Morceau %1$s sur %2$s</string>
+    <string name="song_x_of_x">Morceau %1$d sur %2$d</string>
     <string name="your_library">Ta Bibliothèque</string>
     <string name="repeat_this_song">Répéter ce morceau</string>
     <string name="repeat_all">Tout répéter</string>

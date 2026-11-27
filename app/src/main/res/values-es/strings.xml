@@ -857,7 +857,7 @@
     <string name="reload">Recargar</string>
     <string name="close_find">Cerrar búsqueda</string>
     <string name="no_matches_found">No se encontraron coincidencias</string>
-    <string name="x_of_x_matches">%1$s de %2$s coincidencias</string>
+    <string name="x_of_x_matches">%1$d de %2$d coincidencias</string>
     <string name="previous_match">Coincidencia anterior</string>
     <string name="next_match">Coincidencia siguiente</string>
     <string name="couldn_t_open_this_page">No se pudo abrir esta página</string>
@@ -895,7 +895,7 @@
     <string name="tap_a_queued_download_s_up">Toca \"Iniciar ahora\" en una descarga en cola para empezarla ya, sin esperar ningún horario. Si todas las plazas están ocupadas, la descarga más reciente espera su turno.</string>
     <string name="choose_mp4_or_mkv_output_and">Elige la salida MP4 o MKV, y cuántas veces se reintenta una descarga fallida, en Ajustes > Descargas.</string>
     <string name="next_tip">Siguiente consejo</string>
-    <string name="x_of_x_selected">%1$s de %2$s seleccionados</string>
+    <string name="x_of_x_selected">%1$d de %2$d seleccionados</string>
     <string name="preview_unavailable">Vista previa no disponible</string>
     <string name="redownload_x">Volver a descargar %1$s</string>
     <string name="download_x">Descargar %1$s</string>
@@ -947,7 +947,7 @@
     <string name="stop_music">Detener música</string>
     <string name="close_player">Cerrar reproductor</string>
     <string name="now_playing">Reproduciendo</string>
-    <string name="song_x_of_x">Canción %1$s de %2$s</string>
+    <string name="song_x_of_x">Canción %1$d de %2$d</string>
     <string name="your_library">Tu Biblioteca</string>
     <string name="repeat_this_song">Repetir esta canción</string>
     <string name="repeat_all">Repetir todo</string>

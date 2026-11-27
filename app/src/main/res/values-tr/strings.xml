@@ -784,7 +784,7 @@
     <string name="reload">Yeniden yükle</string>
     <string name="close_find">Bulmayı kapat</string>
     <string name="no_matches_found">Eşleşme bulunamadı</string>
-    <string name="x_of_x_matches">%1$s / %2$s eşleşme</string>
+    <string name="x_of_x_matches">%1$d / %2$d eşleşme</string>
     <string name="previous_match">Önceki eşleşme</string>
     <string name="next_match">Sonraki eşleşme</string>
     <string name="couldn_t_open_this_page">Bu sayfa açılamadı</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">Kuyruktaki bir indirmenin \"Şimdi başlat\" düğmesine dokunarak zamanlama beklemesini atlayıp hemen başlat. Tüm yuvalar doluysa en yeni çalışan indirme sırasını bekler.</string>
     <string name="choose_mp4_or_mkv_output_and">MP4 veya MKV çıktısını ve başarısız bir indirmenin kaç kez yeniden deneneceğini Ayarlar > İndirmeler\'den seç.</string>
     <string name="next_tip">Sonraki ipucu</string>
-    <string name="x_of_x_selected">%1$s / %2$s seçildi</string>
+    <string name="x_of_x_selected">%1$d / %2$d seçildi</string>
     <string name="preview_unavailable">Önizleme yok</string>
     <string name="redownload_x">%1$s yeniden indir</string>
     <string name="download_x">%1$s indir</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">Müziği durdur</string>
     <string name="close_player">Oynatıcıyı kapat</string>
     <string name="now_playing">Şimdi çalıyor</string>
-    <string name="song_x_of_x">Şarkı %1$s / %2$s</string>
+    <string name="song_x_of_x">Şarkı %1$d / %2$d</string>
     <string name="your_library">Kitaplığın</string>
     <string name="repeat_this_song">Bu şarkıyı tekrarla</string>
     <string name="repeat_all">Tümünü tekrarla</string>

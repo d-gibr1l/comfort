@@ -338,7 +338,7 @@ internal fun StoppedRow(
                 Spacer(Modifier.height(6.dp))
             }
             val progressText = when {
-                item.totalItems > 1 -> stringResource(R.string.x_of_x, item.downloadedItems, item.totalItems)
+                item.totalItems > 1 -> stringResource(R.string.x_of_x, "%d".format(item.downloadedItems), "%d".format(item.totalItems))
                 item.expectedBytes > 0 && savedBytes > 0 -> stringResource(R.string.x_of_x, formatFileSize(savedBytes), formatFileSize(item.expectedBytes))
                 item.downloadedItems > 0 -> stringResource(R.string.x_saved, item.downloadedItems)
                 else -> stringResource(R.string.nothing_saved_yet)
@@ -670,7 +670,7 @@ fun QueueItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val leadingText = when {
-                        item.totalItems > 1 -> stringResource(R.string.x_of_x, item.downloadedItems, item.totalItems)
+                        item.totalItems > 1 -> stringResource(R.string.x_of_x, "%d".format(item.downloadedItems), "%d".format(item.totalItems))
                         item.expectedBytes > 0 ->
                             stringResource(R.string.x_of_x, formatFileSize(item.totalBytes + item.liveBytes), formatFileSize(item.expectedBytes))
                         // A single item with no known size — an item count of "0 of 1"/"1 of 1"

@@ -784,7 +784,7 @@
     <string name="reload">重新加载</string>
     <string name="close_find">关闭查找</string>
     <string name="no_matches_found">未找到匹配项</string>
-    <string name="x_of_x_matches">第 %1$s 个，共 %2$s 个匹配项</string>
+    <string name="x_of_x_matches">第 %1$d 个，共 %2$d 个匹配项</string>
     <string name="previous_match">上一个匹配项</string>
     <string name="next_match">下一个匹配项</string>
     <string name="couldn_t_open_this_page">无法打开此页面</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">点按队列中下载的 \"立即开始\"，即可跳过定时等待立即开始。如果所有位置都已占满，最新运行的下载会排队等候。</string>
     <string name="choose_mp4_or_mkv_output_and">在 设置 > 下载 中选择 MP4 或 MKV 输出，以及失败下载的重试次数。</string>
     <string name="next_tip">下一条提示</string>
-    <string name="x_of_x_selected">已选择 %1$s / %2$s</string>
+    <string name="x_of_x_selected">已选择 %1$d / %2$d</string>
     <string name="preview_unavailable">无法预览</string>
     <string name="redownload_x">重新下载 %1$s</string>
     <string name="download_x">下载 %1$s</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">停止音乐</string>
     <string name="close_player">关闭播放器</string>
     <string name="now_playing">正在播放</string>
-    <string name="song_x_of_x">第 %1$s 首，共 %2$s 首</string>
+    <string name="song_x_of_x">第 %1$d 首，共 %2$d 首</string>
     <string name="your_library">你的媒体库</string>
     <string name="repeat_this_song">单曲循环</string>
     <string name="repeat_all">列表循环</string>

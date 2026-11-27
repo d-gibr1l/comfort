@@ -784,7 +784,7 @@
     <string name="reload">फिर से लोड करें</string>
     <string name="close_find">ढूँढना बंद करें</string>
     <string name="no_matches_found">कोई मेल नहीं मिला</string>
-    <string name="x_of_x_matches">%2$s में से %1$s मेल</string>
+    <string name="x_of_x_matches">%2$d में से %1$d मेल</string>
     <string name="previous_match">पिछला मेल</string>
     <string name="next_match">अगला मेल</string>
     <string name="couldn_t_open_this_page">यह पेज खोला नहीं जा सका</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">कतार के किसी डाउनलोड पर \"अभी शुरू करें\" टैप करें ताकि वह शेड्यूल के इंतज़ार के बिना तुरंत शुरू हो। अगर सभी जगहें भरी हैं, तो सबसे नया चल रहा डाउनलोड अपनी बारी का इंतज़ार करता है।</string>
     <string name="choose_mp4_or_mkv_output_and">MP4 या MKV आउटपुट, और विफल डाउनलोड कितनी बार दोबारा आज़माया जाए, सेटिंग > डाउनलोड में चुनें।</string>
     <string name="next_tip">अगला सुझाव</string>
-    <string name="x_of_x_selected">%2$s में से %1$s चुने गए</string>
+    <string name="x_of_x_selected">%2$d में से %1$d चुने गए</string>
     <string name="preview_unavailable">प्रीव्यू उपलब्ध नहीं</string>
     <string name="redownload_x">%1$s फिर से डाउनलोड करें</string>
     <string name="download_x">%1$s डाउनलोड करें</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">संगीत रोकें</string>
     <string name="close_player">प्लेयर बंद करें</string>
     <string name="now_playing">अभी चल रहा</string>
-    <string name="song_x_of_x">गाना %1$s / %2$s</string>
+    <string name="song_x_of_x">गाना %1$d / %2$d</string>
     <string name="your_library">आपकी लाइब्रेरी</string>
     <string name="repeat_this_song">यह गाना दोहराएँ</string>
     <string name="repeat_all">सभी दोहराएँ</string>

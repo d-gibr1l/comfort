@@ -784,7 +784,7 @@
     <string name="reload">Tải lại</string>
     <string name="close_find">Đóng tìm kiếm</string>
     <string name="no_matches_found">Không tìm thấy kết quả khớp</string>
-    <string name="x_of_x_matches">%1$s / %2$s kết quả</string>
+    <string name="x_of_x_matches">%1$d / %2$d kết quả</string>
     <string name="previous_match">Kết quả trước</string>
     <string name="next_match">Kết quả tiếp</string>
     <string name="couldn_t_open_this_page">Không thể mở trang này</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">Nhấn \"Bắt đầu ngay\" trên một lượt tải trong hàng đợi để chạy nó ngay, bỏ qua thời gian chờ theo lịch. Nếu mọi vị trí đều bận, lượt tải mới chạy gần nhất sẽ chờ đến lượt.</string>
     <string name="choose_mp4_or_mkv_output_and">Chọn đầu ra MP4 hoặc MKV, và số lần thử lại lượt tải thất bại, trong Cài đặt > Tải xuống.</string>
     <string name="next_tip">Mẹo tiếp theo</string>
-    <string name="x_of_x_selected">Đã chọn %1$s / %2$s</string>
+    <string name="x_of_x_selected">Đã chọn %1$d / %2$d</string>
     <string name="preview_unavailable">Không xem trước được</string>
     <string name="redownload_x">Tải lại %1$s</string>
     <string name="download_x">Tải xuống %1$s</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">Dừng nhạc</string>
     <string name="close_player">Đóng trình phát</string>
     <string name="now_playing">Đang phát</string>
-    <string name="song_x_of_x">Bài %1$s / %2$s</string>
+    <string name="song_x_of_x">Bài %1$d / %2$d</string>
     <string name="your_library">Thư viện của bạn</string>
     <string name="repeat_this_song">Lặp lại bài này</string>
     <string name="repeat_all">Lặp lại tất cả</string>

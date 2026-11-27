@@ -784,7 +784,7 @@
     <string name="reload">بارگیری دوباره</string>
     <string name="close_find">بستن یافتن</string>
     <string name="no_matches_found">تطابقی پیدا نشد</string>
-    <string name="x_of_x_matches">%1$s از %2$s تطابق</string>
+    <string name="x_of_x_matches">%1$d از %2$d تطابق</string>
     <string name="previous_match">تطابق قبلی</string>
     <string name="next_match">تطابق بعدی</string>
     <string name="couldn_t_open_this_page">باز کردن این صفحه ممکن نشد</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">روی \"اکنون شروع کن\" یک دانلود در صف بزنید تا بدون انتظار زمان‌بندی فوراً شروع شود. اگر همه جاها پر باشد، جدیدترین دانلود در حال اجرا منتظر نوبتش می‌ماند.</string>
     <string name="choose_mp4_or_mkv_output_and">خروجی MP4 یا MKV، و تعداد دفعات تلاش دوباره برای دانلود ناموفق را در تنظیمات > دانلودها انتخاب کنید.</string>
     <string name="next_tip">نکته بعدی</string>
-    <string name="x_of_x_selected">%1$s از %2$s انتخاب شد</string>
+    <string name="x_of_x_selected">%1$d از %2$d انتخاب شد</string>
     <string name="preview_unavailable">پیش‌نمایش در دسترس نیست</string>
     <string name="redownload_x">دانلود دوباره %1$s</string>
     <string name="download_x">دانلود %1$s</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">توقف موسیقی</string>
     <string name="close_player">بستن پخش‌کننده</string>
     <string name="now_playing">در حال پخش</string>
-    <string name="song_x_of_x">آهنگ %1$s از %2$s</string>
+    <string name="song_x_of_x">آهنگ %1$d از %2$d</string>
     <string name="your_library">کتابخانه شما</string>
     <string name="repeat_this_song">تکرار این آهنگ</string>
     <string name="repeat_all">تکرار همه</string>

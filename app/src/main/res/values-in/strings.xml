@@ -842,7 +842,7 @@
     <string name="reload">Muat ulang</string>
     <string name="close_find">Tutup pencarian</string>
     <string name="no_matches_found">Tidak ada yang cocok</string>
-    <string name="x_of_x_matches">%1$s dari %2$s kecocokan</string>
+    <string name="x_of_x_matches">%1$d dari %2$d kecocokan</string>
     <string name="previous_match">Kecocokan sebelumnya</string>
     <string name="next_match">Kecocokan berikutnya</string>
     <string name="couldn_t_open_this_page">Tidak bisa membuka halaman ini</string>
@@ -878,7 +878,7 @@
     <string name="tap_a_queued_download_s_up">Ketuk \"Mulai sekarang\" pada unduhan di antrean untuk langsung memulainya, tanpa menunggu jadwal. Jika semua slot terpakai, unduhan terbaru menunggu gilirannya.</string>
     <string name="choose_mp4_or_mkv_output_and">Pilih output MP4 atau MKV, dan berapa kali unduhan gagal dicoba lagi, di Setelan > Unduhan.</string>
     <string name="next_tip">Tips berikutnya</string>
-    <string name="x_of_x_selected">%1$s dari %2$s dipilih</string>
+    <string name="x_of_x_selected">%1$d dari %2$d dipilih</string>
     <string name="preview_unavailable">Pratinjau tidak tersedia</string>
     <string name="redownload_x">Unduh ulang %1$s</string>
     <string name="download_x">Unduh %1$s</string>
@@ -925,7 +925,7 @@
     <string name="stop_music">Hentikan musik</string>
     <string name="close_player">Tutup pemutar</string>
     <string name="now_playing">Sedang diputar</string>
-    <string name="song_x_of_x">Lagu %1$s dari %2$s</string>
+    <string name="song_x_of_x">Lagu %1$d dari %2$d</string>
     <string name="your_library">Pustaka Anda</string>
     <string name="repeat_this_song">Ulangi lagu ini</string>
     <string name="repeat_all">Ulangi semua</string>

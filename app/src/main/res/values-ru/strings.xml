@@ -887,7 +887,7 @@
     <string name="reload">Обновить</string>
     <string name="close_find">Закрыть поиск</string>
     <string name="no_matches_found">Совпадений нет</string>
-    <string name="x_of_x_matches">Совпадение %1$s из %2$s</string>
+    <string name="x_of_x_matches">Совпадение %1$d из %2$d</string>
     <string name="previous_match">Предыдущее совпадение</string>
     <string name="next_match">Следующее совпадение</string>
     <string name="couldn_t_open_this_page">Не удалось открыть страницу</string>
@@ -927,7 +927,7 @@
     <string name="tap_a_queued_download_s_up">Нажмите «Начать сейчас» у загрузки в очереди, чтобы запустить её сразу, даже вне расписания. Если все места заняты, последняя запущенная загрузка подождёт.</string>
     <string name="choose_mp4_or_mkv_output_and">Выбрать MP4 или MKV и число повторов при ошибке можно в разделе Настройки > Загрузки.</string>
     <string name="next_tip">Следующий совет</string>
-    <string name="x_of_x_selected">Выбрано %1$s из %2$s</string>
+    <string name="x_of_x_selected">Выбрано %1$d из %2$d</string>
     <string name="preview_unavailable">Предпросмотр недоступен</string>
     <string name="redownload_x">Скачать снова %1$s</string>
     <string name="download_x">Скачать %1$s</string>
@@ -982,7 +982,7 @@
     <string name="stop_music">Остановить музыку</string>
     <string name="close_player">Закрыть плеер</string>
     <string name="now_playing">Сейчас играет</string>
-    <string name="song_x_of_x">Песня %1$s из %2$s</string>
+    <string name="song_x_of_x">Песня %1$d из %2$d</string>
     <string name="your_library">Ваша медиатека</string>
     <string name="repeat_this_song">Повтор песни</string>
     <string name="repeat_all">Повтор всех</string>

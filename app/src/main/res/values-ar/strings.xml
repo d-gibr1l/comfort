@@ -784,7 +784,7 @@
     <string name="reload">إعادة التحميل</string>
     <string name="close_find">إغلاق البحث</string>
     <string name="no_matches_found">لا توجد نتائج مطابقة</string>
-    <string name="x_of_x_matches">%1$s من %2$s نتيجة</string>
+    <string name="x_of_x_matches">%1$d من %2$d نتيجة</string>
     <string name="previous_match">النتيجة السابقة</string>
     <string name="next_match">النتيجة التالية</string>
     <string name="couldn_t_open_this_page">تعذّر فتح هذه الصفحة</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">انقر \"ابدأ الآن\" على تنزيل في القائمة لبدئه فورًا، متجاوزًا أي انتظار للجدولة. إذا كانت كل الأماكن مشغولة، ينتظر أحدث تنزيل قيد التشغيل دوره.</string>
     <string name="choose_mp4_or_mkv_output_and">اختر إخراج MP4 أو MKV، وعدد مرات إعادة محاولة التنزيل الفاشل، من الإعدادات > التنزيلات.</string>
     <string name="next_tip">النصيحة التالية</string>
-    <string name="x_of_x_selected">%1$s من %2$s محدد</string>
+    <string name="x_of_x_selected">%1$d من %2$d محدد</string>
     <string name="preview_unavailable">المعاينة غير متاحة</string>
     <string name="redownload_x">إعادة تنزيل %1$s</string>
     <string name="download_x">تنزيل %1$s</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">إيقاف الموسيقى</string>
     <string name="close_player">إغلاق المشغل</string>
     <string name="now_playing">قيد التشغيل</string>
-    <string name="song_x_of_x">الأغنية %1$s من %2$s</string>
+    <string name="song_x_of_x">الأغنية %1$d من %2$d</string>
     <string name="your_library">مكتبتك</string>
     <string name="repeat_this_song">تكرار هذه الأغنية</string>
     <string name="repeat_all">تكرار الكل</string>

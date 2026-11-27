@@ -784,7 +784,7 @@
     <string name="reload">טעינה מחדש</string>
     <string name="close_find">סגירת החיפוש</string>
     <string name="no_matches_found">לא נמצאו התאמות</string>
-    <string name="x_of_x_matches">%1$s מתוך %2$s התאמות</string>
+    <string name="x_of_x_matches">%1$d מתוך %2$d התאמות</string>
     <string name="previous_match">ההתאמה הקודמת</string>
     <string name="next_match">ההתאמה הבאה</string>
     <string name="couldn_t_open_this_page">לא ניתן לפתוח את הדף הזה</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">הקש על \"התחל עכשיו\" בהורדה בתור כדי להתחיל אותה מיד, בלי לחכות לתזמון. אם כל המקומות תפוסים, ההורדה החדשה ביותר שרצה ממתינה לתורה.</string>
     <string name="choose_mp4_or_mkv_output_and">בחר פלט MP4 או MKV, וכמה פעמים הורדה שנכשלה תנסה שוב, בהגדרות > הורדות.</string>
     <string name="next_tip">הטיפ הבא</string>
-    <string name="x_of_x_selected">%1$s מתוך %2$s נבחרו</string>
+    <string name="x_of_x_selected">%1$d מתוך %2$d נבחרו</string>
     <string name="preview_unavailable">תצוגה מקדימה לא זמינה</string>
     <string name="redownload_x">הורדה מחדש של %1$s</string>
     <string name="download_x">הורדת %1$s</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">עצירת המוזיקה</string>
     <string name="close_player">סגירת הנגן</string>
     <string name="now_playing">מתנגן עכשיו</string>
-    <string name="song_x_of_x">שיר %1$s מתוך %2$s</string>
+    <string name="song_x_of_x">שיר %1$d מתוך %2$d</string>
     <string name="your_library">הספרייה שלך</string>
     <string name="repeat_this_song">חזרה על השיר הזה</string>
     <string name="repeat_all">חזרה על הכול</string>

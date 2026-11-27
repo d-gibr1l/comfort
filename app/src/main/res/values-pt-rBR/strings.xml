@@ -866,7 +866,7 @@
     <string name="reload">Recarregar</string>
     <string name="close_find">Fechar busca</string>
     <string name="no_matches_found">Nenhum resultado</string>
-    <string name="x_of_x_matches">%1$s de %2$s resultados</string>
+    <string name="x_of_x_matches">%1$d de %2$d resultados</string>
     <string name="previous_match">Resultado anterior</string>
     <string name="next_match">Próximo resultado</string>
     <string name="couldn_t_open_this_page">Não foi possível abrir esta página</string>
@@ -904,7 +904,7 @@
     <string name="tap_a_queued_download_s_up">Toque em \"Iniciar agora\" num download da fila para começá-lo já, pulando qualquer espera de agendamento. Se todas as vagas estiverem ocupadas, o download mais recente espera a vez.</string>
     <string name="choose_mp4_or_mkv_output_and">Escolha saída em MP4 ou MKV, e quantas vezes um download que falhou é tentado de novo, em Configurações &gt; Downloads.</string>
     <string name="next_tip">Próxima dica</string>
-    <string name="x_of_x_selected">%1$s de %2$s selecionados</string>
+    <string name="x_of_x_selected">%1$d de %2$d selecionados</string>
     <string name="preview_unavailable">Prévia indisponível</string>
     <string name="redownload_x">Baixar %1$s de novo</string>
     <string name="download_x">Baixar %1$s</string>
@@ -956,7 +956,7 @@
     <string name="stop_music">Parar música</string>
     <string name="close_player">Fechar player</string>
     <string name="now_playing">Tocando agora</string>
-    <string name="song_x_of_x">Música %1$s de %2$s</string>
+    <string name="song_x_of_x">Música %1$d de %2$d</string>
     <string name="your_library">Sua Biblioteca</string>
     <string name="repeat_this_song">Repetir esta música</string>
     <string name="repeat_all">Repetir tudo</string>

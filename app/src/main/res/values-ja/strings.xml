@@ -784,7 +784,7 @@
     <string name="reload">再読み込み</string>
     <string name="close_find">検索を閉じる</string>
     <string name="no_matches_found">一致するものはありません</string>
-    <string name="x_of_x_matches">%1$s / %2$s 件</string>
+    <string name="x_of_x_matches">%1$d / %2$d 件</string>
     <string name="previous_match">前の一致</string>
     <string name="next_match">次の一致</string>
     <string name="couldn_t_open_this_page">このページを開けませんでした</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">キュー内のダウンロードの \"今すぐ開始\" をタップすると、スケジュールを待たずにすぐ開始します。すべての枠が使用中なら、最後に開始したダウンロードが順番を待ちます。</string>
     <string name="choose_mp4_or_mkv_output_and">MP4 か MKV の出力と、失敗したダウンロードの再試行回数は、設定 > ダウンロードで選べます。</string>
     <string name="next_tip">次のヒント</string>
-    <string name="x_of_x_selected">%1$s / %2$s 件選択中</string>
+    <string name="x_of_x_selected">%1$d / %2$d 件選択中</string>
     <string name="preview_unavailable">プレビューを利用できません</string>
     <string name="redownload_x">%1$s を再ダウンロード</string>
     <string name="download_x">%1$s をダウンロード</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">音楽を停止</string>
     <string name="close_player">プレーヤーを閉じる</string>
     <string name="now_playing">再生中</string>
-    <string name="song_x_of_x">%1$s / %2$s 曲目</string>
+    <string name="song_x_of_x">%1$d / %2$d 曲目</string>
     <string name="your_library">ライブラリ</string>
     <string name="repeat_this_song">この曲をリピート</string>
     <string name="repeat_all">すべてリピート</string>

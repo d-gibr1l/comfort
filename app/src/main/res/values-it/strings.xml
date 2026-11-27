@@ -784,7 +784,7 @@
     <string name="reload">Ricarica</string>
     <string name="close_find">Chiudi ricerca</string>
     <string name="no_matches_found">Nessuna corrispondenza trovata</string>
-    <string name="x_of_x_matches">%1$s di %2$s corrispondenze</string>
+    <string name="x_of_x_matches">%1$d di %2$d corrispondenze</string>
     <string name="previous_match">Corrispondenza precedente</string>
     <string name="next_match">Corrispondenza successiva</string>
     <string name="couldn_t_open_this_page">Impossibile aprire questa pagina</string>
@@ -812,7 +812,7 @@
     <string name="tap_a_queued_download_s_up">Tocca \"Avvia ora\" su un download in coda per farlo partire subito, saltando l\'attesa della pianificazione. Se tutti i posti sono occupati, il download avviato più di recente aspetta il suo turno.</string>
     <string name="choose_mp4_or_mkv_output_and">Scegli l\'uscita MP4 o MKV, e quante volte riprovare un download non riuscito, in Impostazioni > Download.</string>
     <string name="next_tip">Suggerimento successivo</string>
-    <string name="x_of_x_selected">%1$s di %2$s selezionati</string>
+    <string name="x_of_x_selected">%1$d di %2$d selezionati</string>
     <string name="preview_unavailable">Anteprima non disponibile</string>
     <string name="redownload_x">Scarica di nuovo %1$s</string>
     <string name="download_x">Scarica %1$s</string>
@@ -848,7 +848,7 @@
     <string name="stop_music">Ferma la musica</string>
     <string name="close_player">Chiudi lettore</string>
     <string name="now_playing">In riproduzione</string>
-    <string name="song_x_of_x">Brano %1$s di %2$s</string>
+    <string name="song_x_of_x">Brano %1$d di %2$d</string>
     <string name="your_library">La tua Libreria</string>
     <string name="repeat_this_song">Ripeti questo brano</string>
     <string name="repeat_all">Ripeti tutto</string>

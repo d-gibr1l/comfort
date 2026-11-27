@@ -883,7 +883,7 @@
     <string name="reload">Reload</string>
     <string name="close_find">Close find</string>
     <string name="no_matches_found">No matches found</string>
-    <string name="x_of_x_matches">%1$s of %2$s matches</string>
+    <string name="x_of_x_matches">%1$d of %2$d matches</string>
     <string name="previous_match">Previous match</string>
     <string name="next_match">Next match</string>
     <string name="couldn_t_open_this_page">Couldn\'t open this page</string>
@@ -921,7 +921,7 @@
     <string name="choose_mp4_or_mkv_output_and">Choose MP4 or MKV output, and how many times a failed download retries, in Settings > Downloads.</string>
     <string name="next_tip">Next tip</string>
     <!-- SharePickerScreen.kt -->
-    <string name="x_of_x_selected">%1$s of %2$s selected</string>
+    <string name="x_of_x_selected">%1$d of %2$d selected</string>
     <string name="preview_unavailable">Preview unavailable</string>
     <string name="redownload_x">Redownload %1$s</string>
     <string name="download_x">Download %1$s</string>
@@ -974,7 +974,7 @@
     <!-- NowPlayingScreen.kt -->
     <string name="close_player">Close player</string>
     <string name="now_playing">Now playing</string>
-    <string name="song_x_of_x">Song %1$s of %2$s</string>
+    <string name="song_x_of_x">Song %1$d of %2$d</string>
     <string name="your_library">Your Library</string>
     <string name="repeat_this_song">Repeat this song</string>
     <string name="repeat_all">Repeat all</string>

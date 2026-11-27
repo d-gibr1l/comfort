@@ -849,7 +849,7 @@
     <string name="reload">Neu laden</string>
     <string name="close_find">Suche schließen</string>
     <string name="no_matches_found">Keine Treffer gefunden</string>
-    <string name="x_of_x_matches">%1$s von %2$s Treffern</string>
+    <string name="x_of_x_matches">%1$d von %2$d Treffern</string>
     <string name="previous_match">Vorheriger Treffer</string>
     <string name="next_match">Nächster Treffer</string>
     <string name="couldn_t_open_this_page">Diese Seite konnte nicht geöffnet werden</string>
@@ -885,7 +885,7 @@
     <string name="tap_a_queued_download_s_up">Tippe bei einem wartenden Download auf „Jetzt starten“, um ihn sofort zu starten, auch außerhalb des Zeitplans. Sind alle Plätze belegt, wartet der zuletzt gestartete Download.</string>
     <string name="choose_mp4_or_mkv_output_and">Wähle MP4 oder MKV und wie oft ein fehlgeschlagener Download wiederholt wird, unter Einstellungen > Downloads.</string>
     <string name="next_tip">Nächster Tipp</string>
-    <string name="x_of_x_selected">%1$s von %2$s ausgewählt</string>
+    <string name="x_of_x_selected">%1$d von %2$d ausgewählt</string>
     <string name="preview_unavailable">Keine Vorschau verfügbar</string>
     <string name="redownload_x">%1$s erneut laden</string>
     <string name="download_x">%1$s laden</string>
@@ -934,7 +934,7 @@
     <string name="stop_music">Musik stoppen</string>
     <string name="close_player">Player schließen</string>
     <string name="now_playing">Läuft gerade</string>
-    <string name="song_x_of_x">Song %1$s von %2$s</string>
+    <string name="song_x_of_x">Song %1$d von %2$d</string>
     <string name="your_library">Deine Mediathek</string>
     <string name="repeat_this_song">Diesen Song wiederholen</string>
     <string name="repeat_all">Alle wiederholen</string>
