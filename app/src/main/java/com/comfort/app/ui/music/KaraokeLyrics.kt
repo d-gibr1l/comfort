@@ -55,6 +55,9 @@ internal fun KaraokeLyrics(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> U
         blendMode = if (light) BlendMode.SrcOver else BlendMode.Plus,
         // Blur needs Android 12+.
         useBlurEffect = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
+        // Where the sung line sits, from the top (plus its 100dp keep-alive zone): about a third of
+        // the way down, Apple Music's upper-middle (its own 32dp put it near the top).
+        offset = androidx.compose.ui.unit.Dp(120f),
     )
 }
 
@@ -80,16 +83,27 @@ private fun Lyrics.toSyncedLyrics(): SyncedLyrics? {
 private fun LyricLine.alignmentFor(): KaraokeAlignment =
     if (alignment == LyricAlignment.End) KaraokeAlignment.End else KaraokeAlignment.Start
 
-/** Each word a syllable, carrying the space after it (the library joins them as they are). */
+/** The line's syllables, timed one by one where the source has them (lrc.red's and LyricsPlus's
+ * are), so a long word's wipe lingers or hurries as it's sung; a whole word otherwise. A word's
+ * last piece carries the space after it (the library joins pieces as they are, and tells words
+ * apart by those spaces, which its lift and wave go by). */
 private fun LyricLine.syllables(): List<KaraokeSyllable> {
     val spans = wordSpans
-    return words.mapIndexed { i, word ->
+    return words.flatMapIndexed { i, word ->
         val span = spans.getOrNull(i)
-        val content = if (span != null) {
+        val full = if (span != null) {
             val upTo = spans.getOrNull(i + 1)?.first ?: text.length
             text.substring(span.first, upTo.coerceIn(span.first, text.length))
         } else word.text
-        KaraokeSyllable(content, word.startMs.toInt(), word.endMs.toInt())
+        val parts = word.syllables.filter { it.startChar in 1 until word.text.length || it.startChar == 0 }
+        if (parts.size < 2) return@flatMapIndexed listOf(KaraokeSyllable(full, word.startMs.toInt(), word.endMs.toInt()))
+        parts.mapIndexed { j, syllable ->
+            // From this syllable's first character to the next one's (the last: to the word's end,
+            // its space included), so the pieces cover the word whole.
+            val from = if (j == 0) 0 else syllable.startChar.coerceIn(0, full.length)
+            val to = parts.getOrNull(j + 1)?.startChar?.coerceIn(from, full.length) ?: full.length
+            KaraokeSyllable(full.substring(from, to), syllable.startMs.toInt(), syllable.endMs.toInt())
+        }.filter { it.content.isNotEmpty() }
     }
 }
 
