@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -70,15 +72,13 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
         return
     }
 
-    // Synced: Apple Music's look, drawn by accompanist-lyrics-ui (KaraokeLyrics).
-    if (USE_KARAOKE_VIEW && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-        KaraokeLyrics(lyrics, positionMs, onSeek, zoom.factor, modifier.pinchToZoomText(zoom))
-        return
-    }
-    val current = lyrics.lineAt(positionMs)
     // The lines' words with their own times (word-timed lyrics), in [lines]' order; the line being
     // sung fills word by word on a clock that moves every frame.
     val rich = remember(lyrics) { lyrics.rich?.filterNot { it.isGap }?.sortedBy { it.timeMs }?.takeIf { it.size == lines.size } }
+    // The rows: the lines, and the instrumental breaks between them (breathing dots).
+    val rows = remember(lyrics, rich) { lyricRows(lines, rich) }
+    // The row being sung (or breathed through): followed, lit, and the blur measured from it.
+    val current = rowAt(rows, positionMs)
     val playing by com.comfort.app.music.MusicPlayer.state.let { flow ->
         androidx.compose.runtime.produceState(flow.value.isPlaying, flow) { flow.collect { value = it.isPlaying } }
     }
@@ -159,7 +159,12 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
             // Room above the first line and below the last, so either can sit at the anchor.
             contentPadding = PaddingValues(top = with(density) { anchor.toDp() }, bottom = with(density) { (height - anchor).toDp() }),
         ) {
-            itemsIndexed(lines) { index, line ->
+            itemsIndexed(rows) { index, row ->
+                if (row.line < 0) {
+                    BreathingDots(row.startMs, row.endMs, smoothPosition, zoom.factor)
+                    return@itemsIndexed
+                }
+                val line = lines[row.line]
                 val active = index == current
                 val alpha by animateFloatAsState(
                     when {
@@ -179,7 +184,16 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                     if (handScrolled || current < 0) 0.dp else LINE_BLUR[kotlin.math.abs(index - current).coerceAtMost(LINE_BLUR.lastIndex)],
                     tween(400), label = "lyricBlur",
                 )
-                val richLine = rich?.getOrNull(index)
+                val richLine = rich?.getOrNull(row.line)
+                // Apple Music's rise: a line waits a little low until it's sung. A word-timed one
+                // rises word by word as it's drawn (SweptLyricLine), so it's put down at once; any
+                // other rises whole.
+                val wordTimed = richLine?.isWordSynced == true
+                val drop by animateFloatAsState(
+                    if (index > current) 1f else 0f,
+                    if (wordTimed) androidx.compose.animation.core.snap() else tween(700, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f)),
+                    label = "lyricDrop",
+                )
                 // Shrinks towards the side the line is aligned to: its own script decides that (an
                 // Arabic or Hebrew line sits on the right, whatever the app's language).
                 val originX = remember(line.text) { if (java.text.Bidi(line.text, java.text.Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT).baseIsLeftToRight()) 0f else 1f }
@@ -193,13 +207,14 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
                             scaleX = scale
                             scaleY = scale
                             transformOrigin = androidx.compose.ui.graphics.TransformOrigin(originX, 0.5f)
+                            translationY = drop * WORD_LIFT.toPx()
                         }
                         .then(if (blur > 0.dp && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) Modifier.blur(blur, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded) else Modifier)
                         .padding(vertical = 10.dp, horizontal = 4.dp),
                 ) {
                     if (active && richLine != null && richLine.isWordSynced) {
                         // Being sung, word by word: lit up to the word being sung, the rest dimmed.
-                        SweptLyricLine(richLine, smoothPosition, lineStyle, dimAlpha = 0.4f)
+                        SweptLyricLine(richLine, smoothPosition, lineStyle, dimAlpha = 0.4f, moving = true)
                     } else {
                         Text(line.text.ifBlank { "♪" }, style = lineStyle, fontWeight = FontWeight.Bold, color = color)
                     }
@@ -221,8 +236,118 @@ internal fun LyricsView(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> Unit
 
 private const val FOLLOW_AGAIN_AFTER_MS = 3_000L
 
-/** The full lyrics drawn by accompanist-lyrics-ui (true) or by the view below (false). */
-private const val USE_KARAOKE_VIEW = true
+/** A row of the full lyrics: line [line] of the lyrics, or (-1) an instrumental break, from
+ * [startMs] until [endMs]. */
+private class LyricRow(val line: Int, val startMs: Long, val endMs: Long)
+
+/** Breaks shorter than this aren't worth the dots. */
+private const val MIN_BREAK_MS = 4_000L
+
+/** [lines] as rows, with a break for the intro, for a blank line long enough, and where a line's
+ * words end long enough before the next one starts (word-timed lyrics say when they end). */
+private fun lyricRows(lines: List<Lyrics.Line>, rich: List<com.comfort.app.music.lyrics.LyricLine>?): List<LyricRow> {
+    val rows = ArrayList<LyricRow>(lines.size + 4)
+    if (lines.first().timeMs >= MIN_BREAK_MS) rows += LyricRow(-1, 0L, lines.first().timeMs)
+    lines.forEachIndexed { i, line ->
+        val next = lines.getOrNull(i + 1)?.timeMs
+        if (line.text.isBlank() && next != null && next - line.timeMs >= MIN_BREAK_MS) {
+            rows += LyricRow(-1, line.timeMs, next)
+            return@forEachIndexed
+        }
+        rows += LyricRow(i, line.timeMs, next ?: Long.MAX_VALUE)
+        val sung = rich?.getOrNull(i)
+        if (next != null && sung != null && sung.hasKnownEnd && sung.endMs > line.timeMs && next - sung.endMs >= MIN_BREAK_MS) {
+            rows += LyricRow(-1, sung.endMs, next)
+        }
+    }
+    return rows
+}
+
+/** The row at [positionMs]: the last one that has started, or -1 before the first. */
+private fun rowAt(rows: List<LyricRow>, positionMs: Long): Int {
+    var lo = 0
+    var hi = rows.size - 1
+    var found = -1
+    while (lo <= hi) {
+        val mid = (lo + hi) / 2
+        if (rows[mid].startMs <= positionMs) { found = mid; lo = mid + 1 } else hi = mid - 1
+    }
+    return found
+}
+
+/**
+ * Three dots breathing through an instrumental break (Apple Music's), from [startMs] until [endMs]:
+ * they grow in, breathe, swell once as the singing is about to come back, and shrink away. Nothing
+ * outside the break. Adapted from accompanist-lyrics-ui's KaraokeBreathingDots
+ * (https://github.com/6xingyv/accompanist-lyrics-ui, Apache-2.0).
+ */
+@Composable
+private fun BreathingDots(startMs: Long, endMs: Long, position: () -> Long, zoom: Float) {
+    val ink = Ink
+    val dot = 12.dp * zoom
+    val gap = 8.dp * zoom
+    androidx.compose.foundation.Canvas(
+        Modifier
+            .padding(vertical = 16.dp, horizontal = 8.dp)
+            .size(dot * 3 + gap * 2, dot),
+    ) {
+        val now = position().toFloat()
+        if (now < startMs || now >= endMs) return@Canvas
+        // The stages, squeezed together for a short break.
+        val total = (endMs - startMs).toFloat()
+        val factor = (total / (DOTS_ENTER + DOTS_SWELL + DOTS_STILL + DOTS_EXIT)).coerceAtMost(1f)
+        val enterEnd = startMs + DOTS_ENTER * factor
+        val swellStart = endMs - (DOTS_EXIT + DOTS_STILL + DOTS_SWELL) * factor
+        val stillStart = endMs - (DOTS_EXIT + DOTS_STILL) * factor
+        val exitStart = endMs - DOTS_EXIT * factor
+        val ease = androidx.compose.animation.core.FastOutSlowInEasing
+        val alpha: Float
+        val scale: Float
+        when {
+            now < enterEnd -> {
+                alpha = ease.transform(((now - startMs) / (enterEnd - startMs)).coerceIn(0f, 1f))
+                scale = alpha * 0.8f
+            }
+            now < swellStart -> {
+                alpha = 1f
+                scale = 0.9f - 0.1f * kotlin.math.cos((now - enterEnd) / 3000f * 2f * Math.PI.toFloat())
+            }
+            now < stillStart -> {
+                alpha = 1f
+                scale = 0.8f + 0.2f * kotlin.math.cos((now - swellStart) / (stillStart - swellStart) * 2f * Math.PI.toFloat())
+            }
+            now < exitStart -> {
+                alpha = 1f
+                scale = 1f
+            }
+            else -> {
+                val t = ease.transform(((endMs - now) / (endMs - exitStart)).coerceIn(0f, 1f))
+                alpha = t
+                scale = t
+            }
+        }
+        val r = dot.toPx() / 2f
+        val step = dot.toPx() + gap.toPx()
+        // Each dot lights in turn over the break, as its progress.
+        val breathing = swellStart - enterEnd
+        withTransform({ scale(scale, scale, androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)) }) {
+            for (i in 0 until 3) {
+                val lit = if (breathing > 0f && now >= enterEnd) {
+                    val each = breathing / 3f
+                    ((now - (enterEnd + i * each)) / each).coerceIn(0f, 1f) * 0.6f + 0.4f
+                } else {
+                    0.4f
+                }
+                drawCircle(ink.copy(alpha = lit * alpha), r, androidx.compose.ui.geometry.Offset(r + step * i, size.height / 2f))
+            }
+        }
+    }
+}
+
+private const val DOTS_ENTER = 3_000f
+private const val DOTS_SWELL = 3_000f
+private const val DOTS_STILL = 200f
+private const val DOTS_EXIT = 200f
 
 /** The blur of a line 0, 1, 2, 3… lines from the one being sung (more beyond). */
 private val LINE_BLUR = arrayOf(0.dp, 1.5.dp, 2.5.dp, 3.5.dp, 4.dp)
