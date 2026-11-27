@@ -398,7 +398,9 @@ private fun NowPlayingContent(
                         } else Box(
                             modifier = Modifier
                                 .widthIn(max = 520.dp)
-                                .fillMaxWidth()
+                                // As big as fits: the full width, or less when the height is short (the
+                                // lyric lines under it on a short screen). fillMaxWidth() forced the width,
+                                // and a square too tall for its room ran over the top bar and the lines.
                                 .aspectRatio(1f)
                                 .sharedElement(rememberSharedContentState("cover"), anim)
                                 .scale(coverScale),
