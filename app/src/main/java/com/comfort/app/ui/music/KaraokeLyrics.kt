@@ -1,6 +1,5 @@
 package com.comfort.app.ui.music
 
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -34,8 +33,16 @@ internal fun KaraokeLyrics(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> U
     val position = rememberSmoothPosition(positionMs, playing)
     val light = LocalPlayerLight.current
     val base = androidx.compose.material3.MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
+    // Opened already at the line being sung (and again for each song's lyrics): the library's
+    // follower moves one line at a time, a quick nudge while that line is on screen, but starts
+    // with an animated scroll when it isn't, which never finished (seen on a phone: the lyrics
+    // stayed where they opened while the song went on, the sung line creeping out of view).
+    val listState = remember(synced) {
+        val focus = synced.getCurrentFirstHighlightLineIndexByTime(positionMs.toInt()).coerceIn(0, (synced.lines.size - 1).coerceAtLeast(0))
+        androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = (focus - 1).coerceAtLeast(0))
+    }
     KaraokeLyricsView(
-        listState = rememberLazyListState(),
+        listState = listState,
         lyrics = synced,
         currentPosition = { position().toInt() },
         onLineClicked = { line -> onSeek(line.start.toLong()) },
