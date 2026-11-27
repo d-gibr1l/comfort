@@ -9,9 +9,6 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.gestures.scrollBy
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import com.comfort.app.music.Lyrics
 import com.comfort.app.music.lyrics.LyricAlignment
 import com.comfort.app.music.lyrics.LyricLine
@@ -37,40 +34,8 @@ internal fun KaraokeLyrics(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> U
     val position = rememberSmoothPosition(positionMs, playing)
     val light = LocalPlayerLight.current
     val base = androidx.compose.material3.MaterialTheme.typography.headlineMedium.copy(fontFamily = com.comfort.app.theme.HeaderFontFamily)
-    // The library scrolls to the line being sung once and then stops following (seen on a phone:
-    // the sung line crept down and out of view). Kept on it here, as MeiloX does: whenever that
-    // line changes, it's brought up to the anchor (the library's offset + keep-alive zone), unless
-    // the lyrics were scrolled by hand in the last few seconds.
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = remember(synced) { synced.getCurrentFirstHighlightLineIndexByTime(positionMs.toInt()).coerceIn(0, (synced.lines.size - 1).coerceAtLeast(0)) })
-    val anchorPx = with(androidx.compose.ui.platform.LocalDensity.current) { (LYRICS_OFFSET + LYRICS_KEEP_ALIVE).roundToPx() }
-    androidx.compose.runtime.LaunchedEffect(listState, synced) {
-        var draggedAt = 0L
-        launch {
-            listState.interactionSource.interactions.collect {
-                if (it is androidx.compose.foundation.interaction.DragInteraction) draggedAt = android.os.SystemClock.elapsedRealtime()
-            }
-        }
-        androidx.compose.runtime.snapshotFlow { listState.layoutInfo.visibleItemsInfo.isNotEmpty() }.first { it }
-        var last = -1
-        while (true) {
-            val browsing = android.os.SystemClock.elapsedRealtime() - draggedAt < FOLLOW_AGAIN_MS
-            val focus = synced.getCurrentFirstHighlightLineIndexByTime(position().toInt()).coerceIn(0, (synced.lines.size - 1).coerceAtLeast(0))
-            if (!browsing && !listState.isScrollInProgress && focus != last) {
-                runCatching {
-                    val layout = listState.layoutInfo
-                    val target = layout.visibleItemsInfo.firstOrNull { it.index == focus }
-                    // On screen: moved by the difference (the library's springs animate the lines);
-                    // further (a seek, the app back): put there.
-                    if (target != null) listState.scrollBy((target.offset - (layout.viewportStartOffset + anchorPx)).toFloat())
-                    else listState.scrollToItem(focus, -anchorPx)
-                }
-                last = focus
-            }
-            kotlinx.coroutines.delay(50)
-        }
-    }
     KaraokeLyricsView(
-        listState = listState,
+        listState = rememberLazyListState(),
         lyrics = synced,
         currentPosition = { position().toInt() },
         onLineClicked = { line -> onSeek(line.start.toLong()) },
@@ -83,16 +48,8 @@ internal fun KaraokeLyrics(lyrics: Lyrics, positionMs: Long, onSeek: (Long) -> U
         blendMode = if (light) BlendMode.SrcOver else BlendMode.Plus,
         // Blur needs Android 12+.
         useBlurEffect = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
-        offset = LYRICS_OFFSET,
-        keepAliveZone = LYRICS_KEEP_ALIVE,
     )
 }
-
-// The library's own defaults, named: where the sung line sits is their sum from the top.
-private val LYRICS_OFFSET = androidx.compose.ui.unit.Dp(32f)
-private val LYRICS_KEEP_ALIVE = androidx.compose.ui.unit.Dp(100f)
-/** Following waits this long after the lyrics are scrolled by hand. */
-private const val FOLLOW_AGAIN_MS = 3_000L
 
 /** Comfort's lyrics as the library's: word-timed lines as karaoke lines (their background vocals
  * attached), the rest as timed lines. Null for unsynced lyrics. */
