@@ -2,10 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- accompanist-lyrics-ui asks for Android 10+: only used there (KaraokeLyrics checks), Comfort's
-         own lyrics view below it. -->
-    <uses-sdk tools:overrideLibrary="com.mocharealm.accompanist.lyrics.ui" />
-
     <!-- Reading media saved by another install (a restore after a reinstall or on another phone):
          asked for only then, from the Library (ui/main/MediaAccess.kt). -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

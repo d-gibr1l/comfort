@@ -17,7 +17,7 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
-import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.KaraokeLyricsView
+import com.comfort.app.ui.music.karaoke.composable.lyrics.KaraokeLyricsView
 
 /**
  * Synced lyrics drawn by accompanist-lyrics-ui (Apache-2.0, as MeiloX's): Apple Music's look,
