@@ -174,7 +174,9 @@ internal fun SwipeToDeleteCard(
     val pageSwipe = LocalPageSwipe.current
     SwipeToDismissBox(
         state = dismissState,
-        modifier = (if (pageSwipe != null) modifier.pageSwipeEdges(pageSwipe) else modifier)
+        // A card that can't be swiped away (Swipe to remove off, or selecting) turns the page from
+        // anywhere on it: its middle still took the swipe and did nothing (seen on the phone).
+        modifier = (if (pageSwipe != null) modifier.pageSwipeEdges(pageSwipe, zone = if (enabled) 80.dp else 100_000.dp) else modifier)
             .onSizeChanged { cardWidthPx = it.width.toFloat() },
         enableDismissFromStartToEnd = enabled,
         enableDismissFromEndToStart = enabled,
