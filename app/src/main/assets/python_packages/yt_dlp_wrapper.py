@@ -681,6 +681,19 @@ def _subtitle_failures_as_warnings(ydl):
     ydl._write_subtitles = _write_subtitles
 
 
+def _cached_info_is_playlist(path):
+    """Whether a preview's saved extraction is a whole playlist. A preview lists a video opened
+    from inside a playlist (watch?v=...&list=...) as the playlist, so it can be picked from;
+    reused by a download with "Single video only" on, it downloaded every item (--no-playlist is
+    applied by the extractor, which reusing the saved extraction skips). Seen 2026-11-27: a
+    previewed link shared again with Instant downloaded a 182-video playlist."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f).get("_type") in ("playlist", "multi_video")
+    except Exception:
+        return False
+
+
 def _cached_info_lacks_translations(path, tokens):
     """Whether the preview's saved extraction (download()'s info_json_path) can't give [tokens]
     a track that a fresh one could: YouTube only lists translations of uploaded tracks ("fr-en")
@@ -3316,6 +3329,7 @@ def download(url, download_dir, cookies_path=None, callback=None, filename_forma
             # age check just avoids trying links that have most likely expired.
             if reuse_info and info_json_path and os.path.isfile(info_json_path) and \
                     time.time() - os.path.getmtime(info_json_path) < _INFO_JSON_MAX_AGE_SECONDS and \
+                    not (opts.get("noplaylist") and _cached_info_is_playlist(info_json_path)) and \
                     not (pick_subtitles and opts.get("writesubtitles") and opts.get("writeautomaticsub")
                          and _cached_info_lacks_translations(info_json_path, opts.get("subtitleslangs") or [])):
                 ydl.download_with_info_file(info_json_path)
